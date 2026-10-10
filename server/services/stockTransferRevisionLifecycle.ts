@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type Decimal from "decimal.js";
-import { db } from "../db";
+import { db, type DbTransaction } from "../db";
 import { firstRow } from "../lib/queryResult";
 import { assertNoBaleMirrorMovementTx } from "./accounting/perpetualInventory/cutoverRefusal";
 import { applyTransferRevisionDeltaTx, postTransferResidualTx } from "./inventory/conservedStockTransfer";
@@ -178,7 +178,9 @@ async function assertCompanyScope(
 }
 
 export async function savePendingStockTransferRevision(
-  input: SavePendingRevisionInput
+  input: SavePendingRevisionInput,
+  // Phase 21 (B): the caller's audit, written on this transaction.
+  auditTx?: (tx: DbTransaction, result: PendingRevisionResult) => Promise<void>
 ): Promise<PendingRevisionResult> {
   const companyId = positiveInteger(input.companyId, "Company ID");
   const transferId = positiveInteger(input.transferId, "Transfer ID");
@@ -268,7 +270,7 @@ export async function savePendingStockTransferRevision(
       )
       .returning();
 
-    return {
+    const result: PendingRevisionResult = {
       revisionId,
       transferId,
       revisionNumber,
@@ -280,6 +282,8 @@ export async function savePendingStockTransferRevision(
       voucherDate: String(locked.voucher_date),
       items: savedItems,
     };
+    if (auditTx) await auditTx(tx, result);
+    return result;
   });
 }
 
@@ -333,12 +337,19 @@ export function mergePendingRevisionTargets(
 
 export async function approvePendingStockTransferRevision(
   companyIdInput: number,
-  revisionIdInput: number
+  revisionIdInput: number,
+  // Phase 21 (B): the caller's audit, written on this transaction (no-op
+  // approvals included, as the after-commit audit did).
+  auditTx?: (tx: DbTransaction, result: ApproveRevisionResult) => Promise<void>
 ): Promise<ApproveRevisionResult> {
   const companyId = positiveInteger(companyIdInput, "Company ID");
   const revisionId = positiveInteger(revisionIdInput, "Revision ID");
 
   return db.transaction(async (tx) => {
+    const finish = async (result: ApproveRevisionResult) => {
+      if (auditTx) await auditTx(tx, result);
+      return result;
+    };
     const requestedResult = await tx.execute(sql`
       SELECT
         str.id AS revision_id,
@@ -389,7 +400,7 @@ export async function approvePendingStockTransferRevision(
       const totalAmount = currentItems
         .reduce((sum, item) => sum.plus(lineAmount(item.quantity, item.rate)), new MoneyDecimal(0))
         .toFixed(2);
-      return {
+      return finish({
         revisionId,
         transferId,
         voucherId,
@@ -398,7 +409,7 @@ export async function approvePendingStockTransferRevision(
         changedItemCount: 0,
         inventoryApplied,
         totalAmount,
-      };
+      });
     }
 
     const pendingIds = pendingRows.map((row) => Number(row.id));
@@ -670,7 +681,7 @@ export async function approvePendingStockTransferRevision(
       .set({ optional: false })
       .where(and(eq(stockTransferRevisions.transferId, transferId), eq(stockTransferRevisions.optional, true)));
 
-    return {
+    return finish({
       revisionId,
       transferId,
       voucherId,
@@ -679,6 +690,6 @@ export async function approvePendingStockTransferRevision(
       changedItemCount: changes.filter((change) => Math.abs(change.delta) >= 0.0005).length,
       inventoryApplied,
       totalAmount,
-    };
+    });
   });
 }

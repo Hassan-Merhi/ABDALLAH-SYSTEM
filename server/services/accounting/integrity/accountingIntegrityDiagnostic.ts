@@ -43,6 +43,7 @@ import { buildTrialBalance } from "./trialBalance";
 import { payrollAdvancePostingChecks } from "./payrollAdvancePostingChecks";
 import { retailLedgerChecks } from "./retailLedgerChecks";
 import { ledgerShapeChecks } from "./ledgerShapeChecks";
+import { auditTrailChecks } from "./auditTrailChecks";
 import { getPartyBalances, liveVouchersOf } from "../balances/ledgerBalanceEngine";
 
 export type IntegrityStatus = "pass" | "warn" | "fail";
@@ -841,6 +842,8 @@ export async function runAccountingIntegrityDiagnostic(companyId: number): Promi
   checks.push(...(await retailLedgerChecks(companyId)));
   // Phase 19 (B): D5 voucher shape and C5 account tree, listed.
   checks.push(...(await ledgerShapeChecks(companyId)));
+  // Phase 21 (A): audit triggers present and enabled, unknown actors, hash chain.
+  checks.push(...(await auditTrailChecks(companyId)));
 
   const status: IntegrityStatus = checks.some((c) => c.status === "fail")
     ? "fail"

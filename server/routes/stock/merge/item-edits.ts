@@ -4,6 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
+import { db } from "../../../db";
 import type { Express } from "express";
 import { getErrorMessage, HttpError } from "../../../lib/httpHandlers";
 import { storage } from "../../../storage";
@@ -43,25 +44,28 @@ export function registerStockItemEditRoutes(app: Express) {
         }
       }
 
-      const updated = await storage.updateStockTransferItem(itemId, req.body, req.session.currentCompanyId);
-      try {
+      // Phase 21 (B): the write and its audit commit together.
+      const updated = await db.transaction(async (tx) => {
+        const written = await storage.updateStockTransferItem(itemId, req.body, req.session.currentCompanyId, tx);
         const _sti: Record<string, { new: string }> = {};
         if (req.body.quantity !== undefined) _sti.quantity = { new: String(req.body.quantity) };
         if (req.body.rate !== undefined) _sti.rate = { new: String(req.body.rate) };
         if (req.body.stockItemId !== undefined) _sti.stockItemId = { new: String(req.body.stockItemId) };
-        await logAudit({
-          userId: req.session.userId!,
-          username: req.session.username || "unknown",
-          companyId: req.session.currentCompanyId!,
-          action: "update",
-          tableName: "stock_transfer_items",
-          recordId: itemId,
-          recordIdentifier: `Transfer item #${itemId}`,
-          changes: _sti,
-        });
-      } catch {
-        /* non-fatal */
-      }
+        await logAudit(
+          {
+            userId: req.session.userId!,
+            username: req.session.username || "unknown",
+            companyId: req.session.currentCompanyId!,
+            action: "update",
+            tableName: "stock_transfer_items",
+            recordId: itemId,
+            recordIdentifier: `Transfer item #${itemId}`,
+            changes: _sti,
+          },
+          tx
+        );
+        return written;
+      });
       res.json(updated);
     } catch (error: unknown) {
       res.status(error instanceof HttpError ? error.statusCode : 500).json({ message: getErrorMessage(error) });

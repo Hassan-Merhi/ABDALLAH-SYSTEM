@@ -1,5 +1,5 @@
 import { eq, and, sql, asc } from "drizzle-orm";
-import { db } from "../db";
+import { db, type DatabaseOrTransaction } from "../db";
 import * as schema from "@shared/schema";
 import type { User, InsertUser, Company, InsertCompany, UserCompanyRole, InsertUserCompanyRole } from "@shared/schema";
 
@@ -91,16 +91,21 @@ export async function getUserCompaniesWithRoles(userId: string): Promise<UserCom
   return await db.select().from(schema.userCompanyRoles).where(eq(schema.userCompanyRoles.userId, userId));
 }
 
-export async function createUserCompanyRole(role: InsertUserCompanyRole): Promise<UserCompanyRole> {
-  const [created] = await db.insert(schema.userCompanyRoles).values(role).returning();
+// Phase 21 (B): the role writers take an optional executor so the route audits in the same transaction.
+export async function createUserCompanyRole(
+  role: InsertUserCompanyRole,
+  executor: DatabaseOrTransaction = db
+): Promise<UserCompanyRole> {
+  const [created] = await executor.insert(schema.userCompanyRoles).values(role).returning();
   return created;
 }
 
 export async function updateUserCompanyRole(
   id: number,
-  updates: Partial<InsertUserCompanyRole>
+  updates: Partial<InsertUserCompanyRole>,
+  executor: DatabaseOrTransaction = db
 ): Promise<UserCompanyRole> {
-  const [updated] = await db
+  const [updated] = await executor
     .update(schema.userCompanyRoles)
     .set(updates)
     .where(eq(schema.userCompanyRoles.id, id))
@@ -108,8 +113,8 @@ export async function updateUserCompanyRole(
   return updated;
 }
 
-export async function deleteUserCompanyRole(id: number): Promise<void> {
-  await db.delete(schema.userCompanyRoles).where(eq(schema.userCompanyRoles.id, id));
+export async function deleteUserCompanyRole(id: number, executor: DatabaseOrTransaction = db): Promise<void> {
+  await executor.delete(schema.userCompanyRoles).where(eq(schema.userCompanyRoles.id, id));
 }
 
 // System Settings

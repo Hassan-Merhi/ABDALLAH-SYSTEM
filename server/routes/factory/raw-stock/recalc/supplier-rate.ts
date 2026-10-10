@@ -144,20 +144,26 @@ export function registerRawStockSupplierRateRoutes(app: Express) {
           }
 
           if (!isDryRun) {
-            await db
-              .update(factorySuppliers)
-              .set({ currentRawMaterialCostPerKgUsd: String(costPerKgUsd), updatedAt: new Date() })
-              .where(and(eq(factorySuppliers.id, sid), eq(factorySuppliers.companyId, companyId)));
+            // Phase 21 (B): the write and its audit commit together.
+            await db.transaction(async (tx) => {
+              await tx
+                .update(factorySuppliers)
+                .set({ currentRawMaterialCostPerKgUsd: String(costPerKgUsd), updatedAt: new Date() })
+                .where(and(eq(factorySuppliers.id, sid), eq(factorySuppliers.companyId, companyId)));
 
-            await logAudit({
-              userId: requireSessionUserId(req),
-              username: req.session.username || requireSessionUserId(req),
-              companyId,
-              action: "update",
-              tableName: "factory_suppliers",
-              recordId: sid,
-              recordIdentifier: `supplier-rate/recompute — stable avg from ${rows.length} rows, totalReceived ${totalReceivedKg}kg`,
-              changes: { currentRawMaterialCostPerKgUsd: { old: oldRate, new: costPerKgUsd } },
+              await logAudit(
+                {
+                  userId: requireSessionUserId(req),
+                  username: req.session.username || requireSessionUserId(req),
+                  companyId,
+                  action: "update",
+                  tableName: "factory_suppliers",
+                  recordId: sid,
+                  recordIdentifier: `supplier-rate/recompute — stable avg from ${rows.length} rows, totalReceived ${totalReceivedKg}kg`,
+                  changes: { currentRawMaterialCostPerKgUsd: { old: oldRate, new: costPerKgUsd } },
+                },
+                tx
+              );
             });
           }
           results.push({
@@ -313,20 +319,26 @@ export function registerRawStockSupplierRateRoutes(app: Express) {
 
           const oldRate = parseFloat((existing.currentRawMaterialCostPerKgUsd as string) || "0");
 
-          await db
-            .update(factorySuppliers)
-            .set({ currentRawMaterialCostPerKgUsd: rate.toFixed(), updatedAt: new Date() })
-            .where(and(eq(factorySuppliers.id, sid), eq(factorySuppliers.companyId, companyId)));
+          // Phase 21 (B): the write and its audit commit together.
+          await db.transaction(async (tx) => {
+            await tx
+              .update(factorySuppliers)
+              .set({ currentRawMaterialCostPerKgUsd: rate.toFixed(), updatedAt: new Date() })
+              .where(and(eq(factorySuppliers.id, sid), eq(factorySuppliers.companyId, companyId)));
 
-          await logAudit({
-            userId: requireSessionUserId(req),
-            username: req.session.username || requireSessionUserId(req),
-            companyId,
-            action: "update",
-            tableName: "factory_suppliers",
-            recordId: sid,
-            recordIdentifier: `supplier-rate/restore-from-audit — reverted to pre-recompute moving-average rate`,
-            changes: { currentRawMaterialCostPerKgUsd: { old: oldRate, new: rateNum } },
+            await logAudit(
+              {
+                userId: requireSessionUserId(req),
+                username: req.session.username || requireSessionUserId(req),
+                companyId,
+                action: "update",
+                tableName: "factory_suppliers",
+                recordId: sid,
+                recordIdentifier: `supplier-rate/restore-from-audit — reverted to pre-recompute moving-average rate`,
+                changes: { currentRawMaterialCostPerKgUsd: { old: oldRate, new: rateNum } },
+              },
+              tx
+            );
           });
 
           results.push({

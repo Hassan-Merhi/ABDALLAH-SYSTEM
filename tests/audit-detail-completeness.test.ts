@@ -10,8 +10,8 @@ describe("audit detail completeness", () => {
     const routes = read("server/routes/vouchers/immutableStockTransferRevisionRoutes.ts");
     const compatibility = read("server/routes/vouchers/adminPostUpdateStockTransferRevisionRoute.ts");
 
-    expect(routes).toContain("items: { new: revisionItemsForAudit(result.items) }");
-    expect(routes).toContain("items: { new: result.items }");
+    expect(routes).toContain("items: { new: revisionItemsForAudit(written.items) }");
+    expect(routes).toContain("items: { new: written.items }");
     expect(routes).toContain('"approve",');
     expect(compatibility).toContain("stockItemName: item.stockItemName");
     expect(compatibility).toContain("originalQuantity: item.originalQuantity");
@@ -60,11 +60,13 @@ describe("audit detail completeness", () => {
 
   it("captures item detail for POS sales and credit notes", () => {
     const posCreate = read("server/services/pos/createSaleService.ts");
-    const posUpdate = read("server/services/pos/edit/updateSaleService.ts");
+    // Phase 21 (B): the edit audit moved into the edit's transaction (posSaleUpdateAudit.ts).
+    const posUpdate =
+      read("server/services/pos/edit/updateSaleService.ts") + read("server/services/pos/edit/posSaleUpdateAudit.ts");
     const creditNotes = read("server/routes/creditNoteRoutes.ts");
 
     expect(posCreate).toContain("items: {");
-    expect(posCreate).toContain('"stockItemName" in item ? item.stockItemName : undefined');
+    expect(posCreate).toContain("stockItemName: item.stockItemName");
     expect(posUpdate).toContain("auditOldItems");
     expect(posUpdate).toContain("changes.items = {");
     expect(posUpdate).toContain("old: oldAuditRows.map");

@@ -122,7 +122,9 @@ async function ledger(code: string, accountType: string, options: { companyId?: 
 const auditRows = async (tableName: string, recordId: number) =>
   (
     await pool.query(
-      `SELECT action, username, changes FROM audit_log WHERE table_name = $1 AND record_id = $2 ORDER BY id`,
+      // Phase 21 (A): application rows only; the database row audit (row_*) is tested in phase21a-audit-trigger.
+      `SELECT action, username, changes FROM audit_log WHERE table_name = $1 AND record_id = $2
+        AND action NOT LIKE 'row\\_%' ORDER BY id`,
       [tableName, recordId]
     )
   ).rows as Array<{ action: string; username: string; changes: Record<string, { old?: unknown; new?: unknown }> }>;

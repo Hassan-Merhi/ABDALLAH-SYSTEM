@@ -506,21 +506,26 @@ export function registerUserManagementRoutes(app: Express) {
         companyId,
       }));
 
-      const results = await storage.bulkUpsertRoleFeaturePermissions(permissionsWithCompany);
-
-      // Audit: log each permission change
-      for (const p of permissions) {
-        await logAudit({
-          userId: req.user!.id,
-          username: req.session.username || "unknown",
-          companyId,
-          action: "update",
-          tableName: "role_feature_permissions",
-          recordId: null,
-          recordIdentifier: `role:${p.role} feature:${p.featureKey} enabled:${p.enabled}`,
-          changes: { enabled: { old: !p.enabled, new: p.enabled } },
-        });
-      }
+      // Phase 21 (B): the upserts and one audit row per change commit together.
+      const results = await db.transaction(async (tx) => {
+        const upserted = await storage.bulkUpsertRoleFeaturePermissions(permissionsWithCompany, tx);
+        for (const p of permissions) {
+          await logAudit(
+            {
+              userId: req.user!.id,
+              username: req.session.username || "unknown",
+              companyId,
+              action: "update",
+              tableName: "role_feature_permissions",
+              recordId: null,
+              recordIdentifier: `role:${p.role} feature:${p.featureKey} enabled:${p.enabled}`,
+              changes: { enabled: { old: !p.enabled, new: p.enabled } },
+            },
+            tx
+          );
+        }
+        return upserted;
+      });
 
       // Session invalidation: force affected users to re-login so new permissions take effect
       try {

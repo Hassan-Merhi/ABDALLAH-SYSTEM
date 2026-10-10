@@ -10,6 +10,7 @@ import {
   factorySuppliers,
 } from "@shared/schema";
 import { inArray } from "drizzle-orm";
+import { currentAuditActor } from "../../services/audit/auditActorContext";
 
 // ─── Audit log ────────────────────────────────────────────────────────────────
 export type AuditAction =
@@ -73,9 +74,12 @@ export async function logAudit(
   dbConn: { insert: typeof db.insert } = db
 ) {
   try {
+    // Phase 21 (A), AT4: an empty or "unknown" actor is the request's actor when known.
+    const actorMissing = !String(params.userId ?? "").trim() || params.userId === "unknown";
+    const actor = actorMissing ? currentAuditActor({ userId: "unknown", username: "unknown" }) : null;
     await dbConn.insert(auditLog).values({
-      userId: params.userId,
-      username: params.username,
+      userId: actor?.userId ?? params.userId,
+      username: actor?.username ?? params.username,
       companyId: params.companyId,
       action: normalizeAuditAction(params),
       tableName: params.tableName,

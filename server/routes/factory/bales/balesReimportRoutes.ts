@@ -555,56 +555,58 @@ export function registerBalesReimportRoutes(app: Express) {
         let skipped = 0;
         const errors: string[] = [];
 
-        for (const row of rows) {
-          const id = parseInt(String(row["ID (do not edit)"] ?? row["id"] ?? row["ID"] ?? ""), 10);
-          const productName = String(row["Product Name"] ?? row["productName"] ?? "").trim();
+        // Phase 21 (B): the renames and their audit row commit together.
+        await db.transaction(async (tx) => {
+          for (const row of rows) {
+            const id = parseInt(String(row["ID (do not edit)"] ?? row["id"] ?? row["ID"] ?? ""), 10);
+            const productName = String(row["Product Name"] ?? row["productName"] ?? "").trim();
 
-          if (!id || isNaN(id)) {
-            skipped++;
-            continue;
+            if (!id || isNaN(id)) {
+              skipped++;
+              continue;
+            }
+            if (!productName) {
+              skipped++;
+              continue;
+            }
+
+            const [bale] = await tx
+              .select()
+              .from(factoryBales)
+              .where(and(eq(factoryBales.id, id), eq(factoryBales.companyId, companyId)));
+
+            if (!bale) {
+              errors.push(`Bale ID ${id} not found`);
+              skipped++;
+              continue;
+            }
+
+            if (bale.productId) {
+              await tx
+                .update(factoryBaleProducts)
+                .set({ name: productName, updatedAt: new Date() })
+                .where(and(eq(factoryBaleProducts.id, bale.productId), eq(factoryBaleProducts.companyId, companyId)));
+            }
+
+            await tx.update(factoryBales).set({ productName, updatedAt: new Date() }).where(eq(factoryBales.id, id));
+
+            updated++;
           }
-          if (!productName) {
-            skipped++;
-            continue;
-          }
 
-          const [bale] = await db
-            .select()
-            .from(factoryBales)
-            .where(and(eq(factoryBales.id, id), eq(factoryBales.companyId, companyId)));
-
-          if (!bale) {
-            errors.push(`Bale ID ${id} not found`);
-            skipped++;
-            continue;
-          }
-
-          if (bale.productId) {
-            await db
-              .update(factoryBaleProducts)
-              .set({ name: productName, updatedAt: new Date() })
-              .where(and(eq(factoryBaleProducts.id, bale.productId), eq(factoryBaleProducts.companyId, companyId)));
-          }
-
-          await db.update(factoryBales).set({ productName, updatedAt: new Date() }).where(eq(factoryBales.id, id));
-
-          updated++;
-        }
-
-        try {
-          await logAudit({
-            userId: req.session.userId!,
-            username: req.session.username || req.session.userId!,
-            companyId,
-            action: "update",
-            tableName: "factory_bales",
-            recordId: null,
-            recordIdentifier: `bulk-rename: ${updated} bale(s) updated, ${skipped} skipped`,
-            changes: null,
-          });
-        } catch (auditErr) {
-          logger.error("[bulk-update-names audit] non-fatal:", { error: auditErr });
-        }
+          await logAudit(
+            {
+              userId: req.session.userId!,
+              username: req.session.username || req.session.userId!,
+              companyId,
+              action: "update",
+              tableName: "factory_bales",
+              recordId: null,
+              recordIdentifier: `bulk-rename: ${updated} bale(s) updated, ${skipped} skipped`,
+              changes: null,
+            },
+            tx
+          );
+        });
 
         res.json({ updated, skipped, errors });
       } catch (error: unknown) {

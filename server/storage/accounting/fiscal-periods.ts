@@ -365,7 +365,12 @@ export async function closeFiscalPeriod(
  * Closures made before snapshots existed get their opening balances
  * reconstructed from the closing journal minus the period's activity.
  */
-export async function reopenFiscalPeriod(companyId: number, closureId: number): Promise<schema.FiscalPeriodClosure> {
+export async function reopenFiscalPeriod(
+  companyId: number,
+  closureId: number,
+  // Phase 21 (B): the caller's reopen audit, written on this transaction.
+  auditTx?: (tx: DbTransaction, closure: schema.FiscalPeriodClosure) => Promise<void>
+): Promise<schema.FiscalPeriodClosure> {
   return await db.transaction(async (tx) => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(${CLOSED_PERIOD_LOCK_NAMESPACE}, ${companyId})`);
 
@@ -442,6 +447,7 @@ export async function reopenFiscalPeriod(companyId: number, closureId: number): 
     }
 
     await tx.delete(schema.fiscalPeriodClosures).where(eq(schema.fiscalPeriodClosures.id, closure.id));
+    if (auditTx) await auditTx(tx, closure);
     return closure;
   });
 }

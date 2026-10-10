@@ -30,26 +30,27 @@ export function registerPurchaseOrderDeleteRoute(app: Express): void {
         });
       }
 
-      await storage.deletePurchaseOrder(id, sessionRetirementActor(req));
-      try {
-        await logAudit({
-          userId: req.session.userId!,
-          username: req.session.username || "unknown",
-          companyId: req.session.currentCompanyId!,
-          action: "delete",
-          tableName: "purchase_orders",
-          recordId: existingPO.id,
-          recordIdentifier: existingPO.poNumber || `PO #${id}`,
-          changes: {
-            poNumber: { old: existingPO.poNumber },
-            supplier: { old: existingPO.supplierId },
-            itemsTotal: { old: existingPO.itemsTotal || "0" },
-            status: { old: existingPO.status },
+      // Phase 21 (B): the delete audit is written on the deletion's transaction.
+      await storage.deletePurchaseOrder(id, sessionRetirementActor(req), async (tx) => {
+        await logAudit(
+          {
+            userId: req.session.userId!,
+            username: req.session.username || "unknown",
+            companyId: req.session.currentCompanyId!,
+            action: "delete",
+            tableName: "purchase_orders",
+            recordId: existingPO.id,
+            recordIdentifier: existingPO.poNumber || `PO #${id}`,
+            changes: {
+              poNumber: { old: existingPO.poNumber },
+              supplier: { old: existingPO.supplierId },
+              itemsTotal: { old: existingPO.itemsTotal || "0" },
+              status: { old: existingPO.status },
+            },
           },
-        });
-      } catch {
-        /* non-fatal */
-      }
+          tx
+        );
+      });
       res.json({ message: "Purchase order deleted successfully" });
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });

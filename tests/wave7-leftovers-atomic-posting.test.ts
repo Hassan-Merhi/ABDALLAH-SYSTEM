@@ -91,10 +91,11 @@ async function voucherSides(where: string, params: unknown[]) {
 }
 
 async function auditRows(tableName: string, recordId: number) {
-  const result = await pool.query(`SELECT action, changes FROM audit_log WHERE table_name = $1 AND record_id = $2`, [
-    tableName,
-    recordId,
-  ]);
+  // Phase 21 (A): application rows only; the database row audit is row_*.
+  const result = await pool.query(
+    `SELECT action, changes FROM audit_log WHERE table_name = $1 AND record_id = $2 AND action NOT LIKE 'row\\_%'`,
+    [tableName, recordId]
+  );
   return result.rows;
 }
 

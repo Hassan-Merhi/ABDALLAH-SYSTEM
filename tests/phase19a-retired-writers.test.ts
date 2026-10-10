@@ -99,7 +99,9 @@ async function employee(companyId: number, code: string): Promise<number> {
 
 async function audits(companyId: number, table: string, recordId: number) {
   const { rows } = await pool.query<{ action: string; changes: Record<string, { old?: unknown; new?: unknown }> }>(
-    `SELECT action, changes FROM audit_log WHERE company_id = $1 AND table_name = $2 AND record_id = $3 ORDER BY id`,
+    // Phase 21 (A): application rows only; the database row audit (row_*) is tested in phase21a-audit-trigger.
+    `SELECT action, changes FROM audit_log WHERE company_id = $1 AND table_name = $2 AND record_id = $3
+      AND action NOT LIKE 'row\\_%' ORDER BY id`,
     [companyId, table, recordId]
   );
   return rows;

@@ -1,3 +1,4 @@
+import { finishWithAudit, type AuditTxHook } from "../lib/auditTxHook";
 import type Decimal from "decimal.js";
 import { and, eq } from "drizzle-orm";
 
@@ -48,10 +49,13 @@ function isProduction(adjustmentType: string | null | undefined, quantity: numbe
  * Cancels a stock adjustment under one voucher-row lock and reverses the exact
  * persisted quantity + value. A retry observes deleted_at and becomes a no-op.
  */
-export async function deleteStockAdjustmentVoucher(input: {
-  companyId: number;
-  voucherId: number;
-}): Promise<StockAdjustmentDeletionResult> {
+export async function deleteStockAdjustmentVoucher(
+  input: {
+    companyId: number;
+    voucherId: number;
+  },
+  auditTx?: AuditTxHook<StockAdjustmentDeletionResult>
+): Promise<StockAdjustmentDeletionResult> {
   const companyId = Number(input.companyId);
   const voucherId = Number(input.voucherId);
   if (!Number.isInteger(companyId) || companyId <= 0) {
@@ -62,6 +66,7 @@ export async function deleteStockAdjustmentVoucher(input: {
   }
 
   return db.transaction(async (tx) => {
+    const finish = finishWithAudit(tx, auditTx);
     const [voucher] = await tx.select().from(vouchers).where(eq(vouchers.id, voucherId)).for("update");
     if (!voucher) {
       throw new StockAdjustmentDeletionError("VOUCHER_NOT_FOUND", "Voucher not found", 404);
@@ -81,14 +86,14 @@ export async function deleteStockAdjustmentVoucher(input: {
 
     const entries = await tx.select().from(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
     if (voucher.deletedAt) {
-      return {
+      return finish({
         handled: true,
         replayed: true,
         reversedInventory: false,
         voucher,
         entries,
         adjustmentId: null,
-      };
+      });
     }
 
     const [adjustment] = await tx
@@ -191,13 +196,13 @@ export async function deleteStockAdjustmentVoucher(input: {
       .where(and(eq(vouchers.id, voucherId), eq(vouchers.companyId, companyId)))
       .returning();
 
-    return {
+    return finish({
       handled: true,
       replayed: false,
       reversedInventory,
       voucher: deletedVoucher ?? voucher,
       entries,
       adjustmentId: adjustment.id,
-    };
+    });
   });
 }

@@ -12,7 +12,7 @@
  */
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { and, eq } from "drizzle-orm";
+import { and, eq, notLike } from "drizzle-orm";
 
 import * as schema from "../shared/schema";
 import { db, pool } from "../server/db";
@@ -84,7 +84,9 @@ async function auditRows(tableName: string, recordId: number) {
       and(
         eq(schema.auditLog.companyId, ctx.companyId),
         eq(schema.auditLog.tableName, tableName),
-        eq(schema.auditLog.recordId, recordId)
+        eq(schema.auditLog.recordId, recordId),
+        // Phase 21 (A): application rows only; the database row audit is row_*.
+        notLike(schema.auditLog.action, "row\\_%")
       )
     );
 }

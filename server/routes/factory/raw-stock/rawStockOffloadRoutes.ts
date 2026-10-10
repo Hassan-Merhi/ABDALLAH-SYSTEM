@@ -4,7 +4,7 @@ import { logger } from "../../../lib/logger";
 import { logAudit } from "../../helpers/auditHelpers";
 import { getClientDate } from "../../../lib/dateUtils";
 import type { Express, Request, Response } from "express";
-import { db } from "../../../db";
+import { db, type DbTransaction } from "../../../db";
 import { requireAuth } from "../../../auth";
 import { applyOffloadMovingAverage } from "../../../services/factory/rawStockLockedRate";
 import { resolveStoredFxRateOrThrow } from "../../../services/factory/currencyConversion";
@@ -219,6 +219,23 @@ export function registerRawStockOffloadRoutes(app: Express) {
       // ── Single atomic transaction: all DB writes happen here or not at all ────
       let rawStock: typeof factoryRawStock.$inferSelect | undefined;
 
+      // Phase 21 (B): the offload audit, written on the offload's transaction on
+      // both the first and the continuation receipt path.
+      const writeOffloadAuditTx = async (tx: DbTransaction) => {
+        await logAudit(
+          {
+            userId: req.session.userId!,
+            username: req.session.username || req.session.userId!,
+            companyId,
+            action: "offload",
+            tableName: "production_raw_stock",
+            recordId: containerId,
+            recordIdentifier: `Container #${containerId} — ${receivedKg} kg`,
+            changes: null,
+          },
+          tx
+        );
+      };
       await db.transaction(async (tx) => {
         // ── SUBSEQUENT RECEIPT PATH ───────────────────────────────────────────────
         // When a raw-stock row already exists (PARTIALLY_RECEIVED container), we only:
@@ -247,6 +264,7 @@ export function registerRawStockOffloadRoutes(app: Express) {
             userId: req.session.userId || null,
             supplierName: materialSupplier?.name ?? null,
           });
+          await writeOffloadAuditTx(tx);
           return; // Skip all other financial posting — already done on first receipt
         }
 
@@ -740,19 +758,10 @@ export function registerRawStockOffloadRoutes(app: Express) {
           }
         }
 
+        await writeOffloadAuditTx(tx);
         // (First-receipt event was recorded at step 3 above, inside this same transaction.)
       }); // ── end transaction ────────────────────────────────────────────────────
 
-      await logAudit({
-        userId: req.session.userId!,
-        username: req.session.username || req.session.userId!,
-        companyId,
-        action: "offload",
-        tableName: "production_raw_stock",
-        recordId: containerId,
-        recordIdentifier: `Container #${containerId} — ${receivedKg} kg`,
-        changes: null,
-      });
       res.json({ rawStock, commission: commissionRecord });
     } catch (error: unknown) {
       logger.error("Error offloading container:", { error: error });

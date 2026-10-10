@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { getErrorMessage, errorStatus, HttpError } from "../../lib/httpHandlers";
-import { db } from "../../db";
+import { db, type DbTransaction } from "../../db";
 import { storage } from "../../storage";
 import { voucherMutationBlockReason } from "../../lib/migratedVoucherGuard";
 import { requireAuth, requireNonPOS } from "../../auth";
@@ -13,6 +13,9 @@ import {
   poLineItems,
   vouchers,
   voucherEntries,
+  stockItems,
+  type StockAdjustmentItem,
+  type Voucher,
 } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import type { PgUpdateSetSource } from "drizzle-orm/pg-core";
@@ -300,6 +303,54 @@ export function registerVoucherPurchaseUpdateRoutes(app: Express) {
         ...(description !== undefined ? { description } : {}),
       };
 
+      // Phase 21 (B): the edit audit is written on the adjustment's transaction.
+      const writeAdjustmentAuditTx = async (
+        tx: DbTransaction,
+        written: { voucher: Voucher; items: StockAdjustmentItem[] }
+      ) => {
+        const updatedRow = written.voucher;
+        const _adjChanges: Record<string, { old: unknown; new: unknown }> = {};
+        if (existingVoucher.voucherDate !== updatedRow.voucherDate)
+          _adjChanges.date = { old: existingVoucher.voucherDate, new: updatedRow.voucherDate };
+        if (existingVoucher.totalAmount !== updatedRow.totalAmount)
+          _adjChanges.totalAmount = { old: existingVoucher.totalAmount, new: updatedRow.totalAmount };
+        if (existingVoucher.locationId !== updatedRow.locationId)
+          _adjChanges.location = { old: existingVoucher.locationId, new: updatedRow.locationId };
+        if ((existingVoucher.description ?? "") !== (updatedRow.description ?? ""))
+          _adjChanges.description = { old: existingVoucher.description ?? "", new: updatedRow.description ?? "" };
+        const _resolveAdjName = async (itemId: number) =>
+          (await tx.select({ name: stockItems.name }).from(stockItems).where(eq(stockItems.id, itemId)))[0]?.name ??
+          `Item #${itemId}`;
+        const _adjItemDiff = await buildItemLevelChanges(
+          oldAdjustmentItems.map((item) => ({
+            stockItemId: item.stockItemId,
+            quantity: item.quantity,
+            rate: item.rate,
+            totalAmount: item.totalAmount,
+          })),
+          written.items.map((item) => ({
+            stockItemId: item.stockItemId,
+            quantity: item.quantity,
+            rate: item.rate,
+            totalAmount: item.totalAmount,
+          })),
+          _resolveAdjName
+        );
+        await logAudit(
+          {
+            userId: req.session.userId!,
+            username: req.session.username || "unknown",
+            companyId: req.session.currentCompanyId!,
+            action: "update",
+            tableName: "vouchers",
+            recordId: updatedRow.id,
+            recordIdentifier: updatedRow.voucherNumber,
+            changes: { ..._adjChanges, ..._adjItemDiff },
+          },
+          tx
+        );
+      };
+
       const result = adjustmentVoucher
         ? await storage.updateStockAdjustment(
             adjustmentVoucher.id,
@@ -307,7 +358,8 @@ export function registerVoucherPurchaseUpdateRoutes(app: Express) {
             adjustmentVoucher.adjustmentType,
             description || "",
             normalizedItems,
-            voucherHeader
+            voucherHeader,
+            writeAdjustmentAuditTx
           )
         : await storage.createStockAdjustment(
             id,
@@ -317,50 +369,10 @@ export function registerVoucherPurchaseUpdateRoutes(app: Express) {
             normalizedItems,
             undefined,
             voucherHeader,
-            adjustmentType.toLowerCase()
+            adjustmentType.toLowerCase(),
+            writeAdjustmentAuditTx
           );
       const updated = result.voucher;
-
-      try {
-        const _adjChanges: Record<string, { old: unknown; new: unknown }> = {};
-        if (existingVoucher.voucherDate !== updated.voucherDate)
-          _adjChanges.date = { old: existingVoucher.voucherDate, new: updated.voucherDate };
-        if (existingVoucher.totalAmount !== updated.totalAmount)
-          _adjChanges.totalAmount = { old: existingVoucher.totalAmount, new: updated.totalAmount };
-        if (existingVoucher.locationId !== updated.locationId)
-          _adjChanges.location = { old: existingVoucher.locationId, new: updated.locationId };
-        if ((existingVoucher.description ?? "") !== (updated.description ?? ""))
-          _adjChanges.description = { old: existingVoucher.description ?? "", new: updated.description ?? "" };
-        const _resolveAdjName = async (itemId: number) =>
-          (await storage.getStockItemById(itemId))?.name ?? `Item #${itemId}`;
-        const _adjItemDiff = await buildItemLevelChanges(
-          oldAdjustmentItems.map((item) => ({
-            stockItemId: item.stockItemId,
-            quantity: item.quantity,
-            rate: item.rate,
-            totalAmount: item.totalAmount,
-          })),
-          result.items.map((item) => ({
-            stockItemId: item.stockItemId,
-            quantity: item.quantity,
-            rate: item.rate,
-            totalAmount: item.totalAmount,
-          })),
-          _resolveAdjName
-        );
-        await logAudit({
-          userId: req.session.userId!,
-          username: req.session.username || "unknown",
-          companyId: req.session.currentCompanyId!,
-          action: "update",
-          tableName: "vouchers",
-          recordId: updated.id,
-          recordIdentifier: updated.voucherNumber,
-          changes: { ..._adjChanges, ..._adjItemDiff },
-        });
-      } catch {
-        /* non-fatal */
-      }
 
       res.json(updated);
     } catch (error: unknown) {

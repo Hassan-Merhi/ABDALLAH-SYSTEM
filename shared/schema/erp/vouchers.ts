@@ -45,6 +45,14 @@ export const vouchers = pgTable(
     deletedAt: timestamp("deleted_at"),
     effectiveDate: date("effective_date"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
+    // Phase 21 (A), AT3: kept by the database trigger from the request's actor
+    // setting (server/services/audit/voucherAuditTrigger.ts); never written by
+    // the application. NULL = written before tracking.
+    createdBy: text("created_by"),
+    updatedBy: text("updated_by"),
+    deletedBy: text("deleted_by"),
+    /** The number before a retirement renamed it `{number}~DEL{id}`. */
+    originalVoucherNumber: varchar("original_voucher_number", { length: 100 }),
   },
   (t) => ({
     companyIdx: index("vouchers_company_idx").on(t.companyId),
@@ -56,6 +64,10 @@ export const insertVoucherSchema = createInsertSchema(vouchers)
   .omit({
     id: true,
     createdAt: true,
+    createdBy: true,
+    updatedBy: true,
+    deletedBy: true,
+    originalVoucherNumber: true,
   })
   .extend({
     companyId: z.number().min(1, "Company is required"),

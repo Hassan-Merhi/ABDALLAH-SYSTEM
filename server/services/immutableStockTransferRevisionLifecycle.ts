@@ -1,3 +1,4 @@
+import { finishWithAudit, type AuditTxHook } from "../lib/auditTxHook";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import type Decimal from "decimal.js";
 import { db } from "../db";
@@ -211,7 +212,8 @@ async function assertSubmittedBaseline(
 }
 
 export async function createImmutableStockTransferRevision(
-  input: CreateImmutableRevisionInput
+  input: CreateImmutableRevisionInput,
+  auditTx?: AuditTxHook<ImmutableRevisionResult>
 ): Promise<ImmutableRevisionResult> {
   const companyId = positiveInteger(input.companyId, "Company ID");
   const transferId = positiveInteger(input.transferId, "Transfer ID");
@@ -222,6 +224,7 @@ export async function createImmutableStockTransferRevision(
   const hash = immutableRevisionPayloadHash(normalized, note);
 
   return db.transaction(async (tx) => {
+    const finish = finishWithAudit(tx, auditTx);
     const transfer = await lockTransfer(tx, transferId);
     assertTransfer(transfer, companyId);
     const destinationLocationId = positiveInteger(transfer.destination_location_id, "Destination location ID");
@@ -342,7 +345,7 @@ export async function createImmutableStockTransferRevision(
     const distinctSources = Array.from(
       new Set(savedItems.map((item) => item.sourceLocationName).filter((name): name is string => Boolean(name)))
     );
-    return {
+    return finish({
       revisionId,
       transferId,
       revisionNumber,
@@ -361,7 +364,7 @@ export async function createImmutableStockTransferRevision(
       destinationLocationId,
       destinationLocationName: String(transfer.destination_location_name || "Unknown"),
       items: savedItems,
-    };
+    });
   });
 }
 
@@ -410,7 +413,8 @@ async function lockedRevision(tx: Parameters<Parameters<typeof db.transaction>[0
 export async function approveImmutableStockTransferRevision(
   companyIdInput: number,
   revisionIdInput: number,
-  reviewerIdInput: string
+  reviewerIdInput: string,
+  auditTx?: AuditTxHook<ReviewImmutableRevisionResult>
 ): Promise<ReviewImmutableRevisionResult> {
   const companyId = positiveInteger(companyIdInput, "Company ID");
   const revisionId = positiveInteger(revisionIdInput, "Revision ID");
@@ -418,6 +422,7 @@ export async function approveImmutableStockTransferRevision(
   if (!reviewerId) throw new Error("Reviewer ID is required");
 
   return db.transaction(async (tx) => {
+    const finish = finishWithAudit(tx, auditTx);
     const requested = await lockedRevision(tx, revisionId);
     if (!requested) throw new Error("Revision not found");
     if (Number(requested.company_id) !== companyId) {
@@ -440,7 +445,7 @@ export async function approveImmutableStockTransferRevision(
         .select()
         .from(stockTransferRevisionItems)
         .where(eq(stockTransferRevisionItems.revisionId, revisionId));
-      return {
+      return finish({
         revisionId,
         transferId,
         voucherId,
@@ -453,7 +458,7 @@ export async function approveImmutableStockTransferRevision(
           .reduce((sum, item) => sum.plus(lineAmount(item.quantity, item.rate)), new MoneyDecimal(0))
           .toFixed(2),
         items: toRevisionAuditItems(currentRevisionItems),
-      };
+      });
     }
     if (requested.status !== "pending") {
       throw lifecycleError(
@@ -764,7 +769,7 @@ export async function approveImmutableStockTransferRevision(
     const auditRates = new Map(
       changes.map((change) => [`${change.stockItemId}:${change.sourceLocationId}`, change.rate] as const)
     );
-    return {
+    return finish({
       revisionId,
       transferId,
       voucherId,
@@ -775,7 +780,7 @@ export async function approveImmutableStockTransferRevision(
       inventoryApplied,
       totalAmount,
       items: toRevisionAuditItems(revisionItems, auditRates),
-    };
+    });
   });
 }
 
@@ -783,7 +788,8 @@ export async function rejectImmutableStockTransferRevision(
   companyIdInput: number,
   revisionIdInput: number,
   reviewerIdInput: string,
-  reasonInput?: string | null
+  reasonInput?: string | null,
+  auditTx?: AuditTxHook<ReviewImmutableRevisionResult>
 ): Promise<ReviewImmutableRevisionResult> {
   const companyId = positiveInteger(companyIdInput, "Company ID");
   const revisionId = positiveInteger(revisionIdInput, "Revision ID");
@@ -792,6 +798,7 @@ export async function rejectImmutableStockTransferRevision(
   const reason = reasonInput?.trim() || null;
 
   return db.transaction(async (tx) => {
+    const finish = finishWithAudit(tx, auditTx);
     const requested = await lockedRevision(tx, revisionId);
     if (!requested) throw new Error("Revision not found");
     if (Number(requested.company_id) !== companyId) {
@@ -811,7 +818,7 @@ export async function rejectImmutableStockTransferRevision(
         .select({ quantity: stockTransferItems.quantity, rate: stockTransferItems.rate })
         .from(stockTransferItems)
         .where(eq(stockTransferItems.transferId, transferId));
-      return {
+      return finish({
         revisionId,
         transferId,
         voucherId,
@@ -823,7 +830,7 @@ export async function rejectImmutableStockTransferRevision(
           .reduce((sum, item) => sum.plus(lineAmount(item.quantity, item.rate)), new MoneyDecimal(0))
           .toFixed(2),
         items: toRevisionAuditItems(rejectedRevisionItems),
-      };
+      });
     }
     if (requested.status !== "pending") {
       throw lifecycleError(
@@ -846,7 +853,7 @@ export async function rejectImmutableStockTransferRevision(
       .select({ quantity: stockTransferItems.quantity, rate: stockTransferItems.rate })
       .from(stockTransferItems)
       .where(eq(stockTransferItems.transferId, transferId));
-    return {
+    return finish({
       revisionId,
       transferId,
       voucherId,
@@ -858,6 +865,6 @@ export async function rejectImmutableStockTransferRevision(
         .reduce((sum, item) => sum.plus(lineAmount(item.quantity, item.rate)), new MoneyDecimal(0))
         .toFixed(2),
       items: toRevisionAuditItems(rejectedRevisionItems),
-    };
+    });
   });
 }

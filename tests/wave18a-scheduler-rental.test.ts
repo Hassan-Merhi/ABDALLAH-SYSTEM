@@ -366,7 +366,9 @@ describe("rental units GET only reads; post due accruals now posts and audits", 
     expect(accruals.length).toBeGreaterThan(0);
     for (const voucher of accruals) expect(voucher.voucher_date).toBe(today);
     const { rows: audit } = await pool.query(
-      `SELECT username, changes FROM audit_log WHERE company_id = $1 AND table_name = 'vouchers' AND record_id = $2`,
+      // Phase 21 (A): application rows only (the database row audit is row_*).
+      `SELECT username, changes FROM audit_log WHERE company_id = $1 AND table_name = 'vouchers' AND record_id = $2
+        AND action NOT LIKE 'row\\_%'`,
       [ctx.companyId, accruals[0].id]
     );
     expect(audit).toHaveLength(1);

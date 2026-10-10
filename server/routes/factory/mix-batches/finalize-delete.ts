@@ -140,22 +140,26 @@ export function registerFactoryMixBatchFinalizeDeleteRoutes(app: Express) {
               }
             }
 
+            // Phase 21 (B): the delete audit commits with the delete.
+            await logAudit(
+              {
+                userId: req.session.userId!,
+                username: req.session.username || req.session.userId!,
+                companyId,
+                action: "delete",
+                tableName: "factory_mix_batches",
+                recordId: id,
+                recordIdentifier: `Mix Batch #${id}`,
+                changes: null,
+              },
+              tx
+            );
             return updated;
           }
         )
       );
 
       if (!result) return res.status(404).json({ message: "Mix batch not found" });
-      await logAudit({
-        userId: req.session.userId!,
-        username: req.session.username || req.session.userId!,
-        companyId,
-        action: "delete",
-        tableName: "factory_mix_batches",
-        recordId: id,
-        recordIdentifier: `Mix Batch #${id}`,
-        changes: null,
-      });
       res.json({ id: result.id, message: "Mix batch moved to Deleted Items" });
     } catch (error: unknown) {
       logger.error("Error deleting mix batch:", { error: error });

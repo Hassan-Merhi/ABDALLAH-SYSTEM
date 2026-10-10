@@ -4,7 +4,7 @@ import {
   RentalAutoTransferScopeError,
   runWithAutoTransferCounterparties,
 } from "../../services/rental/autoTransferScope";
-import { softDeleteVoucherTx } from "../../services/accounting/voucherSoftDelete";
+import { retireVouchersTx, sessionRetirementActor } from "../../services/accounting/voucherRetirement";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import {
@@ -322,8 +322,12 @@ export function registerRentalPaymentsAccrualRoutes(
             // Delete the transfer record FIRST to release FK "restrict" constraints
             // on fromVoucherId / toVoucherId before hard-deleting those voucher rows.
             await tx.delete(interCompanyTransfers).where(eq(interCompanyTransfers.id, transfer.id));
-            if (fvid) await softDeleteVoucherTx(tx, fvid);
-            if (tvid) await softDeleteVoucherTx(tx, tvid);
+            // Phase 21 (B): each leg retired with its audit row and the actor.
+            const legRetirement = { reason: "rental-payment-delete-transfer-leg", actor: sessionRetirementActor(req) };
+            if (fvid)
+              await retireVouchersTx(tx, { companyId: transfer.fromCompanyId, voucherIds: [fvid], ...legRetirement });
+            if (tvid)
+              await retireVouchersTx(tx, { companyId: transfer.toCompanyId, voucherIds: [tvid], ...legRetirement });
           }
 
           // 4. Delete the payment row itself

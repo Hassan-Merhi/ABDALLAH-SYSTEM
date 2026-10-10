@@ -218,20 +218,24 @@ export function registerRawStockRecalculateUsedRoutes(app: Express) {
           updated++;
         }
 
-        // Single audit record for the whole batch
-        await logAudit({
-          userId: requireSessionUserId(req),
-          username: req.session.username || requireSessionUserId(req),
-          companyId,
-          action: "update",
-          tableName: "factory_raw_stock",
-          recordIdentifier: "bulk recalculate-used",
-          changes: {
-            updated: { new: updated },
-            summary: { new: summary },
-            rows: { new: appliedChanges },
+        // Single audit record for the whole batch, on the batch's transaction
+        // (Phase 21 B: it was written on the pool, outside it).
+        await logAudit(
+          {
+            userId: requireSessionUserId(req),
+            username: req.session.username || requireSessionUserId(req),
+            companyId,
+            action: "update",
+            tableName: "factory_raw_stock",
+            recordIdentifier: "bulk recalculate-used",
+            changes: {
+              updated: { new: updated },
+              summary: { new: summary },
+              rows: { new: appliedChanges },
+            },
           },
-        });
+          tx
+        );
       });
 
       res.json({

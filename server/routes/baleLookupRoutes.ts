@@ -14,7 +14,6 @@ import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole } from "../auth";
 import { writeAuditEvent } from "../services/audit/auditService";
-import { getClientDate } from "../lib/dateUtils";
 import { deletePhysicalFactoryBalesTx, PhysicalBaleDeletionError } from "./factory/stock/physicalBaleDeletion";
 import { PRIORITY_SCAN_LOCK_NAMESPACE } from "./factory/customer-orders/priorityScanQueue";
 import {
@@ -715,7 +714,6 @@ export function registerBaleLookupRoutes(app: Express) {
             actorId: req.session.userId == null ? null : String(req.session.userId),
             actorName: String(req.session.username || req.session.userId || "unknown"),
             reason: "Bale deleted everywhere from Barcode Lookup",
-            businessDate: getClientDate(req),
           });
           // Audit in the deletion's transaction ("Deleted by" on the barcode lookup).
           await writeAuditEvent(

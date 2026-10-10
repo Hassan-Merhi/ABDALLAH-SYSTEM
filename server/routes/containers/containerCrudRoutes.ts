@@ -122,6 +122,25 @@ export function registerContainerCrudRoutes(app: Express) {
       const companyId = req.session.currentCompanyId;
       const container = await db.transaction(async (tx) => {
         const [container] = await tx.insert(containers).values(data).returning();
+        // Phase 21 (B): the create audit commits with the container.
+        await logAudit(
+          {
+            userId: req.session.userId!,
+            username: req.session.username || "unknown",
+            companyId: req.session.currentCompanyId!,
+            action: "create",
+            tableName: "containers",
+            recordId: container.id,
+            recordIdentifier: container.containerNumber || `Container #${container.id}`,
+            changes: {
+              containerNumber: { new: container.containerNumber },
+              status: { new: container.status },
+              importDate: { new: container.importDate },
+              supplierId: { new: container.supplierId },
+            },
+          },
+          tx
+        );
         if (!hasManualCostData) return container;
 
         const totalAmount = moneyString(toMoney(req.body.ratePerKg).times(toMoney(req.body.totalKg)));
@@ -184,25 +203,6 @@ export function registerContainerCrudRoutes(app: Express) {
         return container;
       });
 
-      try {
-        await logAudit({
-          userId: req.session.userId!,
-          username: req.session.username || "unknown",
-          companyId: req.session.currentCompanyId!,
-          action: "create",
-          tableName: "containers",
-          recordId: container.id,
-          recordIdentifier: container.containerNumber || `Container #${container.id}`,
-          changes: {
-            containerNumber: { new: container.containerNumber },
-            status: { new: container.status },
-            importDate: { new: container.importDate },
-            supplierId: { new: container.supplierId },
-          },
-        });
-      } catch {
-        /* non-fatal */
-      }
       logger.info("container create succeeded", {
         module: "containers",
         action: "create",
@@ -340,28 +340,33 @@ export function registerContainerCrudRoutes(app: Express) {
         });
       }
 
-      await storage.deleteContainer(id, {
-        userId: req.session.userId ?? "unknown",
-        username: req.session.username || "unknown",
-      });
-      try {
-        await logAudit({
-          userId: req.session.userId!,
+      // Phase 21 (B): the delete audit is written on the deletion's transaction.
+      await storage.deleteContainer(
+        id,
+        {
+          userId: req.session.userId ?? "unknown",
           username: req.session.username || "unknown",
-          companyId: req.session.currentCompanyId!,
-          action: "delete",
-          tableName: "containers",
-          recordId: existingContainer.id,
-          recordIdentifier: existingContainer.containerNumber || `Container #${id}`,
-          changes: {
-            containerNumber: { old: existingContainer.containerNumber },
-            status: { old: existingContainer.status },
-            importDate: { old: existingContainer.importDate },
-          },
-        });
-      } catch {
-        /* non-fatal */
-      }
+        },
+        async (tx) => {
+          await logAudit(
+            {
+              userId: req.session.userId!,
+              username: req.session.username || "unknown",
+              companyId: req.session.currentCompanyId!,
+              action: "delete",
+              tableName: "containers",
+              recordId: existingContainer.id,
+              recordIdentifier: existingContainer.containerNumber || `Container #${id}`,
+              changes: {
+                containerNumber: { old: existingContainer.containerNumber },
+                status: { old: existingContainer.status },
+                importDate: { old: existingContainer.importDate },
+              },
+            },
+            tx
+          );
+        }
+      );
       res.json({ message: "Container deleted successfully" });
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });

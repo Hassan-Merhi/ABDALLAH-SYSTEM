@@ -14,6 +14,7 @@ import { eq, and, desc, inArray } from "drizzle-orm";
 import { removeFactoryPosCogsTx } from "../../../../services/accounting/perpetualInventory/factoryPosCogs";
 import { releasePosSaleBalesTx } from "../../../../services/factory/factoryPosSaleBales";
 import { reverseFactoryPosSaleFinancialsTx } from "./sale-financials";
+import { writeAuditEvent } from "../../../../services/audit/auditService";
 
 export function registerPosSaleDeleteRoutes(app: Express) {
   // DELETE /api/factory/pos/sales/:id — void a factory POS sale
@@ -71,6 +72,26 @@ export function registerPosSaleDeleteRoutes(app: Express) {
         await reverseFactoryPosSaleFinancialsTx(tx, companyId, saleId);
         // Mark sale as voided
         await tx.update(factoryPosSales).set({ status: "VOIDED" }).where(eq(factoryPosSales.id, saleId));
+        // Phase 21 (B): the void was unaudited; its audit row (the sale and its
+        // lines as they were) commits with it.
+        const saleItems = await tx.select().from(factoryPosSaleItems).where(eq(factoryPosSaleItems.saleId, saleId));
+        await writeAuditEvent(
+          {
+            userId: req.session.userId ?? undefined,
+            username: req.session.username ?? undefined,
+            companyId,
+            action: "void",
+            tableName: "factory_pos_sales",
+            recordId: saleId,
+            recordIdentifier: `Factory POS sale #${saleId}`,
+            changes: {
+              status: { old: sale.status, new: "VOIDED" },
+              sale: { old: sale },
+              items: { old: saleItems },
+            },
+          },
+          tx
+        );
       });
 
       res.json({ ok: true });

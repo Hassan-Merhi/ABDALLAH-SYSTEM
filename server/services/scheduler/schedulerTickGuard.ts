@@ -1,6 +1,7 @@
 import { logger } from "../../lib/logger";
 import { nameSchedulerCallback } from "../../lib/schedulerObservability";
 import { runWithDatabaseMaintenanceScope } from "../security/databaseScopeRuntimeContext";
+import { runAsSystemAuditActor } from "../audit/auditActorContext";
 
 /**
  * Wraps a scheduled job so a slow run cannot be overtaken by the next tick.
@@ -59,7 +60,10 @@ export function createSchedulerTick(
       // scheduled payments, factory stock journal) only list companies here and
       // post each company in its tenant scope (accounting/scheduledPostingScope.ts,
       // wave 18 A).
-      await runWithDatabaseMaintenanceScope(`scheduler:${action}`, run);
+      // Phase 21 (A): every write of the tick is audited as `system:<job>`.
+      await runAsSystemAuditActor(action, () => runWithDatabaseMaintenanceScope(`scheduler:${action}`, run), {
+        force: true,
+      });
       if (!options.quiet) {
         logger.info(`cron ${action} succeeded`, {
           module: "scheduler",

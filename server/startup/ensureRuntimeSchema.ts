@@ -399,6 +399,24 @@ export async function ensureRuntimeSchema(pool: Pool): Promise<void> {
     ALTER TABLE vouchers
       ADD COLUMN IF NOT EXISTS currency VARCHAR(3) NOT NULL DEFAULT 'USD';
 
+    -- Phase 21 (A), AT3: actor columns and the original number of a retired
+    -- voucher, kept by the audit trail trigger (services/audit/voucherAuditTrigger.ts,
+    -- which adds them as well, fatally). NULL = written before tracking.
+    ALTER TABLE vouchers
+      ADD COLUMN IF NOT EXISTS created_by TEXT,
+      ADD COLUMN IF NOT EXISTS updated_by TEXT,
+      ADD COLUMN IF NOT EXISTS deleted_by TEXT,
+      ADD COLUMN IF NOT EXISTS original_voucher_number VARCHAR(100);
+
+    -- Phase 21 (A), AT5/AT6: request metadata and the hash chain on audit rows.
+    ALTER TABLE audit_log
+      ADD COLUMN IF NOT EXISTS request_id TEXT,
+      ADD COLUMN IF NOT EXISTS ip TEXT,
+      ADD COLUMN IF NOT EXISTS session_id TEXT,
+      ADD COLUMN IF NOT EXISTS reason TEXT,
+      ADD COLUMN IF NOT EXISTS prev_hash TEXT,
+      ADD COLUMN IF NOT EXISTS row_hash TEXT;
+
     ALTER TABLE user_preferences
       ADD COLUMN IF NOT EXISTS preferred_currency VARCHAR(10);
 

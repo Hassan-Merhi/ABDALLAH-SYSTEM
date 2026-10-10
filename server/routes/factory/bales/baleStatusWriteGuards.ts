@@ -8,7 +8,6 @@ import type { Request, Response } from "express";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { customerOrderBales, customerOrders, factoryBales } from "@shared/schema";
 import type { DbTransaction } from "../../../db";
-import { getClientDate } from "../../../lib/dateUtils";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { writeAuditEvent } from "../../../services/audit/auditService";
 import {
@@ -127,7 +126,6 @@ export async function deletePreStockBalesTx(
     actorId: userId,
     actorName,
     reason,
-    businessDate: getClientDate(req),
   });
   for (const bale of bales) {
     await writeAuditEvent(

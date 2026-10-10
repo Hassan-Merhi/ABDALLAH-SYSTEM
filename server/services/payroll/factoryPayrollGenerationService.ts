@@ -1,3 +1,4 @@
+import { finishWithAudit, type AuditTxHook } from "../../lib/auditTxHook";
 import { and, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { db } from "../../db";
 import { writeDaybookEntry } from "../../routes/factory/_helpers";
@@ -36,13 +37,15 @@ export interface FactoryPayrollGenerationResult {
 }
 
 export async function generateFactoryPayrollBatch(
-  input: FactoryPayrollGenerationInput
+  input: FactoryPayrollGenerationInput,
+  auditTx?: AuditTxHook<FactoryPayrollGenerationResult>
 ): Promise<FactoryPayrollGenerationResult> {
   const companyId = Number(input.companyId);
   if (!Number.isInteger(companyId) || companyId <= 0) throw new Error("companyId is required");
   validateFactoryPayrollGenerationDates(input.startDate, input.endDate, input.txDate);
 
   return db.transaction(async (tx) => {
+    const finish = finishWithAudit(tx, auditTx);
     const lockKey = buildFactoryPayrollGenerationLockKey(companyId, input.startDate, input.endDate);
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${lockKey})::bigint)`);
 
@@ -69,7 +72,7 @@ export async function generateFactoryPayrollBatch(
     const existingWorkerIds = new Set(existingPayrolls.map((row) => row.workerId));
     const missingWorkers = workers.filter((worker) => !existingWorkerIds.has(worker.id));
     if (missingWorkers.length === 0) {
-      return { payrolls: existingPayrolls, createdCount: 0, replayed: true };
+      return finish({ payrolls: existingPayrolls, createdCount: 0, replayed: true });
     }
 
     // Ensure saved daily plans have proposal records. attachProductionBonusesToPayroll
@@ -235,6 +238,6 @@ export async function generateFactoryPayrollBatch(
     await rebuildPayrollGenVoucher(tx, companyId, input.startDate, input.endDate);
 
     const payrolls = [...existingPayrolls, ...createdPayrolls].sort((a, b) => a.workerId - b.workerId);
-    return { payrolls, createdCount: createdPayrolls.length, replayed: false };
+    return finish({ payrolls, createdCount: createdPayrolls.length, replayed: false });
   });
 }

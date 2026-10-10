@@ -440,7 +440,12 @@ export async function applyOpeningInventoryJournal(
   companyId: number,
   effectiveFrom: string,
   appliedBy: string,
-  options: { postingReady?: boolean; today?: string } = {}
+  options: {
+    postingReady?: boolean;
+    today?: string;
+    // Phase 21 (B): the caller's cut-over audit, written on this transaction.
+    auditTx?: (tx: DbTransaction, applied: { plan: OpeningInventoryPlan; voucherId: number | null }) => Promise<void>;
+  } = {}
 ): Promise<{ plan: OpeningInventoryPlan; voucherId: number | null }> {
   if (!(options.postingReady ?? PERPETUAL_INVENTORY_POSTING_READY)) {
     throw new OpeningJournalRefusal(
@@ -535,6 +540,7 @@ export async function applyOpeningInventoryJournal(
       INSERT INTO gl_inventory_cutovers (company_id, effective_from, opening_voucher_id, opening_plan, applied_by)
       VALUES (${companyId}, ${effectiveFrom}, ${id}, ${JSON.stringify(plan)}::jsonb, ${appliedBy})
     `);
+        if (options.auditTx) await options.auditTx(tx, { plan, voucherId: id });
         return { plan, voucherId: id };
       },
       { isolationLevel: "repeatable read" }

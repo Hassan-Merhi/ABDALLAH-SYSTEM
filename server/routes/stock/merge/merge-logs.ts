@@ -288,24 +288,26 @@ export function registerStockMergeLogRoutes(app: Express) {
               )
             );
 
+          await logAudit(
+            {
+              userId,
+              username: req.session?.username || req.user?.username || "unknown",
+              companyId,
+              action: "update",
+              tableName: "stock_items",
+              recordId: mergedItemId,
+              recordIdentifier: mergedItemName,
+              changes: {
+                unmerge: {
+                  old: null,
+                  new: { logId, keptItemId, mergedItemId, mergedItemName },
+                },
+              },
+            },
+            tx
+          );
           // Step 4 — Delete the merge log so the same merge cannot be unmerged twice
           await tx.delete(stockItemMergeLogs).where(eq(stockItemMergeLogs.id, logId));
-        });
-
-        await logAudit({
-          userId,
-          username: req.session?.username || req.user?.username || "unknown",
-          companyId,
-          action: "update",
-          tableName: "stock_items",
-          recordId: mergedItemId,
-          recordIdentifier: mergedItemName,
-          changes: {
-            unmerge: {
-              old: null,
-              new: { logId, keptItemId, mergedItemId, mergedItemName },
-            },
-          },
         });
 
         return res.json({ success: true, message: `"${mergedItemName}" has been restored as a separate item.` });

@@ -272,17 +272,23 @@ export const supplierService = {
       throw new SupplierRouteError(404, "Stock group not found");
     }
 
-    const updated = await supplierRepository.updateStockGroup(supplierId, companyId, stockGroupId);
-    if (!updated) throw new SupplierRouteError(404, "Supplier not found");
-
-    await logAudit({
-      ...actor,
-      companyId,
-      action: "update",
-      tableName: "suppliers",
-      recordId: supplierId,
-      recordIdentifier: supplier.legalName,
-      changes: { stockGroupId: { old: supplier.stockGroupId ?? null, new: stockGroupId } },
+    // Phase 21 (B): the change and its audit commit together.
+    const updated = await db.transaction(async (tx) => {
+      const row = await supplierRepository.updateStockGroup(supplierId, companyId, stockGroupId, tx);
+      if (!row) throw new SupplierRouteError(404, "Supplier not found");
+      await logAudit(
+        {
+          ...actor,
+          companyId,
+          action: "update",
+          tableName: "suppliers",
+          recordId: supplierId,
+          recordIdentifier: supplier.legalName,
+          changes: { stockGroupId: { old: supplier.stockGroupId ?? null, new: stockGroupId } },
+        },
+        tx
+      );
+      return row;
     });
 
     return updated;

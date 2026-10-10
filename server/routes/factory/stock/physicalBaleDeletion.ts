@@ -5,6 +5,7 @@
  * transaction; the physical bale, order links, scan reversals, canonical
  * movement and daybook must commit or fail as a single unit.
  */
+import { companyBusinessDate } from "../../../services/accounting/companyBusinessDate";
 import { and, eq, inArray, isNull, ne } from "drizzle-orm";
 
 import {
@@ -39,7 +40,6 @@ export interface PhysicalBaleDeletionArgs {
   actorId: string | null;
   actorName: string;
   reason: string;
-  businessDate: string;
 }
 export type DeletedPhysicalBale = typeof factoryBales.$inferSelect;
 
@@ -79,7 +79,7 @@ export async function deletePhysicalFactoryBalesTx(
   tx: PriorityScanTransaction,
   args: PhysicalBaleDeletionArgs
 ): Promise<DeletedPhysicalBale[]> {
-  const { companyId, baleIds, actorId, actorName, reason, businessDate } = args;
+  const { companyId, baleIds, actorId, actorName, reason } = args;
   if (
     !Array.isArray(baleIds) ||
     baleIds.length < 1 ||
@@ -327,9 +327,11 @@ export async function deletePhysicalFactoryBalesTx(
     actorName,
     reason,
   });
+  // Phase 21 (B): dated by the company's business date (its timezone), not the
+  // date the client sent, which was written unvalidated.
   await writeDaybookEntry(tx, {
     companyId,
-    txDate: businessDate,
+    txDate: await companyBusinessDate(companyId, tx),
     txType: "BALE_REMOVAL",
     description: `Removed ${removed.length} bale(s) from factory stock. Supervisor: ${actorName}. Reason: ${reason}`,
     metaJson,

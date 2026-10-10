@@ -4,6 +4,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { accountingPostingRequests, auditLog, voucherEntries, vouchers } from "@shared/schema";
 import { assertTransactionCompanyScope } from "../security/transactionCompanyScope";
 import { PostingValidationError, type PostingSourceIdentity } from "./centralPostingEngine";
+import { currentAuditActor } from "../audit/auditActorContext";
 
 type VoucherInsert = typeof vouchers.$inferInsert;
 type VoucherRow = typeof vouchers.$inferSelect;
@@ -215,9 +216,11 @@ export async function insertInfrastructureVoucherTx(
     voucherId: created.id,
   });
 
+  // Phase 21 (A), AT4: the request's or job's actor; the writer's name only when none.
+  const actor = currentAuditActor({ userId: "system", username: "infrastructure-voucher-writer" });
   await tx.insert(auditLog).values({
-    userId: "system",
-    username: "infrastructure-voucher-writer",
+    userId: actor.userId,
+    username: actor.username,
     companyId,
     action: "create",
     tableName: "accounting_postings",

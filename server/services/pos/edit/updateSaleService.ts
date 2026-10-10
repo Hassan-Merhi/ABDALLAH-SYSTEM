@@ -11,9 +11,10 @@
 import { db, type DbTransaction } from "../../../db";
 import { logger } from "../../../lib/logger";
 import { storage } from "../../../storage";
-import { logAudit, recalculateIntercompanyForDate } from "../../../routes/_helpers";
+import { recalculateIntercompanyForDate } from "../../../routes/_helpers";
+import { writePosSaleUpdateAuditTx } from "./posSaleUpdateAudit";
 import { salesItems, voucherEntries, stockItems, vouchers } from "@shared/schema";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type {
   HandlerErrorResult,
   PosEditSaleItemInput,
@@ -324,7 +325,14 @@ export async function updatePosSale(
   const preRestrictionResult = applyPosRoleRestrictions(userRole, newLocationId, preExistingVoucher.locationId);
   if ("error" in preRestrictionResult) return err(preRestrictionResult.error);
 
-  const transactionResult = await db.transaction((tx) => applyPosSaleUpdateTx(tx, params, spContextResult.context));
+  // Phase 21 (B): the edit audit is written on the edit's transaction.
+  const transactionResult = await db.transaction(async (tx) => {
+    const result = await applyPosSaleUpdateTx(tx, params, spContextResult.context);
+    if (!result.error) {
+      await writePosSaleUpdateAuditTx(tx, { voucherId, companyId: currentCompanyId, userId, username }, result);
+    }
+    return result;
+  });
   if (transactionResult.error) return err(transactionResult.error);
 
   const existingVoucher = transactionResult.existingVoucher!;
@@ -373,58 +381,6 @@ export async function updatePosSale(
         logger.error("[IntercompanyPOS Recalc] Unhandled:", { error })
       );
     }
-  }
-
-  try {
-    const oldAuditRows = transactionResult.auditOldItems ?? [];
-    const oldItemIds = Array.from(new Set(oldAuditRows.map((item) => item.stockItemId)));
-    const oldItemNames =
-      oldItemIds.length > 0
-        ? await db
-            .select({ id: stockItems.id, name: stockItems.name, code: stockItems.code })
-            .from(stockItems)
-            .where(inArray(stockItems.id, oldItemIds))
-        : [];
-    const oldItemNameMap = new Map(oldItemNames.map((item) => [item.id, item] as const));
-
-    const changes: Record<string, { old?: unknown; new?: unknown }> = {};
-    if (existingVoucher.totalAmount !== updatedVoucher.totalAmount)
-      changes.totalAmount = { old: existingVoucher.totalAmount, new: updatedVoucher.totalAmount };
-    if (existingVoucher.voucherDate !== updatedVoucher.voucherDate)
-      changes.date = { old: existingVoucher.voucherDate, new: updatedVoucher.voucherDate };
-    if (existingVoucher.locationId !== updatedVoucher.locationId)
-      changes.locationId = { old: existingVoucher.locationId, new: updatedVoucher.locationId };
-    changes.itemCount = { new: updatedSalesItems.length };
-    changes.items = {
-      old: oldAuditRows.map((item) => ({
-        stockItemId: item.stockItemId,
-        stockItemName: oldItemNameMap.get(item.stockItemId)?.name ?? `Item #${item.stockItemId}`,
-        code: oldItemNameMap.get(item.stockItemId)?.code ?? null,
-        quantity: item.quantity,
-        rate: item.rate,
-        totalAmount: item.totalAmount,
-      })),
-      new: updatedSalesItems.map((item) => ({
-        stockItemId: item.stockItemId,
-        stockItemName: item.stockItemName,
-        code: item.stockItemCode,
-        quantity: item.quantity,
-        rate: item.sellingPrice,
-        totalAmount: item.totalSales,
-      })),
-    };
-    await logAudit({
-      userId,
-      username,
-      companyId: currentCompanyId,
-      action: "update",
-      tableName: "vouchers",
-      recordId: voucherId,
-      recordIdentifier: updatedVoucher.voucherNumber,
-      changes,
-    });
-  } catch {
-    /* non-fatal */
   }
 
   return {

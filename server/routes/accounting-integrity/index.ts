@@ -323,15 +323,24 @@ export function registerAccountingIntegrityRoutes(app: Express) {
       if (typeof effectiveFrom !== "string" || !ISO_DATE.test(effectiveFrom)) {
         return res.status(400).json({ message: "Invalid date" });
       }
-      const result = await applyOpeningInventoryJournal(companyId, effectiveFrom, req.session.username || "unknown");
-      await logAudit({
-        userId: req.session.userId!,
-        username: req.session.username || "unknown",
-        companyId,
-        action: "create",
-        tableName: "gl_inventory_cutovers",
-        recordIdentifier: "perpetual-inventory-cutover",
-        changes: { cutover: { new: { effectiveFrom, voucherId: result.voucherId, total: result.plan.total } } },
+      // Phase 21 (B): the cut-over audit is written on the cut-over's transaction.
+      const result = await applyOpeningInventoryJournal(companyId, effectiveFrom, req.session.username || "unknown", {
+        auditTx: async (tx, applied) => {
+          await logAudit(
+            {
+              userId: req.session.userId!,
+              username: req.session.username || "unknown",
+              companyId,
+              action: "create",
+              tableName: "gl_inventory_cutovers",
+              recordIdentifier: "perpetual-inventory-cutover",
+              changes: {
+                cutover: { new: { effectiveFrom, voucherId: applied.voucherId, total: applied.plan.total } },
+              },
+            },
+            tx
+          );
+        },
       });
       res.json(result);
     } catch (error: unknown) {

@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { getErrorMessage, HttpError } from "../../lib/httpHandlers";
-import { db } from "../../db";
+import { db, type DatabaseOrTransaction } from "../../db";
 import * as schema from "@shared/schema";
 import type { StockTransferItem, StockAdjustmentItem } from "@shared/schema";
 import { getStockItemByCodeOrAlias } from "../inventory";
@@ -201,9 +201,14 @@ export function lineTotal(quantity: string, rate: string): string {
 export async function updateStockTransferItem(
   id: number,
   updates: Partial<{ stockItemId: number; quantity: string; rate: string }>,
-  companyId?: number
+  companyId?: number,
+  // Phase 21 (B): the caller's transaction, so its audit commits with the edit.
+  executor: DatabaseOrTransaction = db
 ): Promise<StockTransferItem> {
-  const [currentItem] = await db.select().from(schema.stockTransferItems).where(eq(schema.stockTransferItems.id, id));
+  const [currentItem] = await executor
+    .select()
+    .from(schema.stockTransferItems)
+    .where(eq(schema.stockTransferItems.id, id));
   if (!currentItem) throw new Error("Stock transfer item not found");
   await assertInlineEditableTransferLine(currentItem.transferId, companyId);
 
@@ -216,7 +221,7 @@ export async function updateStockTransferItem(
   const finalRate = updates.rate !== undefined ? updates.rate : currentItem.rate;
   updateData.totalAmount = lineTotal(finalQuantity, finalRate);
 
-  const [updated] = await db
+  const [updated] = await executor
     .update(schema.stockTransferItems)
     .set(updateData)
     .where(eq(schema.stockTransferItems.id, id))

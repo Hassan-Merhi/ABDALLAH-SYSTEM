@@ -172,7 +172,8 @@ describe("POST /api/vouchers/with-entries", () => {
 
     const audit = await pool.query<{ action: string; record_identifier: string }>(
       `SELECT action, record_identifier FROM audit_log
-        WHERE company_id = $1 AND table_name = 'vouchers' AND record_id = $2`,
+        WHERE company_id = $1 AND table_name = 'vouchers' AND record_id = $2
+          AND action NOT LIKE 'row\\_%'` /* phase 21 A: application rows, not the database row audit */,
       [ctx.companyId, response.body.voucher.id]
     );
     expect(audit.rows).toHaveLength(1);

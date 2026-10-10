@@ -30,6 +30,7 @@
     { "idx": 25, "version": "7", "when": 1791105240000, "tag": "20261004_001_retail_fashion_barcodes_labels", "breakpoints": true },
     { "idx": 26, "version": "7", "when": 1791191640000, "tag": "20261005_001_retail_financial_core", "breakpoints": true },
     { "idx": 27, "version": "7", "when": 1791537240000, "tag": "20261009_001_voucher_entry_currency_normalization_v2", "breakpoints": true },
-    { "idx": 28, "version": "7", "when": 1791537300000, "tag": "20261009_002_retail_cash_and_inventory_ledger", "breakpoints": true }
+    { "idx": 28, "version": "7", "when": 1791537300000, "tag": "20261009_002_retail_cash_and_inventory_ledger", "breakpoints": true },
+    { "idx": 29, "version": "7", "when": 1791623700000, "tag": "20261010_001_audit_trail_actor_columns", "breakpoints": true }
   ]
 }

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { eq, and, isNull, asc, sql } from "drizzle-orm";
 import { logger } from "../../lib/logger";
-import { db, pool, type DbTransaction } from "../../db";
+import { db, pool, type DatabaseOrTransaction, type DbTransaction } from "../../db";
 import { MoneyDecimal } from "../../lib/money";
 import * as schema from "@shared/schema";
 import { createDatabaseStockMovementAdapter } from "../../services/inventory/databaseStockMovementAdapter";
@@ -27,8 +27,12 @@ export async function getLocationById(id: number): Promise<schema.Location | und
   return location;
 }
 
-export async function createLocation(location: schema.InsertLocation & { code: string }): Promise<schema.Location> {
-  const [created] = await db.insert(schema.locations).values(location).returning();
+export async function createLocation(
+  location: schema.InsertLocation & { code: string },
+  // Phase 21 (B): the caller's transaction, so its create audit commits with the row.
+  executor: DatabaseOrTransaction = db
+): Promise<schema.Location> {
+  const [created] = await executor.insert(schema.locations).values(location).returning();
   return created;
 }
 

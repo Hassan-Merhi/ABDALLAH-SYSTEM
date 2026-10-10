@@ -7,7 +7,6 @@
 import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
-import { getClientDate } from "../../../lib/dateUtils";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 // The physical-deletion service also records the WASTE write-off value event
@@ -67,7 +66,6 @@ export function registerFactoryStockRemovalRoutes(app: Express) {
           actorId: String(supervisor.id),
           actorName: supervisorUsername,
           reason: reason || "Factory bale stock removal",
-          businessDate: getClientDate(req),
         });
       });
 
@@ -145,7 +143,6 @@ export function registerFactoryStockRemovalRoutes(app: Express) {
           actorId: String(supervisor.id),
           actorName: supervisorUsername,
           reason: reason || "Factory bale stock removal",
-          businessDate: getClientDate(req),
         });
       });
 

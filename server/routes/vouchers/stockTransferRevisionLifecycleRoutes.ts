@@ -101,40 +101,43 @@ export function registerStockTransferRevisionLifecycleRoutes(app: Express) {
           return res.status(403).json({ message: "POS user has no assigned source location" });
         }
 
-        const result = await savePendingStockTransferRevision({
-          companyId,
-          transferId,
-          userId,
-          note: parsed.note,
-          sourceLocationIdLimit: assignedLocationId,
-          items: parsed.items.map((item) => ({
-            stockItemId: item.stockItemId,
-            stockItemName: item.stockItemName,
-            sourceLocationId: item.sourceLocationId,
-            sourceLocationName: item.sourceLocationName,
-            originalQuantity: item.originalQuantity,
-            newQuantity: item.newQuantity,
-          })),
-        });
-
-        try {
-          await logAudit({
-            userId,
-            username: req.session.username || req.user?.username || "unknown",
+        const result = await savePendingStockTransferRevision(
+          {
             companyId,
-            action: "update",
-            tableName: "stock_transfer_revisions",
-            recordId: result.revisionId,
-            recordIdentifier: `transfer-${result.transferId}-revision-${result.revisionNumber}`,
-            changes: {
-              status: { old: "pending", new: "pending" },
-              itemCount: { old: null, new: result.itemCount },
-              note: { old: null, new: parsed.note || null },
-            },
-          });
-        } catch {
-          // Revision persistence must not fail because audit logging is unavailable.
-        }
+            transferId,
+            userId,
+            note: parsed.note,
+            sourceLocationIdLimit: assignedLocationId,
+            items: parsed.items.map((item) => ({
+              stockItemId: item.stockItemId,
+              stockItemName: item.stockItemName,
+              sourceLocationId: item.sourceLocationId,
+              sourceLocationName: item.sourceLocationName,
+              originalQuantity: item.originalQuantity,
+              newQuantity: item.newQuantity,
+            })),
+          },
+          // Phase 21 (B): the audit commits with the revision or rolls it back.
+          async (tx, result) => {
+            await logAudit(
+              {
+                userId,
+                username: req.session.username || req.user?.username || "unknown",
+                companyId,
+                action: "update",
+                tableName: "stock_transfer_revisions",
+                recordId: result.revisionId,
+                recordIdentifier: `transfer-${result.transferId}-revision-${result.revisionNumber}`,
+                changes: {
+                  status: { old: "pending", new: "pending" },
+                  itemCount: { old: null, new: result.itemCount },
+                  note: { old: null, new: parsed.note || null },
+                },
+              },
+              tx
+            );
+          }
+        );
 
         res.json({
           id: result.revisionId,
@@ -201,26 +204,27 @@ export function registerStockTransferRevisionLifecycleRoutes(app: Express) {
           return res.status(400).json({ message: "Revision ID is required" });
         }
 
-        const result = await approvePendingStockTransferRevision(companyId, revisionId);
-        try {
-          await logAudit({
-            userId: String(req.user?.id ?? req.session.userId ?? "unknown"),
-            username: req.session.username || req.user?.username || "unknown",
-            companyId,
-            action: "update",
-            tableName: "stock_transfer_revisions",
-            recordId: revisionId,
-            recordIdentifier: `transfer-${result.transferId}-revision-approval`,
-            changes: {
-              status: { old: "pending", new: result.transition },
-              approvedRevisionCount: { old: 0, new: result.approvedRevisionCount },
-              changedItemCount: { old: 0, new: result.changedItemCount },
-              totalAmount: { old: null, new: result.totalAmount },
+        // Phase 21 (B): the audit commits with the approval or rolls it back.
+        const result = await approvePendingStockTransferRevision(companyId, revisionId, async (tx, result) => {
+          await logAudit(
+            {
+              userId: String(req.user?.id ?? req.session.userId ?? "unknown"),
+              username: req.session.username || req.user?.username || "unknown",
+              companyId,
+              action: "update",
+              tableName: "stock_transfer_revisions",
+              recordId: revisionId,
+              recordIdentifier: `transfer-${result.transferId}-revision-approval`,
+              changes: {
+                status: { old: "pending", new: result.transition },
+                approvedRevisionCount: { old: 0, new: result.approvedRevisionCount },
+                changedItemCount: { old: 0, new: result.changedItemCount },
+                totalAmount: { old: null, new: result.totalAmount },
+              },
             },
-          });
-        } catch {
-          // Approval is already committed; audit failure remains non-fatal.
-        }
+            tx
+          );
+        });
 
         return res.json({ success: true, ...result });
       } catch (error) {

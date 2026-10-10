@@ -1,5 +1,5 @@
 import { eq, and, sql } from "drizzle-orm";
-import { db } from "../../db";
+import { db, type DbTransaction } from "../../db";
 import * as schema from "@shared/schema";
 import type {} from "@shared/schema";
 import { retireVouchersTx, type VoucherRetirementActor } from "../../services/accounting/voucherRetirement";
@@ -14,7 +14,12 @@ import {
  * their lines, audited in this transaction, number and posting identity
  * released), not by hard delete; it used to run statement by statement.
  */
-export async function deleteContainer(id: number, actor?: VoucherRetirementActor | null): Promise<void> {
+export async function deleteContainer(
+  id: number,
+  actor?: VoucherRetirementActor | null,
+  // Phase 21 (B): the caller's delete audit, written on this transaction.
+  auditTx?: (tx: DbTransaction, container: schema.Container) => Promise<void>
+): Promise<void> {
   await db.transaction(async (tx) => {
     const [container] = await tx.select().from(schema.containers).where(eq(schema.containers.id, id)).limit(1);
     if (!container) throw new Error("Container not found");
@@ -80,6 +85,7 @@ export async function deleteContainer(id: number, actor?: VoucherRetirementActor
     // Perpetual inventory (wave 8.2): the container's linked journals go with it.
     await removeContainerStockInJournalsTx(tx, container.companyId, id);
     for (const po of pos) await removePurchaseOrderGitTx(tx, container.companyId, po.id);
+    if (auditTx) await auditTx(tx, container);
   });
 }
 

@@ -27,6 +27,7 @@ import { accountingPostingRequests, voucherEntries, vouchers } from "@shared/sch
 
 import type { DatabaseOrTransaction } from "../../db";
 import { writeAuditEvent } from "../audit";
+import { currentAuditActor } from "../audit/auditActorContext";
 
 export const RETIRED_VOUCHER_NUMBER_MARK = "~DEL";
 export const RETIRED_POSTING_IDENTITY_MARK = "#retired:";
@@ -108,7 +109,7 @@ export async function retireVouchersTx(
     )
     .orderBy(voucherEntries.id);
 
-  const actor = options.actor ?? { userId: "system", username: `voucher-retirement:${options.reason}` };
+  const actor = retirementActor(options);
   const retired: RetiredVoucher[] = [];
   for (const voucher of found) {
     // Retired before: nothing left to give up.
@@ -118,7 +119,12 @@ export async function retireVouchersTx(
     const retiredNumber = retiredVoucherNumber(voucher.voucherNumber, voucher.id);
     await tx
       .update(vouchers)
-      .set({ deletedAt, voucherNumber: retiredNumber })
+      // Phase 21 (A), AT3: the number it gives up is kept (the audit trigger keeps it too).
+      .set({
+        deletedAt,
+        voucherNumber: retiredNumber,
+        originalVoucherNumber: sql`COALESCE(${vouchers.originalVoucherNumber}, ${voucher.voucherNumber})`,
+      })
       .where(and(eq(vouchers.id, voucher.id), eq(vouchers.companyId, companyId)));
     const released = await tx
       .update(accountingPostingRequests)
@@ -187,11 +193,22 @@ export async function retireVouchersByNumberTx(
   return retireVouchersTx(tx, { ...options, voucherIds: rows.map((row) => row.id) });
 }
 
+/**
+ * Phase 21 (A), AT4: the actor of a retirement — the one the caller passes,
+ * else the request's or job's actor (auditActorContext.ts), else the system.
+ */
+function retirementActor(options: { actor?: VoucherRetirementActor | null; reason: string }): VoucherRetirementActor {
+  if (options.actor) return options.actor;
+  return currentAuditActor({ userId: "system", username: `voucher-retirement:${options.reason}` });
+}
+
 /** The signed-in user of a request, as the actor of a retirement. */
 export function sessionRetirementActor(req: {
   session?: { userId?: string | number | null; username?: string | null } | null;
 }): VoucherRetirementActor {
-  const userId = req.session?.userId ?? "unknown";
+  const userId = req.session?.userId;
+  // Phase 21 (A), AT4: no "unknown" when the request context knows the actor.
+  if (userId === null || userId === undefined || userId === "") return currentAuditActor();
   return { userId, username: req.session?.username || String(userId) };
 }
 
@@ -216,7 +233,7 @@ export async function retireVouchersWithClient(
 ): Promise<number[]> {
   const ids = [...new Set(options.voucherIds.map(Number).filter((id) => Number.isInteger(id) && id > 0))];
   if (ids.length === 0) return [];
-  const actor = options.actor ?? { userId: "system", username: `voucher-retirement:${options.reason}` };
+  const actor = retirementActor(options);
   const found = await client.query<{
     id: number;
     company_id: number;
@@ -243,7 +260,8 @@ export async function retireVouchersWithClient(
     if (voucher.deleted_at && isRetiredVoucherNumber(voucher.voucher_number)) continue;
     const retiredNumber = retiredVoucherNumber(voucher.voucher_number, voucher.id);
     const updated = await client.query<{ deleted_at: Date }>(
-      `UPDATE vouchers SET deleted_at = COALESCE(deleted_at, NOW()), voucher_number = $2
+      `UPDATE vouchers SET deleted_at = COALESCE(deleted_at, NOW()), voucher_number = $2,
+              original_voucher_number = COALESCE(original_voucher_number, voucher_number)
         WHERE id = $1 AND company_id = $3 RETURNING deleted_at`,
       [voucher.id, retiredNumber, voucher.company_id]
     );

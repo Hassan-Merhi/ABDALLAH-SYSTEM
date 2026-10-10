@@ -3,7 +3,7 @@ import { stockGroups } from "@shared/schema";
 import { companyScopedSuppliers, type InsertCompanyScopedSupplier } from "@shared/schema/supplierCompanyScope";
 import type { CreateSupplierInput } from "../../storage/suppliers";
 
-import { db } from "../../db";
+import { db, type DatabaseOrTransaction } from "../../db";
 import { storage } from "../../storage";
 import { higherPriorityTargetsAbsent } from "../../services/accounting/balances/partyLineRules";
 
@@ -76,8 +76,13 @@ export const supplierRepository = {
     return Boolean(ownedGroup);
   },
 
-  async updateStockGroup(supplierId: number, companyId: number, stockGroupId: number | null) {
-    const [updated] = await db
+  async updateStockGroup(
+    supplierId: number,
+    companyId: number,
+    stockGroupId: number | null,
+    executor: DatabaseOrTransaction = db
+  ) {
+    const [updated] = await executor
       .update(companyScopedSuppliers)
       .set({ stockGroupId })
       .where(

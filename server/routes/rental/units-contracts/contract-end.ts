@@ -169,18 +169,22 @@ export function registerRentalContractEndRoutes(app: Express, ctx: RentalRoutesC
             notes: `[Guarantee refund] ${narration}`,
           });
         }
+        // Phase 21 (B): the end-of-contract audit commits with it.
+        await logAudit(
+          {
+            userId: req.session.userId!,
+            username: req.session.username || "unknown",
+            companyId,
+            action: "update",
+            tableName: "property_contracts",
+            recordId: id,
+            recordIdentifier: `Contract#${id}`,
+            changes: { status: { old: "ACTIVE", new: "ENDED" }, endDate: { old: null, new: endDate } },
+          },
+          tx
+        );
       });
 
-      await logAudit({
-        userId: req.session.userId!,
-        username: req.session.username || "unknown",
-        companyId,
-        action: "update",
-        tableName: "property_contracts",
-        recordId: id,
-        recordIdentifier: `Contract#${id}`,
-        changes: { status: { old: "ACTIVE", new: "ENDED" }, endDate: { old: null, new: endDate } },
-      });
       res.json({ ok: true });
     } catch (e: unknown) {
       if (e instanceof z.ZodError)

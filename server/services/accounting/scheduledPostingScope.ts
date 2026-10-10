@@ -19,6 +19,7 @@ import { sql } from "drizzle-orm";
 
 import { db, type DatabaseOrTransaction } from "../../db";
 import { createTenantDatabaseScope, runWithDatabaseScopeRuntimeContext } from "../security/databaseScopeRuntimeContext";
+import { getAuditActorContext, isSystemAuditActor, runAsSystemAuditActor } from "../audit/auditActorContext";
 
 /** A scheduled posting that was not written because its date is in a closed period. */
 export interface ScheduledPostingSkip {
@@ -30,9 +31,27 @@ export interface ScheduledPostingSkip {
   closedThrough: string | null;
 }
 
-/** Runs `run` in the tenant database scope of one company (never maintenance). */
-export function runInCompanyPostingScope<T>(companyId: number, run: () => Promise<T>): Promise<T> {
-  return runWithDatabaseScopeRuntimeContext(createTenantDatabaseScope(companyId, [], "active-company"), run);
+const DEFAULT_POSTING_JOB = "company-posting";
+
+/**
+ * Runs `run` in the tenant database scope of one company (never maintenance).
+ *
+ * Phase 21 (A): the audit actor is the signed-in user when a request starts the
+ * posting; otherwise (a scheduled tick, boot) `system:<job>` — the tick's job
+ * name, or `job` when given. Every voucher and line it writes is audited by the
+ * database trigger under that actor.
+ */
+export function runInCompanyPostingScope<T>(
+  companyId: number,
+  run: () => Promise<T>,
+  job = DEFAULT_POSTING_JOB
+): Promise<T> {
+  const current = getAuditActorContext();
+  const scoped = () =>
+    runWithDatabaseScopeRuntimeContext(createTenantDatabaseScope(companyId, [], "active-company"), run);
+  // A tick already set `system:<its job>`; keep it unless a more specific job is named.
+  if (current?.actorId && (!isSystemAuditActor(current.actorId) || job === DEFAULT_POSTING_JOB)) return scoped();
+  return runAsSystemAuditActor(job, scoped);
 }
 
 /** The company's closed-books date (latest CLOSED period end), or null. */

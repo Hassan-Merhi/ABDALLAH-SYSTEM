@@ -1,6 +1,6 @@
 import Decimal from "decimal.js";
 import { eq, and, isNull, inArray } from "drizzle-orm";
-import { db } from "../../db";
+import { db, type DbTransaction } from "../../db";
 import { createDatabaseStockMovementAdapter } from "../../services/inventory/databaseStockMovementAdapter";
 import { postStockMovementTx } from "../../services/inventory/stockMovementIntegrityService";
 import {
@@ -48,7 +48,12 @@ export async function updateStockTransfer(
   id: number,
   destinationLocationId: number,
   notes: string,
-  items: Array<{ sourceLocationId: number; stockItemId: number; quantity: string; rate: string }>
+  items: Array<{ sourceLocationId: number; stockItemId: number; quantity: string; rate: string }>,
+  // Phase 21 (B): the caller's header update and audit, on this transaction.
+  afterWriteTx?: (
+    tx: DbTransaction,
+    result: { transfer: schema.StockTransferVoucher; items: StockTransferItem[] }
+  ) => Promise<void>
 ) {
   return await db.transaction(async (tx) => {
     const [existingTransfer] = await tx
@@ -269,9 +274,17 @@ export async function updateStockTransfer(
       deltas: transferDeltas,
     });
 
-    return { transfer: updatedTransfer, items: transferItems };
+    const result = { transfer: updatedTransfer, items: transferItems };
+    if (afterWriteTx) await afterWriteTx(tx, result);
+    return result;
   });
 }
+
+export type UpdatedStockAdjustment = {
+  adjustment: schema.StockAdjustmentVoucher;
+  items: StockAdjustmentItem[];
+  voucher: schema.Voucher;
+};
 
 export async function updateStockAdjustment(
   id: number,
@@ -282,7 +295,10 @@ export async function updateStockAdjustment(
   adjustmentType: string,
   notes: string,
   items: Array<{ stockItemId: number; quantity: string; rate: string }>,
-  voucherHeader?: { voucherDate?: string; description?: string }
+  voucherHeader?: { voucherDate?: string; description?: string },
+  // Phase 21 (B): the caller's audit, written on this transaction so a failed
+  // audit rolls the edit back.
+  afterWriteTx?: (tx: DbTransaction, result: UpdatedStockAdjustment) => Promise<void>
 ) {
   return await db.transaction(async (tx) => {
     // Follow the same lock order as stock-adjustment deletion: voucher first,
@@ -706,6 +722,8 @@ export async function updateStockAdjustment(
       });
     }
 
-    return { adjustment: updatedAdjustment, items: adjustmentItems, voucher: updatedVoucher };
+    const result = { adjustment: updatedAdjustment, items: adjustmentItems, voucher: updatedVoucher };
+    if (afterWriteTx) await afterWriteTx(tx, result);
+    return result;
   });
 }

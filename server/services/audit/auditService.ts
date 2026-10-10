@@ -1,6 +1,7 @@
 import { auditLog } from "@shared/schema";
 import { db } from "../../db";
 import { logger } from "../../lib/logger";
+import { currentAuditActor, getAuditActorContext } from "./auditActorContext";
 
 export type AuditAction =
   | "create"
@@ -53,6 +54,8 @@ export interface AuditEvent extends AuditActor {
   entityType?: string;
   entityId?: number | null;
   metadata?: Record<string, unknown> | null;
+  /** Phase 21 (A), AT6: why the change was made (else the request's reason). */
+  reason?: string | null;
 }
 
 export interface AuditExecutor {
@@ -156,8 +159,15 @@ export function buildAuditChanges(
 
 export async function writeAuditEvent(event: AuditEvent, executor: AuditExecutor = db): Promise<void> {
   const tableName = String(event.tableName ?? event.entityType ?? "audit_event").trim();
-  const userId = String(event.userId ?? "system").trim();
-  const username = String(event.username ?? "system").trim();
+  // Phase 21 (A), AT4: a missing or "unknown" actor is the request's / job's
+  // actor (auditActorContext.ts) when there is one; "system" otherwise.
+  const contextActor = currentAuditActor({ userId: "system", username: "system" });
+  const givenUserId = String(event.userId ?? "").trim();
+  // An explicit blank id is still a caller error (refused below).
+  const actorMissing = event.userId === undefined || event.userId === null || givenUserId === "unknown";
+  const userId = actorMissing ? contextActor.userId : givenUserId;
+  const username = actorMissing ? contextActor.username || userId : String(event.username ?? "system").trim();
+  const reason = String(event.reason ?? getAuditActorContext()?.reason ?? "").trim() || null;
   const recordId = event.recordId ?? event.entityId ?? null;
   const changes = event.changes ?? (event.metadata ? { metadata: { new: event.metadata } } : null);
 
@@ -174,6 +184,8 @@ export async function writeAuditEvent(event: AuditEvent, executor: AuditExecutor
     recordId,
     recordIdentifier: event.recordIdentifier?.trim() || null,
     changes: sanitizeAuditChanges(changes),
+    // request_id, ip and session_id are filled by the audit_log trigger from the request settings.
+    ...(reason ? { reason: reason.slice(0, 500) } : {}),
   };
 
   try {

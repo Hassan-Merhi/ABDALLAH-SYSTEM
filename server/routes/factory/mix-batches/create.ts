@@ -350,7 +350,24 @@ export function registerFactoryMixBatchCreateRoutes(app: Express) {
           sourceId: mixBatch.id,
         });
 
-        return { ...mixBatch, unvalued: settled.unvalued };
+        const created = { ...mixBatch, unvalued: settled.unvalued };
+        await logAudit(
+          {
+            userId: req.session.userId!,
+            username: req.session.username || req.session.userId!,
+            companyId,
+            action: "create",
+            tableName: "factory_mix_batches",
+            recordId: created.id,
+            recordIdentifier: created.batchCode + (created.name ? ` – ${created.name}` : ""),
+            changes: {
+              totalWeightKg: { old: null, new: toMoney(created.totalWeightKg).toFixed(3) },
+              totalCost: { old: null, new: toMoney(created.totalCost).toFixed(2) },
+            },
+          },
+          tx
+        );
+        return created;
       });
 
       const mbToday = getClientDate(req);
@@ -366,19 +383,6 @@ export function registerFactoryMixBatchCreateRoutes(app: Express) {
         amountUsd: toMoney(result.totalCost).toNumber(),
       });
 
-      await logAudit({
-        userId: req.session.userId!,
-        username: req.session.username || req.session.userId!,
-        companyId,
-        action: "create",
-        tableName: "factory_mix_batches",
-        recordId: result.id,
-        recordIdentifier: result.batchCode + (result.name ? ` – ${result.name}` : ""),
-        changes: {
-          totalWeightKg: { old: null, new: toMoney(result.totalWeightKg).toFixed(3) },
-          totalCost: { old: null, new: toMoney(result.totalCost).toFixed(2) },
-        },
-      });
       res.json(result);
     } catch (error: unknown) {
       if (sendFactoryCostBasisRefusal(res, error)) return;

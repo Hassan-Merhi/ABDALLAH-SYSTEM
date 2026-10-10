@@ -5,8 +5,7 @@ import { logger } from "../../lib/logger";
 import {
   AUDIT_LOG_MAINTENANCE_SETTING,
   AUDIT_LOG_RETENTION_MODE,
-  FINANCIAL_AUDIT_TABLE_PREFIXES,
-  FINANCIAL_AUDIT_TABLES,
+  PRUNABLE_AUDIT_TABLES,
 } from "./auditLogRetentionPolicy";
 
 /**
@@ -16,7 +15,7 @@ import {
  *     existing audit row. The single exception is a DELETE made while the
  *     transaction-local setting app.audit_log_maintenance is 'retention' (set
  *     only by the scheduled retention job, auditLogRetention.ts) of a row whose
- *     table_name is not financial (auditLogRetentionPolicy.ts). UPDATE is never
+ *     table_name is on the prunable allow-list (auditLogRetentionPolicy.ts). UPDATE is never
  *     allowed.
  *   - A BEFORE TRUNCATE statement trigger refuses TRUNCATE.
  *
@@ -41,13 +40,12 @@ export const AUDIT_LOG_APPEND_ONLY_DDL: readonly string[] = [
   // keeps its audit rows (wave 12 decision 4), and append-only rows cannot be
   // cleared first, so audit_log carries no foreign key to companies.
   `ALTER TABLE audit_log DROP CONSTRAINT IF EXISTS audit_log_company_id_fkey`,
+  // Phase 21 (A), AT5: "financial" = every table but the prunable allow-list
+  // (auditLogRetentionPolicy.ts PRUNABLE_AUDIT_TABLES); the name is kept so the
+  // retention job's own WHERE and older readers keep working.
   `CREATE OR REPLACE FUNCTION erp_audit_log_is_financial(audit_table text) RETURNS boolean
    LANGUAGE sql IMMUTABLE AS $fn$
-     SELECT lower(btrim(COALESCE(audit_table, ''))) = ANY (${sqlTextArray(FINANCIAL_AUDIT_TABLES)})
-         OR EXISTS (
-              SELECT 1 FROM unnest(${sqlTextArray(FINANCIAL_AUDIT_TABLE_PREFIXES)}) AS financial(prefix)
-               WHERE left(lower(btrim(COALESCE(audit_table, ''))), length(financial.prefix)) = financial.prefix
-            )
+     SELECT NOT (lower(btrim(COALESCE(audit_table, ''))) = ANY (${sqlTextArray(PRUNABLE_AUDIT_TABLES)}))
    $fn$`,
   `CREATE OR REPLACE FUNCTION erp_audit_log_append_only() RETURNS trigger
    LANGUAGE plpgsql AS $fn$
@@ -80,8 +78,11 @@ export const AUDIT_LOG_APPEND_ONLY_DDL: readonly string[] = [
      FOR EACH STATEMENT EXECUTE FUNCTION erp_audit_log_no_truncate()`,
 ];
 
-/** Version of AUDIT_LOG_APPEND_ONLY_DDL (and of the financial table list). Bump it whenever either changes. */
-export const AUDIT_LOG_APPEND_ONLY_VERSION = "2026-10-audit-log-append-only-v2";
+/**
+ * Version of AUDIT_LOG_APPEND_ONLY_DDL (and of the prunable table list). Bump it whenever either changes.
+ * v3 (phase 21 A): the retention list is an allow-list of non-financial tables.
+ */
+export const AUDIT_LOG_APPEND_ONLY_VERSION = "2026-10-audit-log-append-only-v3";
 
 const INSTALL_LOCK_KEY = 2026_10_120;
 

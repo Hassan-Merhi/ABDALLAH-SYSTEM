@@ -295,7 +295,31 @@ export function registerFactoryMixBatchTopUpRoutes(app: Express) {
           sourceId: id,
         });
 
-        return updated;
+        const toppedUp = updated;
+        await logAudit(
+          {
+            userId: req.session.userId!,
+            username: req.session.username || req.session.userId!,
+            companyId,
+            action: "update",
+            tableName: "factory_mix_batches",
+            recordId: toppedUp.id,
+            recordIdentifier: toppedUp.batchCode + (toppedUp.name ? ` – ${toppedUp.name}` : ""),
+            changes: {
+              totalWeightKg: {
+                old: toMoney(batchBeforeTopup?.totalWeightKg).toFixed(3),
+                new: toMoney(toppedUp.totalWeightKg).toFixed(3),
+              },
+              totalCost: {
+                old: toMoney(batchBeforeTopup?.totalCost).toFixed(2),
+                new: toMoney(toppedUp.totalCost).toFixed(2),
+              },
+            },
+          },
+          tx
+        );
+
+        return toppedUp;
       });
 
       const tuTxDate = txDate || getClientDate(req);
@@ -309,30 +333,6 @@ export function registerFactoryMixBatchTopUpRoutes(app: Express) {
         amountCurrency: toMoney(result.totalCost).toNumber(),
         amountUsd: toMoney(result.totalCost).toNumber(),
       });
-
-      try {
-        await logAudit({
-          userId: req.session.userId!,
-          username: req.session.username || req.session.userId!,
-          companyId,
-          action: "update",
-          tableName: "factory_mix_batches",
-          recordId: result.id,
-          recordIdentifier: result.batchCode + (result.name ? ` – ${result.name}` : ""),
-          changes: {
-            totalWeightKg: {
-              old: toMoney(batchBeforeTopup?.totalWeightKg).toFixed(3),
-              new: toMoney(result.totalWeightKg).toFixed(3),
-            },
-            totalCost: {
-              old: toMoney(batchBeforeTopup?.totalCost).toFixed(2),
-              new: toMoney(result.totalCost).toFixed(2),
-            },
-          },
-        });
-      } catch (auditErr) {
-        logger.error("[mix-batch top-up audit] non-fatal:", { error: auditErr });
-      }
 
       res.json(result);
     } catch (error: unknown) {

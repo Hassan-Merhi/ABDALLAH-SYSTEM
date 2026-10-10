@@ -23,6 +23,7 @@ import {
 } from "./centralPostingEngine";
 import { assertCustomerLinkedLedgerPairs } from "./customerLinkedLedgerValidation";
 import type { CompanyScopedTable } from "../../types/companyScopedTable";
+import { currentAuditActor } from "../audit/auditActorContext";
 
 const LEGACY_IDEMPOTENCY_TABLE = "accounting_posting_idempotency";
 const POSTING_AUDIT_TABLE = "accounting_postings";
@@ -106,14 +107,21 @@ async function assertCompanyOwnedIds(input: {
   }
 }
 
+// Phase 21 (A), AT4: a posting without an explicit actor (or with "unknown")
+// is the request's or job's actor (auditActorContext.ts); the engine's own name
+// only when there is none.
+function contextActor(): { userId: string; username: string } {
+  return currentAuditActor({ userId: "system", username: "central-posting-engine" });
+}
+
 function actorUserId(actor: PostingActor): string {
-  const value = String(actor.userId ?? "system").trim();
-  return value || "system";
+  const value = String(actor.userId ?? "").trim();
+  return value && value !== "unknown" ? value : contextActor().userId;
 }
 
 function actorUsername(actor: PostingActor): string {
-  const value = String(actor.username ?? "central-posting-engine").trim();
-  return value || "central-posting-engine";
+  const value = String(actor.username ?? "").trim();
+  return value && String(actor.userId ?? "").trim() !== "unknown" ? value : contextActor().username;
 }
 
 function sourceChanges(source: PostingSourceIdentity) {
@@ -372,9 +380,10 @@ export function createDatabasePostingDependencies(): CentralPostingDependencies 
 
         // Keep the legacy marker during migration so older diagnostics and code
         // paths that still inspect audit_log continue to see the posting identity.
+        const markerActor = contextActor();
         await tx.insert(auditLog).values({
-          userId: "system",
-          username: "central-posting-engine",
+          userId: markerActor.userId,
+          username: markerActor.username,
           companyId,
           action: "create",
           tableName: LEGACY_IDEMPOTENCY_TABLE,

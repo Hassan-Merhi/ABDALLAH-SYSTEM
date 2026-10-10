@@ -364,6 +364,40 @@ export async function createPosSale(
         });
       }
 
+      // Phase 21 (B): the create audit commits with the sale or rolls it back.
+      await logAudit(
+        {
+          userId,
+          username,
+          companyId: currentCompanyId,
+          action: "create",
+          tableName: "vouchers",
+          recordId: txVoucher.id,
+          recordIdentifier: voucherNumber,
+          changes: {
+            voucherNumber: { old: undefined, new: voucherNumber },
+            voucherType: { old: undefined, new: "Sales" },
+            saleType: { old: undefined, new: isCreditSale ? "Credit Invoice" : "Cash Sale" },
+            location: { old: undefined, new: location.name },
+            totalAmount: { old: undefined, new: grandTotal.toFixed(2) },
+            date: { old: undefined, new: voucherDate },
+            itemCount: { old: undefined, new: txSaleItems.length },
+            items: {
+              new: txSaleItems.map((item) => ({
+                stockItemId: item.stockItemId,
+                stockItemName: item.stockItemName,
+                code: item.stockItemCode,
+                quantity: item.quantity,
+                rate: item.rate,
+                totalAmount: item.amount,
+              })),
+            },
+            customer: { old: undefined, new: customerAccount ? customerAccount.name : null },
+          },
+        },
+        tx
+      );
+
       return { voucher: txVoucher, saleItems: txSaleItems, replayed: false };
     });
   } catch (error: unknown) {
@@ -394,40 +428,6 @@ export async function createPosSale(
 
   const voucher = txResult.voucher;
   const saleItems = txResult.saleItems;
-
-  try {
-    await logAudit({
-      userId,
-      username,
-      companyId: currentCompanyId,
-      action: "create",
-      tableName: "vouchers",
-      recordId: voucher.id,
-      recordIdentifier: voucherNumber,
-      changes: {
-        voucherNumber: { old: undefined, new: voucherNumber },
-        voucherType: { old: undefined, new: "Sales" },
-        saleType: { old: undefined, new: isCreditSale ? "Credit Invoice" : "Cash Sale" },
-        location: { old: undefined, new: location.name },
-        totalAmount: { old: undefined, new: grandTotal.toFixed(2) },
-        date: { old: undefined, new: voucherDate },
-        itemCount: { old: undefined, new: saleItems.length },
-        items: {
-          new: saleItems.map((item) => ({
-            stockItemId: item.stockItemId,
-            stockItemName: "stockItemName" in item ? item.stockItemName : undefined,
-            code: "stockItemCode" in item ? item.stockItemCode : undefined,
-            quantity: item.quantity,
-            rate: "rate" in item ? item.rate : item.sellingPrice,
-            totalAmount: "amount" in item ? item.amount : item.totalSales,
-          })),
-        },
-        customer: { old: undefined, new: customerAccount ? customerAccount.name : null },
-      },
-    });
-  } catch {
-    /* non-fatal */
-  }
 
   if (!goldenCoastSaleDetected && !isCreditSale && accountType === "cash") {
     runIntercompanyPosTransfer(currentCompanyId, accountId, grandTotal, voucherDate).catch((error) =>

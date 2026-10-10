@@ -56,31 +56,34 @@ export function registerFactoryMixBatchUpdateRoutes(app: Express) {
         if (name !== undefined) updates.name = name?.trim() || null;
         if (notes !== undefined) updates.notes = notes?.trim() || null;
         if (batchDate !== undefined) updates.batchDate = batchDate || null;
-        const [updated] = await db
-          .update(factoryMixBatches)
-          .set(updates)
-          .where(eq(factoryMixBatches.id, id))
-          .returning();
-        try {
-          await logAudit({
-            userId: req.session.userId!,
-            username: req.session.username || req.session.userId!,
-            companyId,
-            action: "update",
-            tableName: "factory_mix_batches",
-            recordId: id,
-            recordIdentifier: batch.batchCode + (updated.name ? ` – ${updated.name}` : ""),
-            changes: {
-              ...(name !== undefined ? { name: { old: batch.name ?? null, new: updated.name ?? null } } : {}),
-              ...(notes !== undefined ? { notes: { old: batch.notes ?? null, new: updated.notes ?? null } } : {}),
-              ...(batchDate !== undefined
-                ? { batchDate: { old: batch.batchDate ?? null, new: updated.batchDate ?? null } }
-                : {}),
+        // Phase 21 (B): the write and its audit commit together.
+        const updated = await db.transaction(async (tx) => {
+          const [written] = await tx
+            .update(factoryMixBatches)
+            .set(updates)
+            .where(eq(factoryMixBatches.id, id))
+            .returning();
+          await logAudit(
+            {
+              userId: req.session.userId!,
+              username: req.session.username || req.session.userId!,
+              companyId,
+              action: "update",
+              tableName: "factory_mix_batches",
+              recordId: id,
+              recordIdentifier: batch.batchCode + (written.name ? ` – ${written.name}` : ""),
+              changes: {
+                ...(name !== undefined ? { name: { old: batch.name ?? null, new: written.name ?? null } } : {}),
+                ...(notes !== undefined ? { notes: { old: batch.notes ?? null, new: written.notes ?? null } } : {}),
+                ...(batchDate !== undefined
+                  ? { batchDate: { old: batch.batchDate ?? null, new: written.batchDate ?? null } }
+                  : {}),
+              },
             },
-          });
-        } catch (auditErr) {
-          logger.error("[mix-batch simple-patch audit] non-fatal:", { error: auditErr });
-        }
+            tx
+          );
+          return written;
+        });
         return res.json(updated);
       }
 
@@ -338,7 +341,28 @@ export function registerFactoryMixBatchUpdateRoutes(app: Express) {
           sourceId: id,
         });
 
-        return updated;
+        const edited = updated;
+        await logAudit(
+          {
+            userId: req.session.userId!,
+            username: req.session.username || req.session.userId!,
+            companyId,
+            action: "update",
+            tableName: "factory_mix_batches",
+            recordId: edited.id,
+            recordIdentifier: edited.batchCode + (edited.name ? ` – ${edited.name}` : ""),
+            changes: {
+              ...(name !== undefined ? { name: { old: batchBefore.name ?? null, new: name?.trim() || null } } : {}),
+              ...(notes !== undefined ? { notes: { old: batchBefore.notes ?? null, new: notes?.trim() || null } } : {}),
+              totalWeightKg: {
+                old: toMoney(batchBefore.totalWeightKg).toFixed(3),
+                new: toMoney(edited.totalWeightKg).toFixed(3),
+              },
+            },
+          },
+          tx
+        );
+        return edited;
       });
 
       // Update daybook entry
@@ -363,23 +387,6 @@ export function registerFactoryMixBatchUpdateRoutes(app: Express) {
         amountUsd: toMoney(result.totalCost).toNumber(),
       });
 
-      await logAudit({
-        userId: req.session.userId!,
-        username: req.session.username || req.session.userId!,
-        companyId,
-        action: "update",
-        tableName: "factory_mix_batches",
-        recordId: result.id,
-        recordIdentifier: result.batchCode + (result.name ? ` – ${result.name}` : ""),
-        changes: {
-          ...(name !== undefined ? { name: { old: batchBefore.name ?? null, new: name?.trim() || null } } : {}),
-          ...(notes !== undefined ? { notes: { old: batchBefore.notes ?? null, new: notes?.trim() || null } } : {}),
-          totalWeightKg: {
-            old: toMoney(batchBefore.totalWeightKg).toFixed(3),
-            new: toMoney(result.totalWeightKg).toFixed(3),
-          },
-        },
-      });
       res.json(result);
     } catch (error: unknown) {
       if (sendFactoryCostBasisRefusal(res, error)) return;

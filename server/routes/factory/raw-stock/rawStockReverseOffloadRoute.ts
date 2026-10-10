@@ -542,6 +542,19 @@ export function registerRawStockReverseOffloadRoute(app: Express) {
         // Wave 8.4 continuation: the commission journal follows the commission just written.
         await syncContainerCommissionJournalTx(tx, companyId, containerId);
 
+        await logAudit(
+          {
+            userId: req.session.userId!,
+            username: req.session.username || req.session.userId!,
+            companyId,
+            action: "reverse",
+            tableName: "production_raw_stock",
+            recordId: containerId,
+            recordIdentifier: `Container #${containerId} offload reversed`,
+            changes: null,
+          },
+          tx
+        );
         return { message: REVERSAL_SUCCESS_MESSAGE, containerStatus: container.status };
       };
 
@@ -568,16 +581,6 @@ export function registerRawStockReverseOffloadRoute(app: Express) {
           ).value
         : await db.transaction((tx) => reverseOffload(tx, ""));
 
-      await logAudit({
-        userId: req.session.userId!,
-        username: req.session.username || req.session.userId!,
-        companyId,
-        action: "reverse",
-        tableName: "production_raw_stock",
-        recordId: containerId,
-        recordIdentifier: `Container #${containerId} offload reversed`,
-        changes: null,
-      });
       res.json({ message: outcome.message });
     } catch (error: unknown) {
       if (error instanceof ReverseOffloadError) {

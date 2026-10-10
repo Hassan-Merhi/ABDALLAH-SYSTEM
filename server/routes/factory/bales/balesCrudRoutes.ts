@@ -472,27 +472,33 @@ export function registerBalesCrudRoutes(app: Express) {
 
       if (!bale) return res.status(404).json({ message: "Bale not found" });
 
-      if (bale.productId) {
-        await db
-          .update(factoryBaleProducts)
-          .set({ name: name.trim(), updatedAt: new Date() })
-          .where(and(eq(factoryBaleProducts.id, bale.productId), eq(factoryBaleProducts.companyId, companyId)));
-      }
+      // Phase 21 (B): the rename and its audit commit together.
+      await db.transaction(async (tx) => {
+        if (bale.productId) {
+          await tx
+            .update(factoryBaleProducts)
+            .set({ name: name.trim(), updatedAt: new Date() })
+            .where(and(eq(factoryBaleProducts.id, bale.productId), eq(factoryBaleProducts.companyId, companyId)));
+        }
 
-      await db
-        .update(factoryBales)
-        .set({ productName: name.trim(), updatedAt: new Date() })
-        .where(eq(factoryBales.id, id));
+        await tx
+          .update(factoryBales)
+          .set({ productName: name.trim(), updatedAt: new Date() })
+          .where(eq(factoryBales.id, id));
 
-      await logAudit({
-        userId: req.session.userId!,
-        username: req.session.username || req.session.userId!,
-        companyId,
-        action: "update",
-        tableName: "bales",
-        recordId: id,
-        recordIdentifier: `Bale #${id}`,
-        changes: { productName: { old: bale.productName, new: name.trim() } },
+        await logAudit(
+          {
+            userId: req.session.userId!,
+            username: req.session.username || req.session.userId!,
+            companyId,
+            action: "update",
+            tableName: "bales",
+            recordId: id,
+            recordIdentifier: `Bale #${id}`,
+            changes: { productName: { old: bale.productName, new: name.trim() } },
+          },
+          tx
+        );
       });
       res.json({ success: true });
     } catch (error: unknown) {
@@ -670,7 +676,7 @@ export function registerBalesCrudRoutes(app: Express) {
           .set({ weight: newWeightStr })
           .where(eq(customerOrderBales.baleId, id));
 
-        return {
+        const weightResult = {
           bale: updatedBale,
           oldWeight,
           newWeight: rawWeight,
@@ -678,18 +684,22 @@ export function registerBalesCrudRoutes(app: Express) {
           updatedInvoiceBales: invoiceBalesResult?.rowCount ?? 0,
           updatedOrderBales: orderBalesResult?.rowCount ?? 0,
         };
+        await logAudit(
+          {
+            userId: req.session.userId!,
+            username: req.session.username || req.session.userId!,
+            companyId,
+            action: "update",
+            tableName: "factory_bales",
+            recordId: id,
+            recordIdentifier: weightResult.bale.referenceNumber || `Bale #${id}`,
+            changes: { weightKg: { old: weightResult.oldWeight, new: weightResult.newWeight } },
+          },
+          tx
+        );
+        return weightResult;
       });
 
-      await logAudit({
-        userId: req.session.userId!,
-        username: req.session.username || req.session.userId!,
-        companyId,
-        action: "update",
-        tableName: "factory_bales",
-        recordId: id,
-        recordIdentifier: result.bale.referenceNumber || `Bale #${id}`,
-        changes: { weightKg: { old: result.oldWeight, new: result.newWeight } },
-      });
       res.json({
         success: true,
         baleId: id,
@@ -798,22 +808,26 @@ export function registerBalesCrudRoutes(app: Express) {
 
         await tx.update(factoryBales).set({ status: "REPACKED", updatedAt: new Date() }).where(eq(factoryBales.id, id));
 
-        return { originalBale, newBale, newRefNum };
+        const repackResult = { originalBale, newBale, newRefNum };
+        await logAudit(
+          {
+            userId: req.session.userId!,
+            username: req.session.username || req.session.userId!,
+            companyId,
+            action: "update",
+            tableName: "factory_bales",
+            recordId: id,
+            recordIdentifier: repackResult.originalBale.referenceNumber || `Bale #${id}`,
+            changes: {
+              status: { old: repackResult.originalBale.status, new: "REPACKED" },
+              newBaleRef: { old: null, new: repackResult.newRefNum },
+            },
+          },
+          tx
+        );
+        return repackResult;
       });
 
-      await logAudit({
-        userId: req.session.userId!,
-        username: req.session.username || req.session.userId!,
-        companyId,
-        action: "update",
-        tableName: "factory_bales",
-        recordId: id,
-        recordIdentifier: result.originalBale.referenceNumber || `Bale #${id}`,
-        changes: {
-          status: { old: result.originalBale.status, new: "REPACKED" },
-          newBaleRef: { old: null, new: result.newRefNum },
-        },
-      });
       res.json(result);
     } catch (error: unknown) {
       logger.error("Error repacking bale:", { error: error });

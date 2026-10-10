@@ -415,10 +415,13 @@ export async function createStockAdjustment(
   items: StockAdjustmentInputItem[],
   _consumptionAccountOverride?: { code: string; name: string },
   voucherHeader?: { currency?: string; voucherDate?: string; description?: string },
-  storedAdjustmentType?: string
+  storedAdjustmentType?: string,
+  // Phase 21 (B): the caller's audit, written on this transaction so a failed
+  // audit rolls the adjustment back.
+  afterWriteTx?: (tx: DbTransaction, result: Awaited<ReturnType<typeof createStockAdjustmentTx>>) => Promise<void>
 ) {
-  return await db.transaction((tx) =>
-    createStockAdjustmentTx(
+  return await db.transaction(async (tx) => {
+    const result = await createStockAdjustmentTx(
       tx,
       voucherId,
       locationId,
@@ -427,8 +430,10 @@ export async function createStockAdjustment(
       items,
       voucherHeader,
       storedAdjustmentType
-    )
-  );
+    );
+    if (afterWriteTx) await afterWriteTx(tx, result);
+    return result;
+  });
 }
 
 /**

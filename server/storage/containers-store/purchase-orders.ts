@@ -5,7 +5,7 @@ import {
 import { retireVouchersTx, type VoucherRetirementActor } from "../../services/accounting/voucherRetirement";
 import { resolvePoImportCreditTarget } from "../../services/accounting/poImportAccounting";
 import { eq, and, isNull, sql } from "drizzle-orm";
-import { db } from "../../db";
+import { db, type DbTransaction } from "../../db";
 import * as schema from "@shared/schema";
 import type { PurchaseOrder, InsertPurchaseOrder } from "@shared/schema";
 import { getConfiguredIntercompanyCreditAccount } from "../accounting/intercompany";
@@ -371,7 +371,12 @@ export async function updatePurchaseOrder(id: number, updates: Partial<InsertPur
  * (soft delete with their lines, audited in this transaction, number and
  * posting identity released), not hard-deleted.
  */
-export async function deletePurchaseOrder(id: number, actor?: VoucherRetirementActor | null): Promise<void> {
+export async function deletePurchaseOrder(
+  id: number,
+  actor?: VoucherRetirementActor | null,
+  // Phase 21 (B): the caller's delete audit, written on this transaction.
+  auditTx?: (tx: DbTransaction, po: schema.PurchaseOrder) => Promise<void>
+): Promise<void> {
   await db.transaction(async (tx) => {
     const [po] = await tx.select().from(schema.purchaseOrders).where(eq(schema.purchaseOrders.id, id)).limit(1);
     if (!po) throw new Error("Purchase order not found");
@@ -434,5 +439,6 @@ export async function deletePurchaseOrder(id: number, actor?: VoucherRetirementA
         })
         .where(eq(schema.containers.id, containerId));
     }
+    if (auditTx) await auditTx(tx, po);
   });
 }
