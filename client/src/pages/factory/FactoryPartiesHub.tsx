@@ -53,7 +53,7 @@ export default function FactoryPartiesHub() {
           />
         </div>
         <div className="border-b px-4 shrink-0 overflow-x-auto">
-          <TabsList className="flex-nowrap">
+          <TabsList className="w-max max-w-full" aria-label="Factory parties sections">
             {showCustomers && (
               <TabsTrigger value="customers" data-testid="tab-parties-customers">
                 <Users className="h-4 w-4 mr-2" />
