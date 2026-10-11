@@ -43,3 +43,22 @@ All changes belong to `feat/universal-responsive-pill-tabs-20261011`. No backend
 ## Implementation status
 
 The shared pill components and identified custom horizontal tab bars have been migrated on this feature branch. Existing screen-specific controls (sidebar menus, navigation sheets, view toggles and workflow steps) deliberately remain as their original controls. No automated or manual runtime tests were executed as requested; the changes have not been validated in a running browser, and should remain unmerged until accepted by the user.
+
+## Phases 3 and 4 — source implementation completed (11 October 2026)
+
+### Phase 3 — Core ERP
+
+- **Tracking:** `TrackingHub.tsx` keeps the complete Containers OTW / GIT Tracking / Transporter Statement labels, with a phone-safe horizontal strip and an accessible group label.
+- **GIT workbook:** `GITMockup.tsx` also uses the scrollable pill strip for its Detail, Truck / Location, and Agent / Duty tabs.
+- **Stock & Inventory:** `StockHub.tsx` and `InventoryHub.tsx` use the shared tabs rather than their former custom button rows; existing permission filtering and URL query-state logic remain in place.
+- **Sales Tools & Parties:** `SalesToolsHub.tsx` and `PartiesHub.tsx` use shared navigation and preserve role-aware visibility and lazy content.
+
+### Phase 4 — Accounting, vouchers, payroll and reports
+
+- **Accounts and Daybook:** `AccountsLegacy.tsx`, `Daybook.tsx`, and `factory/FactoryDaybook.tsx` use scrollable pill navigation. The Accounts statement-only phone view still hides its parent tab strip.
+- **Payroll:** `payroll/PayrollView.tsx`, `payroll/AdvancesTab.tsx`, `payroll/BonusDialog.tsx`, `components/erprunpayroll/ERPRunPayrollView.tsx`, `components/erprunpayroll/CompactRunPayrollSelection.tsx`, and `factory/factorypayroll/FactoryPayrollView.tsx` use the shared appearance, retaining their separate actions and selection logic.
+- **Financial and personnel details:** `components/ERPWorkerDetail.tsx`, `factory/factoryworkerdetail/FactoryWorkerDetailView.tsx`, `factory/FactoryCustomerStatement.tsx`, `factory/FactoryAdvancesTab.tsx`, and `suppliers/SupplierDetailDialog.tsx` have consistent pill navigation with horizontal overflow where applicable.
+- **Reports:** The production report tabs in `factory/DailyProductionReport.tsx` use a scrollable strip with full labels. Report views already using the shared `TabsList` inherit the global styling.
+- **Explicit non-tab exclusions:** `Vouchers.tsx` and `vouchers/VoucherTabNav.tsx` use a route/type sidebar and a phone selection sheet, not a horizontal secondary tab bar. Those remain unchanged to preserve the agreed navigation model. Segmented view-mode switches (e.g. Condensed/Detailed), workflow progress indicators, and report filters are also not reclassified as tabs.
+
+**Verification status:** Source changes are committed. No TypeScript command, linting, CI run, unit/integration/browser tests, runtime responsive checks, merge, or deployment were performed as requested. Implementation is complete at code level, not validated at runtime.
