@@ -36,10 +36,10 @@ export function registerChatbotAlertRoutes(app: Express) {
         .from(stockItems)
         .where(and(eq(stockItems.companyId, companyId), eq(stockItems.active, true)));
 
-      const invMap = new Map(inventoryRows.map((i) => [i.stockItemId, parseFloat(i.quantity || "0")]));
+      const invMap = new Map(inventoryRows.map((i) => [i.stockItemId, toMoney(i.quantity).toNumber()]));
       const lowStock = stockRows
         .filter((s) => {
-          const lvl = parseFloat(s.reorderLevel || "0");
+          const lvl = toMoney(s.reorderLevel).toNumber();
           return lvl > 0 && (invMap.get(s.id) || 0) <= lvl;
         })
         .map((s) => ({
@@ -47,7 +47,7 @@ export function registerChatbotAlertRoutes(app: Express) {
           name: s.name,
           code: s.code,
           qty: invMap.get(s.id) || 0,
-          reorderLevel: parseFloat(s.reorderLevel || "0"),
+          reorderLevel: toMoney(s.reorderLevel).toNumber(),
         }));
 
       // Open POs (awaiting)
