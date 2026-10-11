@@ -4,6 +4,7 @@ import FactoryPendingLoadings from "./FactoryPendingLoadings";
 import FactoryPriorityScan from "./FactoryPriorityScan";
 import { Truck } from "lucide-react";
 import type { FactoryMyAccess } from "@shared/apiTypes";
+import { TabsList, PillTabButton } from "@/components/ui/tabs";
 import { useHubQueryState } from "@/hooks/use-hub-query-state";
 import { useApplicationLanguage } from "@/contexts/ApplicationLanguageContext";
 import { translatePriorityScanText } from "@/i18n/priorityScanTranslations";
@@ -67,55 +68,39 @@ export default function FactoryLoadingsHub() {
           </div>
         </div>
         {/* Tab row */}
-        <div className="flex gap-0 px-4 overflow-x-auto" role="tablist">
+        <div className="erp-mobile-scroll-tabs px-4 pb-1">
+          <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Factory sections">
           {showLoadings && (
-            <button
-              role="tab"
-              aria-selected={effectiveActiveTab === "loadings"}
+            <PillTabButton
+              selected={effectiveActiveTab === "loadings"}
               data-testid="tab-container-loadings"
               onClick={() => handleTabChange("loadings")}
-              className={[
-                "px-4 py-2 text-sm font-medium border-b-2 transition-colors",
-                effectiveActiveTab === "loadings"
-                  ? "border-primary text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground",
-              ].join(" ")}
+              
             >
               Container Loadings
-            </button>
+            </PillTabButton>
           )}
           {showPending && (
-            <button
-              role="tab"
-              aria-selected={effectiveActiveTab === "pending"}
+            <PillTabButton
+              selected={effectiveActiveTab === "pending"}
               data-testid="tab-pending-loadings"
               onClick={() => handleTabChange("pending")}
-              className={[
-                "px-4 py-2 text-sm font-medium border-b-2 transition-colors",
-                effectiveActiveTab === "pending"
-                  ? "border-primary text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground",
-              ].join(" ")}
+              
             >
               Pending Loadings
-            </button>
+            </PillTabButton>
           )}
           {showPriority && (
-            <button
-              role="tab"
-              aria-selected={effectiveActiveTab === "priority"}
+            <PillTabButton
+              selected={effectiveActiveTab === "priority"}
               data-testid="tab-priority-scan"
               onClick={() => handleTabChange("priority")}
-              className={[
-                "px-4 py-2 text-sm font-medium border-b-2 transition-colors",
-                effectiveActiveTab === "priority"
-                  ? "border-primary text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground",
-              ].join(" ")}
+              
             >
               {priorityScanLabel}
-            </button>
+            </PillTabButton>
           )}
+          </TabsList>
         </div>
       </div>
 
