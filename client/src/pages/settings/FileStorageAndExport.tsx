@@ -7,7 +7,8 @@ export function FileStorageAndExport() {
   return (
     <div className="space-y-4">
       <Tabs defaultValue="files">
-        <TabsList className="w-max max-w-full" aria-label="Files and exports">
+        <div className="erp-mobile-scroll-tabs pb-1">
+          <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Files and exports">
           <TabsTrigger value="files" className="flex items-center gap-1.5" data-testid="tab-file-storage">
             <Upload className="h-3.5 w-3.5" />
             File Storage
@@ -17,6 +18,7 @@ export function FileStorageAndExport() {
             Export Accounts
           </TabsTrigger>
         </TabsList>
+        </div>
 
         <TabsContent value="files" className="mt-4">
           <FileStorageTab />
