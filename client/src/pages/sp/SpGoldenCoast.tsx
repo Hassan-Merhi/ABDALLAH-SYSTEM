@@ -69,7 +69,7 @@ export default function SpGoldenCoast() {
       </div>
 
       <Tabs value={tab} onValueChange={(value) => setTab(value as GoldenCoastTab)}>
-        <TabsList className="flex h-auto flex-wrap gap-1" data-testid="tabs-golden-coast">
+        <TabsList className="w-max max-w-full" data-testid="tabs-golden-coast">
           <TabsTrigger value="overview">{releaseDebtEnglish("Overview")}</TabsTrigger>
           <TabsTrigger value="hadi">{releaseDebtEnglish("HADI")}</TabsTrigger>
           <TabsTrigger value="savings">{releaseDebtEnglish("Hassan Savings")}</TabsTrigger>
