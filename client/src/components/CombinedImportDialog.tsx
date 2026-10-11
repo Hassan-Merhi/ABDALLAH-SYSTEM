@@ -280,7 +280,7 @@ export function CombinedImportDialog({ open, onOpenChange }: CombinedImportDialo
         </DialogHeader>
 
         <Tabs defaultValue="opening" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="w-max max-w-full" aria-label="Dialog sections">
             <TabsTrigger value="opening">Opening Stock</TabsTrigger>
             <TabsTrigger value="prices">Prices</TabsTrigger>
             <TabsTrigger value="items">Items / Names</TabsTrigger>
