@@ -1,5 +1,4 @@
 import {
-  Search,
   Container,
   Building2,
   ChevronDown,
@@ -11,8 +10,8 @@ import {
   Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DataTableToolbar } from "@/components/DataTableToolbar";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -170,38 +169,39 @@ export function ContainerListView({
             {filteredContainers?.length !== containers?.length ? ` of ${containers?.length}` : ""})
           </span>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="relative w-52">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search containers..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-              data-testid="input-search-containers"
-            />
-          </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-40" data-testid="select-filter-status">
-              <SelectValue placeholder="All Statuses" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="PENDING">Pending</SelectItem>
-              <SelectItem value="IN_TRANSIT">In Transit</SelectItem>
-              <SelectItem value="AVAILABLE">Available</SelectItem>
-              <SelectItem value="OFFLOADED">Offloaded</SelectItem>
-              <SelectItem value="HAS_WEIGHT">Has Weight</SelectItem>
-              <SelectItem value="NO_WEIGHT">No Weight</SelectItem>
-            </SelectContent>
-          </Select>
-          {hasActiveFilters && (
+        <DataTableToolbar
+          search={searchQuery}
+          onSearchChange={setSearchQuery}
+          searchPlaceholder="Search containers..."
+          searchTestId="input-search-containers"
+          mobileFilters
+          filterLabel="Container filters"
+          activeFilterCount={statusFilter !== "all" ? 1 : 0}
+          onResetFilters={onResetFilters}
+          className="mb-0"
+          filters={
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-40" data-testid="select-filter-status">
+                <SelectValue placeholder="All Statuses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="PENDING">Pending</SelectItem>
+                <SelectItem value="IN_TRANSIT">In Transit</SelectItem>
+                <SelectItem value="AVAILABLE">Available</SelectItem>
+                <SelectItem value="OFFLOADED">Offloaded</SelectItem>
+                <SelectItem value="HAS_WEIGHT">Has Weight</SelectItem>
+                <SelectItem value="NO_WEIGHT">No Weight</SelectItem>
+              </SelectContent>
+            </Select>
+          }
+          actions={hasActiveFilters ? (
             <Button variant="outline" type="button" onClick={onResetFilters} data-testid="button-reset-filters">
               <RotateCcw className="mr-2 h-4 w-4" />
               Reset filters
             </Button>
-          )}
-        </div>
+          ) : undefined}
+        />
       </div>
 
       <div data-horizontal-scroll="true" className="overflow-x-auto">
