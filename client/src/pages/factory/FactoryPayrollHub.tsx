@@ -68,7 +68,6 @@ export default function FactoryPayrollHub() {
                 selected={active}
                 data-testid={`tab-people-${key}`}
                 onClick={() => setActiveSection(key)}
-                
               >
                 <Icon className="h-3.5 w-3.5" />
                 {label}
