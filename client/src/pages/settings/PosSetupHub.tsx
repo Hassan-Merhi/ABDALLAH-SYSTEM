@@ -25,7 +25,7 @@ export function PosSetupHub({ userRole }: { userRole?: string }) {
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="flex flex-wrap gap-1">
+        <TabsList className="w-max max-w-full" aria-label="POS settings sections">
           <TabsTrigger value="pos-settings" className="flex items-center gap-1">
             <ShoppingCart className="h-3.5 w-3.5" />
             POS Settings
