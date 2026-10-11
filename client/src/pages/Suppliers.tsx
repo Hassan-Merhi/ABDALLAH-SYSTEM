@@ -8,7 +8,6 @@ import { useLocation } from "wouter";
 import { PageHeader } from "@/components/PageHeader";
 import { DataTableToolbar } from "@/components/DataTableToolbar";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Edit, Eye, EyeOff, FileText, Search, Truck, Users, Container, DollarSign } from "lucide-react";
