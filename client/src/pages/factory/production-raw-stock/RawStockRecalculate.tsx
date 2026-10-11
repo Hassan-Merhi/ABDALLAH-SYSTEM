@@ -1,3 +1,4 @@
+import { TabsList, PillTabButton } from "@/components/ui/tabs";
 import { Suspense } from "react";
 import { Link } from "wouter";
 import { ArrowLeft, History, RefreshCw } from "lucide-react";
@@ -107,15 +108,11 @@ export default function RawStockRecalculate() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b">
+      <TabsList className="w-max max-w-full" aria-label="Raw stock recalculation">
         {tabs.map((t) => (
-          <button
+          <PillTabButton
             key={t.id}
-            className={`px-4 py-2 text-xs font-medium transition-colors border-b-2 -mb-px ${
-              activeTab === t.id
-                ? "border-primary text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
+            selected={activeTab === t.id}
             onClick={() => setActiveTab(t.id)}
           >
             {t.label}
@@ -134,9 +131,9 @@ export default function RawStockRecalculate() {
                 {partialOffloadScan!.affected.length}
               </span>
             )}
-          </button>
+          </PillTabButton>
         ))}
-      </div>
+      </TabsList>
 
       {includeCompletedBatches && (
         <div className="text-xs text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-md px-3 py-2">
