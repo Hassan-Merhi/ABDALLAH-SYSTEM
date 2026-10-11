@@ -30,7 +30,7 @@ export default function FactoryFinanceHub() {
     <div className="flex flex-col h-full">
       <Tabs value={activeTab} onValueChange={setTab} className="flex flex-col h-full">
         <div className="border-b bg-background px-4 pt-3 overflow-x-auto">
-          <TabsList className="h-9 flex-nowrap">
+          <TabsList className="w-max max-w-full" aria-label="Factory finance sections">
             {TABS.map((t) => (
               <TabsTrigger key={t.key} value={t.key} className="flex items-center gap-1.5 text-sm">
                 <t.icon className="h-3.5 w-3.5" />
