@@ -48,7 +48,7 @@ export default function FactoryProductionIntelHub() {
         className="flex flex-col h-full overflow-hidden"
       >
         <div className="border-b px-4 pt-3 shrink-0 overflow-x-auto">
-          <TabsList className="flex-nowrap">
+          <TabsList className="w-max max-w-full" aria-label="Production intelligence sections">
             {sections.includes("production-summary") && (
               <TabsTrigger value="production-summary" data-testid="tab-production-intel-summary">
                 <BarChart3 className="h-4 w-4 mr-2" />
