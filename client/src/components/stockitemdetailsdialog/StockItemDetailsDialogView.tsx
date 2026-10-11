@@ -90,7 +90,7 @@ export function StockItemDetailsDialogView({ dialog }: { dialog: StockItemDetail
           </DialogHeader>
 
           <Tabs defaultValue="details" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="w-max max-w-full" aria-label="Dialog sections">
               <TabsTrigger value="details" data-testid="tab-details">
                 Item Details
               </TabsTrigger>
