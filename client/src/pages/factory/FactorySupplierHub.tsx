@@ -45,8 +45,8 @@ export default function FactorySupplierHub() {
         onValueChange={(value) => setSection(value as Section)}
         className="flex flex-col h-full overflow-hidden"
       >
-        <div className="border-b px-4 pt-3 shrink-0 overflow-x-auto">
-          <TabsList className="w-max max-w-full" aria-label="Factory supplier sections">
+        <div className="erp-mobile-scroll-tabs border-b px-4 pt-3 pb-1 shrink-0">
+          <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Factory supplier sections">
             {sections.includes("report") && (
               <TabsTrigger value="report" data-testid="tab-supplier-hub-report">
                 <FileText className="h-4 w-4 mr-2" />
