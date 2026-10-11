@@ -213,8 +213,9 @@ export function ERPRunPayrollView({ model }: ERPRunPayrollViewProps) {
           setStep(1);
         }}
       >
-        <TabsList>
-          <TabsTrigger value="run" data-testid="tab-run-payroll">
+        <div className="erp-mobile-scroll-tabs pb-1">
+          <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Payroll run sections">
+            <TabsTrigger value="run" data-testid="tab-run-payroll">
             <PlayCircle className="h-4 w-4 mr-2" />
             Run Payroll
           </TabsTrigger>
@@ -227,7 +228,8 @@ export function ERPRunPayrollView({ model }: ERPRunPayrollViewProps) {
               </Badge>
             )}
           </TabsTrigger>
-        </TabsList>
+          </TabsList>
+        </div>
 
         <TabsContent value="run" className="mt-4">
           {step === 1 ? (
