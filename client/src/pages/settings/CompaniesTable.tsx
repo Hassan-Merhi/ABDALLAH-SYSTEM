@@ -7,6 +7,7 @@ import { DataTableToolbar } from "@/components/DataTableToolbar";
 import { TableViewOptions, type TableColumnOption } from "@/components/TableViewOptions";
 import { PaginationBar } from "@/components/PaginationBar";
 import { useTablePrefs } from "@/hooks/use-table-prefs";
+import { useClientTablePagination } from "@/hooks/use-client-table-pagination";
 import { ArrowDown, ArrowUp, Edit, Trash2 } from "lucide-react";
 import type { Company } from "@shared/schema";
 
@@ -27,7 +28,7 @@ const COLUMNS: TableColumnOption[] = [
 
 export function CompaniesTable({ companies, onEdit, onDelete }: CompaniesTableProps) {
   const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
+
   const { prefs, setPrefs } = useTablePrefs("settings-companies");
   const pageSize = prefs.pageSize ?? 25;
   const visibility = prefs.columns ?? {};
@@ -38,9 +39,8 @@ export function CompaniesTable({ companies, onEdit, onDelete }: CompaniesTablePr
   const filtered = companies
     .filter((company) => searchAny(search, company.name, company.code))
     .sort((a, b) => String(a[sortKey] ?? "").localeCompare(String(b[sortKey] ?? "")) * sortDir);
-  const pages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const safePage = Math.min(Math.max(1, page), pages);
-  const visible = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const { page: safePage, setPage, totalPages: pages, paginate } = useClientTablePagination(filtered.length, pageSize);
+  const visible = paginate(filtered);
 
   const toggleSort = (key: "name" | "code") => {
     setPrefs({ sortKey: key, sortDir: prefs.sortKey === key && prefs.sortDir === "asc" ? "desc" : "asc" });

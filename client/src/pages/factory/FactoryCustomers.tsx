@@ -20,6 +20,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { DataTableToolbar } from "@/components/DataTableToolbar";
 import { PaginationBar } from "@/components/PaginationBar";
 import { useTablePrefs } from "@/hooks/use-table-prefs";
+import { useClientTablePagination } from "@/hooks/use-client-table-pagination";
 import { useCompany } from "@/contexts/CompanyContext";
 import { BalanceSplit, type LedgerSplitFields } from "./factorycustomerstatement/NotInLedgerParts";
 
@@ -43,7 +44,7 @@ export default function FactoryCustomers() {
   const [, navigate] = useLocation();
   const { selectedCompany } = useCompany();
   const { prefs, setPrefs } = useTablePrefs("factory-customers", { companyId: selectedCompany?.id });
-  const [page, setPage] = useState(1);
+
   const pageSize = prefs.pageSize ?? 25;
   const [search, setSearch] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -204,9 +205,8 @@ export default function FactoryCustomers() {
   const visibleCustomers = showZeroBalance
     ? filtered
     : filtered.filter((customer) => Math.abs(customer.balance ?? 0) > 0.001);
-  const totalPages = Math.max(1, Math.ceil(visibleCustomers.length / pageSize));
-  const safePage = Math.min(Math.max(1, page), totalPages);
-  const pagedCustomers = visibleCustomers.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const { page: safePage, setPage, totalPages, paginate } = useClientTablePagination(visibleCustomers.length, pageSize);
+  const pagedCustomers = paginate(visibleCustomers);
 
   if (isLoading) {
     return (

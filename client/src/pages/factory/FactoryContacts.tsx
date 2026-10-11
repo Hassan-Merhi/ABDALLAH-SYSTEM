@@ -8,6 +8,7 @@ import { DataTableToolbar } from "@/components/DataTableToolbar";
 import { TableViewOptions, type TableColumnOption } from "@/components/TableViewOptions";
 import { PaginationBar } from "@/components/PaginationBar";
 import { useTablePrefs } from "@/hooks/use-table-prefs";
+import { useClientTablePagination } from "@/hooks/use-client-table-pagination";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -86,7 +87,7 @@ export default function FactoryContacts() {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
   const { prefs, setPrefs } = useTablePrefs("factory-contacts", { companyId: selectedCompany?.id });
-  const [page, setPage] = useState(1);
+
   const pageSize = prefs.pageSize ?? 25;
   const visibility = prefs.columns ?? {};
   const show = (key: string) => visibility[key] !== false;
@@ -114,9 +115,8 @@ export default function FactoryContacts() {
   const orderedContacts = [...filtered].sort(
     (a, b) => a.name.localeCompare(b.name) * (prefs.sortDir === "desc" ? -1 : 1)
   );
-  const pages = Math.max(1, Math.ceil(orderedContacts.length / pageSize));
-  const safePage = Math.min(Math.max(1, page), pages);
-  const visibleContacts = orderedContacts.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const { page: safePage, setPage, totalPages: pages, paginate } = useClientTablePagination(orderedContacts.length, pageSize);
+  const visibleContacts = paginate(orderedContacts);
 
   const saveMutation = useMutation({
     mutationFn: async (data: typeof EMPTY_FORM) => {

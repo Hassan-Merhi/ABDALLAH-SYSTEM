@@ -6,6 +6,7 @@ import { DataTableToolbar } from "@/components/DataTableToolbar";
 import { PaginationBar } from "@/components/PaginationBar";
 import { TableViewOptions, type TableColumnOption } from "@/components/TableViewOptions";
 import { useTablePrefs } from "@/hooks/use-table-prefs";
+import { useClientTablePagination } from "@/hooks/use-client-table-pagination";
 import { Edit, Trash2, Key } from "lucide-react";
 import type { SettingsUserRow } from "./settingsTypes";
 
@@ -25,7 +26,7 @@ const COLUMNS: TableColumnOption[] = [
 
 export function UsersTable({ users, onEdit, onDelete, onResetPassword }: UsersTableProps) {
   const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
+
   const { prefs, setPrefs } = useTablePrefs("settings-users");
   const pageSize = prefs.pageSize ?? 25;
   const visibility = prefs.columns ?? {};
@@ -33,9 +34,8 @@ export function UsersTable({ users, onEdit, onDelete, onResetPassword }: UsersTa
   const filtered = users.filter((user) =>
     [user.username, user.role].some((value) => String(value ?? "").toLowerCase().includes(search.toLowerCase().trim()))
   );
-  const pages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const safePage = Math.min(Math.max(1, page), pages);
-  const visible = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const { page: safePage, setPage, totalPages: pages, paginate } = useClientTablePagination(filtered.length, pageSize);
+  const visible = paginate(filtered);
 
   return (
     <div className="min-w-0 space-y-3">
