@@ -40,7 +40,17 @@ export function TabLabel({
   return (
     <div
       data-testid={`sb-tab-${name}`}
+      role="tab"
+      aria-selected={active}
+      tabIndex={active ? 0 : -1}
       onClick={onActivate}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onActivate();
+        }
+      }}
       onDoubleClick={() => {
         setEditing(true);
         setDraft(name);
