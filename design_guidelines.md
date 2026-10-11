@@ -223,3 +223,25 @@
 - Empty states (simple illustrations, max-w-xs)
 - User avatars (w-10 h-10 rounded-full)
 - Company logos (h-8 in selectors)
+## Shared UI component contract (Phase 1, October 2026)
+
+The source of truth for shared component behavior and recommended imports is
+[`docs/shared-ui-phase-1.md`](docs/shared-ui-phase-1.md).
+
+- Use the canonical `PageShell` with `layout="workspace"` for new pages.
+  Keep `PageShell layout="padded"` and `CoreErpPage` for older page
+  contracts; they delegate to the same underlying renderer.
+- Prefer `PageState`'s `EmptyState`, `LoadingState`, `ErrorState` and
+  `SuccessState` for feedback. Use `LoadingSkeleton` when a structural
+  loading placeholder provides more context. The old compact
+  `ui/empty-state` is an adapter, not an alternative implementation.
+- Use `components/StatusBadge` for statuses instead of local ad-hoc
+  color mappings. Domain adapters may add context-specific labels and values.
+- Import directly from canonical module paths for feature-level code.
+  The `@/components/shared` barrel is also supported for grouped imports.
+- Reuse the existing page header, table, form, and dialog primitives.
+  Never duplicate data fetching, business rules, permission checks, or
+  currency calculations inside presentation components.
+
+This phase intentionally does **not** change tab UX, table filters, business
+forms, calculations, or CI enforcement. Those are covered by later phases.

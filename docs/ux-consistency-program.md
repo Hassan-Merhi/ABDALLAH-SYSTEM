@@ -55,7 +55,7 @@ The gate rejects root horizontal overflow, missing application shells, missing s
 
 1. Register the lazy page normally in `client/src/lazyPages.ts` and its workspace router.
 2. Keep the route inside the existing shell; do not create another authenticated `<main>` element.
-3. Use shared page-state, dialog, table, form, report, and workspace primitives.
+3. Use the canonical shared UI primitives specified in `docs/shared-ui-phase-1.md` (page layout, empty/loading states, status badges), then the existing dialog, table, form and report primitives.
 4. For filter-heavy lists, use the shared persisted filter hook and add a reset-all control.
 5. Add the route to the rendered workspace matrix when it introduces a new interaction pattern rather than duplicating an already-covered list or detail pattern.
 6. Run `npm run audit:ux-consistency`, the frontend suite, and the responsive Phase 11 verifier.
