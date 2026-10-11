@@ -42,6 +42,10 @@ The following high-risk list workflows have versioned persistence, company isola
 
 Use the common responsive tab components described in `docs/shared-ui-phase-2.md` when a page switches between tabbed panels; keep route/query state and access filtering in the page.
 
+Follow the shared table/filter/pager contracts documented in
+`docs/shared-ui-phase-3.md` rather than introducing new table toolbars,
+independent mobile sheets, or repeated client-side pagination calculations.
+
 Use `usePaginatedFilterState` for new list workflows. A page with no pagination may ignore the returned page state, but it must still scope the storage key to the selected company whenever its data is company-owned.
 
 ## Rendered release gate

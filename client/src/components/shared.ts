@@ -19,6 +19,7 @@ export { DataTableToolbar, type DataTableToolbarProps } from "./DataTableToolbar
 export { TableViewOptions, type TableColumnOption, type TableViewOptionsProps } from "./TableViewOptions";
 export { PaginationBar, type PaginationBarProps } from "./PaginationBar";
 export { useTablePrefs, type TablePrefs, type TableDensity } from "@/hooks/use-table-prefs";
+export { useClientTablePagination } from "@/hooks/use-client-table-pagination";
 export { PageShell, PageActions, FinancialReportHeader, financialNumberClassName, type PageShellProps, type PageShellLayout, type PageActionsProps } from "./ui/page-shell";
 export { WorkspacePage, WorkspaceSection, WorkspaceSectionHeader, WorkspaceToolbar, WorkspaceToolbarGroup, WorkspaceActions, ResponsiveTableFrame, FormActionBar } from "./ui/workspace-layout";
 export { PageState, LoadingState, EmptyState, ErrorState, SuccessState, type PageStateProps } from "./ui/page-state";

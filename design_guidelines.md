@@ -255,3 +255,13 @@ variants display consistently on phone and desktop, have scrollable strips on
 small screens, and support keyboard navigation and accessible tab panels.
 Do not reimplement tab button colors, selected states or keyboard behavior.
 See [`docs/shared-ui-phase-2.md`](docs/shared-ui-phase-2.md) for the contract.
+
+## Shared list components (Phase 3, October 2026)
+
+The canonical `Table` renderer, `DataTableToolbar`, `TableViewOptions`,
+`PaginationBar`, and `useTablePrefs` are required for new ordinary
+operational list designs where those features are relevant. Keep calculations,
+authorization, and authoritative filters in their owning modules. Standard
+phone record lists use `mobileLayout="cards"`; financial ledgers and
+column-dependent matrices remain scrollable tables. For detailed usage, see
+[`docs/shared-ui-phase-3.md`](docs/shared-ui-phase-3.md).
