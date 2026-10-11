@@ -45,7 +45,8 @@ export default function FactoryAdvancesTab() {
 
   return (
     <Tabs value={activeTab} onValueChange={(value) => setSubTab(value as "advances" | "repayments" | "deductions")}>
-      <TabsList className="mb-4">
+      <div className="erp-mobile-scroll-tabs mb-4 pb-1">
+        <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Factory advances and deductions">
         {showAdvances && (
           <TabsTrigger value="advances" data-testid="subtab-advances">
             <Banknote className="h-4 w-4 mr-2" />
@@ -64,7 +65,8 @@ export default function FactoryAdvancesTab() {
             Deductions
           </TabsTrigger>
         )}
-      </TabsList>
+        </TabsList>
+      </div>
 
       {showAdvances && (
         <TabsContent value="advances" className="mt-0">
