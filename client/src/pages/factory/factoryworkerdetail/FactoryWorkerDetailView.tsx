@@ -335,7 +335,8 @@ export function FactoryWorkerDetailView({ model }: FactoryWorkerDetailModelProps
                 setRequestedDetailTab(value as "profile" | "statement" | "advances" | "bales" | "documents")
               }
             >
-              <TabsList className="mb-4">
+              <div className="erp-mobile-scroll-tabs mb-4 pb-1">
+                <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Factory worker details">
                 {showProfile && (
                   <TabsTrigger value="profile" data-testid="tab-profile">
                     Profile
@@ -361,7 +362,8 @@ export function FactoryWorkerDetailView({ model }: FactoryWorkerDetailModelProps
                     Documents
                   </TabsTrigger>
                 )}
-              </TabsList>
+                </TabsList>
+              </div>
 
               {showProfile && (
                 <TabsContent value="profile" className="space-y-4">
