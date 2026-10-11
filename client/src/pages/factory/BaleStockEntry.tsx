@@ -145,7 +145,8 @@ export default function BaleStockEntry() {
         }}
         className="min-w-0"
       >
-        <TabsList aria-label="Bale stock entry sections" className="w-max max-w-full">
+        <div className="erp-mobile-scroll-tabs pb-1">
+          <TabsList aria-label="Bale stock entry sections" className="w-max min-w-full sm:min-w-0 sm:w-fit">
           {showEntry && (
             <TabsTrigger value="entry" data-testid="tab-stock-entry">
               <ScanLine className="mr-1 h-4 w-4" />
@@ -170,7 +171,8 @@ export default function BaleStockEntry() {
               {tr("productionTargets")}
             </TabsTrigger>
           )}
-        </TabsList>
+          </TabsList>
+        </div>
         {showEntry && (
           <TabsContent value="entry" className="mt-4 min-w-0">
             <StockEntryTab
