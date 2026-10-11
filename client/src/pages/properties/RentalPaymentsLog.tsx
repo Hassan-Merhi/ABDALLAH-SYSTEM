@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/PageHeader";
+import { DataTableToolbar } from "@/components/DataTableToolbar";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { useMobileCardTable } from "@/components/ui/mobile-card-table";
 import {
@@ -22,7 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { AlertTriangle, ClipboardList, Search, Trash2 } from "lucide-react";
+import { AlertTriangle, ClipboardList, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 
 const MONTH_NAMES = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -133,16 +134,13 @@ export default function RentalPaymentsLog({
             subtitle="All payment receipts recorded across all units, sorted by date."
             icon={pageIcon ?? <ClipboardList className="h-5 w-5" />}
           />
-          <div className="relative w-full sm:w-64">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              className="pl-8"
-              placeholder="Search tenant, unit, notes…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              data-testid={`input-${testIdPrefix}-payments-search`}
-            />
-          </div>
+          <DataTableToolbar
+            search={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search tenant, unit, notes…"
+            searchTestId={`input-${testIdPrefix}-payments-search`}
+            className="mb-0"
+          />
         </>
       ) : (
         <div className="flex items-center gap-3 flex-wrap justify-between">
@@ -155,16 +153,13 @@ export default function RentalPaymentsLog({
               />
             </div>
           </div>
-          <div className="relative w-full sm:w-64">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              className="pl-8"
-              placeholder="Search tenant, unit, notes…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              data-testid={`input-${testIdPrefix}-payments-search`}
-            />
-          </div>
+          <DataTableToolbar
+            search={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search tenant, unit, notes…"
+            searchTestId={`input-${testIdPrefix}-payments-search`}
+            className="mb-0"
+          />
         </div>
       )}
 
