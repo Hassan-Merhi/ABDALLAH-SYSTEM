@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Pencil, User, Trash2, FileText, RotateCcw, History, Clock, Eye, EyeOff } from "lucide-react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
+import { useSingleFlightAction } from "@/hooks/use-single-flight-action";
 import { MoneyInput } from "@/components/ui/decimal-input";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { PageHeader } from "@/components/PageHeader";
@@ -42,6 +43,7 @@ interface Customer extends LedgerSplitFields {
 
 export default function FactoryCustomers() {
   const { toast } = useToast();
+  const { execute: executeSave, pending: saving } = useSingleFlightAction();
   const { formatCashAmount } = useCurrencyContext();
   const [, navigate] = useLocation();
   const { selectedCompany } = useCompany();
@@ -175,27 +177,31 @@ export default function FactoryCustomers() {
   };
 
   const handleCreate = () => {
-    if (!formData.legalName.trim()) return;
+    if (!formData.legalName.trim() || saving || createMutation.isPending) return;
     const days = formData.paymentTermsDays ? parseInt(formData.paymentTermsDays) : undefined;
-    createMutation.mutate({
+    void executeSave(() => createMutation.mutateAsync({
       legalName: formData.legalName.trim(),
       phone: formData.phone.trim() || undefined,
       openingBalance: formData.openingBalance || undefined,
       openingBalanceSide: formData.openingBalanceSide || undefined,
       paymentTermsDays: days || undefined,
+    })).catch(() => {
+      // Existing mutation.onError provides feedback.
     });
   };
 
   const handleUpdate = () => {
-    if (!editingCustomer || !formData.legalName.trim()) return;
+    if (!editingCustomer || !formData.legalName.trim() || saving || updateMutation.isPending) return;
     const days = formData.paymentTermsDays ? parseInt(formData.paymentTermsDays) : null;
-    updateMutation.mutate({
+    void executeSave(() => updateMutation.mutateAsync({
       id: editingCustomer.id,
       data: {
         legalName: formData.legalName.trim(),
         phone: formData.phone.trim() || null,
         paymentTermsDays: days,
       },
+    })).catch(() => {
+      // Existing mutation.onError provides feedback.
     });
   };
 
@@ -534,7 +540,7 @@ export default function FactoryCustomers() {
                 Cancel
               </Button>
               <FormSubmitButton type="button" onClick={handleCreate}
-                pending={createMutation.isPending} pendingLabel="Creating…"
+                pending={createMutation.isPending || saving} pendingLabel="Creating…"
                 disabled={!formData.legalName.trim()}
                 data-testid="button-submit-customer">
                 Create Customer

@@ -6,6 +6,7 @@ import { getApiRequest } from "@/lib/factoryApi";
 import { PageHeader } from "@/components/PageHeader";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
+import { useSingleFlightAction } from "@/hooks/use-single-flight-action";
 import { DataTableToolbar } from "@/components/DataTableToolbar";
 import { TableViewOptions, type TableColumnOption } from "@/components/TableViewOptions";
 import { PaginationBar } from "@/components/PaginationBar";
@@ -77,6 +78,7 @@ export default function FactoryContacts() {
   const modeApiRequest = getApiRequest(appMode);
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { execute: executeSave, pending: saving } = useSingleFlightAction();
   const { selectedCompany } = useCompany();
   const { prefs, setPrefs } = useTablePrefs("factory-contacts", { companyId: selectedCompany?.id });
 
@@ -176,14 +178,16 @@ export default function FactoryContacts() {
   const removeNumber = (idx: number) => setForm((f) => ({ ...f, numbers: f.numbers.filter((_, i) => i !== idx) }));
 
   const handleSubmit = () => {
-    if (saveMutation.isPending) return;
+    if (saveMutation.isPending || saving) return;
     if (!form.name.trim()) {
       toast({ title: "Name is required", variant: "destructive" });
       return;
     }
-    saveMutation.mutate({
+    void executeSave(() => saveMutation.mutateAsync({
       ...form,
       numbers: form.numbers.filter((n) => n.number.trim()),
+    })).catch(() => {
+      // Existing mutation.onError provides feedback.
     });
   };
 
@@ -393,7 +397,7 @@ export default function FactoryContacts() {
               Cancel
             </Button>
             <FormSubmitButton type="button" onClick={handleSubmit}
-              pending={saveMutation.isPending} pendingLabel="Saving…">
+              pending={saveMutation.isPending || saving} pendingLabel="Saving…">
               {editingContact ? "Save Changes" : "Add Contact"}
             </FormSubmitButton>
           </DialogFooter>
