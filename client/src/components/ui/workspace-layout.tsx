@@ -1,9 +1,10 @@
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
+import { PageShell, PageActions } from "@/components/ui/page-shell";
 
 export function WorkspacePage({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("min-w-0 space-y-5 sm:space-y-6", className)} {...props} />;
+  return <PageShell layout="workspace" className={className} {...props} />;
 }
 
 export function WorkspaceSection({ className, ...props }: React.HTMLAttributes<HTMLElement>) {
@@ -43,16 +44,7 @@ export function WorkspaceToolbarGroup({ className, ...props }: React.HTMLAttribu
 }
 
 export function WorkspaceActions({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return (
-    <div
-      className={cn(
-        "flex w-full min-w-0 flex-col-reverse gap-2 min-[360px]:grid min-[360px]:grid-cols-2 sm:flex sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end",
-        "*:min-w-0 *:w-full sm:*:w-auto [&_button]:w-full sm:[&_button]:w-auto",
-        className
-      )}
-      {...props}
-    />
-  );
+  return <PageActions layout="responsive" className={className} {...props} />;
 }
 
 export function ResponsiveTableFrame({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {

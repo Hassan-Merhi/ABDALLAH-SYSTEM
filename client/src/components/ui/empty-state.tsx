@@ -1,25 +1,27 @@
-import * as React from "react";
-import { LucideIcon } from "lucide-react";
-import { cn } from "@/lib/utils";
+import type * as React from "react";
+import type { LucideIcon } from "lucide-react";
+import { PageState } from "@/components/ui/page-state";
 
-interface EmptyStateProps extends React.HTMLAttributes<HTMLDivElement> {
+/**
+ * Compatibility adapter for the old compact empty-state presentation.
+ * Rendering and accessibility are owned by the same PageState used elsewhere.
+ * New pages should import EmptyState from @/components/shared (panel layout).
+ */
+export interface CompactEmptyStateProps extends React.HTMLAttributes<HTMLDivElement> {
   icon?: LucideIcon;
   title: string;
   description?: string;
   action?: React.ReactNode;
 }
-
-export function EmptyState({ icon: Icon, title, description, action, className, ...props }: EmptyStateProps) {
+export function EmptyState({ icon, title, description, action, ...props }: CompactEmptyStateProps) {
   return (
-    <div className={cn("empty-state", className)} role="status" {...props}>
-      {Icon && (
-        <div className="empty-state-icon" aria-hidden="true">
-          <Icon className="h-5 w-5" />
-        </div>
-      )}
-      <h3 className="empty-state-title">{title}</h3>
-      {description && <p className="empty-state-desc">{description}</p>}
-      {action && <div className="mt-2">{action}</div>}
-    </div>
+    <PageState
+      layout="legacy"
+      icon={icon ?? null}
+      title={title}
+      description={description}
+      action={action}
+      {...props}
+    />
   );
 }
