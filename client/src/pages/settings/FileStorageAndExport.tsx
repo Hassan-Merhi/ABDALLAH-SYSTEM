@@ -7,7 +7,7 @@ export function FileStorageAndExport() {
   return (
     <div className="space-y-4">
       <Tabs defaultValue="files">
-        <TabsList className="flex-wrap h-auto gap-1">
+        <TabsList className="w-max max-w-full" aria-label="Files and exports">
           <TabsTrigger value="files" className="flex items-center gap-1.5" data-testid="tab-file-storage">
             <Upload className="h-3.5 w-3.5" />
             File Storage
