@@ -212,7 +212,7 @@ export default function SpReports() {
       </div>
 
       <Tabs value={tab} onValueChange={(value) => setTab(value as ReportTab)}>
-        <TabsList data-testid="tabs-sp-reports" className="flex-wrap gap-1">
+        <TabsList data-testid="tabs-sp-reports" className="w-max max-w-full">
           <TabsTrigger value="profit" data-testid="tab-sp-profit">
             <BarChart3 className="h-3.5 w-3.5 mr-1.5" /> Profit & Loss
           </TabsTrigger>
