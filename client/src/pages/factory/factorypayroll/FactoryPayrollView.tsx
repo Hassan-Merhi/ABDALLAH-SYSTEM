@@ -165,7 +165,7 @@ export function FactoryPayrollView({ model }: { model: ReturnType<typeof useFact
           onValueChange={(value) => setRequestedTab(value as "payroll" | "workers")}
           className="space-y-4"
         >
-          <TabsList variant="underline">
+          <TabsList>
             {showPayrollRecords && (
               <TabsTrigger value="payroll" data-testid="tab-payroll-records">
                 <FileText className="mr-1 h-4 w-4" /> Payroll Records
