@@ -643,13 +643,15 @@ export default function FactoryCustomers() {
               >
                 Cancel
               </Button>
-              <Button
+              <FormSubmitButton type="button"
                 onClick={handleUpdate}
-                disabled={updateMutation.isPending || !formData.legalName.trim()}
+                pending={updateMutation.isPending || saving}
+                pendingLabel="Saving…"
+                disabled={!formData.legalName.trim()}
                 data-testid="button-submit-edit-customer"
               >
-                {updateMutation.isPending ? "Saving..." : "Save Changes"}
-              </Button>
+                Save Changes
+              </FormSubmitButton>
             </div>
           </div>
         </DialogContent>

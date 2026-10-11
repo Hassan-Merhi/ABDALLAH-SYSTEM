@@ -52,6 +52,7 @@ export function EditPriceLineDialog({
             <div>
               <label className="text-sm font-medium mb-1 block">Quantity</label>
               <DecimalInput
+                step="1"
                                 value={editLineValues.quantity}
                 onChange={(e) => setEditLineValues({ ...editLineValues, quantity: e.target.value })}
                 onKeyDown={(e) => {
