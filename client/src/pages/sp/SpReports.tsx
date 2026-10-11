@@ -212,7 +212,8 @@ export default function SpReports() {
       </div>
 
       <Tabs value={tab} onValueChange={(value) => setTab(value as ReportTab)}>
-        <TabsList data-testid="tabs-sp-reports" className="w-max max-w-full">
+        <div className="erp-mobile-scroll-tabs pb-1">
+          <TabsList data-testid="tabs-sp-reports" className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Supplier Partner reports">
           <TabsTrigger value="profit" data-testid="tab-sp-profit">
             <BarChart3 className="h-3.5 w-3.5 mr-1.5" /> Profit & Loss
           </TabsTrigger>
@@ -220,6 +221,7 @@ export default function SpReports() {
             <FileSpreadsheet className="h-3.5 w-3.5 mr-1.5" /> Sales Form
           </TabsTrigger>
         </TabsList>
+        </div>
 
         <TabsContent value="profit" className="mt-4 space-y-4">
           <div className="flex items-center gap-3 flex-wrap">
