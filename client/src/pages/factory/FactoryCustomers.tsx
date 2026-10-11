@@ -13,10 +13,14 @@ import { useLocation } from "wouter";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Search, User, Trash2, FileText, RotateCcw, History, Clock, Eye, EyeOff } from "lucide-react";
+import { Plus, Pencil, User, Trash2, FileText, RotateCcw, History, Clock, Eye, EyeOff } from "lucide-react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { PageHeader } from "@/components/PageHeader";
+import { DataTableToolbar } from "@/components/DataTableToolbar";
+import { PaginationBar } from "@/components/PaginationBar";
+import { useTablePrefs } from "@/hooks/use-table-prefs";
+import { useCompany } from "@/contexts/CompanyContext";
 import { BalanceSplit, type LedgerSplitFields } from "./factorycustomerstatement/NotInLedgerParts";
 
 interface Customer extends LedgerSplitFields {
@@ -37,6 +41,10 @@ export default function FactoryCustomers() {
   const { toast } = useToast();
   const { formatCashAmount } = useCurrencyContext();
   const [, navigate] = useLocation();
+  const { selectedCompany } = useCompany();
+  const { prefs, setPrefs } = useTablePrefs("factory-customers", { companyId: selectedCompany?.id });
+  const [page, setPage] = useState(1);
+  const pageSize = prefs.pageSize ?? 25;
   const [search, setSearch] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
@@ -196,6 +204,9 @@ export default function FactoryCustomers() {
   const visibleCustomers = showZeroBalance
     ? filtered
     : filtered.filter((customer) => Math.abs(customer.balance ?? 0) > 0.001);
+  const totalPages = Math.max(1, Math.ceil(visibleCustomers.length / pageSize));
+  const safePage = Math.min(Math.max(1, page), totalPages);
+  const pagedCustomers = visibleCustomers.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   if (isLoading) {
     return (
@@ -231,7 +242,7 @@ export default function FactoryCustomers() {
           {zeroBalanceCount > 0 && (
             <Button
               variant="outline"
-              onClick={() => setShowZeroBalance((visible) => !visible)}
+              onClick={() => { setShowZeroBalance((visible) => !visible); setPage(1); }}
               aria-pressed={showZeroBalance}
               data-testid="button-toggle-zero-balance"
               size="sm"
@@ -253,20 +264,16 @@ export default function FactoryCustomers() {
         </div>
       </div>
 
-      <div className="relative mb-4">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search by name, code, or phone..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-9"
-          data-testid="input-search-customers"
-        />
-      </div>
+      <DataTableToolbar
+        search={search}
+        onSearchChange={(value) => { setSearch(value); setPage(1); }}
+        searchPlaceholder="Search by name, code, or phone..."
+        searchTestId="input-search-customers"
+      />
 
       <div className="rounded-xl border overflow-hidden">
         <div className="table-responsive">
-          <Table mobileLayout="cards">
+          <Table mobileLayout="cards" density={prefs.density}>
             <TableHeader className="sticky top-0 z-30">
               <TableRow className="bg-muted border-b-2 border-border/60 hover:bg-muted">
                 <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
@@ -290,7 +297,7 @@ export default function FactoryCustomers() {
                   </TableCell>
                 </TableRow>
               ) : (
-                visibleCustomers.map((customer) => (
+                pagedCustomers.map((customer) => (
                   <TableRow key={customer.id} data-testid={`row-customer-${customer.id}`}>
                     <TableCell className="font-medium" data-testid={`text-customer-name-${customer.id}`}>
                       <button
@@ -359,6 +366,10 @@ export default function FactoryCustomers() {
           </Table>
         </div>
       </div>
+      <PaginationBar page={safePage} totalPages={totalPages} total={visibleCustomers.length}
+        pageSize={pageSize} onPageChange={setPage} noun="customers"
+        onPageSizeChange={(size) => { setPrefs({ pageSize: size }); setPage(1); }}
+      />
 
       {showDeleted && (
         <div className="rounded-xl border overflow-hidden mt-6">

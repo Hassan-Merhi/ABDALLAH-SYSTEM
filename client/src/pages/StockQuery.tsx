@@ -3,11 +3,11 @@ import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { useLocation, useSearch } from "wouter";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, Package } from "lucide-react";
+import { Package } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
+import { DataTableToolbar } from "@/components/DataTableToolbar";
 
 interface StockItem {
   id: number;
@@ -83,17 +83,9 @@ export default function StockQuery() {
     <div className="flex flex-col gap-4 sm:p-4 md:p-6">
       {/* ── Header + Search ── */}
       <PageHeader title="Stock Query" subtitle="Click any item to view purchase history, sales, and inventory" />
-      <div className="relative w-full sm:max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search by code or name..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-9"
-          autoFocus
-          data-testid="input-stock-search"
-        />
-      </div>
+      <DataTableToolbar search={searchTerm} onSearchChange={setSearchTerm}
+        searchPlaceholder="Search by code or name..." searchTestId="input-stock-search" className="mb-0"
+      />
 
       {/* ── Result count ── */}
       {!isLoading && (items.length > 0 || hasSearch) && (
