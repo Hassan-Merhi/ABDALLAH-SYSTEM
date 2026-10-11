@@ -55,45 +55,6 @@ const TabsList = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement> & { variant?: "pill" | "underline" }
 >(({ className, variant = "pill", onKeyDown, ...props }, ref) => {
-  const localRef = React.useRef<HTMLDivElement | null>(null);
-  const setRef = React.useCallback((node: HTMLDivElement | null) => {
-    localRef.current = node;
-    if (typeof ref === "function") ref(node);
-    else if (ref) ref.current = node;
-  }, [ref]);
-
-  React.useEffect(() => {
-    const list = localRef.current;
-    if (!list) return;
-    const updateOverflow = () => {
-      // A legacy hub may provide its own horizontal scroller around TabsList.
-      const scroller = list.scrollWidth > list.clientWidth + 1
-        ? list
-        : list.closest<HTMLElement>(".erp-mobile-scroll-tabs") ?? list;
-      const tabs = scroller.querySelectorAll<HTMLElement>('[role="tab"]');
-      const firstTab = tabs.item(0);
-      const lastTab = tabs.item(tabs.length - 1);
-      if (!firstTab || !lastTab) return;
-      const bounds = scroller.getBoundingClientRect();
-      const first = firstTab.getBoundingClientRect();
-      const last = lastTab.getBoundingClientRect();
-      list.dataset.overflowLeft = String(Math.min(first.left, last.left) < bounds.left - 2);
-      list.dataset.overflowRight = String(Math.max(first.right, last.right) > bounds.right + 2);
-    };
-    const outer = list.closest<HTMLElement>(".erp-mobile-scroll-tabs");
-    updateOverflow();
-    const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(updateOverflow) : null;
-    observer?.observe(list);
-    if (outer && outer !== list) observer?.observe(outer);
-    list.addEventListener("scroll", updateOverflow, { passive: true });
-    if (outer && outer !== list) outer.addEventListener("scroll", updateOverflow, { passive: true });
-    return () => {
-      observer?.disconnect();
-      list.removeEventListener("scroll", updateOverflow);
-      if (outer && outer !== list) outer.removeEventListener("scroll", updateOverflow);
-    };
-  }, []);
-
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     onKeyDown?.(event);
     if (event.defaultPrevented || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
@@ -115,7 +76,7 @@ const TabsList = React.forwardRef<
 
   return (
     <div
-      ref={setRef}
+      ref={ref}
       role="tablist"
       data-responsive-tabs="true"
       data-variant={variant}
