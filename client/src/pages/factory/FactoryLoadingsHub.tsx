@@ -75,7 +75,6 @@ export default function FactoryLoadingsHub() {
               selected={effectiveActiveTab === "loadings"}
               data-testid="tab-container-loadings"
               onClick={() => handleTabChange("loadings")}
-              
             >
               Container Loadings
             </PillTabButton>
@@ -85,7 +84,6 @@ export default function FactoryLoadingsHub() {
               selected={effectiveActiveTab === "pending"}
               data-testid="tab-pending-loadings"
               onClick={() => handleTabChange("pending")}
-              
             >
               Pending Loadings
             </PillTabButton>
@@ -95,7 +93,6 @@ export default function FactoryLoadingsHub() {
               selected={effectiveActiveTab === "priority"}
               data-testid="tab-priority-scan"
               onClick={() => handleTabChange("priority")}
-              
             >
               {priorityScanLabel}
             </PillTabButton>
