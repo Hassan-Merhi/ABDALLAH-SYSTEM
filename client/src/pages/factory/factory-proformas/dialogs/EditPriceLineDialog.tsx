@@ -9,6 +9,9 @@ import type { useFactoryProformasModel } from "../../factoryproformas/useFactory
 type FactoryProformasModel = ReturnType<typeof useFactoryProformasModel>;
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DecimalInput, MoneyInput } from "@/components/ui/decimal-input";
+import { FormGrid } from "@/components/ui/form";
+import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export function EditPriceLineDialog({
@@ -45,12 +48,11 @@ export function EditPriceLineDialog({
               data-testid="input-edit-line-product-name"
             />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <FormGrid minColumnWidth="8rem">
             <div>
               <label className="text-sm font-medium mb-1 block">Quantity</label>
-              <Input
-                type="number"
-                value={editLineValues.quantity}
+              <DecimalInput
+                                value={editLineValues.quantity}
                 onChange={(e) => setEditLineValues({ ...editLineValues, quantity: e.target.value })}
                 onKeyDown={(e) => {
                   if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault();
@@ -60,9 +62,8 @@ export function EditPriceLineDialog({
             </div>
             <div>
               <label className="text-sm font-medium mb-1 block">Price per Bale</label>
-              <Input
-                type="number"
-                step="0.01"
+              <MoneyInput
+                                step="0.01"
                 value={editLineValues.pricePerBale}
                 onChange={(e) => setEditLineValues({ ...editLineValues, pricePerBale: e.target.value })}
                 onKeyDown={(e) => {
@@ -73,9 +74,8 @@ export function EditPriceLineDialog({
             </div>
             <div>
               <label className="text-sm font-medium mb-1 block">KG / Bale</label>
-              <Input
-                type="number"
-                step="0.01"
+              <DecimalInput
+                                step="0.01"
                 placeholder="e.g. 97"
                 value={editLineValues.weightPerBaleKg}
                 onChange={(e) => setEditLineValues({ ...editLineValues, weightPerBaleKg: e.target.value })}
@@ -85,18 +85,20 @@ export function EditPriceLineDialog({
                 data-testid="input-edit-line-weight"
               />
             </div>
-          </div>
+          </FormGrid>
           <div className="flex justify-end gap-3 pt-2">
             <Button variant="outline" onClick={() => setEditingLine(null)} data-testid="button-cancel-edit-line">
               Cancel
             </Button>
-            <Button
+            <FormSubmitButton
+              type="button"
               onClick={handleEditLine}
-              disabled={!editLineValues.pricePerBale || !editLineValues.quantity || editLineMutation.isPending}
+              disabled={!editLineValues.pricePerBale || !editLineValues.quantity}
+              pending={editLineMutation.isPending}
               data-testid="button-confirm-edit-line"
             >
               Save Changes
-            </Button>
+            </FormSubmitButton>
           </div>
         </div>
       </DialogContent>

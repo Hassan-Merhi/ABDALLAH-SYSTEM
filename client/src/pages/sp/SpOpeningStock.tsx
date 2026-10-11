@@ -6,13 +6,17 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { DecimalInput, MoneyInput } from "@/components/ui/decimal-input";
+import { FormGrid } from "@/components/ui/form";
+import { FormActionBar } from "@/components/ui/workspace-layout";
+import { FormSubmitButton } from "@/components/FormSubmitButton";
+import { formatMoneyDisplay } from "@/lib/moneyDisplay";
 import { Loader2, ArrowRight } from "lucide-react";
 
 function fmt(v: number | string | undefined, dec = 2) {
-  const n = parseFloat(String(v ?? "0"));
-  return isNaN(n)
-    ? `$0.${"0".repeat(dec)}`
-    : `$${n.toLocaleString("en-US", { minimumFractionDigits: dec, maximumFractionDigits: dec })}`;
+  return formatMoneyDisplay(v ?? 0, {
+    currency: "USD", minimumFractionDigits: dec, maximumFractionDigits: dec,
+  });
 }
 function num(v: string) {
   return parseFloat(v || "0") || 0;
@@ -88,6 +92,7 @@ export default function SpOpeningStock() {
   const canSubmit = articleCode.trim() && qtyN > 0 && finalN > 0;
 
   const handleSubmit = () => {
+    if (mutation.isPending) return;
     if (!canSubmit) {
       toast({ title: "Fill in article code, qty and final unit cost", variant: "destructive" });
       return;
@@ -121,7 +126,7 @@ export default function SpOpeningStock() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <FormGrid minColumnWidth="10rem" className="gap-3">
             <div className="col-span-2">
               <label className="text-xs text-muted-foreground">Article Code *</label>
               <Input
@@ -134,9 +139,8 @@ export default function SpOpeningStock() {
             </div>
             <div>
               <label className="text-xs text-muted-foreground">Qty *</label>
-              <Input
-                type="number"
-                step="0.01"
+              <DecimalInput
+                                step="0.01"
                 value={qty}
                 onChange={(e) => setQty(e.target.value)}
                 className="mt-1"
@@ -146,9 +150,8 @@ export default function SpOpeningStock() {
             </div>
             <div>
               <label className="text-xs text-muted-foreground">Base Unit Cost $ (supplier cost)</label>
-              <Input
-                type="number"
-                step="0.0001"
+              <MoneyInput
+                                step="0.0001"
                 value={baseUC}
                 onChange={(e) => setBaseUC(e.target.value)}
                 className="mt-1"
@@ -158,9 +161,8 @@ export default function SpOpeningStock() {
             </div>
             <div>
               <label className="text-xs text-muted-foreground">Landed Unit Cost $ (freight/duty etc.)</label>
-              <Input
-                type="number"
-                step="0.0001"
+              <MoneyInput
+                                step="0.0001"
                 value={landedUC}
                 onChange={(e) => setLandedUC(e.target.value)}
                 className="mt-1"
@@ -170,9 +172,8 @@ export default function SpOpeningStock() {
             </div>
             <div>
               <label className="text-xs text-muted-foreground">Final Unit Cost $ (auto = base + landed) *</label>
-              <Input
-                type="number"
-                step="0.0001"
+              <MoneyInput
+                                step="0.0001"
                 value={finalUC}
                 onChange={(e) => setFinalUC(e.target.value)}
                 className="mt-1"
@@ -190,7 +191,7 @@ export default function SpOpeningStock() {
                 data-testid="input-sp-opn-notes"
               />
             </div>
-          </div>
+          </FormGrid>
 
           {/* Voucher preview */}
           {qtyN > 0 && finalN > 0 && (
@@ -220,16 +221,18 @@ export default function SpOpeningStock() {
             </div>
           )}
 
-          <div className="flex justify-end">
-            <Button
+          <FormActionBar>
+            <FormSubmitButton
+              type="button"
               onClick={handleSubmit}
-              disabled={mutation.isPending || !canSubmit}
+              disabled={!canSubmit}
+              pending={mutation.isPending}
+              pendingLabel="Posting…"
               data-testid="button-sp-post-opening"
             >
-              {mutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Post Opening Stock
-            </Button>
-          </div>
+            </FormSubmitButton>
+          </FormActionBar>
         </CardContent>
       </Card>
 

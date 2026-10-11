@@ -1,6 +1,7 @@
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/decimal-input";
 import { Label } from "@/components/ui/label";
 import { money, type RetailPaymentDraft, type RetailPaymentMethod } from "./retailPosTypes";
 
@@ -84,10 +85,9 @@ export function RetailPaymentPanel({
             </div>
             <div>
               <Label className="text-xs">Amount</Label>
-              <Input
+              <MoneyInput
                 className="mt-1 h-9"
-                type="number"
-                min="0"
+                                min="0"
                 step="0.01"
                 value={payment.amount}
                 onChange={(event) => update(index, { amount: Number(event.target.value) })}
@@ -96,10 +96,9 @@ export function RetailPaymentPanel({
             {payment.method === "cash" ? (
               <div>
                 <Label className="text-xs">Tendered</Label>
-                <Input
+                <MoneyInput
                   className="mt-1 h-9"
-                  type="number"
-                  min="0"
+                                    min="0"
                   step="0.01"
                   value={payment.tenderedAmount ?? payment.amount}
                   onChange={(event) => update(index, { tenderedAmount: Number(event.target.value) })}
