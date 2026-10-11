@@ -120,10 +120,12 @@ export function FactoryCatalogTranslationEditor() {
             </DialogDescription>
           </DialogHeader>
           <Tabs defaultValue="product">
-            <TabsList className="w-max max-w-full" aria-label="Dialog sections">
+            <div className="erp-mobile-scroll-tabs pb-1">
+              <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Dialog sections">
               <TabsTrigger value="product">Product</TabsTrigger>
               <TabsTrigger value="category">Category</TabsTrigger>
             </TabsList>
+            </div>
             <TabsContent value="product" className="space-y-4 pt-3">
               <div className="space-y-2">
                 <Label>Existing product</Label>
