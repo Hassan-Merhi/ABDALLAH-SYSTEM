@@ -2,6 +2,7 @@ import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { FormSubmitButton } from "@/components/FormSubmitButton";
 import {
   Dialog,
   DialogContent,
@@ -407,6 +408,7 @@ export function ContainerFormDialog({
   });
 
   const handleSubmit = () => {
+    if (createMutation.isPending || updateMutation.isPending) return;
     const freightAmt = parseFloat(formData.freight || "0");
     if (freightAmt > 0 && formData.freightPaidBy === "own" && !formData.freightOwnAccountId) {
       toast({ title: "Select the account that paid the freight.", variant: "destructive" });
@@ -465,19 +467,16 @@ export function ContainerFormDialog({
             >
               Cancel
             </Button>
-            <Button
+            <FormSubmitButton
+              type="button"
               onClick={handleSubmit}
-              disabled={
-                !formData.containerNumber || brokerMismatch || createMutation.isPending || updateMutation.isPending
-              }
+              disabled={!formData.containerNumber || brokerMismatch}
+              pending={createMutation.isPending || updateMutation.isPending}
+              pendingLabel="Saving…"
               data-testid="button-save-container"
             >
-              {createMutation.isPending || updateMutation.isPending
-                ? "Saving..."
-                : editingContainer
-                  ? "Update"
-                  : "Create"}
-            </Button>
+              {editingContainer ? "Update" : "Create"}
+            </FormSubmitButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>

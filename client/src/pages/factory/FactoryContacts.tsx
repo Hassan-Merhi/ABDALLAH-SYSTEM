@@ -4,6 +4,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { PageHeader } from "@/components/PageHeader";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { DataTableToolbar } from "@/components/DataTableToolbar";
 import { TableViewOptions, type TableColumnOption } from "@/components/TableViewOptions";
 import { PaginationBar } from "@/components/PaginationBar";
@@ -17,16 +19,6 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Phone, Pencil, Trash2, Copy, BookMarked, X, Check } from "lucide-react";
 
@@ -184,6 +176,7 @@ export default function FactoryContacts() {
   const removeNumber = (idx: number) => setForm((f) => ({ ...f, numbers: f.numbers.filter((_, i) => i !== idx) }));
 
   const handleSubmit = () => {
+    if (saveMutation.isPending) return;
     if (!form.name.trim()) {
       toast({ title: "Name is required", variant: "destructive" });
       return;
@@ -399,34 +392,26 @@ export default function FactoryContacts() {
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSubmit} disabled={saveMutation.isPending}>
-              {saveMutation.isPending ? "Saving…" : editingContact ? "Save Changes" : "Add Contact"}
-            </Button>
+            <FormSubmitButton type="button" onClick={handleSubmit}
+              pending={saveMutation.isPending} pendingLabel="Saving…">
+              {editingContact ? "Save Changes" : "Add Contact"}
+            </FormSubmitButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirm */}
-      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Contact</AlertDialogTitle>
-            <AlertDialogDescription>
-              Remove <strong>{deleteTarget?.name}</strong> from your contacts? This cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
-              disabled={deleteMutation.isPending}
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(isOpen) => { if (!isOpen) setDeleteTarget(null); }}
+        title="Delete Contact"
+        tone="destructive"
+        description={<>Remove <strong>{deleteTarget?.name}</strong> from your contacts? This cannot be undone.</>}
+        confirmText="Delete"
+        loading={deleteMutation.isPending}
+        onConfirm={async () => {
+          if (deleteTarget) await deleteMutation.mutateAsync(deleteTarget.id);
+        }}
+      />
     </div>
   );
 }

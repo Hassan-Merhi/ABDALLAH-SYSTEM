@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -66,6 +66,7 @@ export function ConfirmDialog({
 
   const [stage, setStage] = useState<1 | 2>(1);
   const [phrase, setPhrase] = useState("");
+  const phraseInputId = `confirm-phrase-${useId()}`;
   const [busy, setBusy] = useState(false);
   const pendingRef = useRef(false);
   const [confirmError, setConfirmError] = useState<string | null>(null);
@@ -169,11 +170,11 @@ export function ConfirmDialog({
 
           {!showSecond && requirePhrase && (
             <div className="mt-4 space-y-2">
-              <Label htmlFor="confirm-phrase" className="text-xs">
+              <Label htmlFor={phraseInputId} className="text-xs">
                 Type <span className="font-mono font-semibold">{requirePhrase}</span> to confirm
               </Label>
               <Input
-                id="confirm-phrase"
+                id={phraseInputId}
                 value={phrase}
                 onChange={(event) => setPhrase(event.target.value)}
                 autoComplete="off"

@@ -15,6 +15,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Pencil, User, Trash2, FileText, RotateCcw, History, Clock, Eye, EyeOff } from "lucide-react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { FormSubmitButton } from "@/components/FormSubmitButton";
+import { MoneyInput } from "@/components/ui/decimal-input";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { PageHeader } from "@/components/PageHeader";
 import { DataTableToolbar } from "@/components/DataTableToolbar";
@@ -459,9 +461,8 @@ export default function FactoryCustomers() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-sm font-medium mb-1 block">Opening Balance</label>
-                <Input
-                  type="number"
-                  step="0.01"
+                <MoneyInput
+                                    step="0.01"
                   value={formData.openingBalance}
                   onChange={(e) => setFormData({ ...formData, openingBalance: e.target.value })}
                   placeholder="0.00"
@@ -532,13 +533,12 @@ export default function FactoryCustomers() {
               >
                 Cancel
               </Button>
-              <Button
-                onClick={handleCreate}
-                disabled={createMutation.isPending || !formData.legalName.trim()}
-                data-testid="button-submit-customer"
-              >
-                {createMutation.isPending ? "Creating..." : "Create Customer"}
-              </Button>
+              <FormSubmitButton type="button" onClick={handleCreate}
+                pending={createMutation.isPending} pendingLabel="Creating…"
+                disabled={!formData.legalName.trim()}
+                data-testid="button-submit-customer">
+                Create Customer
+              </FormSubmitButton>
             </div>
           </div>
         </DialogContent>
@@ -658,8 +658,8 @@ export default function FactoryCustomers() {
         tone="destructive"
         confirmText={deleteMutation.isPending ? "Deleting..." : "Delete"}
         loading={deleteMutation.isPending}
-        onConfirm={() => {
-          if (deletingCustomer) deleteMutation.mutate(deletingCustomer.id);
+        onConfirm={async () => {
+          if (deletingCustomer) await deleteMutation.mutateAsync(deletingCustomer.id);
         }}
         description={
           <span>
