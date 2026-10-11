@@ -45,20 +45,6 @@ export default function SalesToolsHub({ access }: { access?: ErpFeatureAccess })
   });
 
   return (
-    <div className="flex min-w-0 flex-col h-full">
-      <div className="border-b bg-background px-3 sm:px-4 py-2.5 shrink-0">
-        <div className="erp-mobile-scroll-tabs pb-1">
-          <div className="flex gap-1 p-1 rounded-xl border bg-card w-max min-w-full sm:min-w-0 sm:w-fit">
-            {tabs.map((t) => {
-              const isActive = activeTab === t.key;
-              return (
-                <button
-                  key={t.key}
-                  type="button"
-                  onClick={() => setTab(t.key)}
-                  data-testid={`tab-${t.key}`}
-                  className={cn(
-                    "inline-flex shrink-0 items-center gap-2 px-4 h-9 rounded-lg te  return (
     <Tabs
       value={activeTab}
       onValueChange={(value) => setTab(value as "daybook" | "transfers" | "pricelist")}
