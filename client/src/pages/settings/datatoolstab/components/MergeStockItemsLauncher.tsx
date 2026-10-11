@@ -57,7 +57,8 @@ export function MergeStockItemsLauncher() {
           </DialogHeader>
 
           <Tabs value={tab} onValueChange={setTab} className="mt-2">
-            <TabsList className="w-max max-w-full" aria-label="Dialog sections">
+            <div className="erp-mobile-scroll-tabs pb-1">
+              <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Dialog sections">
               <TabsTrigger value="single" data-testid="tab-merge-single">
                 Single Item
               </TabsTrigger>
@@ -68,6 +69,7 @@ export function MergeStockItemsLauncher() {
                 History
               </TabsTrigger>
             </TabsList>
+            </div>
             <TabsContent value="single" className="mt-4">
               <MergeStockItemsCard embedded />
             </TabsContent>
