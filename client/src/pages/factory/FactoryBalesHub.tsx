@@ -64,7 +64,7 @@ export default function FactoryBalesHub() {
           />
         </div>
         <div className="flex shrink-0 items-end justify-between gap-4 overflow-x-auto border-b px-4">
-          <TabsList className="flex-nowrap">
+          <TabsList className="w-max max-w-full" aria-label="Bale explorer sections">
             {show("history") && (
               <TabsTrigger value="history" data-testid="tab-bales-history">
                 Bales
