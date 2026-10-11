@@ -637,10 +637,12 @@ export default function Daybook({ user }: { user?: DaybookUser | null } = {}) {
         value={activeDaybookTab}
         onValueChange={(value) => setActiveDaybookTab(value as "transactions" | "activity")}
       >
-        <TabsList className="w-max max-w-full" aria-label="Daybook sections">
+        <div className="erp-mobile-scroll-tabs pb-1">
+          <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Daybook sections">
           <TabsTrigger value="transactions">Transactions</TabsTrigger>
           <TabsTrigger value="activity">Edits &amp; Activity</TabsTrigger>
-        </TabsList>
+          </TabsList>
+        </div>
 
         <TabsContent value="transactions" className="space-y-4 mt-0">
           <DaybookFilters
