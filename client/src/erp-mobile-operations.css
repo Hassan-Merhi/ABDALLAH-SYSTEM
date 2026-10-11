@@ -30,21 +30,6 @@
     min-width: max-content;
   }
 
-  /* Unified pill-tab fade: only indicate more tabs when the strip actually overflows.
-     Physical left/right edges work for both LTR and RTL interfaces. */
-  [data-responsive-tabs="true"][data-variant="pill"][data-overflow-right="true"][data-overflow-left="false"] {
-    -webkit-mask-image: linear-gradient(to right, #000 0%, #000 calc(100% - 18px), transparent 100%);
-    mask-image: linear-gradient(to right, #000 0%, #000 calc(100% - 18px), transparent 100%);
-  }
-  [data-responsive-tabs="true"][data-variant="pill"][data-overflow-left="true"][data-overflow-right="false"] {
-    -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 18px, #000 100%);
-    mask-image: linear-gradient(to right, transparent 0%, #000 18px, #000 100%);
-  }
-  [data-responsive-tabs="true"][data-variant="pill"][data-overflow-left="true"][data-overflow-right="true"] {
-    -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 18px, #000 calc(100% - 18px), transparent 100%);
-    mask-image: linear-gradient(to right, transparent 0%, #000 18px, #000 calc(100% - 18px), transparent 100%);
-  }
-
   /* Edge fades for strips that can scroll live in mobile-browser-compat.css (data-scroll-overflow). */
 
   @media (max-width: 767px), (hover: none) and (pointer: coarse) and (max-height: 500px) {
