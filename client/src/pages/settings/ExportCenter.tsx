@@ -140,22 +140,22 @@ export function ExportCenter() {
       </div>
 
       <Tabs defaultValue="daily" className="w-full">
-        <TabsList className="w-full flex h-auto p-1 bg-muted/50 rounded-lg overflow-x-auto no-scrollbar justify-start sm:justify-center gap-1">
+        <TabsList className="w-max max-w-full" aria-label="Export sections">
           <TabsTrigger
             value="daily"
-            className="flex items-center gap-2 py-2.5 px-4 rounded-md data-[state=active]:bg-background data-[state=active]:shadow-xs transition-all whitespace-nowrap"
+            
           >
             <Download className="h-4 w-4" /> Daily Export
           </TabsTrigger>
           <TabsTrigger
             value="stock-containers"
-            className="flex items-center gap-2 py-2.5 px-4 rounded-md data-[state=active]:bg-background data-[state=active]:shadow-xs transition-all whitespace-nowrap"
+            
           >
             <Building2 className="h-4 w-4" /> Stock &amp; Containers
           </TabsTrigger>
           <TabsTrigger
             value="wa-groups"
-            className="flex items-center gap-2 py-2.5 px-4 rounded-md data-[state=active]:bg-background data-[state=active]:shadow-xs transition-all whitespace-nowrap"
+            
           >
             <MessageCircle className="h-4 w-4" /> POS / WA
           </TabsTrigger>
