@@ -532,7 +532,8 @@ export default function FactoryStatusBuilder() {
         <StatusViewToggle viewMode={viewMode} onChange={setViewMode} />
 
         {/* Tabs */}
-        <div className="flex items-end gap-0 px-4 border-b overflow-x-auto">
+        <div className="erp-mobile-scroll-tabs border-b px-4 pb-1">
+          <div className="inline-flex min-w-max items-center gap-1 rounded-full border border-border bg-muted/40 p-1" aria-label="Status sheet pages">
           {localSheets.map((s, idx) => (
             <TabLabel
               key={s.id ?? `new-${idx}`}
@@ -547,11 +548,12 @@ export default function FactoryStatusBuilder() {
           <button
             data-testid="sb-button-add-tab"
             onClick={addTab}
-            className="flex items-center gap-1 px-3 py-2 text-muted-foreground hover:text-foreground text-sm transition-colors"
+            className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-full px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-background hover:text-foreground sm:min-h-9"
           >
             <Plus className="h-3.5 w-3.5" />
             Add page
           </button>
+          </div>
         </div>
 
         {/* Content */}
