@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Layers } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 import { FactoryWorkerCategoriesPanel } from "./FactoryWorkerCategoriesPanel";
 import { FactoryWorkersDialogs } from "./FactoryWorkersDialogs";
@@ -25,8 +25,8 @@ export function FactoryWorkersView({ model }: FactoryWorkersModelProps) {
     <div className="space-y-5">
       {activeTab ? (
       <Tabs value={activeTab} onValueChange={(value) => setRequestedTab(value as "workers" | "categories")}>
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <TabsList>
+        <div className="erp-mobile-scroll-tabs pb-1">
+          <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Factory worker list sections">
             {showWorkersList && (
               <TabsTrigger value="workers" data-testid="tab-workers">
                 Workers
@@ -46,8 +46,8 @@ export function FactoryWorkersView({ model }: FactoryWorkersModelProps) {
           </TabsList>
         </div>
 
-        {showWorkersList && <FactoryWorkersRosterPanel model={model} />}
-        {showCategories && <FactoryWorkerCategoriesPanel model={model} />}
+        {showWorkersList && <TabsContent value="workers" className="m-0"><FactoryWorkersRosterPanel model={model} /></TabsContent>}
+        {showCategories && <TabsContent value="categories" className="m-0"><FactoryWorkerCategoriesPanel model={model} /></TabsContent>}
       </Tabs>
       ) : (
         <div className="rounded-md border p-4 text-sm text-muted-foreground">
