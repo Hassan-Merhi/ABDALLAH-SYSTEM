@@ -127,6 +127,25 @@ const TabsList = React.forwardRef<
 });
 TabsList.displayName = "TabsList";
 
+const pillTriggerClasses = [
+  "inline-flex min-h-11 shrink-0 touch-manipulation items-center justify-center gap-1.5 whitespace-nowrap text-sm font-medium transition-all sm:min-h-9",
+  "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+  "disabled:pointer-events-none disabled:opacity-40",
+  "rounded-full px-3 py-1.5 text-muted-foreground hover:text-foreground sm:px-4",
+].join(" ");
+
+function scrollSelectedTabIntoView(node: HTMLButtonElement | null) {
+  const list = node?.closest<HTMLElement>('[role="tablist"]');
+  if (!node || !list) return;
+  const scroller = list.scrollWidth > list.clientWidth + 1
+    ? list : list.closest<HTMLElement>(".erp-mobile-scroll-tabs") ?? list;
+  if (scroller.scrollWidth <= scroller.clientWidth) return;
+  const listBox = scroller.getBoundingClientRect();
+  const tabBox = node.getBoundingClientRect();
+  if (tabBox.left < listBox.left) scroller.scrollLeft -= listBox.left - tabBox.left + 8;
+  else if (tabBox.right > listBox.right) scroller.scrollLeft += tabBox.right - listBox.right + 8;
+}
+
 const TabsTrigger = React.forwardRef<
   HTMLButtonElement,
   React.ButtonHTMLAttributes<HTMLButtonElement> & { value: string }
@@ -143,19 +162,8 @@ const TabsTrigger = React.forwardRef<
     [ref]
   );
 
-  // A strip wider than a phone scrolls sideways; keep the active tab in view (horizontally only,
-  // so selecting a tab or opening a deep link never scrolls the page itself).
   React.useEffect(() => {
-    const node = localRef.current;
-    const list = node?.closest<HTMLElement>('[role="tablist"]');
-    if (!active || !node || !list) return;
-    const scroller = list.scrollWidth > list.clientWidth + 1
-      ? list : list.closest<HTMLElement>(".erp-mobile-scroll-tabs") ?? list;
-    if (scroller.scrollWidth <= scroller.clientWidth) return;
-    const listBox = scroller.getBoundingClientRect();
-    const tabBox = node.getBoundingClientRect();
-    if (tabBox.left < listBox.left) scroller.scrollLeft -= listBox.left - tabBox.left + 8;
-    else if (tabBox.right > listBox.right) scroller.scrollLeft += tabBox.right - listBox.right + 8;
+    if (active) scrollSelectedTabIntoView(localRef.current);
   }, [active]);
 
   return (
@@ -173,10 +181,7 @@ const TabsTrigger = React.forwardRef<
         if (!event.defaultPrevented) ctx.onValueChange(value);
       }}
       className={cn(
-        "inline-flex min-h-11 shrink-0 touch-manipulation items-center justify-center gap-1.5 whitespace-nowrap text-sm font-medium transition-all sm:min-h-9",
-        "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-        "disabled:pointer-events-none disabled:opacity-40",
-        "rounded-full px-3 py-1.5 text-muted-foreground hover:text-foreground sm:px-4",
+        pillTriggerClasses,
         active && "bg-background font-semibold text-foreground shadow-sm",
         className
       )}
@@ -187,6 +192,41 @@ const TabsTrigger = React.forwardRef<
   );
 });
 TabsTrigger.displayName = "TabsTrigger";
+
+// For hubs that render their panels directly (rather than using TabsContent),
+// use this button inside TabsList to keep existing navigation logic intact.
+const PillTabButton = React.forwardRef<
+  HTMLButtonElement,
+  Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "aria-selected"> & { selected: boolean }
+>(({ selected, className, children, ...props }, ref) => {
+  const localRef = React.useRef<HTMLButtonElement | null>(null);
+  const setRef = React.useCallback((node: HTMLButtonElement | null) => {
+    localRef.current = node;
+    if (typeof ref === "function") ref(node);
+    else if (ref) ref.current = node;
+  }, [ref]);
+
+  React.useEffect(() => {
+    if (selected) scrollSelectedTabIntoView(localRef.current);
+  }, [selected]);
+
+  return (
+    <button
+      ref={setRef}
+      type="button"
+      role="tab"
+      aria-selected={selected}
+      tabIndex={selected ? 0 : -1}
+      data-state={selected ? "active" : "inactive"}
+      className={cn(pillTriggerClasses, selected && "bg-background font-semibold text-foreground shadow-sm", className)}
+      {...props}
+    >
+      {children}
+    </button>
+  );
+});
+PillTabButton.displayName = "PillTabButton";
+
 
 const TabsContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement> & { value: string }>(
   ({ className, value, children, ...props }, ref) => {
@@ -214,4 +254,4 @@ const TabsContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDi
 );
 TabsContent.displayName = "TabsContent";
 
-export { Tabs, TabsList, TabsTrigger, TabsContent };
+export { Tabs, TabsList, TabsTrigger, TabsContent, PillTabButton };
