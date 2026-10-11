@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Users, Package, Boxes } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { TabsList, PillTabButton } from "@/components/ui/tabs";
 
 import type { ImportTab } from "./factoryimport/types";
 import { SupplierImport } from "./factoryimport/components/SupplierImport";
@@ -39,25 +39,23 @@ export default function FactoryImport() {
 
   return (
     <div className="min-w-0 space-y-4" data-testid="factory-import-page">
-      <div
-        className="-mx-1 flex max-w-full items-center gap-2 overflow-x-auto px-1 pb-1 overscroll-x-contain sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0"
-        data-testid="factory-import-tabs"
-      >
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          return (
-            <Button
-              key={tab.key}
-              variant={activeTab === tab.key ? "default" : "outline"}
-              onClick={() => setRequestedTab(tab.key)}
-              className="shrink-0"
-              data-testid={`tab-import-${tab.key}`}
-            >
-              <Icon className="h-4 w-4 mr-2" />
-              {tab.label}
-            </Button>
-          );
-        })}
+      <div className="erp-mobile-scroll-tabs pb-1" data-testid="factory-import-tabs">
+        <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Factory import sections">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <PillTabButton
+                key={tab.key}
+                selected={activeTab === tab.key}
+                onClick={() => setRequestedTab(tab.key)}
+                data-testid={`tab-import-${tab.key}`}
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                {tab.label}
+              </PillTabButton>
+            );
+          })}
+        </TabsList>
       </div>
 
       <div className="min-w-0">
