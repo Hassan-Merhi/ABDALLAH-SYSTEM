@@ -81,7 +81,8 @@ function UnitActionDialog({
             <div className="p-6 text-center text-muted-foreground text-sm">This is a read-only shared unit.</div>
           ) : (
             <Tabs defaultValue="contract" className="w-full">
-              <TabsList className="w-max max-w-full">
+              <div className="erp-mobile-scroll-tabs pb-1">
+                <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Rental unit actions">
                 <TabsTrigger value="info" data-testid={`tab-${testIdPrefix}-unit-info`}>
                   <UserCog className="h-4 w-4 mr-1" />
                   Edit Info
@@ -91,6 +92,7 @@ function UnitActionDialog({
                   New Contract
                 </TabsTrigger>
               </TabsList>
+              </div>
               <TabsContent value="info">
                 <VacantUnitInfoForm unit={unit} testIdPrefix={testIdPrefix} />
               </TabsContent>
@@ -101,7 +103,8 @@ function UnitActionDialog({
           )
         ) : isShared ? (
           <Tabs defaultValue="payment" className="w-full">
-            <TabsList className="w-max max-w-full">
+            <div className="erp-mobile-scroll-tabs pb-1">
+              <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Rental unit actions">
               <TabsTrigger value="payment" data-testid={`tab-${testIdPrefix}-payment`}>
                 <DollarSign className="h-4 w-4 mr-1" />
                 Payment
@@ -110,6 +113,7 @@ function UnitActionDialog({
                 Statement
               </TabsTrigger>
             </TabsList>
+            </div>
             <TabsContent value="payment">
               <PaymentForm
                 contract={contract}
@@ -133,7 +137,8 @@ function UnitActionDialog({
           </Tabs>
         ) : (
           <Tabs defaultValue="payment" className="w-full">
-            <TabsList className="w-max max-w-full">
+            <div className="erp-mobile-scroll-tabs pb-1">
+              <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Rental unit actions">
               <TabsTrigger value="payment" data-testid={`tab-${testIdPrefix}-payment`}>
                 <DollarSign className="h-4 w-4 mr-1" />
                 Payment
@@ -158,6 +163,7 @@ function UnitActionDialog({
                 End Contract
               </TabsTrigger>
             </TabsList>
+            </div>
             <TabsContent value="payment">
               <PaymentForm
                 contract={contract}
