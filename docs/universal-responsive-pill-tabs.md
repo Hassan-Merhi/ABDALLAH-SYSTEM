@@ -62,3 +62,25 @@ The shared pill components and identified custom horizontal tab bars have been m
 - **Explicit non-tab exclusions:** `Vouchers.tsx` and `vouchers/VoucherTabNav.tsx` use a route/type sidebar and a phone selection sheet, not a horizontal secondary tab bar. Those remain unchanged to preserve the agreed navigation model. Segmented view-mode switches (e.g. Condensed/Detailed), workflow progress indicators, and report filters are also not reclassified as tabs.
 
 **Verification status:** Source changes are committed. No TypeScript command, linting, CI run, unit/integration/browser tests, runtime responsive checks, merge, or deployment were performed as requested. Implementation is complete at code level, not validated at runtime.
+
+## Phase 5 — Factory Mode source implementation (11 October 2026)
+
+Phase 5 is implemented on the same feature branch. The Factory surfaces reviewed and updated include:
+
+| Area | Factory screens | Status |
+| --- | --- | --- |
+| Main hubs | `FactoryFinanceHub`, `FactoryPartiesHub`, `FactorySupplierHub`, `FactoryProductionIntelHub`, `FactoryBalesHub` | One-row pill navigation and horizontally scrollable tab containers |
+| Factory navigation | `FactoryInvoicing`, `FactoryLoadingsHub`, `FactoryPayrollHub`, `FactoryDaybook` | Reused shared tabs or `PillTabButton`, maintaining query-state/permission conditions |
+| Workers and employees | `FactoryWorkersHub`, `FactoryEmployeesHub`, `factoryworkers/FactoryWorkersView` | Replaced section dropdowns/uncoupled panels with shared pill tabs; preserved setting and permission filters |
+| Production and stock | `DailyProductionReport`, `FactoryKpis`, `FactoryProfitability`, `BaleStockEntry`, `FactoryStockAllocationV3`, `production-raw-stock/RawStockRecalculate` | Shared responsive tab strip and selected state |
+| Stock, dispatch and imports | `FactorySheetsAndSacks`, `FactoryDispatchBatches`, `FactoryImport` | Replaced bespoke button-style tab navigation with shared pills; left New Batch/action controls separate |
+| Customer and workers | `FactoryCustomerStatement`, `factoryworkerdetail/FactoryWorkerDetailView`, `FactoryAdvancesTab`, `factorypayroll/FactoryPayrollView` | Existing tab content and permissions preserved, unified responsive layout |
+| Relabeling and editable sheets | `FactoryBaleRelabeling`, `WipersReEntry`, `FactoryStatusBuilder`, `factorystatusbuilder/components/TabLabel` | Matched pill style, retained navigation, rename and delete controls, and added keyboard tab selection |
+
+### Deliberate exclusions
+
+`FactoryProduction.tsx` is a primary vertical navigation sidebar; it is not a secondary horizontal tab bar. The three switches in `FactoryStockAllocationV5.tsx` are independent stock filters, not mutually exclusive pages. Report options, view-mode switches, progress steps, tables and form buttons remain specialized controls rather than being restyled as tabs.
+
+### Verification and delivery status
+
+**Phase 5 code implementation is complete, not proven error-free.** No TypeScript, lint, unit, integration, CI, browser, phone, responsive or accessibility test runs were initiated, per the user's instruction. Do not merge or deploy without separate approval; no PR or release is part of this phase.
