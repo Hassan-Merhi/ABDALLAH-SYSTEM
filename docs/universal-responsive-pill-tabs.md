@@ -84,3 +84,24 @@ Phase 5 is implemented on the same feature branch. The Factory surfaces reviewed
 ### Verification and delivery status
 
 **Phase 5 code implementation is complete, not proven error-free.** No TypeScript, lint, unit, integration, CI, browser, phone, responsive or accessibility test runs were initiated, per the user's instruction. Do not merge or deploy without separate approval; no PR or release is part of this phase.
+
+## Phase 6 — POS, Supplier Partner, Properties, Settings and dialogs
+
+Phase 6 source implementation is complete on `feat/universal-responsive-pill-tabs-20261011`. Responsive pill tabs use the existing `TabsList` / `TabsTrigger` components and the `erp-mobile-scroll-tabs` container rather than copying button styles between pages.
+
+| Scope | Updated surfaces | Implementation |
+| --- | --- | --- |
+| Supplier Partner | `sp/SpGoldenCoast.tsx`, `sp/SpReports.tsx` | Scrollable pill tab bars with preserved reporting and partner state |
+| POS configuration | `settings/PosSetupHub.tsx` | POS Settings, Exchange Rates, Fiscal Period, Price Groups and Auto-Transfer share the same pill styling |
+| Properties | `properties/PropertiesRentalsHub.tsx`, `properties/property-rental/components/UnitActionDialog.tsx` | Rental hub and all three conditional unit-dialog tab layouts retain complete labels and scroll on narrow viewports |
+| Admin and settings | `settings/SessionsHub.tsx`, `settings/ApprovalsPage.tsx` | Session tabs and approval-status tabs use the standard navigation |
+| Files and exports | `settings/FileStorageAndExport.tsx`, `settings/ExportCenter.tsx`, `ImportStockItems.tsx`, `components/CombinedImportDialog.tsx` | Import/export method tabs use shared pills and preserve existing workflows |
+| Utility dialogs | `components/FactoryCatalogTranslationEditor.tsx`, `components/stockitemdetailsdialog/StockItemDetailsDialogView.tsx`, `settings/datatoolstab/components/MergeStockItemsLauncher.tsx`, `suppliers/SupplierDetailDialog.tsx` | All applicable dialog tabs use an independently scrollable strip with existing content/actions and icon/label semantics |
+
+### Exclusions
+
+The POS checkout/cart navigation, phone product-choice sheet, Settings' primary sidebar/mobile section picker, remote-support **browser tab selector**, permission visibility checkboxes, and other view/filter/action controls are not secondary section-tab bars. They were intentionally left unchanged. The shared tab primitive already governs other dialogs and modules previously converted during Phases 2–5.
+
+### Delivery boundary
+
+**Code-level migration complete; not runtime validated.** No TypeScript, lint, CI, unit, integration, browser, accessibility, or responsive test suites were invoked for this phase, at the user's request. There has been no merge to `main`, pull request, or deployment. A separate review/testing handoff remains necessary before production.
