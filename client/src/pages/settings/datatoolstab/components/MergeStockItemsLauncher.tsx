@@ -57,7 +57,7 @@ export function MergeStockItemsLauncher() {
           </DialogHeader>
 
           <Tabs value={tab} onValueChange={setTab} className="mt-2">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="w-max max-w-full" aria-label="Dialog sections">
               <TabsTrigger value="single" data-testid="tab-merge-single">
                 Single Item
               </TabsTrigger>
