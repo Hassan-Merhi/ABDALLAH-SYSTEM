@@ -200,7 +200,8 @@ export function SupplierDetailDialog({
           className="flex-1 flex flex-col overflow-hidden min-h-0"
         >
           <div className="px-6 pt-3 pb-0 shrink-0 flex items-center gap-3 flex-wrap">
-            <TabsList className="w-max max-w-full" aria-label="Supplier details">
+            <div className="erp-mobile-scroll-tabs min-w-0 max-w-full flex-1 pb-1">
+              <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Supplier details">
               <TabsTrigger value="transactions" className="text-xs" data-testid="tab-transactions">
                 <DollarSign className="h-3.5 w-3.5 mr-1.5" />
                 Transactions
@@ -210,6 +211,7 @@ export function SupplierDetailDialog({
                 Purchase Orders {purchaseOrders.length > 0 && `(${purchaseOrders.length})`}
               </TabsTrigger>
             </TabsList>
+            </div>
             {dialogTab === "transactions" && (
               <Button
                 variant={hidePayments ? "default" : "outline"}
