@@ -21,7 +21,7 @@ export default function GITMockup({ embedded = false }: { embedded?: boolean } =
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         <Tabs defaultValue="detail">
-          <TabsList className="grid grid-cols-3 w-full">
+          <TabsList className="w-max max-w-full" aria-label="GIT tracking sections">
             <TabsTrigger value="detail" data-testid="tab-git-detail">
               Detail
             </TabsTrigger>
