@@ -192,8 +192,9 @@ export default function FactoryProfitability() {
         onValueChange={(value) => setRequestedTab(value as "bales" | "containers")}
         data-testid="tabs-profitability"
       >
-        <TabsList>
-          {showBales && (
+        <div className="erp-mobile-scroll-tabs pb-1">
+          <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Factory profitability sections">
+            {showBales && (
             <TabsTrigger value="bales" data-testid="tab-bales">
               Bale Costs
             </TabsTrigger>
@@ -203,7 +204,8 @@ export default function FactoryProfitability() {
               Container Profitability
             </TabsTrigger>
           )}
-        </TabsList>
+          </TabsList>
+        </div>
 
         {showBales && <TabsContent value="bales">
           {balesQuery.isLoading ? (
