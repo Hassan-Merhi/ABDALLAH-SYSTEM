@@ -45,12 +45,7 @@ export function TabLabel({
         setEditing(true);
         setDraft(name);
       }}
-      className={`relative flex items-center gap-1.5 px-3 py-2 cursor-pointer border-b-2 select-none whitespace-nowrap transition-colors
-        ${
-          active
-            ? "border-primary text-foreground font-medium"
-            : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted"
-        }`}
+      className={`relative flex min-h-11 sm:min-h-9 items-center gap-1.5 rounded-full px-3 py-2 cursor-pointer select-none whitespace-nowrap transition-colors ${active ? "bg-background text-foreground font-semibold shadow-sm" : "text-muted-foreground hover:text-foreground hover:bg-muted/50"}`}
     >
       {editing ? (
         <input
