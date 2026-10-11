@@ -206,7 +206,6 @@ export default function FactorySheetsAndSacks() {
             <PillTabButton
               onClick={() => setActiveTab("stock")}
               selected={effectiveTab === "stock"}
-              
             >
               <Layers className="h-4 w-4" />
               Current Stock
@@ -216,7 +215,6 @@ export default function FactorySheetsAndSacks() {
             <PillTabButton
               onClick={() => setActiveTab("movements")}
               selected={effectiveTab === "movements"}
-              
             >
               <History className="h-4 w-4" />
               Movement Log
