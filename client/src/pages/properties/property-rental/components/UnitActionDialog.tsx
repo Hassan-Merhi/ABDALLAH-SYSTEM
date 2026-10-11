@@ -81,7 +81,7 @@ function UnitActionDialog({
             <div className="p-6 text-center text-muted-foreground text-sm">This is a read-only shared unit.</div>
           ) : (
             <Tabs defaultValue="contract" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="w-max max-w-full">
                 <TabsTrigger value="info" data-testid={`tab-${testIdPrefix}-unit-info`}>
                   <UserCog className="h-4 w-4 mr-1" />
                   Edit Info
@@ -101,7 +101,7 @@ function UnitActionDialog({
           )
         ) : isShared ? (
           <Tabs defaultValue="payment" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="w-max max-w-full">
               <TabsTrigger value="payment" data-testid={`tab-${testIdPrefix}-payment`}>
                 <DollarSign className="h-4 w-4 mr-1" />
                 Payment
@@ -133,7 +133,7 @@ function UnitActionDialog({
           </Tabs>
         ) : (
           <Tabs defaultValue="payment" className="w-full">
-            <TabsList className="grid h-auto w-full grid-cols-3 rounded-2xl sm:grid-cols-6 sm:rounded-full">
+            <TabsList className="w-max max-w-full">
               <TabsTrigger value="payment" data-testid={`tab-${testIdPrefix}-payment`}>
                 <DollarSign className="h-4 w-4 mr-1" />
                 Payment
