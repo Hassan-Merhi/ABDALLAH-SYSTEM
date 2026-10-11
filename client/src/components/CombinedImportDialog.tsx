@@ -280,11 +280,13 @@ export function CombinedImportDialog({ open, onOpenChange }: CombinedImportDialo
         </DialogHeader>
 
         <Tabs defaultValue="opening" className="w-full">
-          <TabsList className="w-max max-w-full" aria-label="Dialog sections">
+          <div className="erp-mobile-scroll-tabs pb-1">
+            <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Dialog sections">
             <TabsTrigger value="opening">Opening Stock</TabsTrigger>
             <TabsTrigger value="prices">Prices</TabsTrigger>
             <TabsTrigger value="items">Items / Names</TabsTrigger>
           </TabsList>
+          </div>
 
           <TabsContent value="opening" className="space-y-4">
             <div className="space-y-4 mt-4">
