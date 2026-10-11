@@ -596,7 +596,8 @@ export default function ImportStockItems() {
       />
 
       <Tabs defaultValue="items">
-        <TabsList>
+        <div className="erp-mobile-scroll-tabs pb-1">
+          <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Stock import sections">
           <TabsTrigger value="items" data-testid="tab-new-items">
             <Package className="h-4 w-4 mr-2" />
             New Items
@@ -610,6 +611,7 @@ export default function ImportStockItems() {
             Update Categories
           </TabsTrigger>
         </TabsList>
+        </div>
 
         <TabsContent value="items" className="mt-4">
           <NewItemsTab />
