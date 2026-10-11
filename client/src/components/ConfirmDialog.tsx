@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -67,12 +67,16 @@ export function ConfirmDialog({
   const [stage, setStage] = useState<1 | 2>(1);
   const [phrase, setPhrase] = useState("");
   const [busy, setBusy] = useState(false);
+  const pendingRef = useRef(false);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) {
       setStage(1);
       setPhrase("");
       setBusy(false);
+      setConfirmError(null);
+      pendingRef.current = false;
     }
   }, [open]);
 
@@ -81,16 +85,24 @@ export function ConfirmDialog({
 
   const handlePrimary = async (event: React.MouseEvent | React.SyntheticEvent) => {
     event.preventDefault();
-    if (!phraseMatches || isLoading || confirmDisabled) return;
+    if (!phraseMatches || isLoading || confirmDisabled || pendingRef.current) return;
     if (doubleConfirm && stage === 1) {
+      setConfirmError(null);
       setStage(2);
       return;
     }
+    // A ref locks immediately: state alone cannot stop two clicks before React rerenders.
+    pendingRef.current = true;
+    setConfirmError(null);
     setBusy(true);
     try {
       await onConfirm();
       setOpen(false);
+    } catch (error) {
+      // Keep the confirmation open on failure. Callers may also surface a toast.
+      setConfirmError(error instanceof Error ? error.message : "Action failed. Please try again.");
     } finally {
+      pendingRef.current = false;
       setBusy(false);
     }
   };
@@ -149,6 +161,11 @@ export function ConfirmDialog({
           </AlertDialogHeader>
 
           {!showSecond && children && <div className="mt-4 min-w-0 space-y-3">{children}</div>}
+          {confirmError && (
+            <p role="alert" className="mt-4 text-sm text-destructive" data-testid="text-confirm-error">
+              {confirmError}
+            </p>
+          )}
 
           {!showSecond && requirePhrase && (
             <div className="mt-4 space-y-2">
