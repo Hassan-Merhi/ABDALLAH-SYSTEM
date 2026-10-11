@@ -1,3 +1,4 @@
+import { TabsList } from "@/components/ui/tabs";
 import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -533,7 +534,7 @@ export default function FactoryStatusBuilder() {
 
         {/* Tabs */}
         <div className="erp-mobile-scroll-tabs border-b px-4 pb-1">
-          <div className="inline-flex min-w-max items-center gap-1 rounded-full border border-border bg-muted/40 p-1" aria-label="Status sheet pages">
+          <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Status sheet pages">
           {localSheets.map((s, idx) => (
             <TabLabel
               key={s.id ?? `new-${idx}`}
@@ -553,7 +554,7 @@ export default function FactoryStatusBuilder() {
             <Plus className="h-3.5 w-3.5" />
             Add page
           </button>
-          </div>
+          </TabsList>
         </div>
 
         {/* Content */}
