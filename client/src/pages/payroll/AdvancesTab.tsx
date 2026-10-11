@@ -353,11 +353,13 @@ export function AdvancesTab({ cashAccounts = [] }: AdvancesTabProps) {
       </div>
 
       <Tabs defaultValue="advances">
-        <TabsList>
-          <TabsTrigger value="advances">Advances</TabsTrigger>
+        <div className="erp-mobile-scroll-tabs pb-1">
+          <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Advance and deduction sections">
+            <TabsTrigger value="advances">Advances</TabsTrigger>
           <TabsTrigger value="repayments">Repayments</TabsTrigger>
           <TabsTrigger value="worker-deductions">Worker Deductions</TabsTrigger>
-        </TabsList>
+          </TabsList>
+        </div>
 
         {/* ── Advances sub-tab ── */}
         <TabsContent value="advances" className="space-y-4 pt-4">
