@@ -426,7 +426,8 @@ export default function FactoryCustomerStatement() {
           onValueChange={(value) => setRequestedCustomerTab(value as "statement" | "pricelist")}
           className="flex-1"
         >
-          <TabsList className="mb-4">
+          <div className="erp-mobile-scroll-tabs mb-4 pb-1">
+            <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Customer statement sections">
             {showStatementTab && (
               <TabsTrigger value="statement" data-testid="tab-statement">
                 Statement
@@ -445,7 +446,8 @@ export default function FactoryCustomerStatement() {
                 )}
               </TabsTrigger>
             )}
-          </TabsList>
+            </TabsList>
+          </div>
 
           {/* ─── Statement Tab ─── */}
           {showStatementTab && (
