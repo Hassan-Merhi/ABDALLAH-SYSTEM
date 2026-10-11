@@ -63,8 +63,9 @@ export default function FactoryBalesHub() {
             showBackButton={false}
           />
         </div>
-        <div className="flex shrink-0 items-end justify-between gap-4 overflow-x-auto border-b px-4">
-          <TabsList className="w-max max-w-full" aria-label="Bale explorer sections">
+        <div className="flex min-w-0 shrink-0 items-center gap-2 border-b px-4 pb-1">
+          <div className="erp-mobile-scroll-tabs min-w-0 flex-1 pb-1">
+            <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Bale explorer sections">
             {show("history") && (
               <TabsTrigger value="history" data-testid="tab-bales-history">
                 Bales
@@ -85,7 +86,8 @@ export default function FactoryBalesHub() {
                 Customer Loading
               </TabsTrigger>
             )}
-          </TabsList>
+            </TabsList>
+          </div>
           {activeTab === "products" && <FactoryArabicTranslationActions className="pb-1" />}
         </div>
 
