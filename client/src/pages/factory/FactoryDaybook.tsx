@@ -88,7 +88,7 @@ export default function FactoryDaybook() {
           value={effectiveTab}
           onValueChange={(value) => setActiveDaybookTab(value as "transactions" | "activity")}
         >
-          <TabsList className="w-fit">
+          <TabsList className="w-max max-w-full" aria-label="Factory daybook sections">
             {showTransactions && <TabsTrigger value="transactions">Transactions</TabsTrigger>}
             {showActivity && <TabsTrigger value="activity">Edits &amp; Activity</TabsTrigger>}
           </TabsList>
