@@ -25,6 +25,24 @@ export type StatusKind =
   | "warning"
   | "error"
   | "info"
+  | "in_stock"
+  | "loading"
+  | "loaded"
+  | "sold"
+  | "reserved_for_order"
+  | "label_printed"
+  | "open"
+  | "running"
+  | "failed"
+  | "rolled_back"
+  | "needs_setup"
+  | "disabled"
+  | "gaining"
+  | "losing"
+  | "break_even"
+  | "no_data"
+  | "partial"
+  | "superseded"
   | "neutral";
 
 interface StatusMeta {
@@ -56,6 +74,25 @@ const STATUS_MAP: Record<StatusKind, StatusMeta> = {
   warning: { label: "Warning", variant: "warning", icon: AlertTriangle },
   error: { label: "Error", variant: "destructive", icon: XCircle },
   info: { label: "Info", variant: "info", icon: CircleDot },
+  // Cross-module statuses: one semantic palette, not one hard-coded color per screen.
+  in_stock: { label: "In Stock", variant: "success", icon: CheckCircle2 },
+  loading: { label: "Loading", variant: "warning", icon: Clock },
+  loaded: { label: "Loaded", variant: "warning", icon: Clock },
+  sold: { label: "Sold", variant: "destructive", icon: XCircle },
+  reserved_for_order: { label: "Reserved", variant: "info", icon: Clock },
+  label_printed: { label: "Label Printed", variant: "outline", icon: CheckCircle2 },
+  open: { label: "Open", variant: "info", icon: CircleDot },
+  running: { label: "Running", variant: "info", icon: Loader2 },
+  failed: { label: "Failed", variant: "destructive", icon: XCircle },
+  rolled_back: { label: "Rolled Back", variant: "muted", icon: CircleDot },
+  needs_setup: { label: "Needs Setup", variant: "warning", icon: AlertTriangle },
+  disabled: { label: "Disabled", variant: "muted", icon: CircleDot },
+  gaining: { label: "Gaining", variant: "success", icon: CheckCircle2 },
+  losing: { label: "Losing", variant: "destructive", icon: XCircle },
+  break_even: { label: "Break Even", variant: "info", icon: CircleDot },
+  no_data: { label: "No Data", variant: "warning", icon: AlertTriangle },
+  partial: { label: "Partial", variant: "warning", icon: Clock },
+  superseded: { label: "Superseded", variant: "muted", icon: CircleDot },
   neutral: { label: "—", variant: "muted", icon: CircleDot },
 };
 
