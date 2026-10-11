@@ -173,7 +173,8 @@ export function ERPWorkerDetail({ worker, onBack, onEdit }: Props) {
         {/* Right tabs */}
         <div className="flex-1 min-w-0">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="mb-4 w-max max-w-full" aria-label="Worker details">
+            <div className="erp-mobile-scroll-tabs mb-4 pb-1">
+              <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Worker details">
               <TabsTrigger value="profile" data-testid="tab-erp-profile">
                 Profile
               </TabsTrigger>
@@ -186,7 +187,8 @@ export function ERPWorkerDetail({ worker, onBack, onEdit }: Props) {
               <TabsTrigger value="docs" data-testid="tab-erp-docs">
                 Docs
               </TabsTrigger>
-            </TabsList>
+              </TabsList>
+            </div>
 
             {/* ── Profile ── */}
             <TabsContent value="profile" className="space-y-4">
