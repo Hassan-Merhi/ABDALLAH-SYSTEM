@@ -7,6 +7,7 @@ import FactoryPendingLoadings from "@/pages/factory/FactoryPendingLoadings";
 import FactoryPriorityScan from "@/pages/factory/FactoryPriorityScan";
 import { FileText } from "lucide-react";
 import type { FactoryMyAccess } from "@shared/apiTypes";
+import { TabsList, PillTabButton } from "@/components/ui/tabs";
 import { useHubQueryState } from "@/hooks/use-hub-query-state";
 import { useApplicationLanguage } from "@/contexts/ApplicationLanguageContext";
 import { translatePriorityScanText } from "@/i18n/priorityScanTranslations";
@@ -75,27 +76,23 @@ export default function FactoryInvoicing() {
           />
         </div>
 
-        <div className="flex gap-0 px-4 overflow-x-auto" role="tablist">
+        <div className="erp-mobile-scroll-tabs px-4 pb-1">
+          <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Factory sections">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.key;
             return (
-              <button
+              <PillTabButton
                 key={tab.key}
-                role="tab"
-                aria-selected={isActive}
+                selected={isActive}
                 data-testid={`tab-${tab.key}`}
                 onClick={() => setActiveTab(tab.key)}
-                className={[
-                  "px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
-                  isActive
-                    ? "border-primary text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-foreground",
-                ].join(" ")}
+                
               >
                 {tab.label}
-              </button>
+              </PillTabButton>
             );
           })}
+          </TabsList>
         </div>
       </div>
 
