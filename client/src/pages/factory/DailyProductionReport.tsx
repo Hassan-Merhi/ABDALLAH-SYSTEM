@@ -69,7 +69,8 @@ export default function DailyProductionReport() {
           onValueChange={(value) => setActiveTab(value as OverviewTab)}
           className="flex flex-col flex-1 overflow-hidden"
         >
-          <TabsList className="mx-4 mt-3 mb-0 shrink-0 w-max max-w-full" data-testid="tabs-production-analytics">
+          <div className="erp-mobile-scroll-tabs mx-4 mt-3 mb-0 shrink-0 pb-1">
+            <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Production reports" data-testid="tabs-production-analytics">
             {show("otw-tracking") && (
               <TabsTrigger value="otw-tracking" data-testid="tab-otw-tracking">
                 <Truck className="h-4 w-4 mr-1.5" /> OTW Tracking
@@ -103,7 +104,8 @@ export default function DailyProductionReport() {
             <TabsTrigger value="container-tracking" data-testid="tab-container-tracking" className="hidden">
               Container Tracking
             </TabsTrigger>
-          </TabsList>
+            </TabsList>
+          </div>
 
           {show("otw-tracking") && (
             <TabsContent value="otw-tracking" className="flex-1 overflow-y-auto p-4 mt-0 data-[state=inactive]:hidden">
