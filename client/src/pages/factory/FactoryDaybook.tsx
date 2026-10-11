@@ -88,10 +88,12 @@ export default function FactoryDaybook() {
           value={effectiveTab}
           onValueChange={(value) => setActiveDaybookTab(value as "transactions" | "activity")}
         >
-          <TabsList className="w-max max-w-full" aria-label="Factory daybook sections">
+          <div className="erp-mobile-scroll-tabs pb-1">
+            <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Factory daybook sections">
             {showTransactions && <TabsTrigger value="transactions">Transactions</TabsTrigger>}
             {showActivity && <TabsTrigger value="activity">Edits &amp; Activity</TabsTrigger>}
-          </TabsList>
+            </TabsList>
+          </div>
 
           {showTransactions && (
             <TabsContent value="transactions" className="space-y-4 mt-2">
