@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import FactoryContainerLoadingScan from "./FactoryContainerLoadingScan";
 import FactoryPendingLoadings from "./FactoryPendingLoadings";
 import FactoryPriorityScan from "./FactoryPriorityScan";
@@ -52,7 +53,7 @@ export default function FactoryLoadingsHub() {
   }
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <Tabs value={effectiveActiveTab} onValueChange={(value) => handleTabChange(value as LoadingsTab)} className="flex flex-col h-full overflow-hidden">
       <div className="border-b bg-background shrink-0">
         {/* Header row */}
         <div className="flex items-center gap-3 px-5 pt-4 pb-3">
@@ -67,66 +68,21 @@ export default function FactoryLoadingsHub() {
           </div>
         </div>
         {/* Tab row */}
-        <div className="flex gap-0 px-4 overflow-x-auto" role="tablist">
-          {showLoadings && (
-            <button
-              role="tab"
-              aria-selected={effectiveActiveTab === "loadings"}
-              data-testid="tab-container-loadings"
-              onClick={() => handleTabChange("loadings")}
-              className={[
-                "px-4 py-2 text-sm font-medium border-b-2 transition-colors",
-                effectiveActiveTab === "loadings"
-                  ? "border-primary text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground",
-              ].join(" ")}
-            >
-              Container Loadings
-            </button>
-          )}
-          {showPending && (
-            <button
-              role="tab"
-              aria-selected={effectiveActiveTab === "pending"}
-              data-testid="tab-pending-loadings"
-              onClick={() => handleTabChange("pending")}
-              className={[
-                "px-4 py-2 text-sm font-medium border-b-2 transition-colors",
-                effectiveActiveTab === "pending"
-                  ? "border-primary text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground",
-              ].join(" ")}
-            >
-              Pending Loadings
-            </button>
-          )}
-          {showPriority && (
-            <button
-              role="tab"
-              aria-selected={effectiveActiveTab === "priority"}
-              data-testid="tab-priority-scan"
-              onClick={() => handleTabChange("priority")}
-              className={[
-                "px-4 py-2 text-sm font-medium border-b-2 transition-colors",
-                effectiveActiveTab === "priority"
-                  ? "border-primary text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground",
-              ].join(" ")}
-            >
-              {priorityScanLabel}
-            </button>
-          )}
-        </div>
+        <TabsList variant="underline" className="w-full px-4" aria-label="Loadings sections">
+          {showLoadings && <TabsTrigger value="loadings" data-testid="tab-container-loadings">Container Loadings</TabsTrigger>}
+          {showPending && <TabsTrigger value="pending" data-testid="tab-pending-loadings">Pending Loadings</TabsTrigger>}
+          {showPriority && <TabsTrigger value="priority" data-testid="tab-priority-scan">{priorityScanLabel}</TabsTrigger>}
+        </TabsList>
       </div>
 
-      <div className="flex-1 overflow-auto min-h-0">
+      <TabsContent value={effectiveActiveTab} className="flex-1 overflow-auto min-h-0 mt-0">
         {!effectiveActiveTab && (
           <div className="p-6 text-sm text-muted-foreground">No Loadings tabs are available for this user.</div>
         )}
         {effectiveActiveTab === "loadings" && showLoadings && <FactoryContainerLoadingScan />}
         {effectiveActiveTab === "pending" && showPending && <FactoryPendingLoadings />}
         {effectiveActiveTab === "priority" && showPriority && <FactoryPriorityScan />}
-      </div>
-    </div>
+      </TabsContent>
+    </Tabs>
   );
 }

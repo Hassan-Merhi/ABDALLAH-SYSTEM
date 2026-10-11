@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/PageHeader";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { HardHat, Shield, Users } from "lucide-react";
 import FactoryWorkersHub from "@/pages/factory/FactoryWorkersHub";
 import FactoryEmployeesHub from "@/pages/factory/FactoryEmployeesHub";
@@ -45,7 +46,7 @@ export default function FactoryPayrollHub() {
   const tabs = allTabs.filter((tab) => sections.includes(tab.key));
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <Tabs value={activeSection} onValueChange={(value) => setActiveSection(value as Section)} className="flex flex-col h-full overflow-hidden">
       <div className="border-b bg-background shrink-0">
         {/* Shared page-header grammar (accent bar, icon, subtitle) like the ERP and Properties pages. */}
         <div className="px-4 pt-3 [&>header]:mb-0 [&>header]:border-b-0 [&>header]:pb-2">
@@ -57,32 +58,17 @@ export default function FactoryPayrollHub() {
           />
         </div>
 
-        <div className="flex gap-0 px-4 overflow-x-auto" role="tablist">
-          {tabs.map(({ key, label, Icon }) => {
-            const active = activeSection === key;
-            return (
-              <button
-                key={key}
-                role="tab"
-                aria-selected={active}
-                data-testid={`tab-people-${key}`}
-                onClick={() => setActiveSection(key)}
-                className={[
-                  "flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
-                  active
-                    ? "border-primary text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-foreground",
-                ].join(" ")}
-              >
-                <Icon className="h-3.5 w-3.5" />
-                {label}
-              </button>
-            );
-          })}
-        </div>
+        <TabsList variant="underline" className="w-full px-4" aria-label="Payroll and benefits sections">
+          {tabs.map(({ key, label, Icon }) => (
+            <TabsTrigger key={key} value={key} data-testid={`tab-people-${key}`}>
+              <Icon className="h-3.5 w-3.5" />
+              {label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
       </div>
 
-      <div className="flex-1 overflow-auto min-h-0">
+      <TabsContent value={activeSection} className="flex-1 overflow-auto min-h-0 mt-0">
         {sections.length === 0 && (
           <div className="p-6 text-sm text-muted-foreground">
             No Payroll & Benefits tabs are available for this user.
@@ -99,7 +85,7 @@ export default function FactoryPayrollHub() {
           </div>
         )}
         {activeSection === "insurance" && sections.includes("insurance") && <FactoryInsurance />}
-      </div>
-    </div>
+      </TabsContent>
+    </Tabs>
   );
 }

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/PageHeader";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import FactoryProformas from "@/pages/factory/FactoryProformas";
 import FactoryInvoices from "@/pages/factory/FactoryInvoices";
 import FactoryContainerLoadingScan from "@/pages/factory/FactoryContainerLoadingScan";
@@ -63,7 +64,7 @@ export default function FactoryInvoicing() {
   });
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as InvoicingTab)} className="flex flex-col h-full overflow-hidden">
       <div className="border-b bg-background shrink-0">
         {/* Shared page-header grammar (accent bar, icon, subtitle) like the ERP and Properties pages. */}
         <div className="px-4 pt-3 [&>header]:mb-0 [&>header]:border-b-0 [&>header]:pb-2">
@@ -75,31 +76,16 @@ export default function FactoryInvoicing() {
           />
         </div>
 
-        <div className="flex gap-0 px-4 overflow-x-auto" role="tablist">
-          {tabs.map((tab) => {
-            const isActive = activeTab === tab.key;
-            return (
-              <button
-                key={tab.key}
-                role="tab"
-                aria-selected={isActive}
-                data-testid={`tab-${tab.key}`}
-                onClick={() => setActiveTab(tab.key)}
-                className={[
-                  "px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
-                  isActive
-                    ? "border-primary text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-foreground",
-                ].join(" ")}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
+        <TabsList variant="underline" className="w-full px-4" aria-label="Invoicing sections">
+          {tabs.map((tab) => (
+            <TabsTrigger key={tab.key} value={tab.key} data-testid={`tab-${tab.key}`}>
+              {tab.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
       </div>
 
-      <div className="flex-1 overflow-auto min-h-0">
+      <TabsContent value={activeTab} className="flex-1 overflow-auto min-h-0 mt-0">
         {tabs.length === 0 && (
           <div className="p-6 text-sm text-muted-foreground">No Invoicing tabs are available for this user.</div>
         )}
@@ -108,7 +94,7 @@ export default function FactoryInvoicing() {
         {activeTab === "loadings" && showLoadings && <FactoryContainerLoadingScan />}
         {activeTab === "pending" && showPending && <FactoryPendingLoadings />}
         {activeTab === "priority" && showPriority && <FactoryPriorityScan />}
-      </div>
-    </div>
+      </TabsContent>
+    </Tabs>
   );
 }
