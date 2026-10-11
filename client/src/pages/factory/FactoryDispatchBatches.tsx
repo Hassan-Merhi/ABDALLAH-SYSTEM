@@ -4,6 +4,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import { useLocation, useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -270,31 +271,23 @@ export default function FactoryDispatchBatches() {
   });
 
   return (
-    <div className="flex flex-col h-full">
+    <Tabs value={effectiveActiveTab ?? ""} onValueChange={(value) => setActiveTab(value as "list" | "reports")} className="flex flex-col h-full">
       <PageHeader title="Dispatch Batches" subtitle="Manage local truck dispatch batches for bale sales">
         <div className="flex items-center gap-2 flex-wrap">
-          {showBatches && (
-            <Button
-              variant={effectiveActiveTab === "list" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setActiveTab("list")}
-              data-testid="button-tab-list"
-            >
-              <Truck className="w-3.5 h-3.5 mr-1.5" />
-              Batches
-            </Button>
-          )}
-          {showReports && (
-            <Button
-              variant={effectiveActiveTab === "reports" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setActiveTab("reports")}
-              data-testid="button-tab-reports"
-            >
-              <BarChart2 className="w-3.5 h-3.5 mr-1.5" />
-              Reports
-            </Button>
-          )}
+          <TabsList variant="pill" aria-label="Dispatch batch sections">
+            {showBatches && (
+              <TabsTrigger value="list" data-testid="button-tab-list">
+                <Truck className="h-3.5 w-3.5" />
+                Batches
+              </TabsTrigger>
+            )}
+            {showReports && (
+              <TabsTrigger value="reports" data-testid="button-tab-reports">
+                <BarChart2 className="h-3.5 w-3.5" />
+                Reports
+              </TabsTrigger>
+            )}
+          </TabsList>
           {showBatches && (
             <Button onClick={() => setCreateOpen(true)} data-testid="button-new-dispatch-batch">
               <Plus className="w-4 h-4 mr-2" />
@@ -304,7 +297,7 @@ export default function FactoryDispatchBatches() {
         </div>
       </PageHeader>
 
-      <div className="flex-1 overflow-auto p-4 space-y-4">
+      <TabsContent value={effectiveActiveTab ?? ""} className="flex-1 overflow-auto p-4 space-y-4 mt-0">
         {!effectiveActiveTab && (
           <div className="rounded-md border p-6 text-sm text-muted-foreground">
             No Dispatch Batches tabs are available for this user.
@@ -545,7 +538,7 @@ export default function FactoryDispatchBatches() {
             </Card>
           </>
         )}
-      </div>
+      </TabsContent>
 
       <Dialog
         open={createOpen}
@@ -719,6 +712,6 @@ export default function FactoryDispatchBatches() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </Tabs>
   );
 }

@@ -4,6 +4,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -144,7 +145,7 @@ export default function FactorySheetsAndSacks() {
   );
 
   return (
-    <div className="space-y-6 p-6">
+    <Tabs value={effectiveTab ?? ""} onValueChange={(value) => setActiveTab(value as "stock" | "movements")} className="space-y-6 p-6">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <PageHeader title="Sheets & Sacks" subtitle="Track packaging materials inventory" />
@@ -198,42 +199,29 @@ export default function FactorySheetsAndSacks() {
         </Card>
       </div>
 
-      {/* Tab switcher */}
+      {/* Shared tab strip for phone and desktop; hidden sections stay inaccessible. */}
       {effectiveTab ? (
-        <div className="flex items-center gap-1 border-b">
+        <TabsList variant="underline" aria-label="Sheets and sacks sections">
           {showStock && (
-            <button
-              onClick={() => setActiveTab("stock")}
-              className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                effectiveTab === "stock"
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
+            <TabsTrigger value="stock">
               <Layers className="h-4 w-4" />
               Current Stock
-            </button>
+            </TabsTrigger>
           )}
           {showMovements && (
-            <button
-              onClick={() => setActiveTab("movements")}
-              className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                effectiveTab === "movements"
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
+            <TabsTrigger value="movements">
               <History className="h-4 w-4" />
               Movement Log
-            </button>
+            </TabsTrigger>
           )}
-        </div>
+        </TabsList>
       ) : (
         <div className="rounded-md border p-6 text-sm text-muted-foreground">
           No Sheets & Sacks tabs are available for this user.
         </div>
       )}
 
+      {effectiveTab && <TabsContent value={effectiveTab} className="mt-0 space-y-6">
       {/* ─── CURRENT STOCK TAB ───────────────────────────────────────────── */}
       {effectiveTab === "stock" && (
         <>
@@ -421,6 +409,7 @@ export default function FactorySheetsAndSacks() {
 
       {/* ─── MOVEMENT LOG TAB ─────────────────────────────────────────────── */}
       {effectiveTab === "movements" && <MovementLog items={items} />}
+      </TabsContent>}
 
       {/* Dialogs */}
       {(showAddDialog || editItem) && (
@@ -456,6 +445,6 @@ export default function FactorySheetsAndSacks() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </Tabs>
   );
 }
