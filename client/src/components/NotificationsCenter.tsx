@@ -1,3 +1,4 @@
+import { TabsList, PillTabButton } from "@/components/ui/tabs";
 import type { ClientErrorLike } from "@/lib/clientError";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -314,19 +315,15 @@ export function NotificationsCenter() {
           </div>
 
           {/* Tab bar */}
-          <div className="flex border-b overflow-x-auto">
+          <div className="erp-mobile-scroll-tabs pb-1">
+            <TabsList className="w-max max-w-full" aria-label="Notifications">
             {TABS.map((tab) => (
-              <button
+              <PillTabButton
                 key={tab.id}
                 data-testid={`tab-notif-${tab.id}`}
                 onClick={() => setActiveTab(tab.id)}
-                className={cn(
-                  "flex-1 px-2 py-2 text-xs font-medium whitespace-nowrap transition-colors",
-                  activeTab === tab.id
-                    ? "border-b-2 border-primary text-foreground"
-                    : "text-muted-foreground hover-elevate"
-                )}
-              >
+                selected={activeTab === tab.id}
+                >
                 {tab.label}
                 {tab.id === "intercompany" && (icCountData?.count ?? 0) > 0 && (
                   <span className="ml-1 inline-flex h-3.5 min-w-3.5 px-0.5 items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[11px] font-bold">
@@ -338,8 +335,9 @@ export function NotificationsCenter() {
                     {unreadData!.count}
                   </span>
                 )}
-              </button>
+              </PillTabButton>
             ))}
+            </TabsList>
           </div>
 
           {/* Body */}
