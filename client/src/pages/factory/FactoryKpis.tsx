@@ -147,8 +147,9 @@ export default function FactoryKpis() {
           onValueChange={(value) => setRequestedTab(value as "daily" | "workers" | "mixes")}
           data-testid="tabs-kpi"
         >
-          <TabsList>
-            {showDaily && (
+          <div className="erp-mobile-scroll-tabs pb-1">
+            <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Factory KPI sections">
+              {showDaily && (
               <TabsTrigger value="daily" data-testid="tab-daily">
                 Daily Production
               </TabsTrigger>
@@ -163,7 +164,8 @@ export default function FactoryKpis() {
                 Mix Efficiency
               </TabsTrigger>
             )}
-          </TabsList>
+            </TabsList>
+          </div>
 
           {showDaily && (
             <TabsContent value="daily">
