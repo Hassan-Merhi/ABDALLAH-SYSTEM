@@ -1,3 +1,4 @@
+import { TabsList, PillTabButton } from "@/components/ui/tabs";
 import type { ClientErrorLike } from "@/lib/clientError";
 import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useRef } from "react";
@@ -223,24 +224,17 @@ export default function FactoryBaleRelabeling() {
   return (
     <div className="flex h-full min-w-0 flex-col" data-testid="factory-bale-relabeling-page">
       {/* Sub-nav tabs */}
-      <div className="shrink-0 overflow-x-auto border-b px-3 pt-3 overscroll-x-contain sm:px-6 sm:pt-4">
-        <div className="flex min-w-max items-center gap-1">
-          <button
-            className="shrink-0 rounded-t-md border-b-2 border-primary px-4 py-2 text-sm font-medium text-primary"
-            data-testid="tab-relabeling"
-          >
+      <div className="erp-mobile-scroll-tabs shrink-0 px-3 pt-3 pb-1 sm:px-6 sm:pt-4">
+        <TabsList aria-label="Bale relabeling sections" className="w-max min-w-full sm:min-w-0 sm:w-fit">
+          <PillTabButton selected data-testid="tab-relabeling">
             Bale Relabeling
-          </button>
+          </PillTabButton>
           {showWipersReEntry && (
-            <button
-              onClick={() => navigate("/factory/bale-relabeling/wipers-re-entry")}
-              className="shrink-0 rounded-t-md px-4 py-2 text-sm font-medium text-muted-foreground hover-elevate"
-              data-testid="tab-wipers-re-entry"
-            >
+            <PillTabButton selected={false} onClick={() => navigate("/factory/bale-relabeling/wipers-re-entry")} data-testid="tab-wipers-re-entry">
               Wipers Re-Entry by Date
-            </button>
+            </PillTabButton>
           )}
-        </div>
+        </TabsList>
       </div>
 
       <div className="flex-1 min-w-0 space-y-4 overflow-y-auto p-3 sm:space-y-6 sm:p-6">
