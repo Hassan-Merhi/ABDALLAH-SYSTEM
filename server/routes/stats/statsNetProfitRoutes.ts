@@ -30,6 +30,7 @@ import {
   expenseCategory,
   isIndirectIncome,
 } from "../../services/accounting/accountClassification";
+import { sumMoney, toMoney } from "../../lib/money";
 
 export function registerStatsNetProfitRoutes(app: Express) {
   app.get("/api/stats/net-profit", requireAuth, requireNonPOS, async (req, res) => {
@@ -401,14 +402,13 @@ export function registerStatsNetProfitRoutes(app: Express) {
           .where(otwContainersQuery)
           .execute();
 
-        let stockOtwValue = 0;
-        for (const container of otwContainers) {
-          // Use numeric OR so that grandTotal="0" (DB default) falls through to itemsTotal.
-          // String OR ("0" || itemsTotal) would never reach itemsTotal because "0" is truthy.
-          const gTotal = parseFloat(container.grandTotal ?? "0");
-          const containerValue = gTotal || parseFloat(container.itemsTotal ?? "0");
-          stockOtwValue += containerValue;
-        }
+        // A zero grandTotal (the DB default) falls through to itemsTotal.
+        const stockOtwValue = sumMoney(
+          otwContainers.map((container) => {
+            const gTotal = toMoney(container.grandTotal);
+            return gTotal.isZero() ? toMoney(container.itemsTotal) : gTotal;
+          })
+        ).toNumber();
 
         if (stockOtwValue > 0) {
           forUsTotal += stockOtwValue;
