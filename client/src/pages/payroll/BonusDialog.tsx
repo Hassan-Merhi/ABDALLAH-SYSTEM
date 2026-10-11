@@ -120,7 +120,7 @@ export function BonusDialog({
             setBonusSalesPreview(null);
           }}
         >
-          <TabsList className="w-full">
+          <TabsList className="w-full" aria-label="Bonus calculation method">
             <TabsTrigger value="sales" className="flex-1" data-testid="tab-sales-bonus">
               <Percent className="h-4 w-4 mr-1" />
               Sales %
