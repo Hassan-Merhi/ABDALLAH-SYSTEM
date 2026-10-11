@@ -70,10 +70,15 @@ const TabsList = React.forwardRef<
       const scroller = list.scrollWidth > list.clientWidth + 1
         ? list
         : list.closest<HTMLElement>(".erp-mobile-scroll-tabs") ?? list;
-      list.dataset.overflowLeft = String(scroller.scrollLeft > 2);
-      list.dataset.overflowRight = String(
-        scroller.scrollLeft + scroller.clientWidth < scroller.scrollWidth - 2
-      );
+      const tabs = scroller.querySelectorAll<HTMLElement>('[role="tab"]');
+      const firstTab = tabs.item(0);
+      const lastTab = tabs.item(tabs.length - 1);
+      if (!firstTab || !lastTab) return;
+      const bounds = scroller.getBoundingClientRect();
+      const first = firstTab.getBoundingClientRect();
+      const last = lastTab.getBoundingClientRect();
+      list.dataset.overflowLeft = String(Math.min(first.left, last.left) < bounds.left - 2);
+      list.dataset.overflowRight = String(Math.max(first.right, last.right) > bounds.right + 2);
     };
     const outer = list.closest<HTMLElement>(".erp-mobile-scroll-tabs");
     updateOverflow();
