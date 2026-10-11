@@ -1,3 +1,4 @@
+import { TabsList, PillTabButton } from "@/components/ui/tabs";
 import { useMemo, useState } from "react";
 import {
   Banknote,
@@ -207,16 +208,12 @@ export function CompactRunPayrollSelection({ model }: CompactRunPayrollSelection
 
   return (
     <div className="space-y-4 pt-3">
-      <div className="inline-flex rounded-xl border bg-muted/30 p-1">
-        <Button type="button" size="sm" variant="secondary" className="h-8 rounded-lg" data-testid="tab-run-payroll">
+      <TabsList className="w-max max-w-full" aria-label="Payroll sections">
+        <PillTabButton selected data-testid="tab-run-payroll">
           <PlayCircle className="mr-2 h-4 w-4" />
           Run Payroll
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          className="h-8 rounded-lg text-muted-foreground"
+        </PillTabButton>
+        <PillTabButton selected={false}
           onClick={() => {
             setActiveTab("history");
             setStep(1);
@@ -230,8 +227,8 @@ export function CompactRunPayrollSelection({ model }: CompactRunPayrollSelection
               {draftCount} draft
             </Badge>
           )}
-        </Button>
-      </div>
+        </PillTabButton>
+      </TabsList>
 
       <div className="overflow-hidden rounded-xl border bg-card shadow-xs">
         <div className="border-b p-3 sm:p-4">
