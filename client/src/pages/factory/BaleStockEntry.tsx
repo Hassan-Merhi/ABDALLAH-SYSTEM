@@ -145,7 +145,7 @@ export default function BaleStockEntry() {
         }}
         className="min-w-0"
       >
-        <TabsList aria-label="Bale stock entry sections" className="w-full max-w-full">
+        <TabsList aria-label="Bale stock entry sections" className="w-max max-w-full">
           {showEntry && (
             <TabsTrigger value="entry" data-testid="tab-stock-entry">
               <ScanLine className="mr-1 h-4 w-4" />
