@@ -58,9 +58,11 @@ const TabsList = React.forwardRef<
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     onKeyDown?.(event);
     if (event.defaultPrevented || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    // A few report hubs keep legacy tabs mounted but visually hidden.
+    // Skip those during keyboard navigation instead of focusing an invisible control.
     const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>(
       '[role="tab"]:not(:disabled)'
-    ));
+    )).filter((tab) => tab.getClientRects().length > 0);
     if (!tabs.length) return;
     const currentIndex = tabs.indexOf(document.activeElement as HTMLButtonElement);
     if (currentIndex < 0) return;
