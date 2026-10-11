@@ -86,7 +86,6 @@ export default function FactoryInvoicing() {
                 selected={isActive}
                 data-testid={`tab-${tab.key}`}
                 onClick={() => setActiveTab(tab.key)}
-                
               >
                 {tab.label}
               </PillTabButton>
