@@ -11,6 +11,7 @@ import { FormGrid } from "@/components/ui/form";
 import { FormActionBar } from "@/components/ui/workspace-layout";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { formatMoneyDisplay } from "@/lib/moneyDisplay";
+import { useSingleFlightAction } from "@/hooks/use-single-flight-action";
 import { Loader2, ArrowRight } from "lucide-react";
 
 function fmt(v: number | string | undefined, dec = 2) {
@@ -40,6 +41,7 @@ interface OpeningStockRow {
 export default function SpOpeningStock() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { execute: executePost, pending: submitting } = useSingleFlightAction();
 
   const [articleCode, setArticleCode] = useState("");
   const [qty, setQty] = useState("");
@@ -92,18 +94,20 @@ export default function SpOpeningStock() {
   const canSubmit = articleCode.trim() && qtyN > 0 && finalN > 0;
 
   const handleSubmit = () => {
-    if (mutation.isPending) return;
+    if (mutation.isPending || submitting) return;
     if (!canSubmit) {
       toast({ title: "Fill in article code, qty and final unit cost", variant: "destructive" });
       return;
     }
-    mutation.mutate({
+    void executePost(() => mutation.mutateAsync({
       articleCode: articleCode.trim(),
       qty,
       baseUnitCostUsd: baseUC || "0",
       landedUnitCostUsd: landedUC || "0",
       finalUnitCostUsd: finalUC,
       notes,
+    })).catch(() => {
+      // The mutation's onError handler already shows the posting failure.
     });
   };
 
@@ -226,7 +230,7 @@ export default function SpOpeningStock() {
               type="button"
               onClick={handleSubmit}
               disabled={!canSubmit}
-              pending={mutation.isPending}
+              pending={mutation.isPending || submitting}
               pendingLabel="Posting…"
               data-testid="button-sp-post-opening"
             >

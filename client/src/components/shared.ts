@@ -28,6 +28,7 @@ export { LoadingSkeleton, type LoadingSkeletonProps } from "./LoadingSkeleton";
 export { StatusBadge, type StatusBadgeProps, type StatusKind } from "./StatusBadge";
 export { ConfirmDialog, type ConfirmDialogProps, type ConfirmDialogTone } from "./ConfirmDialog";
 export { FormSubmitButton, type FormSubmitButtonProps } from "./FormSubmitButton";
+export { useSingleFlightAction } from "@/hooks/use-single-flight-action";
 export { MoneyAmount, type MoneyAmountProps } from "./MoneyAmount";
 export { DecimalInput, MoneyInput, type DecimalInputProps } from "./ui/decimal-input";
 export { formatMoneyDisplay, formatMoneyNumber, type MoneyDisplayOptions } from "@/lib/moneyDisplay";
