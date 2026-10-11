@@ -1,6 +1,7 @@
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
+import type { TableDensity } from "@/hooks/use-table-prefs";
 
 import { useMobileCardTable } from "./mobile-card-table";
 import { usePhoneSheet } from "./phone-sheet";
@@ -29,6 +30,8 @@ type TableProps = React.TableHTMLAttributes<HTMLTableElement> & {
    * Only meaningful for tables that are wider than their container.
    */
   stickyFirstColumn?: boolean;
+  /** Presentation-only density; sorting and pagination stay outside the table. */
+  density?: TableDensity;
 };
 
 const Table = React.forwardRef<HTMLTableElement, TableProps>(
@@ -43,6 +46,7 @@ const Table = React.forwardRef<HTMLTableElement, TableProps>(
       maxHeight,
       mobileLayout,
       stickyFirstColumn,
+      density = "standard",
       style,
       ...props
     },
@@ -137,6 +141,7 @@ const Table = React.forwardRef<HTMLTableElement, TableProps>(
         tabIndex={0}
         data-horizontal-scroll="true"
         data-table-scroll-region="true"
+        data-table-density={density}
         data-mobile-cards={cards ? "true" : undefined}
         data-scroll-mode={scrollMode}
         className={cn(
@@ -156,6 +161,8 @@ const Table = React.forwardRef<HTMLTableElement, TableProps>(
           stickyFirstColumn &&
             !cards &&
             "[&_tr>*:first-child]:sticky [&_tr>*:first-child]:left-0 [&_tr>*:first-child]:z-20 [&_thead_tr>*:first-child]:bg-muted [&_tbody_tr>*:first-child]:bg-background [&_tr>*:first-child]:shadow-[1px_0_0_hsl(var(--border))]",
+          density === "compact" && "[&_thead_th]:py-1 [&_tbody_td]:py-1",
+          density === "comfortable" && "[&_thead_th]:py-3 [&_tbody_td]:py-3",
           wrapperClassName,
           // A card stack is part of the page: no scroll cap, no frame.
           cards && "max-h-none overflow-visible rounded-none border-0"
