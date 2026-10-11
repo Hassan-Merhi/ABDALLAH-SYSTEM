@@ -6,6 +6,7 @@ import { useDebounce } from "@/hooks/use-debounce";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import { PageHeader } from "@/components/PageHeader";
+import { DataTableToolbar } from "@/components/DataTableToolbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -223,33 +224,29 @@ export default function Suppliers() {
         )}
       </div>
 
-      {/* Filter bar */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 min-w-48">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-          <Input
-            placeholder="Search suppliers..."
-            value={searchTerm}
-            onChange={(e) => setFilter("searchTerm", e.target.value)}
-            className="pl-9"
-            data-testid="input-supplier-search"
-          />
-        </div>
-        <Button
-          variant={hideZeroBalance ? "secondary" : "outline"}
-          size="default"
-          onClick={() => setFilter("hideZeroBalance", !hideZeroBalance)}
-          data-testid="button-toggle-zero-balance"
-        >
-          {hideZeroBalance ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
-          {hideZeroBalance ? "Hide Zero" : "Show All"}
-        </Button>
-        {hasActiveFilters && (
+      <DataTableToolbar
+        search={searchTerm}
+        onSearchChange={(value) => setFilter("searchTerm", value)}
+        searchPlaceholder="Search suppliers..."
+        searchTestId="input-supplier-search"
+        mobileFilters
+        filterLabel="Supplier filters"
+        activeFilterCount={hasActiveFilters ? 1 : 0}
+        onResetFilters={resetFilters}
+        filters={
+          <Button variant={hideZeroBalance ? "secondary" : "outline"} type="button"
+            onClick={() => setFilter("hideZeroBalance", !hideZeroBalance)}
+            data-testid="button-toggle-zero-balance">
+            {hideZeroBalance ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
+            {hideZeroBalance ? "Hide Zero" : "Show All"}
+          </Button>
+        }
+        actions={hasActiveFilters ? (
           <Button variant="outline" type="button" onClick={resetFilters} data-testid="button-reset-filters">
             Reset filters
           </Button>
-        )}
-      </div>
+        ) : undefined}
+      />
 
       {/* Supplier list */}
       {isLoading ? (
