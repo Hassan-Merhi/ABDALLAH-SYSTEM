@@ -140,7 +140,8 @@ export function ExportCenter() {
       </div>
 
       <Tabs defaultValue="daily" className="w-full">
-        <TabsList className="w-max max-w-full" aria-label="Export sections">
+        <div className="erp-mobile-scroll-tabs pb-1">
+          <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Export sections">
           <TabsTrigger
             value="daily"
             
@@ -160,6 +161,7 @@ export function ExportCenter() {
             <MessageCircle className="h-4 w-4" /> POS / WA
           </TabsTrigger>
         </TabsList>
+        </div>
 
         <TabsContent value="daily">
           <DailyExportTab
