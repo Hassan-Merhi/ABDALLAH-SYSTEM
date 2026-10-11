@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Users, Package, Boxes } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 import type { ImportTab } from "./factoryimport/types";
 import { SupplierImport } from "./factoryimport/components/SupplierImport";
@@ -38,35 +38,26 @@ export default function FactoryImport() {
   }
 
   return (
-    <div className="min-w-0 space-y-4" data-testid="factory-import-page">
-      <div
-        className="-mx-1 flex max-w-full items-center gap-2 overflow-x-auto px-1 pb-1 overscroll-x-contain sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0"
-        data-testid="factory-import-tabs"
-      >
+    <Tabs value={activeTab} onValueChange={(value) => setRequestedTab(value as ImportTab)} className="min-w-0 space-y-4" data-testid="factory-import-page">
+      <TabsList variant="pill" className="w-max max-w-full" data-testid="factory-import-tabs" aria-label="Import sections">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           return (
-            <Button
-              key={tab.key}
-              variant={activeTab === tab.key ? "default" : "outline"}
-              onClick={() => setRequestedTab(tab.key)}
-              className="shrink-0"
-              data-testid={`tab-import-${tab.key}`}
-            >
-              <Icon className="h-4 w-4 mr-2" />
+            <TabsTrigger key={tab.key} value={tab.key} data-testid={`tab-import-${tab.key}`}>
+              <Icon className="h-4 w-4 shrink-0" />
               {tab.label}
-            </Button>
+            </TabsTrigger>
           );
         })}
-      </div>
+      </TabsList>
 
-      <div className="min-w-0">
+      <TabsContent value={activeTab} className="mt-0 min-w-0">
         {activeTab === "suppliers" && <SupplierImport />}
         {activeTab === "raw-stock" && <RawStockImport />}
         {activeTab === "bales" && <BaleImport />}
         {activeTab === "opening-stock" && <OpeningStockImport />}
         {activeTab === "ob-edit" && <SupplierObEdit />}
-      </div>
-    </div>
+      </TabsContent>
+    </Tabs>
   );
 }

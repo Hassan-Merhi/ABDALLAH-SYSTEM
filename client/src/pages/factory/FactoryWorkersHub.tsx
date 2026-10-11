@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Tabs, TabsContent } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { HardHat, DollarSign, CalendarDays, Banknote, Gift, BarChart3 } from "lucide-react";
 import FactoryWorkers from "@/pages/factory/FactoryWorkers";
 import FactoryPayrollTab from "@/pages/factory/FactoryPayrollTab";
@@ -86,36 +85,21 @@ export default function FactoryWorkersHub() {
     clearKeys: ["mode"],
   });
 
-  const current = visibleOptions.find((option) => option.value === tab) ?? visibleOptions[0];
-  const Icon = current?.icon ?? HardHat;
-
   if (visibleOptions.length === 0) {
     return <div className="p-4 text-sm text-muted-foreground">No Workers tabs are available for this user.</div>;
   }
 
   return (
     <Tabs value={tab} onValueChange={(value) => setTab(value as TabValue)}>
-      <div className="mb-4">
-        <Select value={tab} onValueChange={(value) => setTab(value as TabValue)}>
-          <SelectTrigger className="w-52" data-testid="select-workers-section">
-            <SelectValue>
-              <span className="flex items-center gap-2">
-                <Icon className="h-4 w-4 shrink-0" />
-                {current?.label}
-              </span>
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {visibleOptions.map(({ value, label, icon: ItemIcon }) => (
-              <SelectItem key={value} value={value} data-testid={`option-workers-${value}`}>
-                <span className="flex items-center gap-2">
-                  <ItemIcon className="h-4 w-4 shrink-0" />
-                  {label}
-                </span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className="erp-mobile-scroll-tabs mb-4 pb-1">
+        <TabsList variant="pill" className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Worker sections">
+          {visibleOptions.map(({ value, label, icon: ItemIcon }) => (
+            <TabsTrigger key={value} value={value} data-testid={`tab-workers-${value}`}>
+              <ItemIcon className="h-4 w-4 shrink-0" />
+              {label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
       </div>
 
       {visibleValues.includes("workers") && (
