@@ -69,7 +69,7 @@ export default function DailyProductionReport() {
           onValueChange={(value) => setActiveTab(value as OverviewTab)}
           className="flex flex-col flex-1 overflow-hidden"
         >
-          <TabsList className="mx-4 mt-3 mb-0 shrink-0 w-fit" data-testid="tabs-production-analytics">
+          <TabsList className="mx-4 mt-3 mb-0 shrink-0 w-max max-w-full" data-testid="tabs-production-analytics">
             {show("otw-tracking") && (
               <TabsTrigger value="otw-tracking" data-testid="tab-otw-tracking">
                 <Truck className="h-4 w-4 mr-1.5" /> OTW Tracking
