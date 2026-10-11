@@ -245,3 +245,13 @@ The source of truth for shared component behavior and recommended imports is
 
 This phase intentionally does **not** change tab UX, table filters, business
 forms, calculations, or CI enforcement. Those are covered by later phases.
+
+## Shared responsive tabs (Phase 2, October 2026)
+
+New tabbed content must use `Tabs`, `TabsList`, `TabsTrigger`, and
+`TabsContent` from `client/src/components/ui/tabs.tsx`.
+Use the `pill` or `underline` variant based on content hierarchy. Both
+variants display consistently on phone and desktop, have scrollable strips on
+small screens, and support keyboard navigation and accessible tab panels.
+Do not reimplement tab button colors, selected states or keyboard behavior.
+See [`docs/shared-ui-phase-2.md`](docs/shared-ui-phase-2.md) for the contract.

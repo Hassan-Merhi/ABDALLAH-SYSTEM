@@ -83,7 +83,11 @@ function handleListKeyDown(event: React.KeyboardEvent<HTMLDivElement>, activatio
     orientation === "vertical" ? key === "ArrowUp" || key === "ArrowDown" : key === "ArrowLeft" || key === "ArrowRight"
   )) return;
   const options = Array.from(list.querySelectorAll<HTMLButtonElement>('[role="tab"]:not(:disabled):not([aria-disabled="true"])'))
-    .filter((tab) => tab.closest('[role="tablist"]') === list && tab.getClientRects().length > 0);
+    .filter((tab) =>
+      tab.closest('[role="tablist"]') === list &&
+      !tab.closest('[hidden], [inert], [aria-hidden="true"]') &&
+      getComputedStyle(tab).display !== "none"
+    );
   if (!options.length) return;
   const current = options.indexOf(document.activeElement as HTMLButtonElement);
   if (current < 0 && key !== "Home" && key !== "End") return;
