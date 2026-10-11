@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { ArrowLeft, History, RefreshCw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -46,7 +47,7 @@ export default function RawStockRecalculate() {
   } = rawStock;
 
   return (
-    <div className="space-y-6 p-6">
+    <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as (typeof tabs)[number]["id"])} className="space-y-6 p-6">
       {/* Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
@@ -106,37 +107,29 @@ export default function RawStockRecalculate() {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 border-b">
+      {/* Shared responsive tab navigation. */}
+      <TabsList variant="underline" aria-label="Raw stock recalculation sections" className="w-full">
         {tabs.map((t) => (
-          <button
-            key={t.id}
-            className={`px-4 py-2 text-xs font-medium transition-colors border-b-2 -mb-px ${
-              activeTab === t.id
-                ? "border-primary text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-            onClick={() => setActiveTab(t.id)}
-          >
+          <TabsTrigger key={t.id} value={t.id}>
             {t.label}
             {t.id === "sources" && (sourceMismatches?.length ?? 0) > 0 && (
-              <span className="ml-1.5 rounded-full bg-red-500/15 text-red-600 text-[11px] px-1.5 py-0.5">
+              <span className="ml-1 rounded-full bg-destructive/10 px-1.5 py-0.5 text-[11px] text-destructive">
                 {sourceMismatches!.length}
               </span>
             )}
             {t.id === "audit" && (fullAudit?.summary.safeRepairsAvailable ?? 0) > 0 && (
-              <span className="ml-1.5 rounded-full bg-amber-500/15 text-amber-600 text-[11px] px-1.5 py-0.5">
+              <span className="ml-1 rounded-full bg-warning/10 px-1.5 py-0.5 text-[11px] text-warning">
                 {fullAudit!.summary.safeRepairsAvailable}
               </span>
             )}
             {t.id === "partialfix" && (partialOffloadScan?.affected.length ?? 0) > 0 && (
-              <span className="ml-1.5 rounded-full bg-blue-500/15 text-blue-600 text-[11px] px-1.5 py-0.5">
+              <span className="ml-1 rounded-full bg-info/10 px-1.5 py-0.5 text-[11px] text-info">
                 {partialOffloadScan!.affected.length}
               </span>
             )}
-          </button>
+          </TabsTrigger>
         ))}
-      </div>
+      </TabsList>
 
       {includeCompletedBatches && (
         <div className="text-xs text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-md px-3 py-2">
@@ -151,10 +144,12 @@ export default function RawStockRecalculate() {
         </div>
       )}
 
-      <RawStockOperationsPanel rawStock={rawStock} />
+      <TabsContent value={activeTab} className="mt-0 space-y-6">
+        <RawStockOperationsPanel rawStock={rawStock} />
       <RawStockHistoryPanel rawStock={rawStock} />
       <RawStockReplayPanel rawStock={rawStock} />
       <RawStockPartialFixPanel rawStock={rawStock} />
+      </TabsContent>
 
       {/* Batch detail dialog */}
       <Dialog open={detailBatchId !== null} onOpenChange={(open) => !open && setDetailBatchId(null)}>
@@ -172,6 +167,6 @@ export default function RawStockRecalculate() {
       </Dialog>
 
       {AdminDialog}
-    </div>
+    </Tabs>
   );
 }

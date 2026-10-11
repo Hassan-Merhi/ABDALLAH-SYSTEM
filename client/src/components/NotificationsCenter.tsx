@@ -1,5 +1,6 @@
 import type { ClientErrorLike } from "@/lib/clientError";
 import { useState } from "react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -268,6 +269,7 @@ export function NotificationsCenter() {
         </PopoverTrigger>
 
         <PopoverContent align="end" className="w-96 p-0" data-testid="popover-notifications">
+          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabId)}>
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b">
             <div>
@@ -313,37 +315,27 @@ export function NotificationsCenter() {
             </div>
           </div>
 
-          {/* Tab bar */}
-          <div className="flex border-b overflow-x-auto">
+          {/* Shared accessible notifications tabs. */}
+          <TabsList variant="underline" className="w-full" aria-label="Notification categories">
             {TABS.map((tab) => (
-              <button
-                key={tab.id}
-                data-testid={`tab-notif-${tab.id}`}
-                onClick={() => setActiveTab(tab.id)}
-                className={cn(
-                  "flex-1 px-2 py-2 text-xs font-medium whitespace-nowrap transition-colors",
-                  activeTab === tab.id
-                    ? "border-b-2 border-primary text-foreground"
-                    : "text-muted-foreground hover-elevate"
-                )}
-              >
+              <TabsTrigger key={tab.id} value={tab.id} data-testid={`tab-notif-${tab.id}`} className="flex-1 text-xs">
                 {tab.label}
                 {tab.id === "intercompany" && (icCountData?.count ?? 0) > 0 && (
-                  <span className="ml-1 inline-flex h-3.5 min-w-3.5 px-0.5 items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[11px] font-bold">
+                  <span className="ml-1 inline-flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-destructive px-0.5 text-[11px] font-bold text-destructive-foreground">
                     {icCountData!.count}
                   </span>
                 )}
                 {tab.id === "all" && (unreadData?.count ?? 0) > 0 && (
-                  <span className="ml-1 inline-flex h-3.5 min-w-3.5 px-0.5 items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[11px] font-bold">
+                  <span className="ml-1 inline-flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-destructive px-0.5 text-[11px] font-bold text-destructive-foreground">
                     {unreadData!.count}
                   </span>
                 )}
-              </button>
+              </TabsTrigger>
             ))}
-          </div>
+          </TabsList>
 
           {/* Body */}
-          <div className="max-h-[400px] overflow-y-auto">
+          <TabsContent value={activeTab} className="max-h-[400px] overflow-y-auto mt-0">
             {/* Intercompany tab */}
             {activeTab === "intercompany" &&
               (icLoading ? (
@@ -490,7 +482,8 @@ export function NotificationsCenter() {
                   })}
                 </div>
               ))}
-          </div>
+          </TabsContent>
+          </Tabs>
         </PopoverContent>
       </Popover>
 
