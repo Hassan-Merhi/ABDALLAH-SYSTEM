@@ -25,7 +25,8 @@ export function PosSetupHub({ userRole }: { userRole?: string }) {
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="w-max max-w-full" aria-label="POS settings sections">
+        <div className="erp-mobile-scroll-tabs pb-1">
+          <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="POS settings sections">
           <TabsTrigger value="pos-settings" className="flex items-center gap-1">
             <ShoppingCart className="h-3.5 w-3.5" />
             POS Settings
@@ -47,6 +48,7 @@ export function PosSetupHub({ userRole }: { userRole?: string }) {
             Auto-Transfer
           </TabsTrigger>
         </TabsList>
+        </div>
 
         <TabsContent value="pos-settings" className="mt-4">
           <PosSettingsTab />
