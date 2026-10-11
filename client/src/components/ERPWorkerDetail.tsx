@@ -173,7 +173,7 @@ export function ERPWorkerDetail({ worker, onBack, onEdit }: Props) {
         {/* Right tabs */}
         <div className="flex-1 min-w-0">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="mb-4 flex-wrap">
+            <TabsList className="mb-4 w-max max-w-full" aria-label="Worker details">
               <TabsTrigger value="profile" data-testid="tab-erp-profile">
                 Profile
               </TabsTrigger>
