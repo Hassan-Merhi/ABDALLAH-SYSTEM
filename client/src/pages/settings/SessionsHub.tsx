@@ -21,7 +21,8 @@ export function SessionsHub({ isAdmin, isDev }: { isAdmin: boolean; isDev: boole
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="w-max max-w-full" aria-label="Session sections">
+        <div className="erp-mobile-scroll-tabs pb-1">
+          <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Session sections">
           <TabsTrigger value="sessions" className="flex items-center gap-1">
             <Shield className="h-3.5 w-3.5" />
             Active Sessions
@@ -37,6 +38,7 @@ export function SessionsHub({ isAdmin, isDev }: { isAdmin: boolean; isDev: boole
             </TabsTrigger>
           )}
         </TabsList>
+        </div>
 
         <TabsContent value="sessions" className="mt-4">
           <ActiveSessionsTab isAdmin={isAdmin} />
