@@ -120,7 +120,7 @@ export function FactoryCatalogTranslationEditor() {
             </DialogDescription>
           </DialogHeader>
           <Tabs defaultValue="product">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="w-max max-w-full" aria-label="Dialog sections">
               <TabsTrigger value="product">Product</TabsTrigger>
               <TabsTrigger value="category">Category</TabsTrigger>
             </TabsList>
