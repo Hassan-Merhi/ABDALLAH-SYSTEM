@@ -90,7 +90,8 @@ export function StockItemDetailsDialogView({ dialog }: { dialog: StockItemDetail
           </DialogHeader>
 
           <Tabs defaultValue="details" className="w-full">
-            <TabsList className="w-max max-w-full" aria-label="Dialog sections">
+            <div className="erp-mobile-scroll-tabs pb-1">
+              <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Dialog sections">
               <TabsTrigger value="details" data-testid="tab-details">
                 Item Details
               </TabsTrigger>
@@ -104,6 +105,7 @@ export function StockItemDetailsDialogView({ dialog }: { dialog: StockItemDetail
                 Voucher History
               </TabsTrigger>
             </TabsList>
+            </div>
 
             <TabsContent value="details" className="space-y-4 mt-4">
               <div className="border-b pb-6">
