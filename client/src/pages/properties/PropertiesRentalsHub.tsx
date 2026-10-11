@@ -19,7 +19,8 @@ export default function PropertiesRentalsHub() {
   return (
     <div className="space-y-4" data-testid="properties-rentals-hub">
       <Tabs value={tab} onValueChange={(value) => setTab(value as RentalTab)}>
-        <TabsList className="w-max max-w-full" aria-label="Rental sections">
+        <div className="erp-mobile-scroll-tabs pb-1">
+          <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Rental sections">
           <TabsTrigger value="warehouses" data-testid="tab-properties-rentals-warehouses">
             <Building2 className="mr-2 h-4 w-4" />
             Warehouses
@@ -33,6 +34,7 @@ export default function PropertiesRentalsHub() {
             Payments
           </TabsTrigger>
         </TabsList>
+        </div>
 
         <TabsContent value="warehouses" className="mt-4">
           <PropertiesRentalWarehouses />
