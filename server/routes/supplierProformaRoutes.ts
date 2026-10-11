@@ -21,7 +21,12 @@ import { supplierProformas, supplierProformaLines, suppliers } from "@shared/sch
 function sanitizeDecimal(v: unknown): string {
   const raw = String(v ?? "").trim();
   // Strip leading/trailing currency symbols and whitespace
-  const stripped = raw.replace(/^[^0-9\-(]+/, "").replace(/[^0-9.]+$/, "");
+  const leading = raw.replace(/^[^0-9\-(]+/, "");
+  // Trailing currency text is trimmed with a scan, not an end-anchored regex,
+  // so a long non-numeric tail cannot make the match quadratic.
+  let end = leading.length;
+  while (end > 0 && !/[0-9.]/.test(leading[end - 1])) end -= 1;
+  const stripped = leading.slice(0, end);
   // Remove thousands commas: only valid when pattern is NNN,NNN,...
   const noCommas = stripped.replace(/,(?=\d{3}(?:[,.]|$))/g, "");
   // Must match: optional minus, digits, optional .digits — nothing else
