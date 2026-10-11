@@ -24,6 +24,7 @@ export interface ConfirmDialogProps {
   title: string;
   description?: React.ReactNode;
   confirmText?: string;
+  confirmButtonTestId?: string;
   cancelText?: string;
   tone?: ConfirmDialogTone;
   icon?: LucideIcon;
@@ -44,6 +45,7 @@ export function ConfirmDialog({
   title,
   description,
   confirmText = "Confirm",
+  confirmButtonTestId = "button-confirm-confirm",
   cancelText = "Cancel",
   tone = "default",
   icon: Icon,
@@ -197,7 +199,7 @@ export function ConfirmDialog({
           <AlertDialogAction
             onClick={handlePrimary}
             disabled={isLoading || !phraseMatches || !!confirmDisabled}
-            data-testid="button-confirm-confirm"
+            data-testid={confirmButtonTestId}
             className={cn("w-full sm:w-auto", primaryClassName)}
           >
             {isLoading ? (
