@@ -10,13 +10,13 @@ import { applyOffloadMovingAverage } from "../../../services/factory/rawStockLoc
 import { resolveStoredFxRateOrThrow } from "../../../services/factory/currencyConversion";
 import { writeDaybookEntry } from "../_helpers";
 import { FactoryFxRateRequiredError, factoryDocumentRate } from "../../../services/factory/factoryDocumentFxRate";
-import { normFactoryEntry } from "../../../services/factory/factoryVoucherEntryAmounts";
+import { postFactoryVoucherTx } from "../../../services/factory/factoryVoucherPosting";
+import { closedPeriodErrorResponse } from "../../../lib/closedPeriodError";
 import {
   factoryContainers,
   factoryRawStock,
   factoryMixBatchSources,
   factoryContainerCommissions,
-  voucherEntries,
   factoryDaybookEntries,
   factoryOffloadAdditionalCharges,
   vouchers,
@@ -131,10 +131,12 @@ export function registerRawStockOffloadRoutes(app: Express) {
       // refused (409 FACTORY_FX_RATE_REQUIRED). It used to fetch an external rate
       // (never recorded) and fall back to the container's rate.
       let fxRate: number;
+      let fxRateText: string;
       try {
         const ownRate =
           reqFxRate && requestNumber(reqFxRate) > 0 ? { rate: String(reqFxRate), confirmed: true } : undefined;
-        fxRate = requestNumber((await factoryDocumentRate(db, companyId, currencyCode, offloadDate, ownRate)).rate);
+        fxRateText = (await factoryDocumentRate(db, companyId, currencyCode, offloadDate, ownRate)).rate;
+        fxRate = requestNumber(fxRateText);
       } catch (rateError) {
         if (rateError instanceof FactoryFxRateRequiredError) return res.status(409).json(rateError.body);
         throw rateError;
@@ -603,159 +605,130 @@ export function registerRawStockOffloadRoutes(app: Express) {
         // supplier-paid legs used to keep the native amount in the USD columns,
         // which put EUR/AUD figures into the expense accounts and the trial
         // balance as if they were USD (2026-10 accounting audit, wave 6).
-        if (freightVal > 0 && (reqFreightAccountId || effectiveFreightSupplierId)) {
-          const freightVoucherNum = `FACTORY-FREIGHT-${containerId}-${Date.now()}`;
+        //
+        // Phase 22 (C): each voucher goes through the engine (balanced, Decimal,
+        // company-owned targets) with this receipt's posting identity, so a replay
+        // returns the voucher instead of posting it twice. The FACTORY-FREIGHT- /
+        // FACTORY-OC- family numbers are read as identity (reverse offload,
+        // container delete, unposted memo), so they keep the prefix with the
+        // receipt / charge id as the suffix (was Date.now()).
+        const receiptId = rawStock!.id;
+        const freightAmount = parseMoneyInput(reqFreight || "0") ?? new Decimal(0);
+        const otherChargesAmount = parseMoneyInput(reqOtherCharges || "0") ?? new Decimal(0);
+        if (freightAmount.greaterThan(0) && (reqFreightAccountId || effectiveFreightSupplierId)) {
           const freightVoucherCcy = reqFreightCurrencyCode || currencyCode;
-          const freightFx = requestNumber(reqFreightFxRate || String(fxRate));
-          const [freightVoucher] = await tx
-            .insert(vouchers)
-            .values({
-              companyId,
-              voucherType: "Journal",
-              voucherNumber: freightVoucherNum,
-              voucherDate: offloadDate,
-              description: `Freight on container ${container.containerNumber}`,
-              totalAmount: String(freightVal),
-              currency: freightVoucherCcy,
-              exchangeRate: String(freightFx),
-              sourceModule: "FACTORY",
-            })
-            .returning();
-          if (effectiveFreightSupplierId) {
-            // Supplier: Dr Freight Expense / Cr Supplier Balance
-            await tx.insert(voucherEntries).values({
-              voucherId: freightVoucher.id,
-              ledgerAccountId: freightExpenseAcctId!,
-              ...normFactoryEntry(freightVoucherCcy, String(freightVal), "0", freightFx),
-              narration: `Freight expense - container ${container.containerNumber}`,
-            });
-            await tx.insert(voucherEntries).values({
-              voucherId: freightVoucher.id,
-              factorySupplierId: effectiveFreightSupplierId,
-              ...normFactoryEntry(freightVoucherCcy, "0", String(freightVal), freightFx),
-              narration: `Freight payable to supplier - container ${container.containerNumber}`,
-            });
-          } else {
-            // Own-account freight: Dr Freight Expense / Cr own account (the account
-            // that physically paid the freight, e.g. Embassy Shipping).
-            // reqFreightAccountId here is the credit/own account (set from
-            // container.freightOwnAccountId by the offload dialog).
-            await tx.insert(voucherEntries).values({
-              voucherId: freightVoucher.id,
-              ledgerAccountId: freightExpenseAcctId!,
-              ...normFactoryEntry(freightVoucherCcy, String(freightVal), "0", freightFx),
-              narration: `Freight expense - container ${container.containerNumber}`,
-            });
-            await tx.insert(voucherEntries).values({
-              voucherId: freightVoucher.id,
-              ledgerAccountId: parseInt(reqFreightAccountId),
-              ...normFactoryEntry(freightVoucherCcy, "0", String(freightVal), freightFx),
-              narration: `Freight paid via own account - container ${container.containerNumber}`,
-            });
-          }
+          const freightFx = reqFreightFxRate || fxRateText;
+          await postFactoryVoucherTx(tx, {
+            companyId,
+            voucherNumber: `FACTORY-FREIGHT-${containerId}-${receiptId}`,
+            voucherDate: offloadDate,
+            description: `Freight on container ${container.containerNumber}`,
+            currency: freightVoucherCcy,
+            fxRateToUsd: freightFx,
+            source: {
+              sourceType: "factory-offload-freight",
+              sourceId: `${containerId}:${receiptId}`,
+              phase: "freight",
+            },
+            lines: [
+              {
+                ledgerAccountId: freightExpenseAcctId!,
+                debit: freightAmount,
+                narration: `Freight expense - container ${container.containerNumber}`,
+              },
+              effectiveFreightSupplierId
+                ? {
+                    // Supplier: Dr Freight Expense / Cr Supplier Balance
+                    factorySupplierId: effectiveFreightSupplierId,
+                    credit: freightAmount,
+                    narration: `Freight payable to supplier - container ${container.containerNumber}`,
+                  }
+                : {
+                    // Own-account freight: Dr Freight Expense / Cr own account (the account
+                    // that physically paid the freight, e.g. Embassy Shipping).
+                    // reqFreightAccountId here is the credit/own account (set from
+                    // container.freightOwnAccountId by the offload dialog).
+                    ledgerAccountId: parseInt(reqFreightAccountId),
+                    credit: freightAmount,
+                    narration: `Freight paid via own account - container ${container.containerNumber}`,
+                  },
+            ],
+          });
         }
 
         // 9. Other Charges voucher (double-entry)
-        if (otherChargesVal > 0 && (reqOtherChargesAccountId || reqOtherChargesSupplierId)) {
-          const ocMainVoucherNum = `FACTORY-OC-${containerId}-MAIN-${Date.now()}`;
+        if (otherChargesAmount.greaterThan(0) && (reqOtherChargesAccountId || reqOtherChargesSupplierId)) {
           const ocVoucherCcy = reqOtherChargesCurrencyCode || currencyCode;
-          const ocFx = requestNumber(reqOtherChargesFxRate || String(fxRate));
-          const [ocMainVoucher] = await tx
-            .insert(vouchers)
-            .values({
-              companyId,
-              voucherType: "Journal",
-              voucherNumber: ocMainVoucherNum,
-              voucherDate: offloadDate,
-              description: `Other charges on container ${container.containerNumber}`,
-              totalAmount: String(otherChargesVal),
-              currency: ocVoucherCcy,
-              exchangeRate: String(ocFx),
-              sourceModule: "FACTORY",
-            })
-            .returning();
-          if (reqOtherChargesSupplierId) {
-            // Supplier: Dr OC Expense / Cr Supplier Balance
-            await tx.insert(voucherEntries).values({
-              voucherId: ocMainVoucher.id,
-              ledgerAccountId: ocExpenseAcctId!,
-              ...normFactoryEntry(ocVoucherCcy, String(otherChargesVal), "0", ocFx),
-              narration: `Other charges expense - container ${container.containerNumber}`,
-            });
-            await tx.insert(voucherEntries).values({
-              voucherId: ocMainVoucher.id,
-              factorySupplierId: parseInt(reqOtherChargesSupplierId),
-              ...normFactoryEntry(ocVoucherCcy, "0", String(otherChargesVal), ocFx),
-              narration: `Other charges payable to supplier - container ${container.containerNumber}`,
-            });
-          } else {
-            // Own-account other charges: Dr OC Expense / Cr chosen account.
-            await tx.insert(voucherEntries).values({
-              voucherId: ocMainVoucher.id,
-              ledgerAccountId: ocExpenseAcctId!,
-              ...normFactoryEntry(ocVoucherCcy, String(otherChargesVal), "0", ocFx),
-              narration: `Other charges expense - container ${container.containerNumber}`,
-            });
-            await tx.insert(voucherEntries).values({
-              voucherId: ocMainVoucher.id,
-              ledgerAccountId: parseInt(reqOtherChargesAccountId),
-              ...normFactoryEntry(ocVoucherCcy, "0", String(otherChargesVal), ocFx),
-              narration: `Other charges paid via own account - container ${container.containerNumber}`,
-            });
-          }
+          const ocFx = reqOtherChargesFxRate || fxRateText;
+          await postFactoryVoucherTx(tx, {
+            companyId,
+            voucherNumber: `FACTORY-OC-${containerId}-MAIN-${receiptId}`,
+            voucherDate: offloadDate,
+            description: `Other charges on container ${container.containerNumber}`,
+            currency: ocVoucherCcy,
+            fxRateToUsd: ocFx,
+            source: {
+              sourceType: "factory-offload-other-charges",
+              sourceId: `${containerId}:${receiptId}`,
+              phase: "main",
+            },
+            lines: [
+              {
+                ledgerAccountId: ocExpenseAcctId!,
+                debit: otherChargesAmount,
+                narration: `Other charges expense - container ${container.containerNumber}`,
+              },
+              reqOtherChargesSupplierId
+                ? {
+                    // Supplier: Dr OC Expense / Cr Supplier Balance
+                    factorySupplierId: parseInt(reqOtherChargesSupplierId),
+                    credit: otherChargesAmount,
+                    narration: `Other charges payable to supplier - container ${container.containerNumber}`,
+                  }
+                : {
+                    // Own-account other charges: Dr OC Expense / Cr chosen account.
+                    ledgerAccountId: parseInt(reqOtherChargesAccountId),
+                    credit: otherChargesAmount,
+                    narration: `Other charges paid via own account - container ${container.containerNumber}`,
+                  },
+            ],
+          });
         }
 
         // 10. Additional charges vouchers (double-entry, Dr Factory Charges Payable / Cr chosen)
         for (const inserted of insertedAdditionalCharges) {
           const chargeExact = toMoney(inserted.amount);
-          const chargeAmount = chargeExact.toNumber();
-          if (chargeAmount <= 0) continue;
+          if (chargeExact.lessThanOrEqualTo(0)) continue;
           if (!inserted.ledgerAccountId && !inserted.supplierId) continue;
           const addlChargeCcy = inserted.currencyCode || currencyCode;
-          const addlChargeFxNum = requestNumber(inserted.fxRateToUsd || String(fxRate));
-          const addlChargeFx = String(addlChargeFxNum);
-          const ocVoucherNum = `FACTORY-OC-${containerId}-${inserted.id}-${Date.now()}`;
-          const [ocVoucher] = await tx
-            .insert(vouchers)
-            .values({
-              companyId,
-              voucherType: "Journal",
-              voucherNumber: ocVoucherNum,
-              voucherDate: offloadDate,
-              description: `${inserted.description} - container ${container.containerNumber}`,
-              totalAmount: String(chargeAmount),
-              currency: addlChargeCcy,
-              exchangeRate: addlChargeFx,
-              sourceModule: "FACTORY",
-            })
-            .returning();
-          if (inserted.ledgerAccountId) {
-            await tx.insert(voucherEntries).values({
-              voucherId: ocVoucher.id,
-              ledgerAccountId: chargesPayableAcctId,
-              ...normFactoryEntry(addlChargeCcy, chargeExact.toFixed(), "0", addlChargeFx),
-              narration: `${inserted.description} payable - container ${container.containerNumber}`,
-            });
-            await tx.insert(voucherEntries).values({
-              voucherId: ocVoucher.id,
-              ledgerAccountId: inserted.ledgerAccountId,
-              ...normFactoryEntry(addlChargeCcy, "0", chargeExact.toFixed(), addlChargeFx),
-              narration: `${inserted.description} - container ${container.containerNumber}`,
-            });
-          } else if (inserted.supplierId) {
-            await tx.insert(voucherEntries).values({
-              voucherId: ocVoucher.id,
-              ledgerAccountId: chargesPayableAcctId,
-              ...normFactoryEntry(addlChargeCcy, chargeExact.toFixed(), "0", addlChargeFx),
-              narration: `${inserted.description} payable - container ${container.containerNumber}`,
-            });
-            await tx.insert(voucherEntries).values({
-              voucherId: ocVoucher.id,
-              factorySupplierId: inserted.supplierId,
-              ...normFactoryEntry(addlChargeCcy, "0", chargeExact.toFixed(), addlChargeFx),
-              narration: `${inserted.description} - container ${container.containerNumber}`,
-            });
-          }
+          const addlChargeFx = inserted.fxRateToUsd || fxRateText;
+          await postFactoryVoucherTx(tx, {
+            companyId,
+            voucherNumber: `FACTORY-OC-${containerId}-${inserted.id}`,
+            voucherDate: offloadDate,
+            description: `${inserted.description} - container ${container.containerNumber}`,
+            currency: addlChargeCcy,
+            fxRateToUsd: addlChargeFx,
+            source: { sourceType: "factory-offload-additional-charge", sourceId: inserted.id, phase: "offload" },
+            lines: [
+              {
+                ledgerAccountId: chargesPayableAcctId,
+                debit: chargeExact,
+                narration: `${inserted.description} payable - container ${container.containerNumber}`,
+              },
+              inserted.ledgerAccountId
+                ? {
+                    ledgerAccountId: inserted.ledgerAccountId,
+                    credit: chargeExact,
+                    narration: `${inserted.description} - container ${container.containerNumber}`,
+                  }
+                : {
+                    factorySupplierId: inserted.supplierId,
+                    credit: chargeExact,
+                    narration: `${inserted.description} - container ${container.containerNumber}`,
+                  },
+            ],
+          });
         }
 
         await writeOffloadAuditTx(tx);
@@ -765,6 +738,8 @@ export function registerRawStockOffloadRoutes(app: Express) {
       res.json({ rawStock, commission: commissionRecord });
     } catch (error: unknown) {
       logger.error("Error offloading container:", { error: error });
+      const closed = closedPeriodErrorResponse(error);
+      if (closed) return res.status(closed.status).json(closed.body);
       res.status(400).json({ message: getErrorMessage(error) });
     }
   });

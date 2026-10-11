@@ -5,6 +5,7 @@
  */
 import type { DbTransaction } from "../../../db";
 import { logAudit } from "../../../routes/_helpers";
+import { recordVoucherEditAuditTx } from "../../accounting/voucherCorrection";
 import { salesItems, stockItems, vouchers } from "@shared/schema";
 import { eq, inArray } from "drizzle-orm";
 import type { PosSaleUpdateTransactionResult } from "./updateSaleService";
@@ -67,6 +68,18 @@ export async function writePosSaleUpdateAuditTx(
       totalAmount: item.totalSales,
     })),
   };
+  // Phase 22 (B): one row — the correction policy's full before/after snapshot
+  // with the readable sale changes.
+  if (transactionResult.editBefore) {
+    await recordVoucherEditAuditTx(tx, {
+      voucherId,
+      before: transactionResult.editBefore,
+      actor: { userId: params.userId, username: params.username, companyId: params.companyId },
+      reason: "POS sale edit",
+      extra: changes,
+    });
+    return;
+  }
   await logAudit(
     {
       userId: params.userId,

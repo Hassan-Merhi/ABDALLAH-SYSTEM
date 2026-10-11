@@ -11,6 +11,8 @@ import { requireAuth } from "../../../auth";
 import { parseId } from "../../../lib/parseId";
 import { getClientDate } from "../../../lib/dateUtils";
 import { sql, eq, and } from "drizzle-orm";
+import type Decimal from "decimal.js";
+import { sumMoney, toMoney } from "../../../lib/money";
 import {
   customerDispatchBatches,
   customerDispatchTruckRides,
@@ -292,27 +294,30 @@ export function registerDispatchInvoiceRoutes(app: Express) {
         );
         const invoiceNumber = `INV-${String(invoiceNum).padStart(6, "0")}`;
 
-        // 6. Build grouped order lines by articleCode
+        // 6. Build grouped order lines by articleCode.
+        // Phase 22 (C), PE13: exact Decimal sums (were parseFloat sums, posted as
+        // the invoice total, the customer balance and the invoice journal).
         const lineMap = new Map<
           string,
           {
             articleCode: string;
             baleName: string;
             qty: number;
-            totalWeight: number;
-            pricePerBale: number;
-            totalPrice: number;
+            totalWeight: Decimal;
+            pricePerBale: Decimal;
+            totalPrice: Decimal;
           }
         >();
         for (const scan of scans) {
           const key = scan.article_code || "UNKNOWN";
           const existing = lineMap.get(key);
-          const weight = parseFloat(scan.weight_kg || "0");
-          const price = parseFloat(scan.price_used || "0");
+          const weight = toMoney(scan.weight_kg);
+          const price = toMoney(scan.price_used);
+          const scanAmount = toMoney(scan.amount);
           if (existing) {
             existing.qty += 1;
-            existing.totalWeight += weight;
-            existing.totalPrice += parseFloat(scan.amount || "0");
+            existing.totalWeight = existing.totalWeight.plus(weight);
+            existing.totalPrice = existing.totalPrice.plus(scanAmount);
           } else {
             lineMap.set(key, {
               articleCode: key,
@@ -320,13 +325,13 @@ export function registerDispatchInvoiceRoutes(app: Express) {
               qty: 1,
               totalWeight: weight,
               pricePerBale: price,
-              totalPrice: parseFloat(scan.amount || "0"),
+              totalPrice: scanAmount,
             });
           }
         }
         const lines = Array.from(lineMap.values());
 
-        const grandTotal = lines.reduce((sum, l) => sum + l.totalPrice, 0);
+        const grandTotal = sumMoney(lines.map((l) => l.totalPrice));
         const totalQtyBales = scans.length;
         const orderDate = invoiceDate || batch.batch_date || getClientDate(req as Request);
 
@@ -351,7 +356,7 @@ export function registerDispatchInvoiceRoutes(app: Express) {
 
         // 8. Insert customerOrderLines (grouped by article)
         for (const line of lines) {
-          const avgWeight = line.totalWeight / line.qty;
+          const avgWeight = line.totalWeight.div(line.qty);
           await tx.execute(sql`
             INSERT INTO customer_order_lines (order_id, article_code, bale_name, qty, weight_per_bale, total_weight, price_per_bale, total_price)
             VALUES (${orderId}, ${line.articleCode}, ${line.baleName}, ${line.qty}, ${avgWeight.toFixed(3)}, ${line.totalWeight.toFixed(3)}, ${line.pricePerBale.toFixed(2)}, ${line.totalPrice.toFixed(2)})

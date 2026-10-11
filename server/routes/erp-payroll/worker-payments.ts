@@ -8,18 +8,17 @@ import type { Express } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { eq, and, inArray } from "drizzle-orm";
 import { db, type DbTransaction } from "../../db";
+import {
+  erpRequestSourceId,
+  pairLines,
+  postErpVoucherTx,
+  sessionPostingActor,
+  type ErpVoucherLine,
+} from "../../services/accounting/erpVoucherPosting";
 import { requireAuth, requireNonPOS } from "../../auth";
 import type Decimal from "decimal.js";
 import { MoneyDecimal, moneyString, parseMoneyInput, sumMoney } from "../../lib/money";
-import {
-  bankAccounts,
-  employeeGroupMembers,
-  employeeGroups,
-  employees,
-  ledgerAccounts,
-  voucherEntries,
-  vouchers,
-} from "@shared/schema";
+import { bankAccounts, employeeGroupMembers, employeeGroups, employees, ledgerAccounts } from "@shared/schema";
 
 /**
  * Finds or creates a salary expense account inside the posting transaction, so
@@ -85,36 +84,23 @@ export function registerPayrollWorkerPaymentRoutes(app: Express) {
       if (!bank) return res.status(404).json({ message: "Payment account not found" });
 
       // Dr Salary Expense / Cr bank, posted together or not at all.
-      const voucherNumber = `SAL-PAY-${Date.now()}`;
+      const requestSourceId = erpRequestSourceId(req);
       const voucher = await db.transaction(async (tx) => {
         const salaryExpenseAccountId = await salaryExpenseAccountTx(tx, companyId, "SALARY_EXPENSE", "Salary Expense");
-        const [created] = await tx
-          .insert(vouchers)
-          .values({
-            companyId,
-            voucherNumber,
-            voucherType: "Payment",
-            voucherDate: date,
-            description: notes || `Salary payment for ${employee.firstName} ${employee.lastName}`,
-            totalAmount: paymentAmount,
-          })
-          .returning();
-        await tx.insert(voucherEntries).values([
-          {
-            voucherId: created.id,
-            ledgerAccountId: salaryExpenseAccountId,
-            debitAmount: paymentAmount,
-            creditAmount: "0",
-            narration: `Salary payment - ${voucherNumber}`,
-          },
-          {
-            voucherId: created.id,
-            bankAccountId,
-            debitAmount: "0",
-            creditAmount: paymentAmount,
-            narration: `Salary payment - ${voucherNumber}`,
-          },
-        ]);
+        const { voucher: created } = await postErpVoucherTx(tx, {
+          companyId,
+          voucherType: "Payment",
+          voucherDate: date,
+          description: notes || `Salary payment for ${employee.firstName} ${employee.lastName}`,
+          lines: pairLines(
+            { ledgerAccountId: salaryExpenseAccountId },
+            { bankAccountId: Number(bankAccountId) },
+            paymentAmount,
+            "Salary payment"
+          ),
+          source: { type: "worker-salary-payment", id: `${employee.id}:${requestSourceId}` },
+          actor: sessionPostingActor(req, "Salary payment"),
+        });
         return created;
       });
 
@@ -210,20 +196,9 @@ export function registerPayrollWorkerPaymentRoutes(app: Express) {
       }
       const totalAmount = sumMoney([...bulkPayByGroup.values()]);
 
-      const voucherNumber = `SAL-BULK-${Date.now()}`;
+      const requestSourceId = erpRequestSourceId(req);
       const voucher = await db.transaction(async (tx) => {
-        const [created] = await tx
-          .insert(vouchers)
-          .values({
-            companyId,
-            voucherNumber,
-            voucherType: "Payment",
-            voucherDate: date,
-            description: notes || `Bulk salary payment for ${payments.length} workers`,
-            totalAmount: moneyString(totalAmount),
-          })
-          .returning();
-
+        const lines: ErpVoucherLine[] = [];
         for (const [grp, grpTotal] of bulkPayByGroup) {
           const isDefault = grp === "__default__";
           const expCode = isDefault
@@ -234,24 +209,26 @@ export function registerPayrollWorkerPaymentRoutes(app: Express) {
                 .substring(0, 25)}`;
           const expName = isDefault ? "Salary Expense" : `Salary Expense - ${grp}`;
           const expAccountId = await salaryExpenseAccountTx(tx, companyId, expCode, expName);
-          await tx.insert(voucherEntries).values({
-            voucherId: created.id,
+          lines.push({
             ledgerAccountId: expAccountId,
-            debitAmount: moneyString(grpTotal),
-            creditAmount: "0",
-            narration: isDefault
-              ? `Bulk salary payment - ${payments.length} workers - ${voucherNumber}`
-              : `Salary expense - ${grp} - ${voucherNumber}`,
+            debit: grpTotal,
+            narration: isDefault ? `Bulk salary payment - ${payments.length} workers` : `Salary expense - ${grp}`,
           });
         }
-
         // Credit entry for the bank/cash account
-        await tx.insert(voucherEntries).values({
-          voucherId: created.id,
-          debitAmount: "0",
-          creditAmount: moneyString(totalAmount),
-          narration: `Bulk salary payment - ${payments.length} workers - ${voucherNumber}`,
+        lines.push({
+          credit: totalAmount,
+          narration: `Bulk salary payment - ${payments.length} workers`,
           ...(accountType === "cash" ? { ledgerAccountId: creditAccountId } : { bankAccountId: creditAccountId }),
+        });
+        const { voucher: created } = await postErpVoucherTx(tx, {
+          companyId,
+          voucherType: "Payment",
+          voucherDate: date,
+          description: notes || `Bulk salary payment for ${payments.length} workers`,
+          lines,
+          source: { type: "worker-salary-payment-bulk", id: requestSourceId },
+          actor: sessionPostingActor(req, "Bulk salary payment"),
         });
         return created;
       });

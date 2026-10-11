@@ -14,9 +14,9 @@ import { requireAuth } from "../../../auth";
 import { resolveStoredFxRate, UnresolvedExchangeRateError } from "../../../services/factory/currencyConversion";
 import { getOrCreateLedgerAccount } from "../_helpers";
 import { FactoryFxRateRequiredError, factoryDocumentRate } from "../../../services/factory/factoryDocumentFxRate";
-import { factoryContainers, voucherEntries, factoryContainerOtherCharges, vouchers } from "@shared/schema";
+import { factoryContainers, factoryContainerOtherCharges, vouchers } from "@shared/schema";
 import { eq, and, ilike } from "drizzle-orm";
-import { normFactoryEntry } from "./_helpers";
+import { postFactoryVoucherTx } from "../../../services/factory/factoryVoucherPosting";
 import { parseMoneyInput, sumMoney, toMoney } from "../../../lib/money";
 import { retireVouchersTx, sessionRetirementActor } from "../../../services/accounting/voucherRetirement";
 
@@ -203,36 +203,30 @@ export function registerFactoryContainerOtherChargesRoutes(app: Express) {
           if (chargeAmt.lte(0) || !charge.ledgerAccountId || !prepared.fxRate || !payableAccId) continue;
 
           const chargeCcy = charge.currencyCode || "USD";
-          const ocVoucherNum = `FACTORY-OC-${containerId}-${charge.id}-${Date.now()}-${index}`;
-          const [ocVoucher] = await tx
-            .insert(vouchers)
-            .values({
-              companyId,
-              voucherType: "Journal",
-              voucherNumber: ocVoucherNum,
-              voucherDate,
-              description: `${charge.description} - container ${container.containerNumber}`,
-              totalAmount: chargeAmt.toFixed(),
-              currency: chargeCcy,
-              exchangeRate: prepared.fxRate,
-              sourceModule: "FACTORY",
-            })
-            .returning();
-
-          await tx.insert(voucherEntries).values([
-            {
-              voucherId: ocVoucher.id,
-              ledgerAccountId: payableAccId,
-              ...normFactoryEntry(chargeCcy, chargeAmt.toFixed(), "0", prepared.fxRate),
-              narration: `${charge.description} payable - container ${container.containerNumber}`,
-            },
-            {
-              voucherId: ocVoucher.id,
-              ledgerAccountId: charge.ledgerAccountId,
-              ...normFactoryEntry(chargeCcy, "0", chargeAmt.toFixed(), prepared.fxRate),
-              narration: `${charge.description} - container ${container.containerNumber}`,
-            },
-          ]);
+          // Phase 22 (C): through the engine with the charge's posting identity;
+          // FACTORY-OC-{container}-{charge}- family number with the generation
+          // (was Date.now()). Dr Factory Charges Payable / Cr the charge account.
+          await postFactoryVoucherTx(tx, {
+            companyId,
+            voucherNumber: (generation) => `FACTORY-OC-${containerId}-${charge.id}-${generation}`,
+            voucherDate,
+            description: `${charge.description} - container ${container.containerNumber}`,
+            currency: chargeCcy,
+            fxRateToUsd: prepared.fxRate,
+            source: { sourceType: "factory-container-other-charge", sourceId: charge.id, phase: "voucher" },
+            lines: [
+              {
+                ledgerAccountId: payableAccId,
+                debit: chargeAmt,
+                narration: `${charge.description} payable - container ${container.containerNumber}`,
+              },
+              {
+                ledgerAccountId: charge.ledgerAccountId,
+                credit: chargeAmt,
+                narration: `${charge.description} - container ${container.containerNumber}`,
+              },
+            ],
+          });
         }
 
         return newCharges;

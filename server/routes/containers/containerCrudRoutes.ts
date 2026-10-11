@@ -1,7 +1,4 @@
-import {
-  infrastructurePostingIdentity,
-  insertInfrastructureVoucherTx,
-} from "../../services/accounting/infrastructureVoucherIdentity";
+import { postFactoryVoucherTx } from "../../services/factory/factoryVoucherPosting";
 import { systemAccountDefinition } from "../../services/accounting/systemAccounts";
 import { moneyString, toMoney } from "../../lib/money";
 import { parseId } from "../../lib/parseId";
@@ -24,7 +21,6 @@ import {
   stockCategories,
   suppliers,
   ledgerAccounts,
-  voucherEntries,
 } from "@shared/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { requireNonSP } from "./containerHelpers";
@@ -165,41 +161,22 @@ export function registerContainerCrudRoutes(app: Express) {
           .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.code, "PURCHASES")))
           .limit(1);
 
-        const { voucher } = await insertInfrastructureVoucherTx(
-          tx,
-          {
-            companyId,
-            currency: "USD",
-            voucherNumber: `CONT-${container.containerNumber}-${Date.now()}`,
-            voucherType: "Purchase",
-            voucherDate: voucherDate,
-            description: `Container ${container.containerNumber} - ${itemName}`,
-            totalAmount,
-            optional: false,
-            sourceModule: "ERP",
-          },
-          infrastructurePostingIdentity("manual-container", `${companyId}:${container.id}`, "purchase")
-        );
-
+        // Phase 22 (C): through the engine, engine-numbered (was
+        // CONT-{container}-{Date.now()}, read nowhere), same posting identity.
+        // Dr Purchases (expense) / Cr the supplier (payable).
         const narration = `Container ${container.containerNumber} - ${itemName} (${totalKg}kg @ $${ratePerKg}/kg)`;
-        await tx.insert(voucherEntries).values([
-          // Debit: Purchases account (Expense increases)
-          {
-            voucherId: voucher.id,
-            ledgerAccountId: purchasesAccount.id,
-            debitAmount: totalAmount,
-            creditAmount: "0",
-            narration,
-          },
-          // Credit: Supplier account (Accounts Payable increases)
-          {
-            voucherId: voucher.id,
-            supplierId: data.supplierId,
-            debitAmount: "0",
-            creditAmount: totalAmount,
-            narration,
-          },
-        ]);
+        await postFactoryVoucherTx(tx, {
+          companyId,
+          voucherType: "Purchase",
+          voucherDate: voucherDate,
+          description: `Container ${container.containerNumber} - ${itemName}`,
+          sourceModule: "ERP",
+          source: { sourceType: "manual-container", sourceId: `${companyId}:${container.id}`, phase: "purchase" },
+          lines: [
+            { ledgerAccountId: purchasesAccount.id, debit: totalAmount, narration },
+            { supplierId: data.supplierId, credit: totalAmount, narration },
+          ],
+        });
         return container;
       });
 

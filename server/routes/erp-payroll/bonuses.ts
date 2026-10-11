@@ -11,7 +11,8 @@ import { eq, and, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "../../db";
 import { storage } from "../../storage";
 import { requireAuth, requireNonPOS } from "../../auth";
-import { syncEmployeeBalancesFromEntries } from "../_helpers";
+import { postEmployeeVoucherTx } from "./postEmployeeBatch";
+import { erpRequestSourceId, pairLines, sessionPostingActor } from "../../services/accounting/erpVoucherPosting";
 import {
   companies,
   employeeGroupMembers,
@@ -19,7 +20,6 @@ import {
   employees,
   locations,
   salesItems,
-  voucherEntries,
   vouchers,
 } from "@shared/schema";
 import { getAccessibleCompanyIds } from "../../security/companyAccessBoundary";
@@ -422,54 +422,24 @@ export function registerPayrollBonusRoutes(app: Express) {
         });
       }
 
-      // Create voucher
-      const voucherNumber = `BONUS-${Date.now()}`;
+      // Phase 22 (B): Dr bonus expense / Cr employee through the central engine,
+      // the employee balance moved from the posted lines in the same transaction.
+      const requestSourceId = erpRequestSourceId(req);
       const voucher = await db.transaction(async (tx) => {
-        const [voucher] = await tx
-          .insert(vouchers)
-          .values({
-            companyId: req.session.currentCompanyId!,
-            voucherNumber,
-            voucherType: "Journal",
-            voucherDate: date,
-            description: notes || `Bonus for ${employee.firstName} ${employee.lastName}`,
-            totalAmount: bonusCents,
-          })
-          .returning();
-
-        // Create voucher entries (double-entry)
-        // Debit: Bonus Expense - {Group} (or Bonus Expense for ungrouped)
-        await tx.insert(voucherEntries).values({
-          voucherId: voucher.id,
-          ledgerAccountId: bonusSingleAccount.id,
-          debitAmount: bonusCents,
-          creditAmount: "0",
-          narration: `Bonus payment - ${voucherNumber}`,
+        const { voucher } = await postEmployeeVoucherTx(tx, {
+          companyId: req.session.currentCompanyId!,
+          voucherType: "Journal",
+          voucherDate: date,
+          description: notes || `Bonus for ${employee.firstName} ${employee.lastName}`,
+          lines: pairLines(
+            { ledgerAccountId: bonusSingleAccount.id },
+            { employeeId: employee.id },
+            bonusCents,
+            "Bonus payment"
+          ),
+          source: { type: "employee-bonus", id: `${employee.id}:${requestSourceId}` },
+          actor: sessionPostingActor(req, "Bonus payment"),
         });
-
-        // Credit: Employee (using employeeId field directly instead of separate ledger account)
-        await tx.insert(voucherEntries).values({
-          voucherId: voucher.id,
-          ledgerAccountId: null,
-          employeeId: employee.id,
-          debitAmount: "0",
-          creditAmount: bonusCents,
-          narration: `Bonus payment - ${voucherNumber}`,
-        });
-        // Wave 12: the balance moves in the voucher's transaction.
-        await syncEmployeeBalancesFromEntries(
-          [
-            {
-              ledgerAccountId: null,
-              employeeId: employee.id,
-              debitAmount: "0",
-              creditAmount: bonusCents,
-            },
-          ],
-          req.session.currentCompanyId!,
-          false,
-          tx
-        );
         return voucher;
       });
 

@@ -10,16 +10,21 @@ import { db } from "../../../db";
 import { storage } from "../../../storage";
 import { requireAuth } from "../../../auth";
 import { voucherMutationBlockReason } from "../../../lib/migratedVoucherGuard";
-import { writeVoucherAuditTx } from "../../helpers/voucherAuditTrail";
+import {
+  assertVoucherEditableTx,
+  recordVoucherEditAuditTx,
+  sendVoucherCorrectionRefusal,
+} from "../../../services/accounting/voucherCorrection";
+import { rebalanceVoucherRoundingTx } from "../../../services/accounting/engineRounding";
+import { syncFactoryChargeVoucherEditTx } from "./factoryChargeVoucherSync";
 import {
   assertNotIntercompanyTransferLeg,
   sendIntercompanyTransferLegRefusal,
 } from "../../../services/accounting/intercompanyTransferLegGuard";
 import { normalizeVoucherEntryAmounts } from "../../../services/accounting/currencyAmounts";
-import { vouchers, voucherEntries, customerBalances } from "@shared/schema";
+import { vouchers, voucherEntries } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
-import { recalculateOrderTotals } from "../../factory/_helpers";
-import { customerOrderCharges, customerOrders, factoryDaybookEntries as fde } from "@shared/schema";
+import { factoryDaybookEntries as fde } from "@shared/schema";
 import { moveSalesVoucherInventoryLocation } from "./salesLocationInventoryEvidence";
 import { syncContainerChargeVoucherEditTx } from "../../../services/containers/offload-lifecycle/charge-voucher-sync";
 import type { PgUpdateSetSource } from "drizzle-orm/pg-core";
@@ -134,12 +139,19 @@ export function registerVoucherWithEntriesRoutes(app: Express) {
 
       let updatedVoucher!: typeof vouchers.$inferSelect;
       const createdEntries: (typeof voucherEntries.$inferSelect)[] = [];
-      // The rows replaced by this edit, kept for the audit snapshot below.
-      let oldEntries: (typeof voucherEntries.$inferSelect)[] = [];
 
       const oldLocationId = existingVoucher.locationId;
       const newLocationId = voucher.locationId !== undefined ? voucher.locationId : oldLocationId;
       const locationChanged = oldLocationId !== newLocationId;
+
+      // Phase 22 (B): the correction policy refuses first (closed period, reversed
+      // voucher), before the location move below commits on its own.
+      await db.transaction((tx) =>
+        assertVoucherEditableTx(tx, id, {
+          companyId: existingVoucher.companyId,
+          newVoucherDate: voucher.voucherDate ?? null,
+        })
+      );
 
       // Wave 15 (M5): refused before anything moves (the location move below commits on its own).
       try {
@@ -170,7 +182,13 @@ export function registerVoucherWithEntriesRoutes(app: Express) {
       // all. This used to run as separate autocommit writes with a best-effort
       // restore that could leave a voucher with no lines or half its lines.
       await db.transaction(async (tx) => {
-        oldEntries = await tx.select().from(voucherEntries).where(eq(voucherEntries.voucherId, id));
+        // Phase 22 (B), PE9/G4: the correction policy. An open-period edit is
+        // audited in this transaction; a voucher dated (or re-dated) in a closed
+        // period is refused with 409 VOUCHER_CLOSED_PERIOD_REVERSE_INSTEAD.
+        const editContext = await assertVoucherEditableTx(tx, id, {
+          companyId: existingVoucher.companyId,
+          newVoucherDate: voucher.voucherDate ?? null,
+        });
 
         const voucherUpdates: VoucherUpdate = {
           voucherType: voucher.voucherType,
@@ -285,61 +303,44 @@ export function registerVoucherWithEntriesRoutes(app: Express) {
         // Perpetual inventory (wave 8.3): a stock adjustment voucher carries its inventory line.
         await syncStockAdjustmentInventoryTx(tx, existingVoucher.companyId, id);
 
-        // Wave 12 (decision 2): full before/after snapshot in this transaction; a
-        // failed audit write refuses the edit (it used to be written after commit).
-        await writeVoucherAuditTx(tx, {
+        // Phase 22 A (D3): an engine voucher balances exactly; the rounding
+        // remainder of the new lines goes to its ROUNDING line.
+        await rebalanceVoucherRoundingTx(tx, { companyId: existingVoucher.companyId, voucherId: id });
+
+        // Phase 22 (B), PE10: the order-charge and container-charge syncs commit
+        // with the edit (they used to run after it, on the pool).
+        // An edited duty/transport/office charge voucher re-prices the offloaded bales.
+        await syncContainerChargeVoucherEditTx(tx, {
+          companyId: existingVoucher.companyId,
+          voucherNumber: existingVoucher.voucherNumber,
+          oldTotal: existingVoucher.optional ? 0 : existingVoucher.totalAmount,
+          newTotal: updatedVoucher.optional ? 0 : updatedVoucher.totalAmount,
+        });
+        await syncFactoryChargeVoucherEditTx(tx, {
+          companyId: existingVoucher.companyId,
+          voucher: existingVoucher,
+          description: updatedVoucher.description,
+          newAmount: MoneyDecimal.max(totalDebits, totalCredits),
+        });
+
+        // Wave 12 / phase 22 B: full before/after snapshot in this transaction; a
+        // failed audit write refuses the edit.
+        const audited = await recordVoucherEditAuditTx(tx, {
+          voucherId: id,
+          before: editContext.before,
           actor: {
             userId: req.session.userId,
             username: req.session.username,
             companyId: existingVoucher.companyId,
           },
-          action: "update",
-          voucherId: id,
-          before: { voucher: existingVoucher, entries: oldEntries },
-          after: { voucher: updatedVoucher, entries: createdEntries },
+          reason: "Voucher edit (with entries)",
         });
+        createdEntries.splice(0, createdEntries.length, ...audited.entries);
       });
-
-      // An edited duty/transport/office charge voucher re-prices the offloaded bales.
-      await db.transaction((tx) =>
-        syncContainerChargeVoucherEditTx(tx, {
-          companyId: existingVoucher.companyId,
-          voucherNumber: existingVoucher.voucherNumber,
-          oldTotal: existingVoucher.optional ? 0 : existingVoucher.totalAmount,
-          newTotal: updatedVoucher.optional ? 0 : updatedVoucher.totalAmount,
-        })
-      );
-
-      const chargeMatch = existingVoucher.voucherNumber?.match(/^CHARGE-.+-(\d+)-\d+$/);
-      if (chargeMatch && existingVoucher.sourceModule === "FACTORY") {
-        const chargeId = parseInt(chargeMatch[1]);
-        const newAmount = MoneyDecimal.max(totalDebits, totalCredits).toNumber();
-        const [charge] = await db
-          .select({ orderId: customerOrderCharges.orderId })
-          .from(customerOrderCharges)
-          .where(eq(customerOrderCharges.id, chargeId));
-        if (charge) {
-          const chargeUpdate: { amount: string; name?: string } = { amount: String(newAmount) };
-          if (updatedVoucher.description?.trim()) chargeUpdate.name = updatedVoucher.description.trim();
-          await db.update(customerOrderCharges).set(chargeUpdate).where(eq(customerOrderCharges.id, chargeId));
-          await recalculateOrderTotals(db, charge.orderId);
-          const [updatedOrd] = await db
-            .select({ grandTotal: customerOrders.grandTotal, status: customerOrders.status })
-            .from(customerOrders)
-            .where(eq(customerOrders.id, charge.orderId));
-          if (updatedOrd?.status === "FINALIZED") {
-            await db
-              .update(customerBalances)
-              .set({ debitAmount: String(updatedOrd.grandTotal), balance: String(updatedOrd.grandTotal) })
-              .where(
-                and(eq(customerBalances.referenceId, charge.orderId), eq(customerBalances.referenceType, "INVOICE"))
-              );
-          }
-        }
-      }
 
       res.json({ voucher: updatedVoucher, entries: createdEntries });
     } catch (error: unknown) {
+      if (sendVoucherCorrectionRefusal(res, error)) return;
       res.status(errorStatus(error)).json({ message: getErrorMessage(error) });
     }
   });

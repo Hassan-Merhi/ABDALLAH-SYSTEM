@@ -15,7 +15,6 @@ import { requireAuth } from "../../../../auth";
 import { writeDaybookEntry, getOrCreateLedgerAccount } from "../../_helpers";
 import {
   factorySuppliers,
-  voucherEntries,
   vouchers,
   factorySupplierPayments,
   insertFactorySupplierPaymentSchema,
@@ -32,7 +31,7 @@ import {
   financialOperationFingerprint,
   withDurableFinancialOperation,
 } from "../../../../services/accounting/durableFinancialOperation";
-import { normFactoryEntry } from "../../../../services/factory/factoryVoucherEntryAmounts";
+import { postFactoryVoucherTx } from "../../../../services/factory/factoryVoucherPosting";
 import { FactoryFxRateRequiredError, factoryDocumentRate } from "../../../../services/factory/factoryDocumentFxRate";
 import { retireVouchersTx, sessionRetirementActor } from "../../../../services/accounting/voucherRetirement";
 
@@ -131,46 +130,38 @@ export function registerFactorySupplierPaymentRoutes(app: Express) {
           // Double-entry Payment voucher: DR Supplier Payable / CR Bank or Cash
           // amount is stored at four places; the voucher takes it at cents, half up.
           const payAmtStr = toMoney(payment.amount).toFixed(2);
-          const payVoucherNum = `FACTORY-PAY-${payment.id}-${Date.now()}`;
-          // Both legs normalized at the payment's rate (wave 6, wave 17 D): the
-          // cash or bank leg used to carry the native amount in the USD columns.
-          const payAmounts = (debit: string, credit: string) =>
-            normFactoryEntry(payment.currencyCode, debit, credit, postingRate.rate);
-
-          const [payVoucher] = await tx
-            .insert(vouchers)
-            .values({
-              companyId,
-              voucherType: "Payment",
-              voucherNumber: payVoucherNum,
-              voucherDate: payment.date,
-              description: `Supplier payment – see factory payment #${payment.id}`,
-              totalAmount: payAmtStr,
-              currency: payment.currencyCode || "USD",
-              exchangeRate: toMoney(postingRate.rate).toString(),
-              sourceModule: "FACTORY",
-              effectiveDate: (req.body.effectiveDate as string) || null,
-            })
-            .returning();
-
-          // DR: Factory Supplier (debit reduces the liability we owe them)
-          await tx.insert(voucherEntries).values({
-            voucherId: payVoucher.id,
-            factorySupplierId: payment.supplierId,
-            ...payAmounts(payAmtStr, "0"),
-            narration: `Payment to supplier – factory payment #${payment.id}`,
-          });
-
           // CR: Bank/Cash ledger account (or auto-created "Factory Cash Payments" if not specified)
           const crAccountId = payment.paidFromAccountId
             ? payment.paidFromAccountId
             : await getOrCreateLedgerAccount(companyId, "FACTORY_CASH_PAYMENTS", "Factory Cash Payments", "ASSET");
-
-          await tx.insert(voucherEntries).values({
-            voucherId: payVoucher.id,
-            ledgerAccountId: crAccountId,
-            ...payAmounts("0", payAmtStr),
-            narration: `Bank/cash outflow – factory payment #${payment.id}`,
+          // Phase 22 (C): through the engine with the payment's posting identity;
+          // the FACTORY-PAY-{payment}- number is read as identity (supplier
+          // statements and balances, the delete below), so it keeps the prefix with
+          // the posting generation (was Date.now()). Both legs normalized at the
+          // payment's rate (wave 6, wave 17 D).
+          await postFactoryVoucherTx(tx, {
+            companyId,
+            voucherType: "Payment",
+            voucherNumber: (generation) => `FACTORY-PAY-${payment.id}-${generation}`,
+            voucherDate: payment.date,
+            effectiveDate: (req.body.effectiveDate as string) || null,
+            description: `Supplier payment – see factory payment #${payment.id}`,
+            currency: payment.currencyCode || "USD",
+            fxRateToUsd: toMoney(postingRate.rate).toString(),
+            source: { sourceType: "factory-supplier-payment", sourceId: payment.id, phase: "voucher" },
+            lines: [
+              // DR: Factory Supplier (debit reduces the liability we owe them)
+              {
+                factorySupplierId: payment.supplierId,
+                debit: payAmtStr,
+                narration: `Payment to supplier – factory payment #${payment.id}`,
+              },
+              {
+                ledgerAccountId: crAccountId,
+                credit: payAmtStr,
+                narration: `Bank/cash outflow – factory payment #${payment.id}`,
+              },
+            ],
           });
 
           const [spSupplier] = await tx

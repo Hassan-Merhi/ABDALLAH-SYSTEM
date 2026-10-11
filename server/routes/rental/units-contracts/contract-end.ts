@@ -12,7 +12,9 @@ import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 import { z } from "zod";
 import { eq, and, sql } from "drizzle-orm";
-import { propertyUnits, propertyContracts, propertyPayments, vouchers, voucherEntries } from "@shared/schema";
+import { propertyUnits, propertyContracts, propertyPayments } from "@shared/schema";
+import { postErpVoucherTx, sessionPostingActor } from "../../../services/accounting/erpVoucherPosting";
+import { nextGuaranteeVoucherNumberTx } from "../shared/guarantee-number";
 import { parseId } from "../../../lib/parseId";
 import { logAudit } from "../../_helpers";
 import { parseMoneyInput } from "../../../lib/money";
@@ -84,73 +86,31 @@ export function registerRentalContractEndRoutes(app: Express, ctx: RentalRoutesC
             : `Guarantee refund on departure - ${unitLabel}`;
 
           if (refundCashAccountId) {
-            if (tenantPays) {
-              // Tenant gets guarantee back: Dr Security Deposits Paid (asset↓) / Cr Cash (we return money)
-              // Actually: landlord returns money to tenant — Dr Cash reversal: Cr Cash / Dr Sec Dep Paid
-              // We PAID the guarantee as an asset (Sec Dep Paid debit). Refund: Dr Cash received back / Cr Sec Dep Paid cleared
-              const depositAccountId = await findOrCreateLedgerAccount(
-                tx,
-                companyId,
-                "Security Deposits Paid",
-                "Asset",
-                "SEC-DEP-PAID"
-              );
-              const [v] = await tx
-                .insert(vouchers)
-                .values({
-                  companyId,
-                  voucherNumber: `GUAR-REFUND-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${id}`,
-                  voucherType: "Receipt",
-                  voucherDate: dateStr,
-                  description: narration,
-                  totalAmount: amt,
-                  currency: contract.currency || "USD",
-                  sourceModule: "ERP",
-                })
-                .returning();
-              await tx.insert(voucherEntries).values([
-                {
-                  voucherId: v.id,
-                  ledgerAccountId: refundCashAccountId,
-                  debitAmount: amt,
-                  creditAmount: "0",
-                  narration,
-                },
-                { voucherId: v.id, ledgerAccountId: depositAccountId, debitAmount: "0", creditAmount: amt, narration },
-              ]);
-            } else {
-              // Landlord returns deposit to departing tenant: Dr Tenant Deposits (liability↓) / Cr Cash (we pay out)
-              const depositAccountId = await findOrCreateLedgerAccount(
-                tx,
-                companyId,
-                "Tenant Deposits",
-                "Liability",
-                "TENANT-DEP"
-              );
-              const [v] = await tx
-                .insert(vouchers)
-                .values({
-                  companyId,
-                  voucherNumber: `GUAR-REFUND-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${id}`,
-                  voucherType: "Payment",
-                  voucherDate: dateStr,
-                  description: narration,
-                  totalAmount: amt,
-                  currency: contract.currency || "USD",
-                  sourceModule: "ERP",
-                })
-                .returning();
-              await tx.insert(voucherEntries).values([
-                { voucherId: v.id, ledgerAccountId: depositAccountId, debitAmount: amt, creditAmount: "0", narration },
-                {
-                  voucherId: v.id,
-                  ledgerAccountId: refundCashAccountId,
-                  debitAmount: "0",
-                  creditAmount: amt,
-                  narration,
-                },
-              ]);
-            }
+            // Tenant: the guarantee comes back — Dr Cash / Cr Security Deposits Paid.
+            // Landlord: the deposit is returned — Dr Tenant Deposits / Cr Cash.
+            const depositAccountId = tenantPays
+              ? await findOrCreateLedgerAccount(tx, companyId, "Security Deposits Paid", "Asset", "SEC-DEP-PAID")
+              : await findOrCreateLedgerAccount(tx, companyId, "Tenant Deposits", "Liability", "TENANT-DEP");
+            await postErpVoucherTx(tx, {
+              companyId,
+              voucherType: tenantPays ? "Receipt" : "Payment",
+              voucherDate: dateStr,
+              description: narration,
+              currency: contract.currency || "USD",
+              lines: tenantPays
+                ? [
+                    { ledgerAccountId: refundCashAccountId, debit: amt, narration },
+                    { ledgerAccountId: depositAccountId, credit: amt, narration },
+                  ]
+                : [
+                    { ledgerAccountId: depositAccountId, debit: amt, narration },
+                    { ledgerAccountId: refundCashAccountId, credit: amt, narration },
+                  ],
+              voucherNumber: await nextGuaranteeVoucherNumberTx(tx, { companyId, contractId: id, kind: "GUAR-REFUND" }),
+              // One refund per contract end (an ended contract is not ended again).
+              source: { type: "rental-guarantee-refund", id },
+              actor: sessionPostingActor(req, "Guarantee refund on contract end"),
+            });
           }
 
           // Record in payments log as a guarantee activity (ledgerRowId: null so it shows in guarantee section)

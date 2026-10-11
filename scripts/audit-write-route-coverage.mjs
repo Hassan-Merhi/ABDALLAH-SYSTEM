@@ -89,6 +89,10 @@ const SENSITIVE_TABLES = [
 ];
 
 const VOUCHER_RETIREMENT_CALL = /\bretireVouchers(?:Tx|ByNumberTx|WithClient|ForRequestTx)\s*\(/;
+// Phase 22 (B): a route that posts through the ERP or factory engine helpers writes
+// vouchers just as much as one that inserts them itself.
+const VOUCHER_POSTING_CALL =
+  /\b(?:postErpVoucherTx|postErpEntriesTx|postManualVoucherTx|postEmployeeVoucherTx|postAccrualPassTx|postFactoryVoucherTx|postFactoryPartyLineVoucherTx)\s*\(/;
 
 /** Ways this codebase writes: drizzle builders and raw SQL alike. */
 function writesSensitiveTable(source) {
@@ -106,6 +110,7 @@ function writesSensitiveTable(source) {
   // Wave 16 (A): a route that removes vouchers through the retirement helpers
   // (soft delete with audit) still writes vouchers.
   if (VOUCHER_RETIREMENT_CALL.test(source)) return "vouchers";
+  if (VOUCHER_POSTING_CALL.test(source)) return "vouchers";
   return null;
 }
 

@@ -23,6 +23,7 @@ import {
 import { syncStockAdjustmentInventoryTx } from "../../services/accounting/perpetualInventory/stockAdjustments";
 import { stockVoucherTypeRefusal } from "../../services/accounting/stockVoucherTypes";
 import { logAudit } from "../_helpers";
+import { assertVoucherEditableTx, sendVoucherCorrectionRefusal } from "../../services/accounting/voucherCorrection";
 
 /**
  * After a single-line write, the voucher's stored lines must still satisfy the
@@ -118,6 +119,8 @@ export function registerVoucherEntryWriteRoutes(app: Express) {
       try {
         const [target] = assertValidReplacementEntries(voucher.voucherType, true, [req.body]);
         entry = await db.transaction(async (tx) => {
+          // Phase 22 (B), G4: open period only (409 otherwise); audited below.
+          await assertVoucherEditableTx(tx, voucher.id, { companyId: voucher.companyId });
           const [linked] = await linkCustomerLedgerTargets(tx, voucher.companyId, [target]);
           const [created] = await tx
             .insert(voucherEntries)
@@ -161,6 +164,7 @@ export function registerVoucherEntryWriteRoutes(app: Express) {
 
       res.json(entry);
     } catch (error: unknown) {
+      if (sendVoucherCorrectionRefusal(res, error)) return;
       res.status(errorStatus(error)).json({ message: getErrorMessage(error) });
     }
   });
@@ -257,6 +261,11 @@ export function registerVoucherEntryWriteRoutes(app: Express) {
       let updated: typeof voucherEntries.$inferSelect | undefined;
       try {
         updated = await db.transaction(async (tx) => {
+          // Phase 22 (B), G4: an amount edit is open-period only (409 otherwise);
+          // a narration-only edit stays allowed. Audited below.
+          if (allowedUpdates.debitAmount !== undefined || allowedUpdates.creditAmount !== undefined) {
+            await assertVoucherEditableTx(tx, voucher.id, { companyId: voucher.companyId });
+          }
           const [row] = await tx
             .update(voucherEntries)
             .set(allowedUpdates)
@@ -294,6 +303,7 @@ export function registerVoucherEntryWriteRoutes(app: Express) {
 
       res.json(updated);
     } catch (error: unknown) {
+      if (sendVoucherCorrectionRefusal(res, error)) return;
       res.status(errorStatus(error)).json({ message: getErrorMessage(error) });
     }
   });

@@ -39,7 +39,7 @@
  */
 import { randomUUID } from "node:crypto";
 import Decimal from "decimal.js";
-import { and, eq, inArray, like, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, like, or, sql } from "drizzle-orm";
 
 import { containerOffloadItems, containerOffloads, containers, vouchers } from "@shared/schema";
 import type { db } from "../../db";
@@ -52,6 +52,7 @@ import {
   postPreCutoverOffloadMovementTx,
   syncContainerStockInTx,
 } from "../accounting/perpetualInventory/stockReceipts";
+import { editPostedFactoryVoucherTx } from "../factory/factoryVoucherCorrection";
 
 /** The transaction handle drizzle passes to a `db.transaction` callback. */
 export type OffloadOptionalToggleTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -325,20 +326,27 @@ export async function applyOffloadOptionalToggleTx(
     .where(
       and(
         eq(vouchers.companyId, companyId),
+        // Retired vouchers keep their family prefix (`…~DEL{id}`); they are not flipped.
+        isNull(vouchers.deletedAt),
         or(...OFFLOAD_VOUCHER_PREFIXES.map((prefix) => like(vouchers.voucherNumber, `${prefix}-${containerNumber}-%`)))
       )
     );
 
   if (offloadVouchers.length > 0) {
-    await tx
-      .update(vouchers)
-      .set({ optional: targetOptional })
-      .where(
-        inArray(
-          vouchers.id,
-          offloadVouchers.map((voucher) => voucher.id)
-        )
-      );
+    // Phase 22 (C), G10: posted ↔ optional is an edit of the posted vouchers —
+    // refused (409, reverse instead) in a closed period, audited before/after
+    // in this transaction otherwise.
+    const voucherIds = offloadVouchers.map((voucher) => voucher.id);
+    await editPostedFactoryVoucherTx(
+      tx,
+      {
+        companyId,
+        voucherIds,
+        reason: targetOptional ? "container-offload-suspended" : "container-offload-restored",
+        actor: { userId: input.actorUserId ?? null, username: input.actorUsername ?? null },
+      },
+      () => tx.update(vouchers).set({ optional: targetOptional }).where(inArray(vouchers.id, voucherIds))
+    );
   }
 
   await tx.update(containerOffloads).set({ optional: targetOptional }).where(eq(containerOffloads.id, offloadId));

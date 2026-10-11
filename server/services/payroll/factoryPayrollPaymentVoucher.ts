@@ -10,7 +10,8 @@
  *
  * Identity: voucher number `PAYMENT-PAY-{payrollId}-PAID` (the shape every
  * PAYMENT-PAY reader already matches) and the posting request
- * `infra:factory-payroll-payment:{company}:{payroll}:payment`, so a retry in
+ * `factory-payroll-payment:{company}:{payroll}:payment` (phase 22 B: posted
+ * through the central engine), so a retry in
  * the same state replays the same voucher instead of posting a second one.
  * Un-marking the payment removes it (and any other PAYMENT-PAY-{id}-* voucher)
  * in the caller's transaction; the closed-period trigger refuses that in a
@@ -19,42 +20,17 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
 import type Decimal from "decimal.js";
 
-import { ledgerAccounts, vouchers, voucherEntries } from "@shared/schema";
-import type { DatabaseOrTransaction } from "../../db";
+import { ledgerAccounts, vouchers } from "@shared/schema";
+import type { DatabaseOrTransaction, DbTransaction } from "../../db";
 import { HttpError } from "../../lib/httpHandlers";
-import {
-  infrastructurePostingIdentity,
-  insertInfrastructureVoucherTx,
-} from "../accounting/infrastructureVoucherIdentity";
+import { pairLines, postErpVoucherTx } from "../accounting/erpVoucherPosting";
 import { retireVouchersTx } from "../accounting/voucherRetirement";
-import { normalizeVoucherEntryAmounts } from "../accounting/currencyAmounts";
 
 export const FACTORY_PAYROLL_PAYMENT_ACCOUNT_REQUIRED =
   "Choose the cash or bank account that pays this payroll before marking it paid";
 
 export function factoryPayrollPaymentVoucherNumber(payrollId: number): string {
   return `PAYMENT-PAY-${payrollId}-PAID`;
-}
-
-function usdLine(debit: string, credit: string) {
-  const norm = normalizeVoucherEntryAmounts({
-    transactionCurrency: "USD",
-    baseCurrency: "USD",
-    transactionDebitAmount: debit,
-    transactionCreditAmount: credit,
-    historicalRate: "1",
-  });
-  return {
-    transactionCurrency: norm.transactionCurrency,
-    transactionDebitAmount: norm.transactionDebitAmount,
-    transactionCreditAmount: norm.transactionCreditAmount,
-    baseDebitAmount: norm.baseDebitAmount,
-    baseCreditAmount: norm.baseCreditAmount,
-    historicalExchangeRate: norm.historicalExchangeRate,
-    rateConvention: norm.rateConvention,
-    debitAmount: norm.debitAmount,
-    creditAmount: norm.creditAmount,
-  };
 }
 
 /**
@@ -86,7 +62,7 @@ export async function resolveFactoryPayrollPaymentAccountTx(
 }
 
 export async function postFactoryPayrollPaymentVoucherTx(
-  tx: DatabaseOrTransaction,
+  tx: DbTransaction,
   input: {
     companyId: number;
     payrollId: number;
@@ -102,26 +78,22 @@ export async function postFactoryPayrollPaymentVoucherTx(
   const amount = input.netSalary.toFixed(2);
   if (!input.netSalary.greaterThan(0)) return { voucherId: null };
   const narration = `Payroll payment: ${input.workerName} (${input.periodStart} – ${input.periodEnd})`;
-  const voucherFields = {
+  // Phase 22 (B): through the central engine, number and identity unchanged in shape.
+  const { voucher } = await postErpVoucherTx(tx, {
     companyId: input.companyId,
     voucherNumber: factoryPayrollPaymentVoucherNumber(input.payrollId),
     voucherType: "Payment",
     voucherDate: input.paymentDate,
     description: narration,
-    totalAmount: amount,
-    currency: "USD",
     sourceModule: "FACTORY",
-  };
-  const { voucher } = await insertInfrastructureVoucherTx(
-    tx,
-    voucherFields,
-    infrastructurePostingIdentity("factory-payroll-payment", `${input.companyId}:${input.payrollId}`, "payment"),
-    { payableAccountId: input.payableAccountId, cashAccountId: input.cashAccountId }
-  );
-  await tx.insert(voucherEntries).values([
-    { voucherId: voucher.id, ledgerAccountId: input.payableAccountId, ...usdLine(amount, "0"), narration },
-    { voucherId: voucher.id, ledgerAccountId: input.cashAccountId, ...usdLine("0", amount), narration },
-  ]);
+    lines: pairLines(
+      { ledgerAccountId: input.payableAccountId },
+      { ledgerAccountId: input.cashAccountId },
+      amount,
+      narration
+    ),
+    source: { type: "factory-payroll-payment", id: `${input.companyId}:${input.payrollId}`, revision: "payment" },
+  });
   return { voucherId: voucher.id };
 }
 

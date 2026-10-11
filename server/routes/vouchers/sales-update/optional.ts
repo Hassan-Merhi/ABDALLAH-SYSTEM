@@ -25,6 +25,7 @@ import { syncPurchaseOrderGitForVoucherTx } from "../../../services/accounting/p
 import { syncStockAdjustmentInventoryTx } from "../../../services/accounting/perpetualInventory/stockAdjustments";
 import { syncFactoryInvoiceForChargeVoucherTx } from "../../../services/accounting/perpetualInventory/factoryInvoice";
 import { sendBaleMirrorMovementRefusal } from "../../../services/accounting/perpetualInventory/cutoverRefusal";
+import { assertVoucherEditableTx, sendVoucherCorrectionRefusal } from "../../../services/accounting/voucherCorrection";
 import {
   assertStoredVoucherLinesValidTx,
   replacementErrorStatus,
@@ -107,7 +108,13 @@ export function registerVoucherOptionalUpdateRoutes(app: Express) {
         locationId: existingVoucher.locationId,
       };
       await db.transaction(async (tx) => {
-        const auditBefore = await readVoucherAuditState(tx, id);
+        // Phase 22 A (owner decision, G10): posted -> optional (and back) is an
+        // edit: refused in a closed period (409 VOUCHER_CLOSED_PERIOD_REVERSE_INSTEAD;
+        // reverse the voucher instead) and audited with the full snapshot below.
+        const auditBefore =
+          wasOptional !== willBeOptional
+            ? (await assertVoucherEditableTx(tx, id, { companyId: existingVoucher.companyId })).before
+            : await readVoucherAuditState(tx, id);
         const ledgerBefore = await voucherInventoryLedgerTx(tx, toggleVoucher);
         let toggleDeltas: Decimal[] = [];
         let toggleRevision: number | null = null;
@@ -176,7 +183,10 @@ export function registerVoucherOptionalUpdateRoutes(app: Express) {
           voucherId: id,
           before: auditBefore,
           after: auditAfter,
-          extra: { optional: { old: wasOptional, new: willBeOptional } },
+          extra: {
+            optional: { old: wasOptional, new: willBeOptional },
+            ...(wasOptional !== willBeOptional ? { correctionPolicy: { new: "open-period-edit" } } : {}),
+          },
         });
       });
 
@@ -185,6 +195,7 @@ export function registerVoucherOptionalUpdateRoutes(app: Express) {
       res.json(updated);
     } catch (error: unknown) {
       if (sendBaleMirrorMovementRefusal(res, error)) return;
+      if (sendVoucherCorrectionRefusal(res, error)) return;
       if ((error as { name?: string }).name === "ValidationError") {
         return res.status(400).json({ message: getErrorMessage(error) });
       }

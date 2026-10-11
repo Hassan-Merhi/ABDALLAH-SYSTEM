@@ -37,17 +37,14 @@ import { createHash } from "node:crypto";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import type Decimal from "decimal.js";
 
-import { propertyMonthlyLedger, voucherEntries } from "@shared/schema";
+import { propertyMonthlyLedger } from "@shared/schema";
 
 import { db, type DatabaseOrTransaction, type DbTransaction } from "../../db";
 import { MoneyDecimal, sumMoney, toMoney } from "../../lib/money";
 import { findOrCreateLedgerAccount } from "../../routes/rental/shared/ledger";
 import { writeAuditEvent } from "../audit";
 import { companyBusinessDate } from "../accounting/companyBusinessDate";
-import {
-  infrastructurePostingIdentity,
-  insertInfrastructureVoucherTx,
-} from "../accounting/infrastructureVoucherIdentity";
+import { postErpVoucherTx } from "../accounting/erpVoucherPosting";
 import { companyClosedThrough, isDateInClosedPeriod } from "../accounting/scheduledPostingScope";
 import { assertTransactionCompanyScope } from "../security/transactionCompanyScope";
 import { getRentalBillingDay, getRentalPeriodDueDate } from "./rentalPeriodService";
@@ -359,64 +356,45 @@ export async function applyLegacyPrepaidRecognition(
       const sourceId = `${companyId}:${module}:${row.ledgerRowId}`;
       for (const reclass of row.reclassifications) {
         const narration = `Legacy prepaid rent reclassification - unit${row.unitId} - ${period}`;
-        const { voucher } = await insertInfrastructureVoucherTx(
-          tx,
-          {
-            companyId,
-            voucherNumber: reclass.voucherNumber,
-            voucherType: "Journal",
-            voucherDate: reclass.voucherDate,
-            description: narration,
-            totalAmount: reclass.amount,
-            currency: row.currency,
-            sourceModule: module,
-          },
-          infrastructurePostingIdentity("rental-prepaid-repair", sourceId, `reclass:${reclass.paymentId}`),
-          {
-            ledgerRowId: row.ledgerRowId,
-            paymentId: reclass.paymentId,
-            amount: reclass.amount,
-            paymentDate: reclass.voucherDate,
-            dueDate: row.dueDate,
-          }
-        );
-        await tx.insert(voucherEntries).values(
-          reclass.lines.map((line) => ({
-            voucherId: voucher.id,
+        // Phase 22 (B): through the central engine; the reviewed plan's number is kept.
+        const { voucher } = await postErpVoucherTx(tx, {
+          companyId,
+          voucherNumber: reclass.voucherNumber,
+          voucherType: "Journal",
+          voucherDate: reclass.voucherDate,
+          description: narration,
+          currency: row.currency,
+          sourceModule: module,
+          lines: reclass.lines.map((line) => ({
             ledgerAccountId: accountId(line),
-            debitAmount: line.debit,
-            creditAmount: line.credit,
+            debit: line.debit,
+            credit: line.credit,
             narration,
-          }))
-        );
+          })),
+          source: { type: "rental-prepaid-repair", id: sourceId, revision: `reclass:${reclass.paymentId}` },
+          actor: { userId: options.actor.userId, username: options.actor.username, reason: "Legacy prepaid repair" },
+        });
         posted.push({ voucherNumber: reclass.voucherNumber, voucherId: voucher.id });
       }
 
       const narration = `Prepaid rent recognized - unit${row.unitId} - ${period}`;
-      const { voucher: recognition } = await insertInfrastructureVoucherTx(
-        tx,
-        {
-          companyId,
-          voucherNumber: row.recognition.voucherNumber,
-          voucherType: "Journal",
-          voucherDate: row.dueDate,
-          description: narration,
-          totalAmount: row.expected,
-          currency: row.currency,
-          sourceModule: module,
-        },
-        infrastructurePostingIdentity("rental-prepaid-repair", sourceId, "recognition"),
-        { ledgerRowId: row.ledgerRowId, amount: row.expected, dueDate: row.dueDate }
-      );
-      await tx.insert(voucherEntries).values(
-        row.recognition.lines.map((line) => ({
-          voucherId: recognition.id,
+      const { voucher: recognition } = await postErpVoucherTx(tx, {
+        companyId,
+        voucherNumber: row.recognition.voucherNumber,
+        voucherType: "Journal",
+        voucherDate: row.dueDate,
+        description: narration,
+        currency: row.currency,
+        sourceModule: module,
+        lines: row.recognition.lines.map((line) => ({
           ledgerAccountId: accountId(line),
-          debitAmount: line.debit,
-          creditAmount: line.credit,
+          debit: line.debit,
+          credit: line.credit,
           narration,
-        }))
-      );
+        })),
+        source: { type: "rental-prepaid-repair", id: sourceId, revision: "recognition" },
+        actor: { userId: options.actor.userId, username: options.actor.username, reason: "Legacy prepaid repair" },
+      });
       posted.push({ voucherNumber: row.recognition.voucherNumber, voucherId: recognition.id });
 
       await tx

@@ -43,14 +43,12 @@
  */
 import type Decimal from "decimal.js";
 import { sql } from "drizzle-orm";
-import { voucherEntries } from "@shared/schema";
 
 import type { DatabaseOrTransaction, DbTransaction } from "../../db";
 import { HttpError } from "../../lib/httpHandlers";
 import { MoneyDecimal } from "../../lib/money";
 import { findFactoryFxRateOnOrBefore, normalizeFactoryCurrency } from "../factory/factoryFxRateOnDate";
-import { normFactoryEntry } from "../factory/factoryVoucherEntryAmounts";
-import { infrastructurePostingIdentity, insertInfrastructureVoucherTx } from "./infrastructureVoucherIdentity";
+import { postFactoryVoucherTx } from "../factory/factoryVoucherPosting";
 import { retireVouchersTx } from "./voucherRetirement";
 import { customerLedgerAccountTx } from "./perpetualInventory/factoryInvoice";
 import { ledgerAccountByCodeTx } from "./perpetualInventory/linkedJournal";
@@ -256,29 +254,25 @@ export async function postFactoryPosReceiptTx(
   const credits = lines.reduce((sum, line) => sum.plus(line.credit), new MoneyDecimal(0));
   if (!debits.eq(credits)) throw new Error("A factory POS sale voucher does not balance");
 
-  const { voucher } = await insertInfrastructureVoucherTx(
-    tx,
-    {
-      companyId: input.companyId,
-      voucherType: cashLeg.isZero() ? "Journal" : "Receipt",
-      voucherNumber: factoryPosReceiptVoucherNumber(input.saleId),
-      voucherDate: input.voucherDate,
-      description: ["Factory POS Sale", `${sale}${who}`].join(" "),
-      totalAmount: total.toFixed(2),
-      currency,
-      exchangeRate: input.rate,
-      sourceModule: "FACTORY_POS",
-    },
-    infrastructurePostingIdentity(FACTORY_POS_RECEIPT_SOURCE, input.saleId)
-  );
-  await tx.insert(voucherEntries).values(
-    lines.map((line) => ({
-      voucherId: voucher.id,
+  // Phase 22 (C): through the engine (balance, targets, customer-ledger pair)
+  // with the sale's existing posting identity and number.
+  const { voucher } = await postFactoryVoucherTx(tx, {
+    companyId: input.companyId,
+    voucherType: cashLeg.isZero() ? "Journal" : "Receipt",
+    voucherNumber: factoryPosReceiptVoucherNumber(input.saleId),
+    voucherDate: input.voucherDate,
+    description: ["Factory POS Sale", `${sale}${who}`].join(" "),
+    currency,
+    fxRateToUsd: input.rate,
+    sourceModule: "FACTORY_POS",
+    source: { sourceType: FACTORY_POS_RECEIPT_SOURCE, sourceId: input.saleId, phase: "voucher" },
+    lines: lines.map((line) => ({
       ledgerAccountId: line.ledgerAccountId,
-      ...(line.customerId ? { customerId: line.customerId } : {}),
-      ...normFactoryEntry(currency, line.debit.toFixed(2), line.credit.toFixed(2), input.rate),
+      customerId: line.customerId ?? null,
+      debit: line.debit.toDecimalPlaces(2),
+      credit: line.credit.toDecimalPlaces(2),
       narration: line.narration,
-    }))
-  );
+    })),
+  });
   return voucher.id;
 }

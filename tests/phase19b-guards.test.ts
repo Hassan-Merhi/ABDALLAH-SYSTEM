@@ -716,8 +716,10 @@ describe("PE2: rental reads, roles, business date, actor and rate", () => {
     expect(accrued.body.asOf).toBe(today);
     expect(accrued.body.accrued).toBeGreaterThan(0);
     const { rows: accruals } = await pool.query(
-      `SELECT id, voucher_date::text AS voucher_date FROM vouchers
-        WHERE company_id = $1 AND voucher_number LIKE 'ACCR-RENT-%' AND deleted_at IS NULL`,
+      // Phase 22 (B): the accrual is numbered by the engine; found by its posting identity.
+      `SELECT v.id, v.voucher_date::text AS voucher_date FROM vouchers v
+         JOIN accounting_posting_requests apr ON apr.voucher_id = v.id
+        WHERE v.company_id = $1 AND apr.source_type = 'rental-accrual' AND v.deleted_at IS NULL`,
       [ctx.companyId]
     );
     expect(accruals.length).toBeGreaterThan(0);

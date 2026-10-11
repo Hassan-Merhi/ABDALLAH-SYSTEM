@@ -1,7 +1,7 @@
 import type Decimal from "decimal.js";
 import * as schema from "@shared/schema";
 
-import { toMoney } from "../../../lib/money";
+import { parseMoneyInput, toMoney } from "../../../lib/money";
 
 export type ContainerOffloadLifecycleMode = "create-or-replace" | "replace-only";
 
@@ -55,9 +55,13 @@ export class ContainerOffloadLifecycleError extends Error {
   }
 }
 
-export function amount(value: unknown): number {
-  const parsed = Number.parseFloat(String(value ?? "0"));
-  return Number.isFinite(parsed) ? parsed : 0;
+/**
+ * A money input as an exact Decimal (phase 22 C, PE13: was a parseFloat
+ * number). Accepts what parseFloat accepted (a leading number); anything
+ * else is zero.
+ */
+export function amount(value: unknown): Decimal {
+  return parseMoneyInput(typeof value === "number" ? value : String(value ?? "0")) ?? toMoney(0);
 }
 
 export function positiveIds(values: unknown[]): number[] {

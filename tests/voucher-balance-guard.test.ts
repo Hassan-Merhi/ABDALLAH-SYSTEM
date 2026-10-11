@@ -260,13 +260,25 @@ describe("voucher balance guard", () => {
     ).rejects.toThrow(/does not balance/);
   });
 
-  it("balances lines in one transaction currency in that currency, the base within a cent", async () => {
+  it("balances lines in one transaction currency in that currency, and a new voucher's base exactly", async () => {
     // XOF 500 + 500 against XOF 1,000: the per-line USD bases are a cent apart.
+    // v6 (phase 22 A, D3): a new voucher has no base tolerance any more (the
+    // central engine posts the cent to the ROUNDING account); history keeps it.
     await expect(
       transaction((q) =>
         voucher(q, companyId, "2026-10-05", [
           ["0.83", "0", "XOF", "500"],
           ["0.83", "0", "XOF", "500"],
+          ["0", "1.67", "XOF", "1000"],
+        ])
+      )
+    ).rejects.toThrow(/does not balance/);
+    await expect(
+      transaction((q) =>
+        voucher(q, companyId, "2026-10-05", [
+          ["0.83", "0", "XOF", "500"],
+          ["0.83", "0", "XOF", "500"],
+          ["0.01", "0", "USD", "0.01"],
           ["0", "1.67", "XOF", "1000"],
         ])
       )

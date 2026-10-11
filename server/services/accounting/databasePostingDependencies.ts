@@ -24,6 +24,7 @@ import {
 import { assertCustomerLinkedLedgerPairs } from "./customerLinkedLedgerValidation";
 import type { CompanyScopedTable } from "../../types/companyScopedTable";
 import { currentAuditActor } from "../audit/auditActorContext";
+import { isRetiredVoucherNumber } from "./voucherRetirement";
 
 const LEGACY_IDEMPOTENCY_TABLE = "accounting_posting_idempotency";
 const POSTING_AUDIT_TABLE = "accounting_postings";
@@ -355,6 +356,11 @@ export function createDatabasePostingDependencies(): CentralPostingDependencies 
           voucherId,
           idempotencyKey: source.idempotencyKey,
         });
+        // Phase 22 (B): a retired voucher gave up its identity (voucherRetirement
+        // releases the canonical marker); its legacy audit marker must not bring
+        // the identity back, or a deliberate re-post after a rebuild would
+        // "replay" the deleted voucher and post nothing.
+        if (existing.voucher.deletedAt && isRetiredVoucherNumber(existing.voucher.voucherNumber)) return null;
 
         await tx.insert(accountingPostingRequests).values({
           companyId,

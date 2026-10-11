@@ -46,6 +46,14 @@ import {
 import { postSaleCogsTx } from "../../accounting/perpetualInventory/saleCogs";
 import { baleMirrorMovementRefusal } from "../../accounting/perpetualInventory/cutoverRefusal";
 import { spDeductionAmount, spPayableAfterDeduction } from "../spDeduction";
+import { toMoney } from "../../../lib/money";
+import {
+  assertVoucherEditableTx,
+  VoucherCorrectionError,
+  type VoucherEditContext,
+} from "../../accounting/voucherCorrection";
+import type { VoucherAuditState } from "../../../routes/helpers/voucherAuditTrail";
+import { rebalanceVoucherRoundingTx } from "../../accounting/engineRounding";
 
 function err(result: HandlerErrorResult): { status: number; body: PosSaleUpdateResponseBody } {
   // HandlerErrorResult bodies are plain JSON message objects; the response
@@ -60,6 +68,8 @@ export interface PosSaleUpdateTransactionResult {
   grandTotal?: number;
   totalQtySoldEdit?: number;
   isGoldenCoastEdit?: boolean;
+  /** Phase 22 (B): the voucher before the edit, for the correction-policy audit row. */
+  editBefore?: VoucherAuditState;
   auditOldItems?: Array<{
     stockItemId: number;
     quantity: string;
@@ -130,6 +140,22 @@ export async function applyPosSaleUpdateTx(
 
   const restrictionResult = applyPosRoleRestrictions(userRole, newLocationId, lockedVoucher.locationId);
   if ("error" in restrictionResult) return restrictionResult;
+
+  // Phase 22 (B), PE9/G4: the correction policy — an open-period edit is audited
+  // below in this transaction; a sale dated (or re-dated) in a closed period is
+  // refused with 409 VOUCHER_CLOSED_PERIOD_REVERSE_INSTEAD (reverse it instead).
+  let editContext: VoucherEditContext;
+  try {
+    editContext = await assertVoucherEditableTx(tx, voucherId, {
+      companyId: currentCompanyId,
+      newVoucherDate: typeof voucherDate === "string" ? voucherDate : null,
+    });
+  } catch (error: unknown) {
+    if (error instanceof VoucherCorrectionError) {
+      return { error: { status: error.statusCode, body: error.body() } };
+    }
+    throw error;
+  }
 
   if (!lockedVoucher.locationId) {
     return { error: { status: 400, body: { message: "Existing sale is missing a location" } } };
@@ -219,8 +245,11 @@ export async function applyPosSaleUpdateTx(
     exchangeRate: lockedVoucher.exchangeRate ? String(lockedVoucher.exchangeRate) : null,
   });
 
+  // Phase 22 A (D3): the rounding remainder of an engine voucher's new lines.
+  await rebalanceVoucherRoundingTx(tx, { companyId: lockedVoucher.companyId, voucherId });
+
   if (isGoldenCoastEdit && clientSaleId && !isCreditSale) {
-    const oldPaymentEntry = oldEntries.find((entry) => Number(entry.debitAmount ?? 0) > 0);
+    const oldPaymentEntry = oldEntries.find((entry) => toMoney(entry.debitAmount).gt(0));
     const normalizedPaymentType =
       rawPaymentAccountType === "bank" || rawPaymentAccountType === "cash"
         ? rawPaymentAccountType
@@ -288,6 +317,7 @@ export async function applyPosSaleUpdateTx(
     grandTotal: rebuildResult.grandTotal,
     totalQtySoldEdit: rebuildResult.totalQtySoldEdit,
     isGoldenCoastEdit,
+    editBefore: editContext.before,
     auditOldItems: oldSalesItems.map((item) => ({
       stockItemId: item.stockItemId,
       quantity: item.quantity,
@@ -363,7 +393,7 @@ export async function updatePosSale(
   let customerAccount = null;
   if (isCreditSale) {
     const updatedEntries = await db.select().from(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
-    const debitEntry = updatedEntries.find((entry) => parseFloat(entry.debitAmount || "0") > 0);
+    const debitEntry = updatedEntries.find((entry) => toMoney(entry.debitAmount).gt(0));
     if (debitEntry?.ledgerAccountId) {
       customerAccount = await storage.getLedgerAccountById(debitEntry.ledgerAccountId);
     }

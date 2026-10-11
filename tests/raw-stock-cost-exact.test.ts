@@ -21,6 +21,21 @@ vi.mock("../server/routes/factory/_helpers", () => ({
   getOrFetchFxRateToUsd: async () => "1",
   getOrCreateLedgerAccount: async () => 77,
 }));
+// Phase 22 (C): the manual purchase voucher posts through the factory door to
+// the engine (covered against a database by the phase 22 (C) suite). Here the
+// door's own request builder turns the route's lines into the stored entries,
+// which are recorded instead of posted.
+vi.mock("../server/services/factory/factoryVoucherPosting", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../server/services/factory/factoryVoucherPosting")>();
+  return {
+    ...actual,
+    postFactoryVoucherTx: async (_tx: unknown, input: Parameters<typeof actual.buildFactoryVoucherRequest>[0]) => {
+      const request = actual.buildFactoryVoucherRequest(input);
+      for (const entry of request.entries) harness.writes.push(["insert", "voucher_entries", entry as never]);
+      return { voucher: { id: 1, voucherNumber: "JV-7-2026-000001" }, entries: [], replayed: false };
+    },
+  };
+});
 vi.mock("../server/db", async () => {
   const { getTableName } = await import("drizzle-orm");
   const chain = (value: unknown) => {

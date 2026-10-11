@@ -36,9 +36,9 @@ import { validateItemsBasic, calculateGrandTotal, validateInventoryAvailability 
 import {
   getOrCreateSalesRevenueAccount,
   fetchSupplierPartnerAccountingContext,
-  insertSaleAccountingEntries,
+  buildSaleAccountingLines,
 } from "./postSaleAccounting";
-import { insertSaleVoucher } from "./createSaleVoucher";
+import { postErpVoucherTx } from "../accounting/erpVoucherPosting";
 import { lockAndDeductInventoryForSaleItem } from "./deductSaleInventory";
 import { lockAndFindExistingPosSaleTx, POS_CLIENT_SALE_ID_MAX_LENGTH } from "./posSaleIdempotency";
 import { isGoldenCoastPosCompany, postGoldenCoastPosAccountingTx } from "./goldenCoastPosAccounting";
@@ -174,7 +174,6 @@ export async function createPosSale(
   if ("error" in locationResult) return err(locationResult.error);
   const { location } = locationResult;
 
-  const voucherNumber = `SALES-${Date.now()}-${randomUUID().slice(0, 8)}`;
   const voucherDate = providedVoucherDate || voucherDateFallback;
 
   const stockExistsError = await validateStockItemsExist(currentCompanyId, items);
@@ -208,6 +207,7 @@ export async function createPosSale(
   const spCtx = spCtxResult;
 
   type PosSaleTxResult = { voucher: PosSaleVoucher; saleItems: PosSaleResponseItem[]; replayed: boolean };
+  let voucherNumber = "";
   let txResult: PosSaleTxResult;
   try {
     txResult = await db.transaction(async (tx): Promise<PosSaleTxResult> => {
@@ -220,25 +220,12 @@ export async function createPosSale(
         return { voucher: existing.voucher, saleItems: existing.saleItems, replayed: true };
       }
 
-      const txVoucher = await insertSaleVoucher(tx, {
-        companyId: currentCompanyId,
-        locationId: parsedLocationId,
-        locationName: location.name,
-        voucherNumber,
-        voucherDate,
-        notes,
-        isCreditSale,
-        customerAccountName: customerAccount ? customerAccount.name : undefined,
-        grandTotal,
-        effectiveShiftId,
-        clientSaleId,
-        currency,
-        exchangeRate,
-      });
-
-      await insertSaleAccountingEntries(tx, {
-        txVoucherId: txVoucher.id,
-        voucherNumber,
+      // Phase 22 (B): the sale voucher goes through the central engine, which
+      // allocates its number (SV-<company>-YYYY-000001). Modern clients send
+      // clientSaleId as the retry identity; older callers have none and get a
+      // one-shot identity (the clientSaleId lock above stays the replay check).
+      const saleLines = await buildSaleAccountingLines(tx, {
+        voucherLabel: location.name,
         grandTotal,
         isCreditSale,
         accountType,
@@ -252,6 +239,34 @@ export async function createPosSale(
         currency: currency || "USD",
         exchangeRate: exchangeRate ? String(exchangeRate) : null,
       });
+      const posted = await postErpVoucherTx(tx, {
+        companyId: currentCompanyId,
+        voucherType: "Sales",
+        voucherDate,
+        description:
+          notes ||
+          (isCreditSale
+            ? `Credit Invoice Sale at ${location.name} - ${customerAccount ? customerAccount.name : undefined}`
+            : `POS Sale at ${location.name}`),
+        locationId: parsedLocationId,
+        currency: currency || "USD",
+        exchangeRate: exchangeRate != null && exchangeRate !== "" ? String(exchangeRate) : null,
+        lines: saleLines,
+        source: { type: "pos-sale", id: clientSaleId || `legacy-${randomUUID()}` },
+        actor: { userId, username, reason: "POS sale" },
+        metadata: {
+          locationName: location.name,
+          shiftId: effectiveShiftId,
+          clientSaleId: clientSaleId || null,
+          isCreditSale: !!isCreditSale,
+        },
+      });
+      const txVoucher = posted.voucher;
+      if (posted.replayed) {
+        const replayedItems = await tx.select().from(salesItems).where(eq(salesItems.voucherId, txVoucher.id));
+        return { voucher: txVoucher, saleItems: replayedItems, replayed: true };
+      }
+      voucherNumber = txVoucher.voucherNumber;
 
       const txSaleItems = [];
       const issueOrdinalByStockItem = new Map<number, number>();
@@ -430,7 +445,7 @@ export async function createPosSale(
   const saleItems = txResult.saleItems;
 
   if (!goldenCoastSaleDetected && !isCreditSale && accountType === "cash") {
-    runIntercompanyPosTransfer(currentCompanyId, accountId, grandTotal, voucherDate).catch((error) =>
+    runIntercompanyPosTransfer(currentCompanyId, accountId, grandTotal, voucherDate, voucher.id).catch((error) =>
       logger.error("[IntercompanyPOS] Unhandled:", { error })
     );
   }

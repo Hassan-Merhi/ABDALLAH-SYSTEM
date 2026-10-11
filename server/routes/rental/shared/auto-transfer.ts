@@ -1,14 +1,9 @@
+import { randomUUID } from "node:crypto";
 import { logger } from "../../../lib/logger";
+import { postErpVoucherTx } from "../../../services/accounting/erpVoucherPosting";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { db, type DbTransaction } from "../../../db";
-import {
-  ledgerAccounts,
-  vouchers,
-  voucherEntries,
-  rentalAutoTransferConfigs,
-  interCompanyTransfers,
-  companies,
-} from "@shared/schema";
+import { ledgerAccounts, rentalAutoTransferConfigs, interCompanyTransfers, companies } from "@shared/schema";
 import { eq, and, inArray, isNull } from "drizzle-orm";
 import { retireVouchersTx, type VoucherRetirementActor } from "../../../services/accounting/voucherRetirement";
 import { runWithAutoTransferCounterparties } from "../../../services/rental/autoTransferScope";
@@ -158,7 +153,9 @@ export async function maybeRunAutoTransfer(
         if (!fromClearing || !toClearing) return;
         const baseDesc = `Auto rent transfer - ${unitLabel}`;
         const desc = notes ? `${baseDesc} - ${notes}` : baseDesc;
-        const txId = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        // Phase 22 (B): both legs post through the central engine (numbers
+        // allocated per company, identity = the rental payment).
+        const transferSourceId = sourcePaymentId ? String(sourcePaymentId) : `once-${randomUUID()}`;
 
         const outNarration = notes
           ? `Transfer out to ${toCompany.name} - ${notes}`
@@ -168,65 +165,31 @@ export async function maybeRunAutoTransfer(
           : `Transfer in from ${fromCompany.name}`;
 
         // Voucher in FROM company (Payment — money leaves)
-        const [fromVoucher] = await tx
-          .insert(vouchers)
-          .values({
-            companyId,
-            voucherNumber: `TR-OUT-${txId}`,
-            voucherType: "Payment",
-            voucherDate: transferDate,
-            description: `${desc} → ${toCompany.name}`,
-            totalAmount: amount,
-            optional: false,
-          })
-          .returning();
-        await tx.insert(voucherEntries).values([
-          {
-            voucherId: fromVoucher.id,
-            ledgerAccountId: fromClearing.id,
-            debitAmount: amount,
-            creditAmount: "0",
-            narration: outNarration,
-          },
-          {
-            voucherId: fromVoucher.id,
-            ledgerAccountId: fromLedgerAccountId,
-            debitAmount: "0",
-            creditAmount: amount,
-            narration: outNarration,
-          },
-        ]);
+        const { voucher: fromVoucher } = await postErpVoucherTx(tx, {
+          companyId,
+          voucherType: "Payment",
+          voucherDate: transferDate,
+          description: `${desc} → ${toCompany.name}`,
+          lines: [
+            { ledgerAccountId: fromClearing.id, debit: amount, narration: outNarration },
+            { ledgerAccountId: fromLedgerAccountId, credit: amount, narration: outNarration },
+          ],
+          source: { type: "rental-auto-transfer-out", id: transferSourceId },
+        });
 
         // Voucher in TO company (Receipt — money arrives)
         // DR destLedgerAccountId (cash/account receives money), CR toClearing (clearing settled)
-        const [toVoucher] = await tx
-          .insert(vouchers)
-          .values({
-            companyId: cfg.destCompanyId,
-            voucherNumber: `TR-IN-${txId}`,
-            voucherType: "Receipt",
-            voucherDate: transferDate,
-            description: notes ? `Transfer from ${fromCompany.name} - ${notes}` : `Transfer from ${fromCompany.name}`,
-            totalAmount: amount,
-            optional: false,
-          })
-          .returning();
-        await tx.insert(voucherEntries).values([
-          {
-            voucherId: toVoucher.id,
-            ledgerAccountId: cfg.destLedgerAccountId,
-            debitAmount: amount,
-            creditAmount: "0",
-            narration: inNarration,
-          },
-          {
-            voucherId: toVoucher.id,
-            ledgerAccountId: toClearing.id,
-            debitAmount: "0",
-            creditAmount: amount,
-            narration: inNarration,
-          },
-        ]);
+        const { voucher: toVoucher } = await postErpVoucherTx(tx, {
+          companyId: cfg.destCompanyId,
+          voucherType: "Receipt",
+          voucherDate: transferDate,
+          description: notes ? `Transfer from ${fromCompany.name} - ${notes}` : `Transfer from ${fromCompany.name}`,
+          lines: [
+            { ledgerAccountId: cfg.destLedgerAccountId, debit: amount, narration: inNarration },
+            { ledgerAccountId: toClearing.id, credit: amount, narration: inNarration },
+          ],
+          source: { type: "rental-auto-transfer-in", id: transferSourceId },
+        });
 
         // Record link (sourcePaymentId links this transfer back to the originating payment)
         await tx.insert(interCompanyTransfers).values({

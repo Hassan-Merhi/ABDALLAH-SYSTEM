@@ -1,7 +1,4 @@
-import {
-  infrastructurePostingIdentity,
-  insertInfrastructureVoucherTx,
-} from "../../services/accounting/infrastructureVoucherIdentity";
+import { postFactoryPartyLineVoucherTx, postFactoryVoucherTx } from "../../services/factory/factoryVoucherPosting";
 import { retireVouchersTx, type VoucherRetirementActor } from "../../services/accounting/voucherRetirement";
 import { resolvePoImportCreditTarget } from "../../services/accounting/poImportAccounting";
 import { eq, and, isNull, sql } from "drizzle-orm";
@@ -150,51 +147,36 @@ export async function createPurchaseOrder(
           parentCreditAccount = [newAccount];
         }
 
-        const subsidiaryVoucherNumber = `PURCH-${created.poNumber}-${Date.now()}`;
-        const { voucher: subsidiaryVoucher } = await insertInfrastructureVoucherTx(
-          tx,
-          {
-            companyId: po.companyId,
-            voucherNumber: subsidiaryVoucherNumber,
-            voucherType: "Purchase",
-            voucherDate,
-            description: descBase || `Purchase for PO ${created.poNumber} (${parentCompany.name} paid supplier)`,
-            totalAmount: poTotal.toFixed(2),
-            optional: false,
-          },
-          infrastructurePostingIdentity(
-            "purchase-order",
-            String(po.companyId) + ":" + String(created.poNumber),
-            "purchase"
-          ),
-          po,
-          { replaceEntriesOnReplay: false }
-        );
-
-        await tx.insert(schema.voucherEntries).values({
-          voucherId: subsidiaryVoucher.id,
-          ledgerAccountId: purchasesAccount[0].id,
-          debitAmount: poIntercoTotal.toFixed(2),
-          creditAmount: "0",
-          narration: `PO ${created.poNumber} - Purchases`,
-        });
-
-        if (isParentFreight) {
-          await tx.insert(schema.voucherEntries).values({
-            voucherId: subsidiaryVoucher.id,
-            ledgerAccountId: purchasesAccount[0].id,
-            debitAmount: poFreight.toFixed(2),
-            creditAmount: "0",
-            narration: `PO ${created.poNumber} - Freight (paid by ${parentCompany.name})`,
-          });
-        }
-
-        await tx.insert(schema.voucherEntries).values({
-          voucherId: subsidiaryVoucher.id,
-          ledgerAccountId: parentCreditAccount[0].id,
-          debitAmount: "0",
-          creditAmount: poTotal.toFixed(2),
-          narration: `PO ${created.poNumber} - ${parentCompany.name} paid supplier`,
+        // Phase 22 (C): through the engine, engine-numbered (the PURCH- number
+        // carried a timestamp and is read nowhere), same posting identity.
+        const { voucher: subsidiaryVoucher } = await postFactoryVoucherTx(tx, {
+          companyId: po.companyId,
+          voucherType: "Purchase",
+          voucherDate,
+          description: descBase || `Purchase for PO ${created.poNumber} (${parentCompany.name} paid supplier)`,
+          sourceModule: "ERP",
+          source: { sourceType: "purchase-order", sourceId: `${po.companyId}:${created.poNumber}`, phase: "purchase" },
+          lines: [
+            {
+              ledgerAccountId: purchasesAccount[0].id,
+              debit: poIntercoTotal.toFixed(2),
+              narration: `PO ${created.poNumber} - Purchases`,
+            },
+            ...(isParentFreight
+              ? [
+                  {
+                    ledgerAccountId: purchasesAccount[0].id,
+                    debit: poFreight.toFixed(2),
+                    narration: `PO ${created.poNumber} - Freight (paid by ${parentCompany.name})`,
+                  },
+                ]
+              : []),
+            {
+              ledgerAccountId: parentCreditAccount[0].id,
+              credit: poTotal.toFixed(2),
+              narration: `PO ${created.poNumber} - ${parentCompany.name} paid supplier`,
+            },
+          ],
         });
 
         await tx
@@ -234,115 +216,86 @@ export async function createPurchaseOrder(
           subsidiaryReceivableAccount = [newAccount];
         }
 
-        const parentVoucherNumber = `INTERCO-PARENT-${created.poNumber}-${Date.now()}`;
-        const { voucher: parentVoucher } = await insertInfrastructureVoucherTx(
-          tx,
-          {
-            companyId: parentCompany.id,
-            voucherNumber: parentVoucherNumber,
-            voucherType: "Journal",
-            voucherDate,
-            description: descBase
-              ? `${descBase} - ${currentCompany?.name || "Subsidiary"}`
-              : `Inter-company PO ${created.poNumber} - ${currentCompany?.name || "Subsidiary"}`,
-            totalAmount: poTotal.toFixed(2),
-            optional: false,
-          },
-          infrastructurePostingIdentity(
-            "purchase-order",
-            String(po.companyId) + ":" + String(created.poNumber),
-            "purchase"
-          ),
-          po,
-          { replaceEntriesOnReplay: false }
-        );
-
         const intercoNarration = containerNum
           ? `${currentCompany?.name || "Subsidiary"} PO ${created.poNumber} - Container ${containerNum}`
           : `PO ${created.poNumber} - ${currentCompany?.name || "Subsidiary"} owes us`;
-
-        await tx.insert(schema.voucherEntries).values({
-          voucherId: parentVoucher.id,
-          ledgerAccountId: subsidiaryReceivableAccount[0].id,
-          debitAmount: poTotal.toFixed(2),
-          creditAmount: "0",
-          narration: intercoNarration,
+        // INTERCO-PARENT-{po}- is read as identity (containerHelpers sync), so
+        // the family number is kept with the PO id as its suffix (was Date.now()).
+        // The parent's voucher credits the subsidiary's supplier (a party of the
+        // other company); the engine refuses a target another company owns, so
+        // it goes through the party-line writer (identity, Decimal, exact
+        // balance) until the parent-supplier model (G17: due-to/due-from
+        // accounts) is decided.
+        await postFactoryPartyLineVoucherTx(tx, {
+          companyId: parentCompany.id,
+          voucherNumber: `INTERCO-PARENT-${created.poNumber}-${created.id}`,
+          voucherDate,
+          description: descBase
+            ? `${descBase} - ${currentCompany?.name || "Subsidiary"}`
+            : `Inter-company PO ${created.poNumber} - ${currentCompany?.name || "Subsidiary"}`,
+          sourceModule: "ERP",
+          source: { sourceType: "purchase-order", sourceId: `${po.companyId}:${created.poNumber}`, phase: "purchase" },
+          lines: [
+            {
+              ledgerAccountId: subsidiaryReceivableAccount[0].id,
+              debit: poTotal.toFixed(2),
+              narration: intercoNarration,
+            },
+            ...(po.supplierId
+              ? [{ supplierId: po.supplierId, credit: poIntercoTotal.toFixed(2), narration: intercoNarration }]
+              : []),
+            ...(isParentFreight && freightParentAcctId
+              ? [
+                  {
+                    ledgerAccountId: freightParentAcctId,
+                    credit: poFreight.toFixed(2),
+                    narration: containerNum
+                      ? `Freight - ${currentCompany?.name || "Subsidiary"} PO ${created.poNumber} - Container ${containerNum}`
+                      : `Freight - PO ${created.poNumber}`,
+                  },
+                ]
+              : []),
+          ],
         });
-
-        if (po.supplierId) {
-          await tx.insert(schema.voucherEntries).values({
-            voucherId: parentVoucher.id,
-            supplierId: po.supplierId,
-            debitAmount: "0",
-            creditAmount: poIntercoTotal.toFixed(2),
-            narration: intercoNarration,
-          });
-        }
-
-        if (isParentFreight && freightParentAcctId) {
-          await tx.insert(schema.voucherEntries).values({
-            voucherId: parentVoucher.id,
-            ledgerAccountId: freightParentAcctId,
-            debitAmount: "0",
-            creditAmount: poFreight.toFixed(2),
-            narration: containerNum
-              ? `Freight - ${currentCompany?.name || "Subsidiary"} PO ${created.poNumber} - Container ${containerNum}`
-              : `Freight - PO ${created.poNumber}`,
-          });
-        }
       } else {
-        const voucherNumber = `PURCH-${created.poNumber}-${Date.now()}`;
-        const { voucher: purchaseVoucher } = await insertInfrastructureVoucherTx(
-          tx,
-          {
-            companyId: po.companyId,
-            voucherNumber,
-            voucherType: "Purchase",
-            voucherDate,
-            description: descBase || `Purchase for PO ${created.poNumber}`,
-            totalAmount: poTotal.toFixed(2),
-            optional: false,
-          },
-          infrastructurePostingIdentity(
-            "purchase-order",
-            String(po.companyId) + ":" + String(created.poNumber),
-            "purchase"
-          ),
-          po,
-          { replaceEntriesOnReplay: false }
-        );
-
-        await tx.insert(schema.voucherEntries).values({
-          voucherId: purchaseVoucher.id,
-          ledgerAccountId: purchasesAccount[0].id,
-          debitAmount: poTotal.toFixed(2),
-          creditAmount: "0",
-          narration: `PO ${created.poNumber} - Purchases`,
-        });
-
         const creditTarget = resolvePoImportCreditTarget({
           companyType: currentCompany?.companyType,
           hasExplicitParentLink: Boolean(parentCompany),
           configuredIntercompanyCreditAccountId,
           supplierId: po.supplierId,
         });
-        if (creditTarget.kind === "intercompany") {
-          await tx.insert(schema.voucherEntries).values({
-            voucherId: purchaseVoucher.id,
-            ledgerAccountId: creditTarget.ledgerAccountId,
-            debitAmount: "0",
-            creditAmount: poTotal.toFixed(2),
-            narration: `PO ${created.poNumber} - Intercompany credit`,
-          });
-        } else if (creditTarget.supplierId) {
-          await tx.insert(schema.voucherEntries).values({
-            voucherId: purchaseVoucher.id,
-            supplierId: creditTarget.supplierId,
-            debitAmount: "0",
-            creditAmount: poTotal.toFixed(2),
-            narration: `PO ${created.poNumber} - Supplier`,
-          });
-        }
+        const { voucher: purchaseVoucher } = await postFactoryVoucherTx(tx, {
+          companyId: po.companyId,
+          voucherType: "Purchase",
+          voucherDate,
+          description: descBase || `Purchase for PO ${created.poNumber}`,
+          sourceModule: "ERP",
+          source: { sourceType: "purchase-order", sourceId: `${po.companyId}:${created.poNumber}`, phase: "purchase" },
+          lines: [
+            {
+              ledgerAccountId: purchasesAccount[0].id,
+              debit: poTotal.toFixed(2),
+              narration: `PO ${created.poNumber} - Purchases`,
+            },
+            ...(creditTarget.kind === "intercompany"
+              ? [
+                  {
+                    ledgerAccountId: creditTarget.ledgerAccountId,
+                    credit: poTotal.toFixed(2),
+                    narration: `PO ${created.poNumber} - Intercompany credit`,
+                  },
+                ]
+              : creditTarget.supplierId
+                ? [
+                    {
+                      supplierId: creditTarget.supplierId,
+                      credit: poTotal.toFixed(2),
+                      narration: `PO ${created.poNumber} - Supplier`,
+                    },
+                  ]
+                : []),
+          ],
+        });
 
         await tx
           .update(schema.purchaseOrders)

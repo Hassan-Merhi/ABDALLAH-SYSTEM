@@ -17,6 +17,7 @@ import {
   replacementErrorStatus,
 } from "../services/accounting/voucherEntryReplacement";
 import { syncStockAdjustmentInventoryTx } from "../services/accounting/perpetualInventory/stockAdjustments";
+import { assertVoucherEditableTx, sendVoucherCorrectionRefusal } from "../services/accounting/voucherCorrection";
 
 function canEditVoucherDate(role: string, voucherDate: string | Date): boolean {
   if (role === "Admin" || role === "Owner" || role === "Developer") return true;
@@ -155,6 +156,8 @@ export function registerVoucherEntryCurrencyEditRoutes(app: Express) {
       let updated: typeof voucherEntries.$inferSelect;
       try {
         updated = await db.transaction(async (tx) => {
+          // Phase 22 (B), G4: an amount edit is open-period only (409 otherwise).
+          await assertVoucherEditableTx(tx, row.voucher.id, { companyId });
           const [written] = await tx
             .update(voucherEntries)
             .set({
@@ -217,6 +220,7 @@ export function registerVoucherEntryCurrencyEditRoutes(app: Express) {
 
       return res.json(updated);
     } catch (error: unknown) {
+      if (sendVoucherCorrectionRefusal(res, error)) return;
       const status = /rate|required|cannot have both|must have either/i.test(getErrorMessage(error)) ? 400 : 500;
       return res.status(status).json({ message: getErrorMessage(error) });
     }

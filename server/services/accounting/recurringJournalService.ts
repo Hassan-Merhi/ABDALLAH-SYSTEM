@@ -593,7 +593,6 @@ async function runRecurringJournalInScope(recurring: RecurringJournal): Promise<
       const requestKey = `recurring-journal:${locked.id}:${scheduledFor}`;
       const built = buildManualJournalPostingRequest({
         companyId: locked.companyId,
-        voucherNumber: `RJ-${locked.id}-${scheduledFor.replaceAll("-", "")}`,
         voucherDate: scheduledFor,
         entries,
         notes: description,

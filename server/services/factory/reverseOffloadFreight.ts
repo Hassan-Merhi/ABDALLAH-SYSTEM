@@ -64,11 +64,17 @@ export async function restoreRetiredPreOffloadFreightTx(
     .limit(1)
     .for("update");
   if (!retired) return null;
-  if (
-    String(retired.currency || "USD").toUpperCase() !== params.currency.toUpperCase() ||
-    !toMoney(retired.totalAmount).eq(toMoney(params.amount))
-  ) {
-    return null;
+  if (String(retired.currency || "USD").toUpperCase() !== params.currency.toUpperCase()) return null;
+  // The header holds the document-currency total (phase 22 C keeps that for
+  // engine-posted factory vouchers too); a voucher whose header carries the USD
+  // base is matched by its lines' document-currency debit total.
+  if (!toMoney(retired.totalAmount).eq(toMoney(params.amount))) {
+    const nativeDebit = await tx.execute(
+      sql`SELECT COALESCE(SUM(COALESCE(transaction_debit_amount, debit_amount)), 0)::text AS total
+            FROM voucher_entries WHERE voucher_id = ${retired.id}`
+    );
+    const total = (nativeDebit.rows[0] as { total?: string } | undefined)?.total ?? "0";
+    if (!toMoney(total).toDecimalPlaces(2).eq(toMoney(params.amount).toDecimalPlaces(2))) return null;
   }
   const freightLine = await tx.execute(
     sql`SELECT 1 FROM voucher_entries

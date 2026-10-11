@@ -21,7 +21,16 @@ import { createDatabasePostingDependencies } from "../../services/accounting/dat
 import { erpRateToDaybookFxRateToUsd } from "../../services/accounting/currencyAmounts";
 import { applyEmployeeBalanceDeltasTx } from "../../services/accounting/employeeBalancePosting";
 import { buildManualJournalPostingRequest } from "../../services/accounting/manualJournalPosting";
-import { transformGoldenCoastOwnerWithdrawalJournal } from "../../services/accounting/goldenCoastOwnerWithdrawalJournal";
+import {
+  applyGoldenCoastOwnerWithdrawalTemplate,
+  goldenCoastOwnerWithdrawalTemplatePreview,
+  matchGoldenCoastOwnerWithdrawalJournal,
+  type GoldenCoastOwnerWithdrawalTransform,
+} from "../../services/accounting/goldenCoastOwnerWithdrawalJournal";
+
+export const GC_OWNER_WITHDRAWAL_TEMPLATE_CONFIRM = "GC_OWNER_WITHDRAWAL_TEMPLATE_CONFIRM";
+export const GC_OWNER_WITHDRAWAL_TEMPLATE_MESSAGE =
+  "This journal is a Golden Coast owner withdrawal. Press OK to post the owner-withdrawal template (Dr owner equity, Dr GC Sales Cash, Cr GC Owner Withdrawal Clearing at twice the amount), or Cancel to post it exactly as entered.";
 import { recalculateOrderTotals } from "../factory/_helpers";
 import { checkAccountWhatsAppRule } from "../factoryWhatsappRoutes";
 import { buildVoucherChangesForCreate, logAudit, snapshotVoucherEntries } from "../_helpers";
@@ -212,11 +221,34 @@ async function createActiveJournal(req: Request, res: Response, next: NextFuncti
       return;
     }
 
-    const ownerWithdrawal = await transformGoldenCoastOwnerWithdrawalJournal({ companyId, entries });
+    // Phase 22 (B), D6: the Golden Coast owner-withdrawal template is applied
+    // only when the user confirmed it; a matching journal without that answer
+    // is refused with the template's lines, and `false` posts it as entered.
+    const templateAnswer = req.body?.goldenCoastOwnerWithdrawalTemplate;
+    const withdrawalMatch = await matchGoldenCoastOwnerWithdrawalJournal({ companyId, entries });
+    if (withdrawalMatch && typeof templateAnswer !== "boolean") {
+      res.status(409).json({
+        code: GC_OWNER_WITHDRAWAL_TEMPLATE_CONFIRM,
+        message: GC_OWNER_WITHDRAWAL_TEMPLATE_MESSAGE,
+        template: goldenCoastOwnerWithdrawalTemplatePreview(withdrawalMatch),
+      });
+      return;
+    }
+    if (templateAnswer === true && !withdrawalMatch) {
+      res.status(400).json({
+        code: "GC_OWNER_WITHDRAWAL_TEMPLATE_NOT_APPLICABLE",
+        message: "This journal is not a Golden Coast owner withdrawal; post it without the template.",
+      });
+      return;
+    }
+    const ownerWithdrawal: GoldenCoastOwnerWithdrawalTransform =
+      withdrawalMatch && templateAnswer === true
+        ? await applyGoldenCoastOwnerWithdrawalTemplate(companyId, withdrawalMatch)
+        : { entries, transformed: false };
     const postingEntries = ownerWithdrawal.entries;
 
     if (ownerWithdrawal.transformed) {
-      logger.info("Golden Coast owner withdrawal journal transformed", {
+      logger.info("Golden Coast owner withdrawal template posted (confirmed by the user)", {
         module: "vouchers",
         action: "createJournalCentral",
         companyId,
@@ -230,7 +262,6 @@ async function createActiveJournal(req: Request, res: Response, next: NextFuncti
 
     const built = buildManualJournalPostingRequest({
       companyId,
-      voucherNumber: `JOURNAL-${Date.now()}`,
       voucherDate,
       entries: postingEntries,
       notes,

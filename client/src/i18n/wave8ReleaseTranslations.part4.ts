@@ -2,6 +2,97 @@ import type { Phase3SharedUiEntry } from "./sharedUiPhase3TranslationTypes";
 
 // Wave 8 release closeout, continued from part 3 (which reached the 900-line limit).
 export const wave8ReleaseTranslationsPart4: readonly Phase3SharedUiEntry[] = [
+  // Phase 22 A: correction policy, engine rounding and numbering.
+  {
+    en: "Voucher number counter could not be created",
+    ar: "تعذر إنشاء عدّاد أرقام السندات",
+    fr: "Le compteur de numéros de bons n’a pas pu être créé",
+  },
+  {
+    en: "voucherNumber is required before a voucher can be inserted",
+    ar: "يلزم voucherNumber قبل إدراج السند",
+    fr: "voucherNumber est requis avant d’insérer un bon",
+  },
+  {
+    en: "This voucher is deleted and cannot be changed or reversed.",
+    ar: "هذا السند محذوف ولا يمكن تعديله أو عكسه.",
+    fr: "Ce bon est supprimé et ne peut être ni modifié ni extourné.",
+  },
+  {
+    en: "This voucher is dated in a closed period and cannot be edited. Reverse it and post a corrected voucher dated in an open period instead.",
+    ar: "هذا السند مؤرخ في فترة مقفلة ولا يمكن تعديله. اعكسه ثم سجّل سنداً مصححاً بتاريخ في فترة مفتوحة.",
+    fr: "Ce bon est daté dans une période clôturée et ne peut pas être modifié. Extournez-le et passez un bon corrigé daté dans une période ouverte.",
+  },
+  {
+    en: "This voucher has been reversed, or is itself a reversal, and cannot be edited. Post a new voucher instead.",
+    ar: "تم عكس هذا السند، أو أنه هو نفسه سند عكس، ولا يمكن تعديله. سجّل سنداً جديداً بدلاً من ذلك.",
+    fr: "Ce bon a été extourné, ou est lui-même une extourne, et ne peut pas être modifié. Passez plutôt un nouveau bon.",
+  },
+  {
+    en: "A reason is required to reverse a voucher.",
+    ar: "يلزم ذكر سبب لعكس السند.",
+    fr: "Un motif est requis pour extourner un bon.",
+  },
+  {
+    en: "This voucher has already been reversed.",
+    ar: "تم عكس هذا السند بالفعل.",
+    fr: "Ce bon a déjà été extourné.",
+  },
+  {
+    en: "A reversal voucher cannot itself be reversed.",
+    ar: "لا يمكن عكس سند العكس نفسه.",
+    fr: "Un bon d’extourne ne peut pas lui-même être extourné.",
+  },
+  {
+    en: "An optional voucher is not posted to the ledger, so there is nothing to reverse.",
+    ar: "السند الاختياري غير مرحّل إلى الدفتر، لذلك لا يوجد ما يُعكس.",
+    fr: "Un bon facultatif n’est pas comptabilisé au grand livre : il n’y a rien à extourner.",
+  },
+  {
+    en: "The reversal date is in a closed period. Choose a date in an open period.",
+    ar: "تاريخ العكس في فترة مقفلة. اختر تاريخاً في فترة مفتوحة.",
+    fr: "La date d’extourne est dans une période clôturée. Choisissez une date dans une période ouverte.",
+  },
+  {
+    en: "The reversal date must be a YYYY-MM-DD date.",
+    ar: "يجب أن يكون تاريخ العكس بصيغة YYYY-MM-DD.",
+    fr: "La date d’extourne doit être au format AAAA-MM-JJ.",
+  },
+  {
+    en: "Voucher is not balanced in its transaction currency",
+    ar: "السند غير متوازن بعملة المعاملة",
+    fr: "Le bon n’est pas équilibré dans sa devise de transaction",
+  },
+  {
+    en: "The company's ROUNDING account is deleted; restore it before posting a voucher with a rounding difference",
+    ar: "حساب ROUNDING الخاص بالشركة محذوف؛ استعده قبل ترحيل سند فيه فرق تقريب",
+    fr: "Le compte ROUNDING de la société est supprimé ; restaurez-le avant de passer un bon comportant un écart d’arrondi",
+  },
+  {
+    en: "The company's ROUNDING account could not be provisioned",
+    ar: "تعذر إنشاء حساب ROUNDING الخاص بالشركة",
+    fr: "Le compte ROUNDING de la société n’a pas pu être créé",
+  },
+  {
+    en: "A valid companyId is required to number a voucher",
+    ar: "يلزم companyId صالح لترقيم السند",
+    fr: "Un companyId valide est requis pour numéroter un bon",
+  },
+  {
+    en: "A voucher date (YYYY-MM-DD) is required to number a voucher",
+    ar: "يلزم تاريخ السند (YYYY-MM-DD) لترقيمه",
+    fr: "Une date de bon (AAAA-MM-JJ) est requise pour le numéroter",
+  },
+  {
+    en: "A voucher type is required to number a voucher",
+    ar: "يلزم نوع السند لترقيمه",
+    fr: "Un type de bon est requis pour le numéroter",
+  },
+  {
+    en: "Rounding Differences",
+    ar: "فروق التقريب",
+    fr: "Écarts d’arrondi",
+  },
   {
     en: "Reason…",
     ar: "السبب…",
@@ -511,5 +602,50 @@ export const wave8ReleaseTranslationsPart4: readonly Phase3SharedUiEntry[] = [
     en: "Unknown reversal contra account",
     ar: "حساب مقابل غير معروف للعكس",
     fr: "Compte de contrepartie d’extourne inconnu",
+  },
+  {
+    en: "Rates are no longer applied to containers here. Set the rate on the container itself: it uses the recorded factory rate dated on or before the container and updates its journals.",
+    ar: "لم تعد الأسعار تُطبَّق على الحاويات من هنا. حدّد السعر على الحاوية نفسها: فهي تستخدم سعر المصنع المسجّل بتاريخ الحاوية أو قبله وتحدّث قيودها.",
+    fr: "Les taux ne sont plus appliqués aux conteneurs ici. Saisissez le taux sur le conteneur lui-même : il utilise le taux d’usine enregistré à la date du conteneur ou avant, et met à jour ses écritures.",
+  },
+  {
+    en: "The bales changed while the swap was being prepared; reload and try again",
+    ar: "تغيّرت البالات أثناء تحضير الاستبدال؛ أعد التحميل وحاول مرة أخرى",
+    fr: "Les balles ont changé pendant la préparation de l’échange ; rechargez et réessayez",
+  },
+  {
+    en: "This journal is a Golden Coast owner withdrawal. Press OK to post the owner-withdrawal template (Dr owner equity, Dr GC Sales Cash, Cr GC Owner Withdrawal Clearing at twice the amount), or Cancel to post it exactly as entered.",
+    ar: "هذا القيد سحب مالك لشركة Golden Coast. اضغط موافق لترحيل نموذج سحب المالك (مدين حقوق المالك، مدين GC Sales Cash، دائن حساب مقاصة سحب المالك بضعف المبلغ)، أو إلغاء لترحيله كما أُدخل تماماً.",
+    fr: "Cette écriture est un retrait du propriétaire Golden Coast. Appuyez sur OK pour passer le modèle de retrait du propriétaire (débit capitaux du propriétaire, débit GC Sales Cash, crédit compte de compensation des retraits du propriétaire pour le double du montant), ou sur Annuler pour la passer exactement telle que saisie.",
+  },
+  {
+    en: "This journal is not a Golden Coast owner withdrawal; post it without the template.",
+    ar: "هذا القيد ليس سحب مالك لشركة Golden Coast؛ رحّله بدون النموذج.",
+    fr: "Cette écriture n’est pas un retrait du propriétaire Golden Coast ; passez-la sans le modèle.",
+  },
+  {
+    en: "${GC_OWNER_WITHDRAWAL_CLEARING_CODE} is deleted; restore it from Deleted Items before posting the template",
+    ar: "الحساب {{0}} محذوف؛ استعده من العناصر المحذوفة قبل ترحيل النموذج",
+    fr: "{{0}} est supprimé ; restaurez-le depuis les éléments supprimés avant de passer le modèle",
+  },
+  {
+    en: "Counterpart line has no positive historical rate",
+    ar: "سطر الطرف المقابل ليس له سعر تاريخي موجب",
+    fr: "La ligne de contrepartie n’a pas de taux historique positif",
+  },
+  {
+    en: "A POS sale needs a revenue line",
+    ar: "يحتاج بيع نقطة البيع إلى سطر إيراد",
+    fr: "Une vente au point de vente nécessite une ligne de produit",
+  },
+  {
+    en: "Phantom accrual correction — Dr AP / Cr Rent Expense (${phantomToPost.length} rows)",
+    ar: "تصحيح استحقاق وهمي — مدين الدائنين / دائن مصروف الإيجار ({{0}} صفوف)",
+    fr: "Correction de régularisation fantôme — débit fournisseurs / crédit charge de loyer ({{0}} lignes)",
+  },
+  {
+    en: "Orphaned AP debit correction (${orphansToPost.length} row(s)) — Dr Rent Expense / Cr AP",
+    ar: "تصحيح مدين دائنين يتيم ({{0}} صفوف) — مدين مصروف الإيجار / دائن الدائنين",
+    fr: "Correction de débit fournisseurs orphelin ({{0}} ligne(s)) — débit charge de loyer / crédit fournisseurs",
   },
 ];

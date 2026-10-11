@@ -31,6 +31,13 @@ const po = {
 vi.mock("../server/services/accounting/perpetualInventory/stockReceipts", () => ({
   syncPurchaseOrderGitTx: async () => null,
 }));
+// Phase 22 (C): the voucher resync is an in-place edit of a posted voucher
+// through the correction policy (closed-period refusal, before/after audit),
+// covered against a database by the phase 22 (C) suite. Here it only wraps the edit.
+vi.mock("../server/services/factory/factoryVoucherCorrection", () => ({
+  editPostedFactoryVoucherTx: async (_tx: unknown, _input: unknown, edit: () => Promise<unknown>) => edit(),
+  sendVoucherCorrectionRefusal: () => false,
+}));
 vi.mock("../server/auth", () => {
   const pass = (_q: unknown, _s: unknown, next: () => void) => next();
   return { requireAuth: pass, requireRole: () => pass };
@@ -110,7 +117,11 @@ describe("PO charge edit", () => {
     expect(await patchPurchaseOrder({ freight: "1.005" })).toBe(200);
 
     expect(written("update", "vouchers")).toEqual([{ totalAmount: "101.01" }]);
-    expect(written("update", "voucher_entries")).toEqual([{ debitAmount: "101.01" }, { creditAmount: "101.01" }]);
+    // Phase 22 (C): the edited lines get every amount column (usdLineAmounts, 6 dp).
+    expect(written("update", "voucher_entries")).toEqual([
+      expect.objectContaining({ debitAmount: "101.010000", creditAmount: "0.000000", baseDebitAmount: "101.010000" }),
+      expect.objectContaining({ debitAmount: "0.000000", creditAmount: "101.010000", baseCreditAmount: "101.010000" }),
+    ]);
     expect(written("update", "containers")).toEqual([
       { itemsTotal: "100.00", chargesTotal: "1.01", grandTotal: "101.01" },
     ]);

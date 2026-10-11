@@ -53,18 +53,13 @@
  */
 import type Decimal from "decimal.js";
 import { sql } from "drizzle-orm";
-import { voucherEntries } from "@shared/schema";
 
 import type { DatabaseOrTransaction, DbTransaction } from "../../db";
 import { MoneyDecimal, toMoney } from "../../lib/money";
-import {
-  infrastructurePostingIdentity,
-  insertInfrastructureVoucherTx,
-} from "../accounting/infrastructureVoucherIdentity";
 import { retireVouchersTx } from "../accounting/voucherRetirement";
 import { systemAccountIdsTx } from "../accounting/perpetualInventory/linkedJournal";
 import { resolveStoredFxRate } from "./currencyConversion";
-import { normFactoryEntry } from "./factoryVoucherEntryAmounts";
+import { postFactoryVoucherTx } from "./factoryVoucherPosting";
 
 export const CONTAINER_COMMISSION_SOURCE = "factory-container-commission";
 
@@ -245,34 +240,29 @@ export async function syncContainerCommissionJournalTx(
 
   const debitAccountId = await importCostAccountIdTx(tx, companyId, containerId);
   const rateText = rate.toFixed();
-  const { voucher } = await insertInfrastructureVoucherTx(
-    tx,
-    {
-      companyId,
-      voucherType: "Journal",
-      voucherNumber: containerCommissionVoucherNumber(containerId),
-      voucherDate: row.date,
-      description: ["Commission - container", row.container_number].join(" "),
-      totalAmount: amount.toFixed(2),
-      currency,
-      exchangeRate: rateText,
-      sourceModule: "FACTORY",
-    },
-    infrastructurePostingIdentity(CONTAINER_COMMISSION_SOURCE, containerId)
-  );
-  await tx.insert(voucherEntries).values([
-    {
-      voucherId: voucher.id,
-      ledgerAccountId: debitAccountId,
-      ...normFactoryEntry(currency, amount.toFixed(2), "0", rateText),
-      narration: `Commission cost - container ${row.container_number}`,
-    },
-    {
-      voucherId: voucher.id,
-      ...(payeeSupplierId ? { factorySupplierId: payeeSupplierId } : { ledgerAccountId: Number(payeeAccountId) }),
-      ...normFactoryEntry(currency, "0", amount.toFixed(2), rateText),
-      narration: `Commission payable - container ${row.container_number}`,
-    },
-  ]);
+  // Phase 22 (C): through the engine with the container's commission identity
+  // and its FACTORY-COMM-{container} number (read as identity by the unposted
+  // memo and the integrity diagnostic).
+  const { voucher } = await postFactoryVoucherTx(tx, {
+    companyId,
+    voucherNumber: containerCommissionVoucherNumber(containerId),
+    voucherDate: row.date,
+    description: ["Commission - container", row.container_number].join(" "),
+    currency,
+    fxRateToUsd: rateText,
+    source: { sourceType: CONTAINER_COMMISSION_SOURCE, sourceId: containerId, phase: "voucher" },
+    lines: [
+      {
+        ledgerAccountId: debitAccountId,
+        debit: amount,
+        narration: `Commission cost - container ${row.container_number}`,
+      },
+      {
+        ...(payeeSupplierId ? { factorySupplierId: payeeSupplierId } : { ledgerAccountId: Number(payeeAccountId) }),
+        credit: amount,
+        narration: `Commission payable - container ${row.container_number}`,
+      },
+    ],
+  });
   return { voucherId: voucher.id, source };
 }

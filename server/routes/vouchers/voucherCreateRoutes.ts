@@ -14,12 +14,18 @@ import {
 } from "../_helpers";
 import { triggerIntercompanyNotifications } from "../intercompanyNotificationRoutes";
 import { autoReallocateLoansAccounts } from "../../lib/transporterAllocation";
-import { vouchers, voucherEntries, customers, type InsertVoucher } from "@shared/schema";
+import { customers, type InsertVoucher } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 
 import Decimal from "decimal.js";
 import { normalizeVoucherEntryAmounts } from "../../services/accounting/currencyAmounts";
 import { PostingValidationError } from "../../services/accounting/centralPostingEngine";
+import type { VoucherEntryInsertFields } from "../../services/accounting/accountingTypes";
+import {
+  erpRequestSourceId,
+  postManualVoucherTx,
+  sessionPostingActor,
+} from "../../services/accounting/erpVoucherPosting";
 import { stockVoucherTypeRefusal } from "../../services/accounting/stockVoucherTypes";
 import {
   validateManualVoucherEntryAmounts,
@@ -164,6 +170,7 @@ export function registerVoucherCreateRoutes(app: Express) {
         throw validationError;
       }
 
+      const idempotencyHeader = String(req.get("X-Idempotency-Key") ?? "").trim();
       // Get current exchange rate before starting the transaction
       const exchangeRate = await getCurrentExchangeRate(req.session.currentCompanyId!);
 
@@ -180,25 +187,13 @@ export function registerVoucherCreateRoutes(app: Express) {
       // Create voucher + all entries atomically inside a single transaction.
       // Any thrown error automatically rolls back both the voucher row and
       // all entry rows — no manual cleanup required.
+      // Phase 22 (B): an active voucher posts through the central engine (number
+      // allocated there, identity = the X-Idempotency-Key header or the form's
+      // display number); an optional one (off-ledger, may be unbalanced) keeps
+      // the direct insert with an allocated number.
+      const isOptional = voucher.optional === true;
       const { createdVoucher, createdEntries } = await db.transaction(async (tx) => {
-        const [txVoucher] = await tx
-          .insert(vouchers)
-          .values({
-            companyId: req.session.currentCompanyId!,
-            locationId: voucher.locationId || null,
-            voucherNumber: voucher.voucherNumber,
-            voucherType: voucher.voucherType,
-            voucherDate: voucher.voucherDate,
-            description: voucher.description || null,
-            totalAmount: Decimal.max(validatedTotals.debitTotal, validatedTotals.creditTotal).toFixed(2),
-            optional: voucher.optional ?? false,
-            currency: voucherCurrency,
-            exchangeRate: voucherHistoricalRate,
-          })
-          .returning();
-
-        const txEntries: (typeof voucherEntries.$inferSelect)[] = [];
-
+        const builtEntries: VoucherEntryInsertFields[] = [];
         // Create voucher entries
         for (const entry of entries) {
           // Cross-field validation: when an entry references a customer/
@@ -283,25 +278,41 @@ export function registerVoucherCreateRoutes(app: Express) {
             };
           }
 
-          const [txEntry] = await tx
-            .insert(voucherEntries)
-            .values({
-              voucherId: txVoucher.id,
-              ledgerAccountId,
-              bankAccountId: entry.bankAccountId || null,
-              fixedAssetId: entry.fixedAssetId || null,
-              supplierId: entry.supplierId || null,
-              employeeId: entry.employeeId || null,
-              customerId: entry.customerId || null,
-              factorySupplierId: entry.factorySupplierId || null,
-              debitAmount: entry.debitAmount || "0",
-              creditAmount: entry.creditAmount || "0",
-              narration: entry.narration || null,
-              ...dualCurrencyFields,
-            })
-            .returning();
-          txEntries.push(txEntry);
+          builtEntries.push({
+            ledgerAccountId,
+            bankAccountId: entry.bankAccountId || null,
+            fixedAssetId: entry.fixedAssetId || null,
+            supplierId: entry.supplierId || null,
+            employeeId: entry.employeeId || null,
+            customerId: entry.customerId || null,
+            factorySupplierId: entry.factorySupplierId || null,
+            debitAmount: entry.debitAmount || "0",
+            creditAmount: entry.creditAmount || "0",
+            narration: entry.narration || null,
+            ...dualCurrencyFields,
+          });
         }
+
+        const posted = await postManualVoucherTx(tx, {
+          companyId: req.session.currentCompanyId!,
+          locationId: voucher.locationId || null,
+          voucherType: voucher.voucherType,
+          voucherDate: voucher.voucherDate,
+          description: voucher.description || null,
+          currency: voucherCurrency,
+          exchangeRate: voucherHistoricalRate,
+          optional: isOptional,
+          optionalTotalAmount: Decimal.max(validatedTotals.debitTotal, validatedTotals.creditTotal).toFixed(2),
+          entries: builtEntries,
+          source: {
+            type: "manual-voucher",
+            id: `${req.session.currentCompanyId}:${idempotencyHeader || String(voucher.voucherNumber ?? "") || erpRequestSourceId(req)}`,
+          },
+          actor: sessionPostingActor(req, "Voucher with entries"),
+        });
+        if (posted.replayed) return { createdVoucher: posted.voucher, createdEntries: posted.entries };
+        const txVoucher = posted.voucher;
+        const txEntries = posted.entries;
 
         // Sync employee balances from voucher entries (only for non-optional
         // vouchers), in this transaction (wave 12).

@@ -8,10 +8,15 @@ import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../../lib/httpHandlers";
 import { db } from "../../../../db";
 import { requireAuth } from "../../../../auth";
-import { ledgerAccounts, voucherEntries, employees, vouchers } from "@shared/schema";
+import { ledgerAccounts, employees } from "@shared/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import type Decimal from "decimal.js";
 import { parseMoneyInput, sumMoney, toMoney } from "../../../../lib/money";
+import {
+  factoryRequestSourceId,
+  factorySessionActor,
+  postFactoryVoucherTx,
+} from "../../../../services/factory/factoryVoucherPosting";
 
 export function registerFactoryEmployeeBulkWithdrawRoutes(app: Express) {
   // POST /api/factory/employees/bulk-withdraw — withdraw from multiple employees at once
@@ -60,29 +65,35 @@ export function registerFactoryEmployeeBulkWithdrawRoutes(app: Express) {
       if (!cashAccount) return res.status(404).json({ message: "Cash account not found" });
 
       const totalAmount = sumMoney(validWithdrawals.map((w) => w.exactAmount));
-      const voucherNumber = `EMP-WD-BULK-${Date.now()}`;
 
       const { bulkVoucher, results } = await db.transaction(async (tx) => {
-        const [bulkVoucher] = await tx
-          .insert(vouchers)
-          .values({
-            companyId,
-            voucherNumber,
-            voucherType: "Journal",
-            voucherDate: date,
-            description: notes || `Bulk withdrawal - ${validWithdrawals.length} employees`,
-            totalAmount: totalAmount.toFixed(2),
-          })
-          .returning();
-
-        // CR: Cash (total)
-        await tx.insert(voucherEntries).values({
-          voucherId: bulkVoucher.id,
-          ledgerAccountId: cashAccount.id,
-          debitAmount: "0",
-          creditAmount: totalAmount.toFixed(2),
-          narration: notes || `Bulk withdrawal - ${validWithdrawals.length} employees - ${voucherNumber}`,
+        // Phase 22 (C): through the engine, engine-numbered (was
+        // EMP-WD-BULK-{Date.now()}), with the request's identity. CR Cash (total) /
+        // DR each employee.
+        const { voucher: bulkVoucher, replayed } = await postFactoryVoucherTx(tx, {
+          companyId,
+          voucherDate: date,
+          description: notes || `Bulk withdrawal - ${validWithdrawals.length} employees`,
+          sourceModule: "ERP",
+          source: { sourceType: "factory-bulk-withdrawal", sourceId: factoryRequestSourceId(req), phase: "voucher" },
+          actor: factorySessionActor(req),
+          lines: [
+            {
+              ledgerAccountId: cashAccount.id,
+              credit: totalAmount,
+              narration: notes || `Bulk withdrawal - ${validWithdrawals.length} employees`,
+            },
+            ...validWithdrawals.map((wd) => {
+              const emp = employeeById.get(parseInt(wd.employeeId))!;
+              return {
+                employeeId: parseInt(wd.employeeId),
+                debit: wd.exactAmount,
+                narration: wd.notes || `Withdrawal for ${emp.firstName} ${emp.lastName}`,
+              };
+            }),
+          ],
         });
+        if (replayed) return { bulkVoucher, results: [] };
 
         const results = [];
         for (const wd of validWithdrawals) {
@@ -97,16 +108,6 @@ export function registerFactoryEmployeeBulkWithdrawRoutes(app: Express) {
             .from(employees)
             .where(and(eq(employees.id, empId), eq(employees.companyId, companyId)));
           const emp = fresh ?? employeeById.get(empId)!;
-
-          // DR: Employee
-          await tx.insert(voucherEntries).values({
-            voucherId: bulkVoucher.id,
-            ledgerAccountId: null,
-            employeeId: empId,
-            debitAmount: amount.toFixed(2),
-            creditAmount: "0",
-            narration: wd.notes || `Withdrawal for ${emp.firstName} ${emp.lastName} - ${voucherNumber}`,
-          });
 
           const newBalance = toMoney(emp.currentBalance).minus(amount);
           const newWithdrawals = toMoney(emp.totalWithdrawals).plus(amount);

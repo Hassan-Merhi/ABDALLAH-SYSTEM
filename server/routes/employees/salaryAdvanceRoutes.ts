@@ -20,6 +20,12 @@ import type Decimal from "decimal.js";
 import { MoneyDecimal, toMoney } from "../../lib/money";
 import { writeAuditEvent } from "../../services/audit";
 import { writeVoucherAuditTx } from "../helpers/voucherAuditTrail";
+import {
+  erpRequestSourceId,
+  pairLines,
+  postErpVoucherTx,
+  sessionPostingActor,
+} from "../../services/accounting/erpVoucherPosting";
 
 /** An advance is paid off only when nothing is left at cents. */
 function isPaidOff(remaining: Decimal): boolean {
@@ -84,39 +90,31 @@ export function registerSalaryAdvanceRoutes(app: Express): void {
           entries: (typeof voucherEntries.$inferSelect)[];
         } | null = null;
         if (cashAccountId) {
-          const voucherNumber = `SA-${Date.now()}`;
-          const [voucher] = await tx
-            .insert(vouchers)
-            .values({
-              companyId,
-              voucherNumber,
-              voucherType: "Payment",
-              voucherDate: parsed.advanceDate,
-              description: parsed.notes || `Salary advance for ${employee.firstName} ${employee.lastName}`,
-              totalAmount: parsed.amount,
-            })
-            .returning();
+          // Phase 22 (B): Dr employee / Cr cash through the central engine.
+          const posted = await postErpVoucherTx(tx, {
+            companyId,
+            voucherType: "Payment",
+            voucherDate: parsed.advanceDate,
+            description: parsed.notes || `Salary advance for ${employee.firstName} ${employee.lastName}`,
+            lines: pairLines(
+              { employeeId: employee.id },
+              { ledgerAccountId: cashAccountId },
+              parsed.amount,
+              "Salary advance"
+            ),
+            source: { type: "salary-advance", id: `${employee.id}:${erpRequestSourceId(req)}` },
+            actor: sessionPostingActor(req, "Salary advance"),
+          });
+          const { voucher, entries } = posted;
           voucherId = voucher.id;
-          const entries = await tx
-            .insert(voucherEntries)
-            .values([
-              {
-                voucherId: voucher.id,
-                ledgerAccountId: null,
-                employeeId: employee.id,
-                debitAmount: parsed.amount,
-                creditAmount: "0",
-                narration: `Salary advance - ${voucherNumber}`,
-              },
-              {
-                voucherId: voucher.id,
-                ledgerAccountId: cashAccountId,
-                debitAmount: "0",
-                creditAmount: parsed.amount,
-                narration: `Salary advance - ${voucherNumber}`,
-              },
-            ])
-            .returning();
+          if (posted.replayed) {
+            // A resent request: the advance it created is returned, not added again.
+            const [existing] = await tx
+              .select()
+              .from(salaryAdvances)
+              .where(and(eq(salaryAdvances.companyId, companyId), eq(salaryAdvances.voucherId, voucher.id)));
+            if (existing) return existing;
+          }
           auditVoucher = { voucher, entries };
         }
 

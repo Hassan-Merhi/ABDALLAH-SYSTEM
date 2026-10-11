@@ -463,10 +463,13 @@ describe("atomic writers", () => {
         [ctx.companyId, destCompanyId]
       )
     ).toBe(1);
+    // Phase 22 (B): both legs are numbered by the engine; the link names them.
     expect(
-      await count(`SELECT COUNT(*) AS n FROM vouchers WHERE company_id = $1 AND voucher_number LIKE 'TR-IN-%'`, [
-        destCompanyId,
-      ])
+      await count(
+        `SELECT COUNT(*) AS n FROM vouchers v JOIN inter_company_transfers ict ON ict.to_voucher_id = v.id
+          WHERE v.company_id = $1 AND v.deleted_at IS NULL`,
+        [destCompanyId]
+      )
     ).toBe(1);
   }, 60_000);
 

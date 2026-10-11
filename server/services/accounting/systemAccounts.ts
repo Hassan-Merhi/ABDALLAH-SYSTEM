@@ -52,6 +52,16 @@ export const SYSTEM_ACCOUNTS: readonly SystemAccountDefinition[] = [
     required: true,
     purpose: "Counterpart of opening balances entered without an explicit contra account.",
   },
+  // Phase 22 A, D3 (owner decision): the central posting engine posts the
+  // base-currency remainder of per-line conversion here, so every voucher
+  // balances exactly (services/accounting/engineRounding.ts).
+  {
+    code: "ROUNDING",
+    name: "Rounding Differences",
+    accountType: "Indirect Expense",
+    required: true,
+    purpose: "Base-currency rounding remainder of vouchers converted line by line (a credit balance is a gain).",
+  },
   {
     code: "PURCHASES",
     name: "Purchases",

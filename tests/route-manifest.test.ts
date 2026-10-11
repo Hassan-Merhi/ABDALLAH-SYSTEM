@@ -187,8 +187,12 @@ describe("route manifest", () => {
 
   // The pool logs as its connections close: settle it before the file ends (a log
   // that lands after teardown fails the shard with EnvironmentTeardownError).
+  // The "remove" log of the last connections is forwarded to the runner
+  // asynchronously, so give that console RPC a moment to drain after end()
+  // (seen intermittently: "Closing rpc while onUserConsoleLog was pending").
   afterAll(async () => {
     await pool.end();
+    await new Promise((resolve) => setTimeout(resolve, 250));
   });
 
   it("has a committed snapshot to compare against", () => {

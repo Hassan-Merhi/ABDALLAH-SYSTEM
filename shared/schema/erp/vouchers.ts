@@ -12,7 +12,11 @@ import {
   index,
   jsonb,
   bigserial,
+  bigint,
+  primaryKey,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { companies, locations } from "../common";
@@ -53,10 +57,44 @@ export const vouchers = pgTable(
     deletedBy: text("deleted_by"),
     /** The number before a retirement renamed it `{number}~DEL{id}`. */
     originalVoucherNumber: varchar("original_voucher_number", { length: 100 }),
+    // Phase 22 (A), PE9: the voucher this one reverses (reverseVoucherTx). At
+    // most one live reversal per original (partial unique index below).
+    // Phase 22 (A), D3: written by the central posting engine, which balances
+    // the voucher exactly (ROUNDING line); the balance guard then allows no
+    // base difference. Set once (the guard's marker trigger refuses clearing it).
+    postedByEngine: boolean("posted_by_engine").notNull().default(false),
+    // NO ACTION (checked at the end of the statement), so a company cleanup
+    // deleting both vouchers in one statement works; the original alone cannot go.
+    reversalOfVoucherId: integer("reversal_of_voucher_id").references((): AnyPgColumn => vouchers.id),
   },
   (t) => ({
     companyIdx: index("vouchers_company_idx").on(t.companyId),
     companyDateIdx: index("vouchers_company_date_idx").on(t.companyId, t.voucherDate),
+    reversalOfUnique: uniqueIndex("vouchers_reversal_of_live_unique")
+      .on(t.reversalOfVoucherId)
+      .where(sql`reversal_of_voucher_id IS NOT NULL AND deleted_at IS NULL`),
+  })
+);
+
+/**
+ * Gapless voucher number counters (phase 22 A, PE8/G9): one row per company,
+ * number prefix (voucher type) and year, locked FOR UPDATE by
+ * allocateVoucherNumberTx (server/services/accounting/voucherNumbering.ts).
+ * Also created at boot by ensureRuntimeSchema.
+ */
+export const voucherNumberSequences = pgTable(
+  "voucher_number_sequences",
+  {
+    companyId: integer("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    prefix: varchar("prefix", { length: 20 }).notNull(),
+    year: integer("year").notNull(),
+    lastValue: bigint("last_value", { mode: "number" }).notNull().default(0),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.companyId, t.prefix, t.year] }),
   })
 );
 
@@ -68,6 +106,8 @@ export const insertVoucherSchema = createInsertSchema(vouchers)
     updatedBy: true,
     deletedBy: true,
     originalVoucherNumber: true,
+    reversalOfVoucherId: true,
+    postedByEngine: true,
   })
   .extend({
     companyId: z.number().min(1, "Company is required"),

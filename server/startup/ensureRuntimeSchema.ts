@@ -408,6 +408,24 @@ export async function ensureRuntimeSchema(pool: Pool): Promise<void> {
       ADD COLUMN IF NOT EXISTS deleted_by TEXT,
       ADD COLUMN IF NOT EXISTS original_voucher_number VARCHAR(100);
 
+    -- Phase 22 (A), PE8/G9/PE9 (migrations/20261010_002): gapless voucher
+    -- number counters and the reversal link (services/accounting/voucherNumbering.ts,
+    -- voucherCorrection.ts).
+    CREATE TABLE IF NOT EXISTS voucher_number_sequences (
+      company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      prefix VARCHAR(20) NOT NULL,
+      year INTEGER NOT NULL,
+      last_value BIGINT NOT NULL DEFAULT 0,
+      updated_at TIMESTAMP NOT NULL DEFAULT now(),
+      CONSTRAINT voucher_number_sequences_company_id_prefix_year_pk PRIMARY KEY (company_id, prefix, year)
+    );
+    ALTER TABLE vouchers
+      ADD COLUMN IF NOT EXISTS reversal_of_voucher_id INTEGER REFERENCES vouchers(id),
+      ADD COLUMN IF NOT EXISTS posted_by_engine BOOLEAN NOT NULL DEFAULT false;
+    CREATE UNIQUE INDEX IF NOT EXISTS vouchers_reversal_of_live_unique
+      ON vouchers (reversal_of_voucher_id)
+      WHERE reversal_of_voucher_id IS NOT NULL AND deleted_at IS NULL;
+
     -- Phase 21 (A), AT5/AT6: request metadata and the hash chain on audit rows.
     ALTER TABLE audit_log
       ADD COLUMN IF NOT EXISTS request_id TEXT,

@@ -87,6 +87,41 @@ vi.mock("../server/routes/helpers/voucherAuditTrail", () => ({
   writeVoucherAuditTx: harness.writeVoucherAuditTx,
   readVoucherAuditState: harness.readVoucherAuditState,
 }));
+// Phase 22 (B): the route posts through postManualVoucherTx (the engine for an
+// active journal, a numbered direct insert for an optional one). Here it is
+// replaced by the direct insert on the test transaction, so the route's own
+// line building, balance sync, audit and daybook behaviour stay observable.
+vi.mock("../server/services/accounting/erpVoucherPosting", () => ({
+  erpRequestSourceId: () => "once-test",
+  sessionPostingActor: () => ({}),
+  postManualVoucherTx: async (tx: any, input: any) => {
+    const [voucher] = await tx
+      .insert(harness.tables.vouchers)
+      .values({
+        companyId: input.companyId,
+        voucherType: input.voucherType,
+        voucherDate: input.voucherDate,
+        description: input.description,
+        totalAmount: input.optionalTotalAmount,
+        optional: input.optional,
+        currency: input.currency,
+        exchangeRate: input.exchangeRate,
+        effectiveDate: input.effectiveDate,
+      })
+      .returning();
+    const entries = await tx
+      .insert(harness.tables.voucherEntries)
+      .values(input.entries.map((entry: any) => ({ voucherId: voucher.id, ...entry })))
+      .returning();
+    return { voucher, entries, replayed: false };
+  },
+}));
+vi.mock("../server/services/accounting/voucherCorrection", () => ({
+  assertVoucherEditableTx: async () => ({ before: { voucher: null, entries: [] } }),
+  recordVoucherEditAuditTx: async () => ({ voucher: null, entries: [] }),
+  sendVoucherCorrectionRefusal: () => false,
+}));
+vi.mock("../server/services/accounting/engineRounding", () => ({ rebalanceVoucherRoundingTx: async () => "0.00" }));
 vi.mock("../server/routes/factoryWhatsappRoutes", () => ({
   checkAccountWhatsAppRule: harness.checkAccountWhatsAppRule,
 }));

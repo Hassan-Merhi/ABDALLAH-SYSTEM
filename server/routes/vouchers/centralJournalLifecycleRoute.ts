@@ -4,7 +4,6 @@ import {
   customerBalances,
   customerOrderCharges,
   customerOrders,
-  factoryDaybookEntries,
   interCompanyTransfers,
   intercompanyPaymentRequests,
   propertyPayments,
@@ -29,10 +28,16 @@ import { buildManualJournalPostingRequest } from "../../services/accounting/manu
 import { softDeleteInterCompanyCounterpartTx } from "../voucher-entries/delete";
 import { recalculateOrderTotals } from "../factory/_helpers";
 import { checkAccountWhatsAppRule } from "../factoryWhatsappRoutes";
-import { readVoucherAuditState, writeVoucherAuditTx } from "../helpers/voucherAuditTrail";
-import { allocateCents, sumMoney, toMoney } from "../../lib/money";
+import { writeVoucherAuditTx } from "../helpers/voucherAuditTrail";
+import { findIntercompanyCounterpart, syncIntercompanyCounterpartTx } from "./intercompanyCounterpartRescale";
+import {
+  assertVoucherEditableTx,
+  recordVoucherEditAuditTx,
+  sendVoucherCorrectionRefusal,
+} from "../../services/accounting/voucherCorrection";
+import { rebalanceVoucherRoundingTx } from "../../services/accounting/engineRounding";
+import { toMoney } from "../../lib/money";
 import { getAccessibleCompanyIds } from "../../security/companyAccessBoundary";
-import type Decimal from "decimal.js";
 
 const postingDependencies = createDatabasePostingDependencies();
 
@@ -190,167 +195,11 @@ async function syncJournalToOrderChargeTx(
   }
 }
 
-export const INTERCOMPANY_COUNTERPART_MIXED_CURRENCY_MESSAGE =
-  "The intercompany counterpart voucher has lines in more than one currency or rate, so this edit cannot rescale it. Delete the journal and post the transfer again instead.";
-export const INTERCOMPANY_COUNTERPART_ZERO_TOTAL_MESSAGE =
-  "The journal had a zero total, so its intercompany counterpart cannot be rescaled. Delete the journal and post the transfer again instead.";
-
-class CounterpartSyncRefused extends HttpError {
-  constructor(message: string) {
-    super(409, message);
-  }
-}
-
-/** The intercompany transfer naming the voucher and the other company, when there is one. */
-async function findIntercompanyCounterpart(
-  voucherId: number,
-  companyId: number
-): Promise<{ otherVoucherId: number; otherCompanyId: number } | null> {
-  const [transfer] = await db
-    .select()
-    .from(interCompanyTransfers)
-    .where(or(eq(interCompanyTransfers.fromVoucherId, voucherId), eq(interCompanyTransfers.toVoucherId, voucherId)))
-    .limit(1);
-  if (!transfer) return null;
-  const isSource = transfer.fromVoucherId === voucherId;
-  const otherVoucherId = isSource ? transfer.toVoucherId : transfer.fromVoucherId;
-  const ownCompanyId = isSource ? transfer.fromCompanyId : transfer.toCompanyId;
-  if (!otherVoucherId || otherVoucherId === voucherId || ownCompanyId !== companyId) return null;
-  return { otherVoucherId, otherCompanyId: isSource ? transfer.toCompanyId : transfer.fromCompanyId };
-}
-
-/** Base amount of a transaction amount under the line's stored rate (as the currency trigger computes it). */
-function baseOf(amount: Decimal, convention: string | null, rate: string | null): Decimal {
-  if (!convention || convention === "IDENTITY") return amount;
-  const exactRate = toMoney(rate);
-  if (!exactRate.gt(0)) throw new Error("Counterpart line has no positive historical rate");
-  const base = convention === "BASE_PER_TRANSACTION" ? amount.times(exactRate) : amount.dividedBy(exactRate);
-  return base.toDecimalPlaces(6);
-}
-
-/**
- * Wave 18 (B): the intercompany counterpart follows a journal edit inside the
- * edit's transaction (a failure rolls the edit back; nothing is swallowed).
- * Its lines are rescaled by the same ratio as the edited journal (new total /
- * old total) in their own transaction currency, each side allocated to the
- * exact cent so the voucher still balances; a normalized line gets its
- * transaction_* and base amounts written together at its stored rate, so the
- * currency trigger v2 accepts it. A counterpart with lines in several
- * currencies or rates is refused (409).
- */
-async function syncIntercompanyCounterpartTx(
-  tx: DbTransaction,
-  params: {
-    voucherId: number;
-    otherVoucherId: number;
-    otherCompanyId: number;
-    oldTotal: string | null;
-    newTotal: string | null;
-    actor: { userId?: string | null; username?: string | null };
-  }
-): Promise<void> {
-  const { voucherId, otherVoucherId } = params;
-  const oldTotal = toMoney(params.oldTotal);
-  const newTotal = toMoney(params.newTotal);
-  if (oldTotal.equals(newTotal)) return;
-  if (!oldTotal.gt(0)) throw new CounterpartSyncRefused(INTERCOMPANY_COUNTERPART_ZERO_TOTAL_MESSAGE);
-
-  await tx.execute(
-    sql`SELECT id FROM vouchers WHERE id = ${otherVoucherId} AND company_id = ${params.otherCompanyId} FOR UPDATE`
-  );
-  const [otherVoucher] = await tx
-    .select()
-    .from(vouchers)
-    .where(and(eq(vouchers.id, otherVoucherId), eq(vouchers.companyId, params.otherCompanyId)));
-  if (!otherVoucher || otherVoucher.deletedAt) return;
-
-  const otherEntries = await tx.select().from(voucherEntries).where(eq(voucherEntries.voucherId, otherVoucherId));
-  const shapes = new Set(
-    otherEntries.map((entry) =>
-      entry.transactionCurrency
-        ? `${entry.transactionCurrency}|${entry.rateConvention ?? ""}|${toMoney(entry.historicalExchangeRate).toFixed()}`
-        : "legacy"
-    )
-  );
-  if (shapes.size > 1) throw new CounterpartSyncRefused(INTERCOMPANY_COUNTERPART_MIXED_CURRENCY_MESSAGE);
-
-  const txDebit = (entry: (typeof otherEntries)[number]) =>
-    toMoney(entry.transactionCurrency ? entry.transactionDebitAmount : entry.debitAmount);
-  const txCredit = (entry: (typeof otherEntries)[number]) =>
-    toMoney(entry.transactionCurrency ? entry.transactionCreditAmount : entry.creditAmount);
-  const debitLines = otherEntries.filter((entry) => txDebit(entry).gt(0));
-  const creditLines = otherEntries.filter((entry) => txCredit(entry).gt(0));
-  const oldSideTotal = sumMoney(debitLines.map(txDebit));
-  const newSideTotal = oldSideTotal.times(newTotal).dividedBy(oldTotal).toDecimalPlaces(2);
-  // Each side to the same exact total, so the voucher balances in its own currency.
-  const newDebits = allocateCents(debitLines.map(txDebit), newSideTotal);
-  const newCredits = allocateCents(creditLines.map(txCredit), newSideTotal);
-
-  const auditBefore = await readVoucherAuditState(tx, otherVoucherId);
-  let newBaseTotal = toMoney(0);
-  const writeLine = async (entry: (typeof otherEntries)[number], amount: Decimal, side: "debit" | "credit") => {
-    if (!entry.transactionCurrency) {
-      // Legacy line (no transaction amounts): the base column is the amount.
-      newBaseTotal = side === "debit" ? newBaseTotal.plus(amount) : newBaseTotal;
-      await tx
-        .update(voucherEntries)
-        .set(side === "debit" ? { debitAmount: amount.toFixed(2) } : { creditAmount: amount.toFixed(2) })
-        .where(eq(voucherEntries.id, entry.id));
-      return;
-    }
-    const base = baseOf(amount, entry.rateConvention, entry.historicalExchangeRate);
-    if (side === "debit") newBaseTotal = newBaseTotal.plus(base);
-    const transaction = amount.toFixed(6);
-    const baseText = base.toFixed(6);
-    await tx
-      .update(voucherEntries)
-      .set(
-        side === "debit"
-          ? {
-              transactionDebitAmount: transaction,
-              transactionCreditAmount: "0.000000",
-              baseDebitAmount: baseText,
-              baseCreditAmount: "0.000000",
-              debitAmount: baseText,
-              creditAmount: "0",
-            }
-          : {
-              transactionDebitAmount: "0.000000",
-              transactionCreditAmount: transaction,
-              baseDebitAmount: "0.000000",
-              baseCreditAmount: baseText,
-              debitAmount: "0",
-              creditAmount: baseText,
-            }
-      )
-      .where(eq(voucherEntries.id, entry.id));
-  };
-  for (const [index, entry] of debitLines.entries()) await writeLine(entry, newDebits[index], "debit");
-  for (const [index, entry] of creditLines.entries()) await writeLine(entry, newCredits[index], "credit");
-
-  await tx
-    .update(vouchers)
-    .set({ totalAmount: newBaseTotal.toFixed(6) })
-    .where(eq(vouchers.id, otherVoucherId));
-  await tx
-    .update(factoryDaybookEntries)
-    .set({ amountCurrency: newSideTotal.toFixed(2), amountUsd: newBaseTotal.toFixed(2) })
-    .where(
-      and(eq(factoryDaybookEntries.referenceTable, "vouchers"), eq(factoryDaybookEntries.referenceId, otherVoucherId))
-    );
-  // Wave 12: the counterpart's rescaled lines are audited under its own company, in this transaction.
-  await writeVoucherAuditTx(tx, {
-    actor: { ...params.actor, companyId: otherVoucher.companyId },
-    action: "update",
-    voucherId: otherVoucherId,
-    before: auditBefore,
-    after: await readVoucherAuditState(tx, otherVoucherId),
-    extra: {
-      interCompanyCounterpartOf: { new: { voucherId } },
-      rescale: { old: oldTotal.toFixed(), new: newTotal.toFixed() },
-    },
-  });
-}
+// Phase 22 (B), D8: the counterpart rescale lives in intercompanyCounterpartRescale.ts.
+export {
+  INTERCOMPANY_COUNTERPART_MIXED_CURRENCY_MESSAGE,
+  INTERCOMPANY_COUNTERPART_ZERO_TOTAL_MESSAGE,
+} from "./intercompanyCounterpartRescale";
 
 async function updateActiveJournal(req: Request, res: Response, next: NextFunction): Promise<void> {
   const startedAt = Date.now();
@@ -468,9 +317,15 @@ async function updateActiveJournal(req: Request, res: Response, next: NextFuncti
         if (lockedVoucher.optional) {
           throw new Error("Optional journal transitions must use the compatibility route");
         }
+        // Phase 22 A (correction policy): open period only (409
+        // VOUCHER_CLOSED_PERIOD_REVERSE_INSTEAD otherwise); a reversed journal is not edited.
+        const editContext = await assertVoucherEditableTx(tx, voucherId, {
+          companyId,
+          newVoucherDate: built.request.voucher.voucherDate,
+          newEffectiveDate: built.request.voucher.effectiveDate ?? null,
+        });
 
         const oldEntries = await tx.select().from(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
-        const auditBefore = { voucher: lockedVoucher, entries: oldEntries };
 
         await postingDependencies.ownership.validateVoucherOwnership({
           tx,
@@ -502,7 +357,7 @@ async function updateActiveJournal(req: Request, res: Response, next: NextFuncti
           .returning();
 
         await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
-        const createdEntries = await tx
+        const insertedEntries = await tx
           .insert(voucherEntries)
           .values(built.request.entries.map((entry) => ({ voucherId, ...entry })))
           .returning();
@@ -510,30 +365,34 @@ async function updateActiveJournal(req: Request, res: Response, next: NextFuncti
         await applyEmployeeBalanceDeltasTx({
           tx,
           companyId,
-          entries: createdEntries,
+          entries: insertedEntries,
           direction: "apply",
           missingEmployeeBehavior: "throw",
         });
 
-        // Wave 12 (decision 2): full before/after snapshot in this transaction; a
+        // Phase 22 A (D3): an engine journal balances exactly; the rounding
+        // remainder of the new lines goes to its ROUNDING line.
+        await rebalanceVoucherRoundingTx(tx, { companyId, voucherId });
+
+        // Wave 12 / phase 22 A: full before/after snapshot in this transaction; a
         // failed audit write refuses the edit.
-        await writeVoucherAuditTx(tx, {
-          actor: { userId, username: req.session.username, companyId },
-          action: "update",
+        const audited = await recordVoucherEditAuditTx(tx, {
           voucherId,
-          before: auditBefore,
-          after: { voucher: updatedVoucher, entries: createdEntries },
+          before: editContext.before,
+          actor: { userId, username: req.session.username, companyId },
+          reason: "Manual journal update",
         });
+        const createdEntries = audited.entries;
 
         const actor = { userId, username: req.session.username };
         await syncJournalToOrderChargeTx(tx, companyId, createdEntries, updatedVoucher.id, actor);
         if (counterpart) {
           await syncIntercompanyCounterpartTx(tx, {
             voucherId,
-            otherVoucherId: counterpart.otherVoucherId,
-            otherCompanyId: counterpart.otherCompanyId,
+            counterpart,
             oldTotal: lockedVoucher.totalAmount,
             newTotal: updatedVoucher.totalAmount,
+            newVoucherDate: updatedVoucher.voucherDate,
             actor,
           });
         }
@@ -601,6 +460,7 @@ async function updateActiveJournal(req: Request, res: Response, next: NextFuncti
       durationMs: Date.now() - startedAt,
       error,
     });
+    if (sendVoucherCorrectionRefusal(res, error)) return;
     res.status(errorStatus(error)).json({ message: getErrorMessage(error) });
   }
 }
@@ -654,6 +514,8 @@ async function deleteActiveJournal(req: Request, res: Response, next: NextFuncti
       if (lockedVoucher.deletedAt) {
         return { replayed: true, voucher: lockedVoucher, entries: [] };
       }
+      // Phase 22 A: not in a closed period (reverse instead); not an original with a live reversal.
+      await assertVoucherEditableTx(tx, voucherId, { companyId, purpose: "delete" });
 
       const entries = await tx.select().from(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
       await applyEmployeeBalanceDeltasTx({
@@ -731,6 +593,7 @@ async function deleteActiveJournal(req: Request, res: Response, next: NextFuncti
       voucherId,
       error,
     });
+    if (sendVoucherCorrectionRefusal(res, error)) return;
     res.status(errorStatus(error)).json({ message: getErrorMessage(error) });
   }
 }

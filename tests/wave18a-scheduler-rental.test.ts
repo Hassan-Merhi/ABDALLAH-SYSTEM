@@ -112,6 +112,19 @@ const vouchersLike = async (pattern: string) =>
     )
   ).rows;
 
+// Phase 22 (B): a recurring journal's number is allocated by the engine; its
+// voucher is found by its posting identity (recurring-journal:<id>:<date>).
+const recurringVouchers = async (recurringId: number) =>
+  (
+    await pool.query<{ id: number; voucher_number: string; voucher_date: string; total_amount: string }>(
+      `SELECT v.id, v.voucher_number, v.voucher_date::text AS voucher_date, v.total_amount::text AS total_amount
+         FROM vouchers v JOIN accounting_posting_requests apr ON apr.voucher_id = v.id
+        WHERE v.company_id = $1 AND apr.source_type = 'recurring-journal' AND apr.source_id LIKE $2
+          AND v.deleted_at IS NULL ORDER BY v.id`,
+      [ctx.companyId, `${recurringId}:%`]
+    )
+  ).rows;
+
 beforeAll(async () => {
   ctx = await seedTestData(TEST_PREFIX);
   await pool.query(`UPDATE user_company_roles SET role = 'Owner' WHERE user_id = $1 AND company_id = $2`, [
@@ -182,7 +195,7 @@ describe("scheduled posters run in tenant scope and skip closed periods", () => 
     const skipped = await asScheduler(() => runRecurringJournal(due));
     expect(skipped.posted).toBe(false);
     expect(skipped.skipped).toMatchObject({ reference: `recurring-journal:${recurring.id}`, reason: "PERIOD_CLOSED" });
-    expect(await vouchersLike(`RJ-${recurring.id}-%`)).toEqual([]);
+    expect(await recurringVouchers(recurring.id)).toEqual([]);
     const { rows: held } = await pool.query(
       `SELECT next_run_date::text AS next_run_date, last_error FROM recurring_journals WHERE id = $1`,
       [recurring.id]
@@ -193,8 +206,10 @@ describe("scheduled posters run in tenant scope and skip closed periods", () => 
     await reopenBooks();
     const posted = await asScheduler(() => runRecurringJournal(due));
     expect(posted.posted).toBe(true);
-    const rj = await vouchersLike(`RJ-${recurring.id}-%`);
+    const rj = await recurringVouchers(recurring.id);
     expect(rj).toHaveLength(1);
+    expect(rj[0].voucher_number).toMatch(/^JV-\d+-\d{4}-\d{6}$/);
+    expect(rj[0].voucher_number.startsWith(`JV-${ctx.companyId}-`)).toBe(true);
     expect(rj[0]).toMatchObject({ voucher_date: closureDate, total_amount: "25.00" });
     const { rows: audit } = await pool.query(
       `SELECT changes FROM audit_log WHERE company_id = $1 AND table_name = 'recurring_journals' AND record_id = $2`,
@@ -362,7 +377,13 @@ describe("rental units GET only reads; post due accruals now posts and audits", 
     );
     expect(scheduled[0].posting_status).toBe("SCHEDULED");
 
-    const accruals = await vouchersLike("ACCR-RENT-%");
+    // Phase 22 (B): the accrual is numbered by the engine; found by its posting identity.
+    const { rows: accruals } = await pool.query<{ id: number; voucher_date: string }>(
+      `SELECT v.id, v.voucher_date::text AS voucher_date FROM vouchers v
+         JOIN accounting_posting_requests apr ON apr.voucher_id = v.id
+        WHERE v.company_id = $1 AND apr.source_type = 'rental-accrual' AND v.deleted_at IS NULL ORDER BY v.id`,
+      [ctx.companyId]
+    );
     expect(accruals.length).toBeGreaterThan(0);
     for (const voucher of accruals) expect(voucher.voucher_date).toBe(today);
     const { rows: audit } = await pool.query(

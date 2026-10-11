@@ -146,7 +146,6 @@ async function createCentralPaymentReceipt(req: Request, res: Response, next: Ne
     const result = await db.transaction(async (tx) => {
       const built = await buildPaymentReceiptPostingRequest({
         companyId,
-        voucherNumber: `${String(body.voucherType).toUpperCase()}-${Date.now()}`,
         voucherType: body.voucherType,
         voucherDate: body.voucherDate,
         paymentAccountType: body.paymentAccountType,

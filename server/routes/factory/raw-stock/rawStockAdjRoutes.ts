@@ -13,7 +13,6 @@ import {
   factoryRawStock,
   factoryMixBatches,
   factoryMixBatchSources,
-  voucherEntries,
   factoryDaybookEntries,
   factoryRawMaterialAdjustments,
   vouchers,
@@ -21,7 +20,7 @@ import {
 import { eq, and, desc, sql, inArray, ilike, isNull } from "drizzle-orm";
 import type Decimal from "decimal.js";
 import { MoneyDecimal, moneyString, parseMoneyInput, toMoney } from "../../../lib/money";
-import { normFactoryEntry } from "../../../services/factory/factoryVoucherEntryAmounts";
+import { postFactoryVoucherTx } from "../../../services/factory/factoryVoucherPosting";
 import { FactoryFxRateRequiredError, factoryDocumentRate } from "../../../services/factory/factoryDocumentFxRate";
 import { syncContainerCommissionJournalTx } from "../../../services/factory/containerCommissionJournal";
 import { retireVouchersTx, sessionRetirementActor } from "../../../services/accounting/voucherRetirement";
@@ -335,36 +334,31 @@ export function registerRawStockAdjRoutes(app: Express) {
             .limit(1);
           const supplierName = sup?.name || `Supplier #${resolvedSupplierId}`;
 
-          const voucherNum = `FACTORY-MANUAL-${inserted.id}-${Date.now()}`;
-          const [voucher] = await tx
-            .insert(vouchers)
-            .values({
-              companyId,
-              voucherType: "Journal",
-              voucherNumber: voucherNum,
-              voucherDate: date,
-              description: `Manual raw material purchase: ${kgNum} kg @ ${costNum}/${ccy} — ${supplierName}`,
-              totalAmount: moneyString(totalAmount),
-              currency: ccy,
-              exchangeRate: fxRate,
-              sourceModule: "FACTORY",
-            })
-            .returning();
-
-          // Dr Raw Material Stock (both legs normalized at the purchase's rate, wave 6)
-          await tx.insert(voucherEntries).values({
-            voucherId: voucher.id,
-            ledgerAccountId: rawMaterialAcctId,
-            ...normFactoryEntry(ccy, moneyString(totalAmount), "0", fxRate),
-            narration: `Raw material stock — ${kgNum} kg from ${supplierName}`,
-          });
-
-          // Cr Supplier
-          await tx.insert(voucherEntries).values({
-            voucherId: voucher.id,
-            factorySupplierId: resolvedSupplierId,
-            ...normFactoryEntry(ccy, "0", moneyString(totalAmount), fxRate),
-            narration: `Payable to ${supplierName} for raw material`,
+          // Phase 22 (C): through the engine with the adjustment's posting
+          // identity; the FACTORY-MANUAL-{adjustment}- number keeps its prefix with
+          // the posting generation (was Date.now()). Both legs normalized at the
+          // purchase's rate (wave 6): Dr Raw Material Stock / Cr Supplier.
+          const adjustmentId = inserted.id;
+          await postFactoryVoucherTx(tx, {
+            companyId,
+            voucherNumber: (generation) => `FACTORY-MANUAL-${adjustmentId}-${generation}`,
+            voucherDate: date,
+            description: `Manual raw material purchase: ${kgNum} kg @ ${costNum}/${ccy} — ${supplierName}`,
+            currency: ccy,
+            fxRateToUsd: fxRate,
+            source: { sourceType: "factory-raw-material-purchase", sourceId: adjustmentId, phase: "voucher" },
+            lines: [
+              {
+                ledgerAccountId: rawMaterialAcctId,
+                debit: moneyString(totalAmount),
+                narration: `Raw material stock — ${kgNum} kg from ${supplierName}`,
+              },
+              {
+                factorySupplierId: resolvedSupplierId,
+                credit: moneyString(totalAmount),
+                narration: `Payable to ${supplierName} for raw material`,
+              },
+            ],
           });
 
           await writeDaybookEntry(tx, {

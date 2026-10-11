@@ -11,6 +11,12 @@ import type { Express, Request, Response } from "express";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
 import { eq, and, sql, isNull, inArray } from "drizzle-orm";
+import { postErpVoucherTx } from "../../services/accounting/erpVoucherPosting";
+import {
+  assertVoucherEditableTx,
+  recordVoucherEditAuditTx,
+  sendVoucherCorrectionRefusal,
+} from "../../services/accounting/voucherCorrection";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -541,39 +547,23 @@ export function registerAdvanceManagementRoutes(app: Express) {
           }
 
           const amount = toMoney(adv.amount);
-          const voucherNumber = `PAYMENT-ADV-${adv.id}-${Date.now()}`;
+          const voucherNumber = `PAYMENT-ADV-${adv.id}-1`;
           const narration = `Advance to ${adv.workerName}: $${amount.toFixed(2)} (retroactive)`;
 
-          const [createdVoucher] = await tx
-            .insert(vouchers)
-            .values({
-              companyId,
-              voucherNumber,
-              voucherType: "Payment",
-              voucherDate: adv.advanceDate,
-              description: narration,
-              totalAmount: amount.toFixed(2),
-              currency: "USD",
-              sourceModule: "FACTORY",
-            })
-            .returning();
-
-          await tx.insert(voucherEntries).values([
-            {
-              voucherId: createdVoucher.id,
-              ledgerAccountId: advancesAccount.id,
-              debitAmount: amount.toFixed(2),
-              creditAmount: "0",
-              narration,
-            },
-            {
-              voucherId: createdVoucher.id,
-              ledgerAccountId: cashAccountId,
-              debitAmount: "0",
-              creditAmount: amount.toFixed(2),
-              narration,
-            },
-          ]);
+          await postErpVoucherTx(tx, {
+            companyId,
+            voucherNumber,
+            voucherType: "Payment",
+            voucherDate: adv.advanceDate,
+            description: narration,
+            currency: "USD",
+            sourceModule: "FACTORY",
+            lines: [
+              { ledgerAccountId: advancesAccount.id, debit: amount.toFixed(2), narration: narration },
+              { ledgerAccountId: cashAccountId, credit: amount.toFixed(2), narration: narration },
+            ],
+            source: { type: "worker-advance", id: adv.id },
+          });
 
           await tx
             .update(factoryWorkerAdvances)
@@ -700,8 +690,11 @@ export function registerAdvanceManagementRoutes(app: Express) {
           const narration = `Advance to ${workerName}: $${amount.toFixed(2)}`;
 
           if (advVoucherMap.has(adv.id)) {
-            // Patch the credit leg of the existing voucher to the new cash account
+            // Patch the credit leg of the existing voucher to the new cash account.
+            // Phase 22 (B), G4: an open-period edit audited in this transaction;
+            // a voucher in a closed period is refused (409, reverse instead).
             const voucherId = advVoucherMap.get(adv.id)!;
+            const editContext = await assertVoucherEditableTx(tx, voucherId, { companyId });
             const entries = await tx
               .select({ id: voucherEntries.id, creditAmount: voucherEntries.creditAmount })
               .from(voucherEntries)
@@ -716,40 +709,31 @@ export function registerAdvanceManagementRoutes(app: Express) {
                 .update(voucherEntries)
                 .set({ ledgerAccountId: cashAccountId })
                 .where(eq(voucherEntries.id, creditEntry.id));
+              await recordVoucherEditAuditTx(tx, {
+                voucherId,
+                before: editContext.before,
+                actor: { userId: req.session.userId, username: req.session.username, companyId },
+                reason: "Advance cash account reassigned",
+              });
               vouchersPatched++;
             }
           } else {
             // No voucher existed — create one now: DR Factory Worker Advances / CR Cash
-            const voucherNumber = `PAYMENT-ADV-${adv.id}-${Date.now()}`;
-            const [createdVoucher] = await tx
-              .insert(vouchers)
-              .values({
-                companyId,
-                voucherNumber,
-                voucherType: "Payment",
-                voucherDate: advDate,
-                description: narration,
-                totalAmount: amount.toFixed(2),
-                currency: "USD",
-                sourceModule: "FACTORY",
-              })
-              .returning();
-            await tx.insert(voucherEntries).values([
-              {
-                voucherId: createdVoucher.id,
-                ledgerAccountId: advancesAccountId,
-                debitAmount: amount.toFixed(2),
-                creditAmount: "0",
-                narration,
-              },
-              {
-                voucherId: createdVoucher.id,
-                ledgerAccountId: cashAccountId,
-                debitAmount: "0",
-                creditAmount: amount.toFixed(2),
-                narration,
-              },
-            ]);
+            const voucherNumber = `PAYMENT-ADV-${adv.id}-1`;
+            await postErpVoucherTx(tx, {
+              companyId,
+              voucherNumber,
+              voucherType: "Payment",
+              voucherDate: advDate,
+              description: narration,
+              currency: "USD",
+              sourceModule: "FACTORY",
+              lines: [
+                { ledgerAccountId: advancesAccountId, debit: amount.toFixed(2), narration: narration },
+                { ledgerAccountId: cashAccountId, credit: amount.toFixed(2), narration: narration },
+              ],
+              source: { type: "worker-advance", id: adv.id },
+            });
             vouchersCreated++;
           }
 
@@ -778,6 +762,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
       });
     } catch (error: unknown) {
       logger.error("Error bulk-updating advance cash accounts:", { error: error });
+      if (sendVoucherCorrectionRefusal(res, error)) return;
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });

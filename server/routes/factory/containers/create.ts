@@ -13,15 +13,10 @@ import { requireAuth } from "../../../auth";
 import { resolveStoredFxRateOrThrow } from "../../../services/factory/currencyConversion";
 import { writeDaybookEntry, getOrCreateLedgerAccount } from "../_helpers";
 import { FactoryFxRateRequiredError, factoryDocumentRate } from "../../../services/factory/factoryDocumentFxRate";
-import {
-  factorySuppliers,
-  factoryContainers,
-  insertFactoryContainerSchema,
-  voucherEntries,
-  vouchers,
-} from "@shared/schema";
+import { factorySuppliers, factoryContainers, insertFactoryContainerSchema } from "@shared/schema";
 import { eq } from "drizzle-orm";
-import { normFactoryEntry } from "./_helpers";
+import { postFactoryVoucherTx, type FactoryVoucherLine } from "../../../services/factory/factoryVoucherPosting";
+import { closedPeriodErrorResponse } from "../../../lib/closedPeriodError";
 import { containerFreightFxRateToUsd } from "../../../services/factory/factoryVoucherEntryAmounts";
 import { syncContainerCommissionJournalTx } from "../../../services/factory/containerCommissionJournal";
 import { toMoney } from "../../../lib/money";
@@ -226,44 +221,38 @@ export function registerFactoryContainerCreateRoutes(app: Express) {
           fxRateToUsd: resolveStoredFxRateOrThrow(ccyForDesc, container.fxRateToUsd, container.fxRateConfirmed),
         });
 
-        // Double-entry: Goods value — Dr Factory Import Cost / Cr Supplier Payable
+        // Double-entry: Goods value — Dr Factory Import Cost / Cr Supplier Payable.
+        // Phase 22 (C): posted through the engine with the container's posting
+        // identity (a replay returns this voucher); the FACTORY-IMPORT-{container}-
+        // family number is read as its identity elsewhere, so it keeps the prefix
+        // with a deterministic suffix (was Date.now()).
+        const containerFx = resolveStoredFxRateOrThrow(
+          container.currencyCode,
+          container.fxRateToUsd,
+          container.fxRateConfirmed
+        );
         if (goodsValue.greaterThan(0) && container.supplierId) {
-          const importVoucherNum = `FACTORY-IMPORT-${container.id}-${Date.now()}`;
-          {
-            const [importVoucher] = await tx
-              .insert(vouchers)
-              .values({
-                companyId,
-                voucherType: "Journal",
-                voucherNumber: importVoucherNum,
-                voucherDate: container.arrivalDate || today,
-                description: `Goods import - container ${container.containerNumber}`,
-                totalAmount: goodsValue.toFixed(),
-                currency: container.currencyCode || "USD",
-                exchangeRate: String(
-                  resolveStoredFxRateOrThrow(container.currencyCode, container.fxRateToUsd, container.fxRateConfirmed)
-                ),
-                sourceModule: "FACTORY",
-              })
-              .returning();
-            const importFactoryFxRate = resolveStoredFxRateOrThrow(
-              container.currencyCode,
-              container.fxRateToUsd,
-              container.fxRateConfirmed
-            );
-            await tx.insert(voucherEntries).values({
-              voucherId: importVoucher.id,
-              ledgerAccountId: importCostAccId,
-              ...normFactoryEntry(container.currencyCode || "USD", goodsValue.toFixed(), "0", importFactoryFxRate),
-              narration: `Goods import cost - container ${container.containerNumber}`,
-            });
-            await tx.insert(voucherEntries).values({
-              voucherId: importVoucher.id,
-              factorySupplierId: container.supplierId,
-              ...normFactoryEntry(container.currencyCode || "USD", "0", goodsValue.toFixed(), importFactoryFxRate),
-              narration: `Goods payable to supplier - container ${container.containerNumber}`,
-            });
-          }
+          await postFactoryVoucherTx(tx, {
+            companyId,
+            voucherNumber: (generation) => `FACTORY-IMPORT-${container.id}-${generation}`,
+            voucherDate: container.arrivalDate || today,
+            description: `Goods import - container ${container.containerNumber}`,
+            currency: container.currencyCode || "USD",
+            fxRateToUsd: String(containerFx),
+            source: { sourceType: "factory-container-import", sourceId: container.id, phase: "goods" },
+            lines: [
+              {
+                ledgerAccountId: importCostAccId,
+                debit: goodsValue,
+                narration: `Goods import cost - container ${container.containerNumber}`,
+              },
+              {
+                factorySupplierId: container.supplierId,
+                credit: goodsValue,
+                narration: `Goods payable to supplier - container ${container.containerNumber}`,
+              },
+            ],
+          });
         }
 
         // Commission: posted above as FACTORY-COMM-{container} (Dr import cost /
@@ -279,53 +268,45 @@ export function registerFactoryContainerCreateRoutes(app: Express) {
         const freightPaidBy = container.freightPaidBy || "supplier";
         const freightOwnAcctId = container.freightOwnAccountId ?? null;
         if (freightAmt.greaterThan(0) && container.freightAccountId) {
-          const freightVoucherNum = `FACTORY-FREIGHT-${container.id}`;
-          {
-            const [freightVoucher] = await tx
-              .insert(vouchers)
-              .values({
-                companyId,
-                voucherType: freightPaidBy === "own" ? "Payment" : "Journal",
-                voucherNumber: freightVoucherNum,
-                voucherDate: container.arrivalDate || today,
-                description: `Freight on container ${container.containerNumber}`,
-                totalAmount: freightAmt.toFixed(),
-                currency: freightCcy,
-                exchangeRate: String(containerFreightFxRateToUsd(container)),
-                sourceModule: "FACTORY",
-              })
-              .returning();
-            // Factory freight FX rate (BASE_PER_TRANSACTION: USD per foreign unit)
-            const freightFactoryFxRate = containerFreightFxRateToUsd(container);
-            // Dr Freight Expense
-            await tx.insert(voucherEntries).values({
-              voucherId: freightVoucher.id,
-              ledgerAccountId: container.freightAccountId,
-              ...normFactoryEntry(freightCcy, freightAmt.toFixed(), "0", freightFactoryFxRate),
-              narration: `Freight expense - container ${container.containerNumber}`,
-            });
-            if (freightPaidBy === "own" && freightOwnAcctId) {
-              // Cr Own account (paid by company itself)
-              await tx.insert(voucherEntries).values({
-                voucherId: freightVoucher.id,
-                ledgerAccountId: freightOwnAcctId,
-                ...normFactoryEntry(freightCcy, "0", freightAmt.toFixed(), freightFactoryFxRate),
-                narration: `Freight paid via own account - container ${container.containerNumber}`,
-              });
-            } else if (freightPaidBy === "supplier" && container.supplierId) {
-              // Cr Supplier Payable
-              await tx.insert(voucherEntries).values({
-                voucherId: freightVoucher.id,
-                factorySupplierId: container.supplierId,
-                ...normFactoryEntry(freightCcy, "0", freightAmt.toFixed(), freightFactoryFxRate),
-                narration: `Freight payable to supplier - container ${container.containerNumber}`,
-              });
-            } else {
-              // A one-sided freight journal would leave the voucher unbalanced;
-              // the container is not created (the transaction rolls back).
-              throw new Error("Freight needs a purchase supplier or an own account to credit");
-            }
+          let creditLine: FactoryVoucherLine;
+          if (freightPaidBy === "own" && freightOwnAcctId) {
+            // Cr Own account (paid by company itself)
+            creditLine = {
+              ledgerAccountId: freightOwnAcctId,
+              credit: freightAmt,
+              narration: `Freight paid via own account - container ${container.containerNumber}`,
+            };
+          } else if (freightPaidBy === "supplier" && container.supplierId) {
+            // Cr Supplier Payable
+            creditLine = {
+              factorySupplierId: container.supplierId,
+              credit: freightAmt,
+              narration: `Freight payable to supplier - container ${container.containerNumber}`,
+            };
+          } else {
+            // A one-sided freight journal would leave the voucher unbalanced;
+            // the container is not created (the transaction rolls back).
+            throw new Error("Freight needs a purchase supplier or an own account to credit");
           }
+          await postFactoryVoucherTx(tx, {
+            companyId,
+            voucherType: freightPaidBy === "own" ? "Payment" : "Journal",
+            voucherNumber: `FACTORY-FREIGHT-${container.id}`,
+            voucherDate: container.arrivalDate || today,
+            description: `Freight on container ${container.containerNumber}`,
+            currency: freightCcy,
+            // Factory freight FX rate (BASE_PER_TRANSACTION: USD per foreign unit)
+            fxRateToUsd: String(containerFreightFxRateToUsd(container)),
+            source: { sourceType: "factory-container-freight", sourceId: container.id, phase: "freight" },
+            lines: [
+              {
+                ledgerAccountId: container.freightAccountId,
+                debit: freightAmt,
+                narration: `Freight expense - container ${container.containerNumber}`,
+              },
+              creditLine,
+            ],
+          });
         }
         return container;
       });
@@ -350,6 +331,8 @@ export function registerFactoryContainerCreateRoutes(app: Express) {
       });
       logger.error("Error creating factory container:", { error: error });
       if (error instanceof FactoryFxRateRequiredError) return res.status(409).json(error.body);
+      const closed = closedPeriodErrorResponse(error);
+      if (closed) return res.status(closed.status).json(closed.body);
       const cause = ((error as { cause?: unknown })?.cause ?? error) as { code?: string; detail?: string };
       if (cause?.code === "23505" && cause?.detail?.includes("container_number")) {
         return res

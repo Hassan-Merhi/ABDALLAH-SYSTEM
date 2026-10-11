@@ -138,7 +138,9 @@ describe("POST /api/vouchers/with-entries", () => {
 
     expect(response.status).toBe(200);
     const created = response.body.voucher;
-    expect(created.voucherNumber).toBe(number);
+    // Phase 22 (B): an active voucher is numbered by the engine (the form's
+    // display number is the request identity, not the voucher number).
+    expect(created.voucherNumber).toMatch(/^JV-\d+-2026-\d{6}$/);
     expect(created.companyId).toBe(ctx.companyId);
     expect(created.locationId).toBe(ctx.locationId);
     // The header carries the larger side, not the sum of both.
@@ -178,7 +180,7 @@ describe("POST /api/vouchers/with-entries", () => {
     );
     expect(audit.rows).toHaveLength(1);
     expect(audit.rows[0].action).toBe("create");
-    expect(audit.rows[0].record_identifier).toBe(number);
+    expect(audit.rows[0].record_identifier).toMatch(/^JV-\d+-2026-\d{6}$/);
   });
 
   it("refuses an unbalanced active voucher and writes nothing", async () => {
@@ -388,7 +390,7 @@ describe("POST /api/vouchers/with-entries", () => {
     }
   });
 
-  it("keeps an entry's own ledger when the named customer has no linked account", async () => {
+  it("refuses a line naming an unlinked customer and another ledger (two targets)", async () => {
     const number = voucherNumber();
 
     const response = await postWithEntries({
@@ -399,10 +401,12 @@ describe("POST /api/vouchers/with-entries", () => {
       ],
     });
 
-    expect(response.status).toBe(200);
-    const entries = await entriesFor(response.body.voucher.id);
-    const customerEntry = entries.find((e) => e.customerId === unlinkedCustomerId);
-    expect(customerEntry?.ledgerAccountId).toBe(ctx.cashAccountId);
+    // Phase 22 (B): the active voucher posts through the central engine, which
+    // takes a customer plus a ledger on one line only when the ledger is the
+    // customer's own; a line naming an unlinked customer and another ledger
+    // has two targets and is refused (it used to post to both).
+    expect(response.status).toBe(400);
+    expect(response.body.code).toBe("POSTING_LINKED_LEDGER_MISMATCH");
   });
 
   it("normalises a foreign-currency journal into base amounts at the supplied rate", async () => {

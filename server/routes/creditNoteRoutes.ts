@@ -37,6 +37,13 @@ import {
 import { inventoryLedgerNetTx, postReversalResidualTx, sumDecimals } from "../services/inventory/valueExactReversal";
 import { createDatabaseStockMovementAdapter } from "../services/inventory/databaseStockMovementAdapter";
 import { postStockMovementTx } from "../services/inventory/stockMovementIntegrityService";
+import {
+  assertVoucherEditableTx,
+  recordVoucherEditAuditTx,
+  sendVoucherCorrectionRefusal,
+} from "../services/accounting/voucherCorrection";
+import { rebalanceVoucherRoundingTx } from "../services/accounting/engineRounding";
+import { allocateVoucherNumberTx } from "../services/accounting/voucherNumbering";
 
 type CreditNoteItemInput = {
   stockItemId?: unknown;
@@ -154,11 +161,12 @@ export function registerCreditNoteRoutes(app: Express) {
         totalInventoryValue = addInventoryValues(totalInventoryValue, multiplyInventoryValues(qty, inventoryCost));
       }
 
-      const timestamp = Date.now();
-      const prefix = noteType === "Credit Note" ? "CN" : "DN";
-      const voucherNumber = `${prefix}-${timestamp}`;
-
       const voucher = await db.transaction(async (tx) => {
+        // Phase 22 (B), PE8: the gapless number (CN-/DN-<company>-YYYY-000001).
+        // The lines stay direct writes: the inventory lines are the value the
+        // sub-ledger moved, known only after the stock movements, which are
+        // keyed by this voucher's id (listed in the phase 22 B wave log).
+        const voucherNumber = await allocateVoucherNumberTx(tx, { companyId, voucherType: noteType, voucherDate });
         const [createdVoucher] = await tx
           .insert(vouchers)
           .values({
@@ -523,6 +531,11 @@ export function registerCreditNoteRoutes(app: Express) {
       const oldItems = await db.select().from(creditNoteItems).where(eq(creditNoteItems.voucherId, voucherId));
 
       await db.transaction(async (tx) => {
+        // Phase 22 (B), PE9/G4: open-period edit, audited below; closed period → 409.
+        const editContext = await assertVoucherEditableTx(tx, voucherId, {
+          companyId,
+          newVoucherDate: voucherDate ?? null,
+        });
         const existingItems = await tx.select().from(creditNoteItems).where(eq(creditNoteItems.voucherId, voucherId));
         // Wave 11: the old lines move back exactly their value_moved.
         const ledgerBefore = await inventoryLedgerNetTx(tx, companyId, [voucherId]);
@@ -689,6 +702,8 @@ export function registerCreditNoteRoutes(app: Express) {
           actor: { userId: req.session.userId!, username: req.session.username || "unknown" },
         });
 
+        // Phase 22 A (D3): the rounding remainder of an engine voucher's new lines.
+        await rebalanceVoucherRoundingTx(tx, { companyId, voucherId });
         // Wave 16 (B): audited in the editing transaction.
         const changes: Record<string, { old: unknown; new: unknown }> = {};
         if (voucherDate && voucher.voucherDate !== voucherDate)
@@ -718,24 +733,21 @@ export function registerCreditNoteRoutes(app: Express) {
               resolveName
             )
           : {};
-        await logAudit(
-          {
-            userId: req.session.userId!,
-            username: req.session.username || "unknown",
-            companyId,
-            action: "update",
-            tableName: "vouchers",
-            recordId: voucherId,
-            recordIdentifier: voucher.voucherNumber,
-            changes: { ...changes, ...itemDiff },
-          },
-          tx
-        );
+        // Phase 22 (B): one row — the correction policy's full before/after
+        // snapshot with the readable note changes.
+        await recordVoucherEditAuditTx(tx, {
+          voucherId,
+          before: editContext.before,
+          actor: { userId: req.session.userId, username: req.session.username, companyId },
+          reason: `${noteType} edit`,
+          extra: { ...changes, ...itemDiff },
+        });
       });
 
       res.json({ success: true, voucherId, message: `${noteType} updated successfully` });
     } catch (error: unknown) {
       logger.error("Update credit note error:", { error });
+      if (sendVoucherCorrectionRefusal(res, error)) return;
       res.status(error instanceof HttpError ? error.statusCode : 500).json({ message: getErrorMessage(error) });
     }
   });

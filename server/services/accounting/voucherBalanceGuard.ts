@@ -2,6 +2,7 @@ import type { Pool } from "pg";
 
 import { logger } from "../../lib/logger";
 import { getErrorMessage } from "../../lib/httpHandlers";
+import { ENGINE_ROUNDING_NARRATION, ROUNDING_ACCOUNT_CODE } from "./engineRounding";
 /**
  * Voucher balance guard (2026-10 accounting audit, waves 8.5, 9 and 12).
  *
@@ -45,6 +46,14 @@ import { getErrorMessage } from "../../lib/httpHandlers";
  * by the integrity diagnostic, `voucher_shape_new`, not enforced here: see the
  * phase 19 B wave log entry.)
  *
+ * v6 (phase 22 A), D3 (owner decision): every non-history voucher balances
+ * exactly in its 2 dp base columns (base tolerance 0); history keeps the
+ * one-cent tolerance of single-currency vouchers. The central posting engine
+ * adds a ROUNDING line for the per-line conversion remainder (engineRounding.ts)
+ * and marks its vouchers (`vouchers.posted_by_engine`, set once, never
+ * cleared); in-place line writers call rebalanceVoucherRoundingTx. The
+ * ROUNDING line (USD) is left out of the transaction-currency check.
+ *
  * A reviewed repair can `SET LOCAL app.ledger_integrity_bypass = 'on'` for its
  * own transaction; the bypass skips the balance check, never the history marker.
  */
@@ -53,7 +62,10 @@ import { getErrorMessage } from "../../lib/httpHandlers";
 export const VOUCHER_HISTORY_MARKER_COLUMN = "balance_guard_exempt_history";
 
 /** Version of VOUCHER_BALANCE_GUARD_DDL. Bump it whenever a statement changes. */
-export const VOUCHER_BALANCE_GUARD_VERSION = "2026-10-voucher-balance-v5";
+export const VOUCHER_BALANCE_GUARD_VERSION = "2026-10-voucher-balance-v6";
+
+/** v6: set by the central posting engine (voucherPostingService); set once, never cleared. */
+export const VOUCHER_ENGINE_MARKER_COLUMN = "posted_by_engine";
 
 /** Every trigger the guard installs, as `[table, trigger]`. */
 export const VOUCHER_BALANCE_GUARD_TRIGGERS: ReadonlyArray<readonly [table: string, trigger: string]> = [
@@ -78,6 +90,9 @@ export const VOUCHER_BALANCE_GUARD_DDL: readonly string[] = [
        ALTER TABLE vouchers ALTER COLUMN ${VOUCHER_HISTORY_MARKER_COLUMN} SET DEFAULT false;
      END IF;
    END $marker$`,
+  // v6: engine vouchers are checked exactly (the column is also added by
+  // ensureRuntimeSchema and migration 20261010_002; existing rows are false).
+  `ALTER TABLE vouchers ADD COLUMN IF NOT EXISTS ${VOUCHER_ENGINE_MARKER_COLUMN} boolean NOT NULL DEFAULT false`,
   `CREATE OR REPLACE FUNCTION erp_vouchers_history_marker_guard() RETURNS trigger
    LANGUAGE plpgsql AS $fn$
    BEGIN
@@ -87,12 +102,15 @@ export const VOUCHER_BALANCE_GUARD_DDL: readonly string[] = [
      ELSIF NEW.${VOUCHER_HISTORY_MARKER_COLUMN} IS DISTINCT FROM OLD.${VOUCHER_HISTORY_MARKER_COLUMN} THEN
        RAISE EXCEPTION 'Voucher % history marker is set once, when the balance guard is installed, and cannot change',
          OLD.voucher_number USING ERRCODE = '23514';
+     ELSIF OLD.${VOUCHER_ENGINE_MARKER_COLUMN} AND NOT NEW.${VOUCHER_ENGINE_MARKER_COLUMN} THEN
+       RAISE EXCEPTION 'Voucher % was posted by the central posting engine; that marker cannot be cleared',
+         OLD.voucher_number USING ERRCODE = '23514';
      END IF;
      RETURN NEW;
    END $fn$`,
   `DROP TRIGGER IF EXISTS vouchers_balance_guard_history_marker ON vouchers`,
   `CREATE TRIGGER vouchers_balance_guard_history_marker
-     BEFORE INSERT OR UPDATE OF ${VOUCHER_HISTORY_MARKER_COLUMN} ON vouchers
+     BEFORE INSERT OR UPDATE OF ${VOUCHER_HISTORY_MARKER_COLUMN}, ${VOUCHER_ENGINE_MARKER_COLUMN} ON vouchers
      FOR EACH ROW EXECUTE FUNCTION erp_vouchers_history_marker_guard()`,
   // The one-argument form is the version carrier (the installer and the
   // integrity diagnostic read its comment): a header-side check.
@@ -117,6 +135,7 @@ export const VOUCHER_BALANCE_GUARD_DDL: readonly string[] = [
    BEGIN
      IF p_voucher_id IS NULL OR erp_ledger_integrity_bypassed() THEN RETURN; END IF;
      SELECT vo.id, vo.voucher_number, vo.voucher_type, vo.${VOUCHER_HISTORY_MARKER_COLUMN} AS history,
+            vo.${VOUCHER_ENGINE_MARKER_COLUMN} AS engine,
             COALESCE(co.company_type, '') AS company_type,
             EXISTS (SELECT 1 FROM gl_inventory_cutovers c
                      WHERE c.company_id = vo.company_id AND c.effective_from <= vo.voucher_date) AS perpetual
@@ -126,14 +145,22 @@ export const VOUCHER_BALANCE_GUARD_DDL: readonly string[] = [
      -- D1: a history voucher is checked only when its lines change.
      IF NOT FOUND OR (v.history AND NOT p_lines_changed) THEN RETURN; END IF;
 
-     SELECT COUNT(DISTINCT transaction_currency) FILTER (WHERE transaction_currency IS NOT NULL),
-            COALESCE(bool_and(transaction_currency IS NOT NULL), false),
-            COUNT(*) FILTER (WHERE COALESCE(debit_amount, 0) <> 0 OR COALESCE(transaction_debit_amount, 0) <> 0),
-            COUNT(*) FILTER (WHERE COALESCE(credit_amount, 0) <> 0 OR COALESCE(transaction_credit_amount, 0) <> 0),
-            COALESCE(SUM(debit_amount), 0), COALESCE(SUM(credit_amount), 0),
-            COALESCE(SUM(transaction_debit_amount), 0), COALESCE(SUM(transaction_credit_amount), 0)
+     -- v6: the engine's ROUNDING line (USD, base only) is left out of the
+     -- transaction-currency check; it is part of the base sums.
+     SELECT COUNT(DISTINCT l.transaction_currency) FILTER (WHERE l.transaction_currency IS NOT NULL AND NOT l.rounding),
+            COALESCE(bool_and(l.transaction_currency IS NOT NULL) FILTER (WHERE NOT l.rounding), false),
+            COUNT(*) FILTER (WHERE COALESCE(l.debit_amount, 0) <> 0 OR COALESCE(l.transaction_debit_amount, 0) <> 0),
+            COUNT(*) FILTER (WHERE COALESCE(l.credit_amount, 0) <> 0 OR COALESCE(l.transaction_credit_amount, 0) <> 0),
+            COALESCE(SUM(l.debit_amount), 0), COALESCE(SUM(l.credit_amount), 0),
+            COALESCE(SUM(l.transaction_debit_amount) FILTER (WHERE NOT l.rounding), 0),
+            COALESCE(SUM(l.transaction_credit_amount) FILTER (WHERE NOT l.rounding), 0)
        INTO currencies, all_in_currency, debit_lines, credit_lines, base_debit, base_credit, txn_debit, txn_credit
-       FROM voucher_entries WHERE voucher_id = p_voucher_id;
+       FROM (SELECT ve.*,
+                    COALESCE(ve.narration = '${ENGINE_ROUNDING_NARRATION}' AND ve.rate_convention = 'IDENTITY'
+                             AND EXISTS (SELECT 1 FROM ledger_accounts la
+                                          WHERE la.id = ve.ledger_account_id AND la.code = '${ROUNDING_ACCOUNT_CODE}'),
+                             false) AS rounding
+               FROM voucher_entries ve WHERE ve.voucher_id = p_voucher_id) l;
 
      -- Periodic stock adjustment: one-sided by design when a stock document backs it.
      IF v.voucher_type IN ('Stock Adjustment', 'Production', 'Consumption', 'Mixed')
@@ -146,7 +173,9 @@ export const VOUCHER_BALANCE_GUARD_DDL: readonly string[] = [
      END IF;
 
      IF currencies = 1 AND all_in_currency THEN
-       base_tolerance := 0.01;
+       -- v6 (phase 22 A, D3, owner decision): a new voucher balances exactly
+       -- (the engine adds its ROUNDING line); history keeps the one-cent tolerance.
+       IF v.history THEN base_tolerance := 0.01; END IF;
        IF round(txn_debit, 2) <> round(txn_credit, 2) THEN
          RAISE EXCEPTION 'Voucher % does not balance in its transaction currency: debits %, credits %',
            v.voucher_number, round(txn_debit, 2), round(txn_credit, 2)

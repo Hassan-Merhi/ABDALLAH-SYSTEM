@@ -6,6 +6,17 @@ import { voucherMutationBlockReason } from "../../lib/migratedVoucherGuard";
 import { requireAuth, requireNonPOS } from "../../auth";
 import { syncEmployeeBalancesFromEntries } from "../_helpers";
 import { writeVoucherAuditTx } from "../helpers/voucherAuditTrail";
+import {
+  erpRequestSourceId,
+  postManualVoucherTx,
+  sessionPostingActor,
+} from "../../services/accounting/erpVoucherPosting";
+import {
+  assertVoucherEditableTx,
+  recordVoucherEditAuditTx,
+  sendVoucherCorrectionRefusal,
+} from "../../services/accounting/voucherCorrection";
+import { rebalanceVoucherRoundingTx } from "../../services/accounting/engineRounding";
 import { triggerIntercompanyNotifications } from "../intercompanyNotificationRoutes";
 import { autoReallocateLoansAccounts } from "../../lib/transporterAllocation";
 import { vouchers, voucherEntries, customers, ledgerAccounts } from "@shared/schema";
@@ -98,9 +109,6 @@ export function registerVoucherPaymentRoutes(app: Express) {
       if (!totals) return res.status(400).json({ message: "Invalid amount" });
       const { baseTotal } = totals;
 
-      // Generate voucher number
-      const voucherNumber = `${voucherType.toUpperCase()}-${Date.now()}`;
-
       // Use database transaction for atomic operation
       const companyId = req.session.currentCompanyId!;
 
@@ -160,24 +168,6 @@ export function registerVoucherPaymentRoutes(app: Express) {
       };
 
       const result = await db.transaction(async (tx) => {
-        // Create voucher
-        const [createdVoucher] = await tx
-          .insert(vouchers)
-          .values({
-            companyId,
-            voucherNumber,
-            voucherType,
-            voucherDate,
-            description: notes || null,
-            // Store historical base-currency (USD) total (baseTotal = transactionTotal for USD vouchers).
-            totalAmount: baseTotal.toFixed(6),
-            optional: optional ?? false,
-            currency: vCurrency,
-            exchangeRate: vRateRaw ? String(vRateRaw) : null,
-            effectiveDate: effectiveDate || null,
-          })
-          .returning();
-
         const voucherEntriesToCreate = [];
 
         // Pre-compute the payment-account field once (same for every entry)
@@ -221,7 +211,6 @@ export function registerVoucherPaymentRoutes(app: Express) {
               // DR payment account (reduce liability)
               // CR contra account
               voucherEntriesToCreate.push({
-                voucherId: createdVoucher.id,
                 ...paymentAccountField,
                 debitAmount: normDR.debitAmount,
                 creditAmount: normDR.creditAmount,
@@ -235,7 +224,6 @@ export function registerVoucherPaymentRoutes(app: Express) {
                 narration,
               });
               voucherEntriesToCreate.push({
-                voucherId: createdVoucher.id,
                 ...entryAccountField,
                 debitAmount: normCR.debitAmount,
                 creditAmount: normCR.creditAmount,
@@ -253,7 +241,6 @@ export function registerVoucherPaymentRoutes(app: Express) {
               // DR contra account (expense/asset purchased)
               // CR payment account (cash goes out)
               voucherEntriesToCreate.push({
-                voucherId: createdVoucher.id,
                 ...entryAccountField,
                 debitAmount: normDR.debitAmount,
                 creditAmount: normDR.creditAmount,
@@ -267,7 +254,6 @@ export function registerVoucherPaymentRoutes(app: Express) {
                 narration,
               });
               voucherEntriesToCreate.push({
-                voucherId: createdVoucher.id,
                 ...paymentAccountField,
                 debitAmount: normCR.debitAmount,
                 creditAmount: normCR.creditAmount,
@@ -287,7 +273,6 @@ export function registerVoucherPaymentRoutes(app: Express) {
               // DR contra account (source, e.g. loans)
               // CR payment account (increase liability)
               voucherEntriesToCreate.push({
-                voucherId: createdVoucher.id,
                 ...entryAccountField,
                 debitAmount: normDR.debitAmount,
                 creditAmount: normDR.creditAmount,
@@ -301,7 +286,6 @@ export function registerVoucherPaymentRoutes(app: Express) {
                 narration,
               });
               voucherEntriesToCreate.push({
-                voucherId: createdVoucher.id,
                 ...paymentAccountField,
                 debitAmount: normCR.debitAmount,
                 creditAmount: normCR.creditAmount,
@@ -319,7 +303,6 @@ export function registerVoucherPaymentRoutes(app: Express) {
               // DR payment account (cash comes in)
               // CR contra account (income/liability)
               voucherEntriesToCreate.push({
-                voucherId: createdVoucher.id,
                 ...paymentAccountField,
                 debitAmount: normDR.debitAmount,
                 creditAmount: normDR.creditAmount,
@@ -333,7 +316,6 @@ export function registerVoucherPaymentRoutes(app: Express) {
                 narration,
               });
               voucherEntriesToCreate.push({
-                voucherId: createdVoucher.id,
                 ...entryAccountField,
                 debitAmount: normCR.debitAmount,
                 creditAmount: normCR.creditAmount,
@@ -350,8 +332,26 @@ export function registerVoucherPaymentRoutes(app: Express) {
           }
         }
 
-        // Batch insert all voucher entries
-        const createdEntries = await tx.insert(voucherEntries).values(voucherEntriesToCreate).returning();
+        // Phase 22 (B): an active voucher posts through the central engine (number
+        // allocated there); an optional one keeps a direct insert with an
+        // allocated number (it is off the ledger and may be unbalanced).
+        const posted = await postManualVoucherTx(tx, {
+          companyId,
+          voucherType,
+          voucherDate,
+          description: notes || null,
+          currency: vCurrency,
+          exchangeRate: vRateRaw ? String(vRateRaw) : null,
+          effectiveDate: effectiveDate || null,
+          optional: optional === true,
+          optionalTotalAmount: baseTotal.toFixed(6),
+          entries: voucherEntriesToCreate,
+          source: { type: "payment-receipt-legacy", id: `${companyId}:${erpRequestSourceId(req)}` },
+          actor: sessionPostingActor(req, `${voucherType} creation`),
+        });
+        if (posted.replayed) return { voucher: posted.voucher, entries: posted.entries };
+        const createdVoucher = posted.voucher;
+        const createdEntries = posted.entries;
 
         // Wave 12: employee balances and the audit row are written in this transaction.
         if (!createdVoucher.optional) {
@@ -515,6 +515,12 @@ export function registerVoucherPaymentRoutes(app: Express) {
         if (blockedVoucherReason) {
           throw new Error(blockedVoucherReason);
         }
+        // Phase 22 (B), PE9/G4: open-period edit, audited below; closed period → 409.
+        const editContext = await assertVoucherEditableTx(tx, voucherId, {
+          companyId: existingVoucher.companyId,
+          newVoucherDate: voucherDate,
+          newEffectiveDate: effectiveDate || null,
+        });
 
         // Get existing entries before deleting (for balance sync)
         const oldEntries = await tx.select().from(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
@@ -623,7 +629,9 @@ export function registerVoucherPaymentRoutes(app: Express) {
         }
 
         // Batch insert all new voucher entries
-        const createdEntries = await tx.insert(voucherEntries).values(voucherEntriesToCreate).returning();
+        const insertedEntries = await tx.insert(voucherEntries).values(voucherEntriesToCreate).returning();
+        // Phase 22 A (D3): the rounding remainder of an engine voucher's new lines.
+        await rebalanceVoucherRoundingTx(tx, { companyId: existingVoucher.companyId, voucherId });
 
         // An edited duty/transport/office charge voucher re-prices the offloaded bales.
         await syncContainerChargeVoucherEditTx(tx, {
@@ -639,19 +647,19 @@ export function registerVoucherPaymentRoutes(app: Express) {
           await syncEmployeeBalancesFromEntries(oldEntries, req.session.currentCompanyId!, true, tx);
         }
         if (!updatedVoucher.optional) {
-          await syncEmployeeBalancesFromEntries(createdEntries, req.session.currentCompanyId!, false, tx);
+          await syncEmployeeBalancesFromEntries(insertedEntries, req.session.currentCompanyId!, false, tx);
         }
-        await writeVoucherAuditTx(tx, {
+        const audited = await recordVoucherEditAuditTx(tx, {
+          voucherId,
+          before: editContext.before,
           actor: {
             userId: req.session.userId,
             username: req.session.username,
             companyId: req.session.currentCompanyId,
           },
-          action: "update",
-          voucherId,
-          before: { voucher: existingVoucher, entries: oldEntries },
-          after: { voucher: updatedVoucher, entries: createdEntries },
+          reason: `${voucherType} voucher update`,
         });
+        const createdEntries = audited.entries;
 
         return {
           voucher: updatedVoucher,
@@ -680,6 +688,7 @@ export function registerVoucherPaymentRoutes(app: Express) {
 
       res.json({ voucher: result.voucher, entries: result.entries, whatsapp: waResultPatch });
     } catch (error: unknown) {
+      if (sendVoucherCorrectionRefusal(res, error)) return;
       logger.error("Error updating payment/receipt voucher:", { error: error });
       res.status(errorStatus(error)).json({ message: getErrorMessage(error) });
     }

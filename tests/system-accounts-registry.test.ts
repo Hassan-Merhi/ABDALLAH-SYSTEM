@@ -53,13 +53,14 @@ afterAll(async () => {
 describe("ensureSystemAccounts", () => {
   it("creates the required accounts once, and a second run creates nothing", async () => {
     const first = await asMaintenance(() => db.transaction((tx) => ensureSystemAccounts(tx, fresh)));
-    expect(first.map((status) => status.state)).toEqual(["created", "created"]);
+    // Phase 22 A: ROUNDING is required as well (engine rounding remainder).
+    expect(first.map((status) => status.state)).toEqual(["created", "created", "created"]);
     const second = await asMaintenance(() => db.transaction((tx) => ensureSystemAccounts(tx, fresh)));
-    expect(second.map((status) => status.state)).toEqual(["ok", "ok"]);
+    expect(second.map((status) => status.state)).toEqual(["ok", "ok", "ok"]);
     const count = await asMaintenance(() =>
       pool.query(`SELECT COUNT(*)::int AS n FROM ledger_accounts WHERE company_id = $1`, [fresh])
     );
-    expect(count.rows[0].n).toBe(2);
+    expect(count.rows[0].n).toBe(3);
   });
 
   it("leaves an existing account untouched and reuses a same-named one", async () => {
@@ -67,6 +68,7 @@ describe("ensureSystemAccounts", () => {
     expect(statuses).toEqual([
       expect.objectContaining({ code: "RETAINED_EARNINGS", state: "type_differs", actualType: "Profit" }),
       expect.objectContaining({ code: "OPENING_BALANCE_EQUITY", state: "reused_by_name", actualCode: "OBE-OLD" }),
+      expect.objectContaining({ code: "ROUNDING", state: "created" }),
     ]);
     const rows = await asMaintenance(() =>
       pool.query(`SELECT code, name, account_type FROM ledger_accounts WHERE company_id = $1 ORDER BY code`, [legacy])
@@ -74,6 +76,7 @@ describe("ensureSystemAccounts", () => {
     expect(rows.rows).toEqual([
       { code: "OBE-OLD", name: "Opening Balance Equity", account_type: "Equity" },
       { code: "RETAINED_EARNINGS", name: "Old Retained", account_type: "Profit" },
+      { code: "ROUNDING", name: "Rounding Differences", account_type: "Indirect Expense" },
     ]);
   });
 

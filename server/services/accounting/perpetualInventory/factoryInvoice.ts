@@ -39,15 +39,11 @@
  */
 import { sql } from "drizzle-orm";
 
-import type Decimal from "decimal.js";
-import { voucherEntries } from "@shared/schema";
-
 import type { DatabaseOrTransaction, DbTransaction } from "../../../db";
 import { HttpError } from "../../../lib/httpHandlers";
 import { MoneyDecimal, toMoney } from "../../../lib/money";
 import { findFactoryFxRateOnOrBefore, normalizeFactoryCurrency } from "../../factory/factoryFxRateOnDate";
-import { normFactoryEntry } from "../../factory/factoryVoucherEntryAmounts";
-import { infrastructurePostingIdentity, insertInfrastructureVoucherTx } from "../infrastructureVoucherIdentity";
+import { postFactoryVoucherTx, type FactoryVoucherLine } from "../../factory/factoryVoucherPosting";
 import { getInventoryCutover, isPerpetualInventoryActive } from "./cutover";
 import {
   isSupplierPartnerCompany,
@@ -271,43 +267,33 @@ async function postForeignCurrencyInvoiceTx(
   }
 ): Promise<number | null> {
   const nonZero = (line: LinkedJournalLine) => !line.debit.isZero() || !line.credit.isZero();
-  const rows = [
+  const lines: FactoryVoucherLine[] = [
     ...params.nativeLines.filter(nonZero).map((line) => ({ line, currency: params.currency, rate: params.rate })),
     ...params.usdLines.filter(nonZero).map((line) => ({ line, currency: "USD", rate: "1" })),
   ].map(({ line, currency, rate }) => ({
-    line,
-    amounts: normFactoryEntry(currency, line.debit.toFixed(2), line.credit.toFixed(2), rate),
+    ledgerAccountId: line.ledgerAccountId,
+    customerId: line.customerId ?? null,
+    debit: line.debit.toDecimalPlaces(2),
+    credit: line.credit.toDecimalPlaces(2),
+    narration: line.narration,
+    currency,
+    fxRateToUsd: rate,
   }));
-  if (rows.length === 0) return null;
-  const sum = (pick: (amounts: (typeof rows)[number]["amounts"]) => string): Decimal =>
-    rows.reduce((total, row) => total.plus(pick(row.amounts)), new MoneyDecimal(0));
-  const debits = sum((amounts) => amounts.debitAmount);
-  if (!debits.eq(sum((amounts) => amounts.creditAmount)))
-    throw new Error("A perpetual-inventory journal does not balance");
+  if (lines.length === 0) return null;
 
-  const { voucher } = await insertInfrastructureVoucherTx(
-    tx,
-    {
-      companyId: params.companyId,
-      voucherNumber: params.voucherNumber,
-      voucherType: "Journal",
-      voucherDate: params.voucherDate,
-      description: params.description,
-      totalAmount: debits.toDecimalPlaces(2).toFixed(2),
-      currency: params.currency,
-      exchangeRate: params.rate,
-    },
-    infrastructurePostingIdentity(params.identity.sourceType, params.identity.sourceId)
-  );
-  await tx.insert(voucherEntries).values(
-    rows.map(({ line, amounts }) => ({
-      voucherId: voucher.id,
-      ledgerAccountId: line.ledgerAccountId,
-      ...(line.customerId ? { customerId: line.customerId } : {}),
-      ...amounts,
-      narration: line.narration,
-    }))
-  );
+  // Phase 22 (C): through the engine (balance, targets, customer-ledger pair,
+  // identity) with the invoice's existing posting identity and number.
+  const { voucher } = await postFactoryVoucherTx(tx, {
+    companyId: params.companyId,
+    voucherNumber: params.voucherNumber,
+    voucherDate: params.voucherDate,
+    description: params.description,
+    currency: params.currency,
+    fxRateToUsd: params.rate,
+    sourceModule: "ERP",
+    source: { sourceType: params.identity.sourceType, sourceId: params.identity.sourceId, phase: "voucher" },
+    lines,
+  });
   return voucher.id;
 }
 

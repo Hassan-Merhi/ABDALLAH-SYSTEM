@@ -11,15 +11,10 @@ import { logger } from "../../../lib/logger";
 import { db } from "../../../db";
 import { requireAuth, requireRole } from "../../../auth";
 import { getOrCreateLedgerAccount } from "../_helpers";
-import {
-  factoryContainers,
-  voucherEntries,
-  factoryDaybookEntries,
-  factoryContainerOtherCharges,
-  vouchers,
-} from "@shared/schema";
+import { factoryContainers, factoryDaybookEntries, factoryContainerOtherCharges, vouchers } from "@shared/schema";
 import { eq, and, sql, ilike, ne } from "drizzle-orm";
-import { normFactoryEntry } from "./_helpers";
+import { postFactoryVoucherTx } from "../../../services/factory/factoryVoucherPosting";
+import { toMoney } from "../../../lib/money";
 import { retireVouchersTx, sessionRetirementActor } from "../../../services/accounting/voucherRetirement";
 
 export function registerFactoryContainerOtherChargesCurrencyAdminRoutes(app: Express) {
@@ -233,38 +228,20 @@ export function registerFactoryContainerOtherChargesCurrencyAdminRoutes(app: Exp
               const voucherDate = container.arrivalDate || containerCreatedDate;
 
               for (const charge of tableCharges) {
-                const chargeAmt = parseFloat(charge.amount || "0");
-                if (chargeAmt <= 0 || !charge.ledgerAccountId) continue;
-                const ocVoucherNum = `FACTORY-OC-${containerId}-${charge.id}-${Date.now()}`;
-                const [ocVoucher] = await tx
-                  .insert(vouchers)
-                  .values({
-                    companyId,
-                    voucherType: "Journal",
-                    voucherNumber: ocVoucherNum,
-                    voucherDate,
-                    description: `${charge.description} - container ${container.containerNumber}`,
-                    totalAmount: String(chargeAmt),
-                    currency: "USD",
-                    exchangeRate: "1",
-                    sourceModule: "FACTORY",
-                  })
-                  .returning();
-
-                await tx.insert(voucherEntries).values([
-                  {
-                    voucherId: ocVoucher.id,
-                    ledgerAccountId: payableAccId,
-                    ...normFactoryEntry("USD", String(chargeAmt), "0", null),
-                    narration: `${charge.description} payable`,
-                  },
-                  {
-                    voucherId: ocVoucher.id,
-                    ledgerAccountId: charge.ledgerAccountId,
-                    ...normFactoryEntry("USD", "0", String(chargeAmt), null),
-                    narration: `${charge.description}`,
-                  },
-                ]);
+                // Phase 22 (C): exact, through the engine with the charge's identity.
+                const chargeAmt = toMoney(charge.amount);
+                if (chargeAmt.lessThanOrEqualTo(0) || !charge.ledgerAccountId) continue;
+                await postFactoryVoucherTx(tx, {
+                  companyId,
+                  voucherNumber: (generation) => `FACTORY-OC-${containerId}-${charge.id}-${generation}`,
+                  voucherDate,
+                  description: `${charge.description} - container ${container.containerNumber}`,
+                  source: { sourceType: "factory-container-other-charge", sourceId: charge.id, phase: "voucher" },
+                  lines: [
+                    { ledgerAccountId: payableAccId, debit: chargeAmt, narration: `${charge.description} payable` },
+                    { ledgerAccountId: charge.ledgerAccountId, credit: chargeAmt, narration: `${charge.description}` },
+                  ],
+                });
               }
             }
 

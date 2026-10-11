@@ -22,6 +22,11 @@ import type { PgUpdateSetSource } from "drizzle-orm/pg-core";
 import type Decimal from "decimal.js";
 import { parseMoneyInput, sumMoney, toMoney } from "../../lib/money";
 import { syncPurchaseOrderGitTx } from "../../services/accounting/perpetualInventory/stockReceipts";
+import {
+  assertVoucherEditableTx,
+  recordVoucherEditAuditTx,
+  sendVoucherCorrectionRefusal,
+} from "../../services/accounting/voucherCorrection";
 
 /** The columns a voucher edit may set, checked against the vouchers table. */
 type VoucherUpdate = PgUpdateSetSource<typeof vouchers>;
@@ -118,6 +123,11 @@ export function registerVoucherPurchaseUpdateRoutes(app: Express) {
         if (!lockedPO || lockedPO.voucherId !== id) {
           throw new HttpError(409, "Purchase order changed concurrently. Reload and try again.");
         }
+        // Phase 22 (B), PE9/G4: open-period edit, audited below; closed period → 409.
+        const editContext = await assertVoucherEditableTx(tx, id, {
+          companyId: existingVoucher.companyId,
+          newVoucherDate: voucherDate ?? null,
+        });
         const oldPOTotal = toMoney(lockedPO.itemsTotal);
         const difference = totalAmount.minus(oldPOTotal);
 
@@ -191,7 +201,6 @@ export function registerVoucherPurchaseUpdateRoutes(app: Express) {
         const updatedRows = await tx.update(vouchers).set(voucherUpdates).where(eq(vouchers.id, id)).returning();
         // Perpetual inventory (wave 8.2): goods in transit follows the edited PO voucher.
         await syncPurchaseOrderGitTx(tx, existingVoucher.companyId, po.id);
-
         const _purChanges: Record<string, { old: unknown; new: unknown }> = {};
         if (existingVoucher.voucherDate !== updatedRows[0].voucherDate)
           _purChanges.date = { old: existingVoucher.voucherDate, new: updatedRows[0].voucherDate };
@@ -215,23 +224,20 @@ export function registerVoucherPurchaseUpdateRoutes(app: Express) {
             lineTotal: it.lineTotal,
           }))
         );
-        await logAudit(
-          {
-            userId: req.session.userId!,
-            username: req.session.username || "unknown",
-            companyId: req.session.currentCompanyId!,
-            action: "update",
-            tableName: "vouchers",
-            recordId: updatedRows[0].id,
-            recordIdentifier: updatedRows[0].voucherNumber,
-            changes: { ..._purChanges, ..._itemDiff },
-          },
-          tx
-        );
+        // Phase 22 (B): one audit row — the full before/after snapshot of the
+        // correction policy with the readable PO changes.
+        await recordVoucherEditAuditTx(tx, {
+          voucherId: id,
+          before: editContext.before,
+          actor: { userId: req.session.userId, username: req.session.username, companyId: existingVoucher.companyId },
+          reason: "Purchase voucher update",
+          extra: { ..._purChanges, ..._itemDiff },
+        });
         return updatedRows;
       });
       res.json(updated[0]);
     } catch (error: unknown) {
+      if (sendVoucherCorrectionRefusal(res, error)) return;
       const status = error instanceof HttpError ? error.statusCode : errorStatus(error);
       res.status(status).json({ message: getErrorMessage(error) });
     }

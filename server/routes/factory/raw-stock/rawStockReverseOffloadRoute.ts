@@ -9,7 +9,6 @@ import {
   factoryMixBatches,
   factoryMixBatchSources,
   factoryContainerCommissions,
-  voucherEntries,
   factoryDaybookEntries,
   factoryOffloadAdditionalCharges,
   vouchers,
@@ -37,7 +36,8 @@ import {
   financialOperationFingerprint,
   withDurableFinancialOperation,
 } from "../../../services/accounting/durableFinancialOperation";
-import { normFactoryEntry } from "../../../services/factory/factoryVoucherEntryAmounts";
+import { postFactoryVoucherTx } from "../../../services/factory/factoryVoucherPosting";
+import { toMoney } from "../../../lib/money";
 import { FactoryFxRateRequiredError, factoryDocumentRate } from "../../../services/factory/factoryDocumentFxRate";
 import { restoreRetiredPreOffloadFreightTx } from "../../../services/factory/reverseOffloadFreight";
 import { syncContainerCommissionJournalTx } from "../../../services/factory/containerCommissionJournal";
@@ -369,7 +369,7 @@ export function registerRawStockReverseOffloadRoute(app: Express) {
         // posts (`FACTORY-FREIGHT-{containerId}`) rather than carrying a timestamp:
         // this is the same voucher being restored, so it keeps one identity that the
         // next offload's cleanup can find exactly.
-        const restoredFreightAmt = parseFloat(restoredFreight || "0");
+        const restoredFreightAmt = toMoney(restoredFreight || "0").toNumber();
         // A voucher with only a debit leg is an unbalanced posting: it inflates one
         // side of the ledger and reports as VOUCHER_NOT_BALANCED in the convergence
         // reconciliation. The freight credit has to land on somebody — the paying
@@ -417,48 +417,37 @@ export function registerRawStockReverseOffloadRoute(app: Express) {
                 : undefined
             )
           ).rate;
-          const restoredFreightAmounts = (debit: string, credit: string) =>
-            normFactoryEntry(restoredFreightCurrencyCode, debit, credit, restoredFreightRate);
-          const [restoredFreightVoucher] = await tx
-            .insert(vouchers)
-            .values({
-              companyId,
-              voucherType: "Journal",
-              voucherNumber: restoredFreightVoucherNum,
-              voucherDate: restoredFreightDate,
-              description: `Freight on container ${container.containerNumber}`,
-              totalAmount: String(restoredFreightAmt),
-              currency: restoredFreightCurrencyCode,
-              exchangeRate: restoredFreightRate,
-              sourceModule: "FACTORY",
-            })
-            .returning();
-          // Dr Freight Expense
-          await tx.insert(voucherEntries).values({
-            voucherId: restoredFreightVoucher.id,
-            ledgerAccountId: restoredFreightAccountId,
-            ...restoredFreightAmounts(String(restoredFreightAmt), "0"),
-            narration: `Freight expense - container ${container.containerNumber}`,
+          // Phase 22 (C): through the engine with the container's freight posting
+          // identity (the create route's), Dr Freight Expense / Cr the supplier when
+          // pre-offload freight was supplier-paid, else the own account (never
+          // container.supplierId — that would debit the material supplier).
+          await postFactoryVoucherTx(tx, {
+            companyId,
+            voucherNumber: restoredFreightVoucherNum,
+            voucherDate: restoredFreightDate,
+            description: `Freight on container ${container.containerNumber}`,
+            currency: restoredFreightCurrencyCode,
+            fxRateToUsd: restoredFreightRate,
+            source: { sourceType: "factory-container-freight", sourceId: containerId, phase: "freight" },
+            lines: [
+              {
+                ledgerAccountId: restoredFreightAccountId,
+                debit: restoredFreight,
+                narration: `Freight expense - container ${container.containerNumber}`,
+              },
+              restoredFreightCreditSupplierId !== null
+                ? {
+                    factorySupplierId: restoredFreightCreditSupplierId,
+                    credit: restoredFreight,
+                    narration: `Freight payable to supplier - container ${container.containerNumber}`,
+                  }
+                : {
+                    ledgerAccountId: restoredFreightCreditAccountId,
+                    credit: restoredFreight,
+                    narration: `Freight paid via own account - container ${container.containerNumber}`,
+                  },
+            ],
           });
-          // Cr: supplier when pre-offload freight was supplier-paid;
-          //     own account when it was own-account paid (never fall back
-          //     to container.supplierId — that would silently debit the
-          //     material supplier for freight they didn't owe).
-          if (restoredFreightCreditSupplierId !== null) {
-            await tx.insert(voucherEntries).values({
-              voucherId: restoredFreightVoucher.id,
-              factorySupplierId: restoredFreightCreditSupplierId,
-              ...restoredFreightAmounts("0", String(restoredFreightAmt)),
-              narration: `Freight payable to supplier - container ${container.containerNumber}`,
-            });
-          } else if (hasRestoredFreightCreditLedger) {
-            await tx.insert(voucherEntries).values({
-              voucherId: restoredFreightVoucher.id,
-              ledgerAccountId: restoredFreightCreditAccountId,
-              ...restoredFreightAmounts("0", String(restoredFreightAmt)),
-              narration: `Freight paid via own account - container ${container.containerNumber}`,
-            });
-          }
         } else if (restoredFreightAmt > 0 && restoredFreightAccountId) {
           // The freight itself is still restored onto the container in step 10, so
           // no amount is lost — but with no counterparty to credit there is no

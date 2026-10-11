@@ -59,6 +59,8 @@ export async function writeVoucherAuditTx(
     before: VoucherAuditState | null;
     after: VoucherAuditState | null;
     extra?: AuditChanges;
+    /** Phase 22 A: why the voucher was changed (audit_log.reason; else the request's reason). */
+    reason?: string | null;
   }
 ): Promise<void> {
   const { before, after } = params;
@@ -98,6 +100,7 @@ export async function writeVoucherAuditTx(
       recordId: params.voucherId,
       recordIdentifier: voucher?.voucherNumber ?? null,
       changes: { ...summary, ...snapshot, ...(params.extra ?? {}) },
+      ...(params.reason ? { reason: params.reason } : {}),
     },
     tx
   );

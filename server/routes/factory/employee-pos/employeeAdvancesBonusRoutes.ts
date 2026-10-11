@@ -4,7 +4,8 @@ import type { Express, Request, Response } from "express";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 
-import { ledgerAccounts, voucherEntries, employees, factoryWorkers, vouchers } from "@shared/schema";
+import { ledgerAccounts, employees, factoryWorkers } from "@shared/schema";
+import { factorySessionActor, postFactoryVoucherTx } from "../../../services/factory/factoryVoucherPosting";
 import { eq, and, sql } from "drizzle-orm";
 import { findOrCreateLedger } from "../../payroll/core/_helpers";
 import { MoneyDecimal, moneyString, parseMoneyInput, toMoney } from "../../../lib/money";
@@ -190,51 +191,47 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
           .returning();
       }
 
-      const voucherNumber = `EMP-BON-${Date.now()}`;
+      // Phase 22 (C): the bonus row, its voucher (engine, engine-numbered — was
+      // EMP-BON-{Date.now()} — with the bonus's posting identity) and the
+      // employee's running balance commit together (the balance and the bonus row
+      // used to be written after the voucher's commit).
       const desc = notes || `Bonus for ${emp.firstName} ${emp.lastName}`;
-      const voucher = await db.transaction(async (tx) => {
-        const [voucher] = await tx
-          .insert(vouchers)
-          .values({
-            companyId,
-            voucherNumber,
-            voucherType: "Journal",
-            voucherDate: bonusDate,
-            description: desc,
-            totalAmount: moneyString(amt),
-          })
-          .returning();
-
-        await tx.insert(voucherEntries).values({
-          voucherId: voucher.id,
-          ledgerAccountId: payrollExpenseAccount.id,
-          debitAmount: moneyString(amt),
-          creditAmount: "0",
-          narration: desc,
+      const bonusResult = await db.transaction(async (tx) => {
+        const inserted = await tx.execute(sql`
+          INSERT INTO employee_bonuses (company_id, employee_id, bonus_date, amount, notes, voucher_id)
+          VALUES (${companyId}, ${parseInt(employeeId)}, ${bonusDate}, ${moneyString(amt)}, ${notes || null}, NULL)
+          RETURNING id
+        `);
+        const bonusId = Number((inserted.rows[0] as { id: number }).id);
+        const { voucher } = await postFactoryVoucherTx(tx, {
+          companyId,
+          voucherDate: bonusDate,
+          description: desc,
+          sourceModule: "ERP",
+          source: { sourceType: "factory-employee-bonus", sourceId: bonusId, phase: "voucher" },
+          actor: factorySessionActor(req),
+          lines: [
+            { ledgerAccountId: payrollExpenseAccount.id, debit: amt, narration: desc },
+            { employeeId: parseInt(employeeId), credit: amt, narration: desc },
+          ],
         });
-        await tx.insert(voucherEntries).values({
-          voucherId: voucher.id,
-          ledgerAccountId: null,
-          employeeId: parseInt(employeeId),
-          debitAmount: "0",
-          creditAmount: moneyString(amt),
-          narration: desc,
-        });
-        return voucher;
+        const [current] = await tx
+          .select({ currentBalance: employees.currentBalance, totalDeposits: employees.totalDeposits })
+          .from(employees)
+          .where(eq(employees.id, parseInt(employeeId)))
+          .for("update");
+        const newBalance = toMoney(current?.currentBalance).plus(moneyString(amt));
+        const newDeposits = toMoney(current?.totalDeposits).plus(moneyString(amt));
+        await tx
+          .update(employees)
+          .set({ currentBalance: moneyString(newBalance), totalDeposits: moneyString(newDeposits) })
+          .where(eq(employees.id, parseInt(employeeId)));
+        return tx.execute(sql`
+          UPDATE employee_bonuses SET voucher_id = ${voucher.id}
+           WHERE id = ${bonusId} AND company_id = ${companyId}
+          RETURNING *
+        `);
       });
-
-      const newBalance = toMoney(emp.currentBalance).plus(moneyString(amt));
-      const newDeposits = toMoney(emp.totalDeposits).plus(moneyString(amt));
-      await db
-        .update(employees)
-        .set({ currentBalance: moneyString(newBalance), totalDeposits: moneyString(newDeposits) })
-        .where(eq(employees.id, parseInt(employeeId)));
-
-      const bonusResult = await db.execute(sql`
-        INSERT INTO employee_bonuses (company_id, employee_id, bonus_date, amount, notes, voucher_id)
-        VALUES (${companyId}, ${parseInt(employeeId)}, ${bonusDate}, ${moneyString(amt)}, ${notes || null}, ${voucher.id})
-        RETURNING *
-      `);
       res.status(201).json(bonusResult.rows[0]);
     } catch (err: unknown) {
       res.status(500).json({ message: getErrorMessage(err) });
@@ -400,42 +397,29 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
 
       // Mark bonus as paid and create journal entry in a transaction
       await db.transaction(async (tx) => {
-        await tx.execute(sql`
+        const marked = await tx.execute(sql`
           UPDATE worker_bonuses SET status = 'paid', cash_account_id = ${cashId}, paid_date = ${payDate}
           WHERE id = ${parseInt(req.params.id)} AND company_id = ${companyId} AND status = 'pending'
+          RETURNING id
         `);
-
-        if (amt.greaterThan(0)) {
+        // Phase 22 (C): only the request that moved it to paid posts (a concurrent
+        // second pay found it paid already), through the engine with the bonus's
+        // identity; WBONUS-{id}- is read by the delete below, so it keeps the
+        // prefix with the posting generation (was Date.now()).
+        if (marked.rows.length > 0 && amt.greaterThan(0)) {
           const narration = wb.notes || `Bonus for ${workerName}`;
-          const [bVoucher] = await tx
-            .insert(vouchers)
-            .values({
-              companyId,
-              voucherNumber: `WBONUS-${req.params.id}-${Date.now()}`,
-              voucherType: "Journal",
-              voucherDate: payDate,
-              description: narration,
-              totalAmount: moneyString(amt),
-              currency: "USD",
-              sourceModule: "FACTORY",
-            })
-            .returning();
-          await tx.insert(voucherEntries).values([
-            {
-              voucherId: bVoucher.id,
-              ledgerAccountId: expAcc.id,
-              debitAmount: moneyString(amt),
-              creditAmount: "0",
-              narration: `Bonus - ${workerName}: ${narration}`,
-            },
-            {
-              voucherId: bVoucher.id,
-              ledgerAccountId: cashId,
-              debitAmount: "0",
-              creditAmount: moneyString(amt),
-              narration,
-            },
-          ]);
+          await postFactoryVoucherTx(tx, {
+            companyId,
+            voucherNumber: (generation) => `WBONUS-${req.params.id}-${generation}`,
+            voucherDate: payDate,
+            description: narration,
+            source: { sourceType: "factory-worker-bonus", sourceId: req.params.id, phase: "paid" },
+            actor: factorySessionActor(req),
+            lines: [
+              { ledgerAccountId: expAcc.id, debit: amt, narration: `Bonus - ${workerName}: ${narration}` },
+              { ledgerAccountId: cashId, credit: amt, narration },
+            ],
+          });
         }
       });
 

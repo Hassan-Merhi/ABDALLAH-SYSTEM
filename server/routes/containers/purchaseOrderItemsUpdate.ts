@@ -12,6 +12,8 @@ import { syncIntercoParentVoucher } from "./containerHelpers";
 import type Decimal from "decimal.js";
 import { MoneyDecimal, parseMoneyInput, sumMoney, toMoney } from "../../lib/money";
 import { syncPurchaseOrderGitTx } from "../../services/accounting/perpetualInventory/stockReceipts";
+import { usdLineAmounts } from "../../services/factory/factoryVoucherPosting";
+import { editPostedFactoryVoucherTx } from "../../services/factory/factoryVoucherCorrection";
 
 type PurchaseOrderRecord = NonNullable<Awaited<ReturnType<typeof storage.getPurchaseOrderById>>>;
 
@@ -270,26 +272,38 @@ export async function applyPurchaseOrderItemsUpdate(
     // Update the associated voucher — use supplier share (intercoTotal) so freight excluded
     // when it's paid via own-account or parent-company voucher.
     if (existingPO.voucherId) {
-      await tx.update(vouchers).set({ totalAmount: b1IntercoTotal }).where(eq(vouchers.id, existingPO.voucherId));
-
-      const existingEntries = await tx
-        .select()
-        .from(voucherEntries)
-        .where(eq(voucherEntries.voucherId, existingPO.voucherId));
-
-      for (const entry of existingEntries) {
-        if (toMoney(entry.debitAmount).greaterThan(0)) {
-          await tx
-            .update(voucherEntries)
-            .set({ debitAmount: b1IntercoTotal, creditAmount: "0" })
-            .where(eq(voucherEntries.id, entry.id));
-        } else if (toMoney(entry.creditAmount).greaterThan(0)) {
-          await tx
-            .update(voucherEntries)
-            .set({ creditAmount: b1IntercoTotal, debitAmount: "0" })
-            .where(eq(voucherEntries.id, entry.id));
+      const poVoucherId = existingPO.voucherId;
+      // Phase 22 (C), G4: an audited open-period edit of the posted PO voucher
+      // (409 in a closed period: reverse and re-post); every amount column.
+      await editPostedFactoryVoucherTx(
+        tx,
+        {
+          companyId: existingPO.companyId,
+          voucherIds: [poVoucherId],
+          reason: "purchase-order-items-update",
+          actor: { userId: req.session.userId, username: req.session.username },
+        },
+        async () => {
+          await tx.update(vouchers).set({ totalAmount: b1IntercoTotal }).where(eq(vouchers.id, poVoucherId));
+          const existingEntries = await tx
+            .select()
+            .from(voucherEntries)
+            .where(eq(voucherEntries.voucherId, poVoucherId));
+          for (const entry of existingEntries) {
+            if (toMoney(entry.debitAmount).greaterThan(0)) {
+              await tx
+                .update(voucherEntries)
+                .set(usdLineAmounts(b1IntercoTotal, 0))
+                .where(eq(voucherEntries.id, entry.id));
+            } else if (toMoney(entry.creditAmount).greaterThan(0)) {
+              await tx
+                .update(voucherEntries)
+                .set(usdLineAmounts(0, b1IntercoTotal))
+                .where(eq(voucherEntries.id, entry.id));
+            }
+          }
         }
-      }
+      );
     }
 
     // ── Inter-company sync: only for true subsidiary POs (not same-company).

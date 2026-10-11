@@ -24,7 +24,12 @@ type CentralPaymentReceiptBody = Omit<
   "companyId" | "voucherNumber" | "actor" | "resolveTarget"
 > & { optional?: unknown };
 import { checkAccountWhatsAppRule } from "../factoryWhatsappRoutes";
-import { buildVoucherChangesForUpdate, logAudit, snapshotVoucherEntries } from "../_helpers";
+import {
+  assertVoucherEditableTx,
+  recordVoucherEditAuditTx,
+  sendVoucherCorrectionRefusal,
+} from "../../services/accounting/voucherCorrection";
+import { rebalanceVoucherRoundingTx } from "../../services/accounting/engineRounding";
 
 const postingDependencies = createDatabasePostingDependencies();
 
@@ -148,6 +153,13 @@ async function updateActivePaymentReceipt(req: Request, res: Response, next: Nex
       if (!isActivePaymentReceiptType(lockedVoucher.voucherType) || lockedVoucher.optional) {
         throw new Error("Payment/Receipt compatibility state changed during update");
       }
+      // Phase 22 A (correction policy): open period only (409
+      // VOUCHER_CLOSED_PERIOD_REVERSE_INSTEAD otherwise); a reversed voucher is not edited.
+      const editContext = await assertVoucherEditableTx(tx, voucherId, {
+        companyId,
+        newVoucherDate: String(body.voucherDate),
+        newEffectiveDate: body.effectiveDate ? String(body.effectiveDate) : null,
+      });
 
       const built = await buildPaymentReceiptPostingRequest({
         companyId,
@@ -205,7 +217,7 @@ async function updateActivePaymentReceipt(req: Request, res: Response, next: Nex
         .returning();
 
       await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
-      const createdEntries = await tx
+      const insertedEntries = await tx
         .insert(voucherEntries)
         .values(built.request.entries.map((entry) => ({ voucherId, ...entry })))
         .returning();
@@ -213,10 +225,12 @@ async function updateActivePaymentReceipt(req: Request, res: Response, next: Nex
       await applyEmployeeBalanceDeltasTx({
         tx,
         companyId,
-        entries: createdEntries,
+        entries: insertedEntries,
         direction: "apply",
         missingEmployeeBehavior: "throw",
       });
+      // Phase 22 A (D3): an engine voucher balances exactly (ROUNDING line).
+      await rebalanceVoucherRoundingTx(tx, { companyId, voucherId });
 
       // An edited duty/transport/office charge voucher re-prices the offloaded bales.
       await syncContainerChargeVoucherEditTx(tx, {
@@ -226,41 +240,17 @@ async function updateActivePaymentReceipt(req: Request, res: Response, next: Nex
         newTotal: updatedVoucher.totalAmount,
       });
 
-      // Wave 16 (B): the edit replaces the voucher's lines (delete and
-      // re-insert, the legacy edit contract). The before and after lines are
-      // audited in this transaction, so a failed audit rolls the edit back.
-      const oldSnapshot = await snapshotVoucherEntries(oldEntries, tx);
-      const newSnapshot = await snapshotVoucherEntries(createdEntries, tx);
-      await logAudit(
-        {
-          userId: userId!,
-          username: req.session.username || "unknown",
-          companyId,
-          action: "update",
-          tableName: "vouchers",
-          recordId: voucherId,
-          recordIdentifier: updatedVoucher.voucherNumber,
-          changes: buildVoucherChangesForUpdate(
-            {
-              voucherType: lockedVoucher.voucherType,
-              voucherDate: lockedVoucher.voucherDate,
-              totalAmount: lockedVoucher.totalAmount,
-              description: lockedVoucher.description,
-              optional: lockedVoucher.optional,
-            },
-            {
-              voucherType: updatedVoucher.voucherType,
-              voucherDate: updatedVoucher.voucherDate,
-              totalAmount: updatedVoucher.totalAmount,
-              description: updatedVoucher.description,
-              optional: updatedVoucher.optional,
-            },
-            oldSnapshot,
-            newSnapshot
-          ),
-        },
-        tx
-      );
+      // Wave 16 (B) / phase 22 A: the edit replaces the voucher's lines (delete
+      // and re-insert, the legacy edit contract). The full header and every line
+      // before and after are audited in this transaction, so a failed audit
+      // rolls the edit back.
+      const audited = await recordVoucherEditAuditTx(tx, {
+        voucherId,
+        before: editContext.before,
+        actor: { userId: userId ?? null, username: req.session.username || "unknown", companyId },
+        reason: `${body.voucherType} voucher update`,
+      });
+      const createdEntries = audited.entries;
 
       return {
         voucher: updatedVoucher,
@@ -310,6 +300,7 @@ async function updateActivePaymentReceipt(req: Request, res: Response, next: Nex
       durationMs: Date.now() - startedAt,
       error,
     });
+    if (sendVoucherCorrectionRefusal(res, error)) return;
     if (error instanceof PostingValidationError) {
       res.status(400).json({ message: error.message, code: error.code });
       return;

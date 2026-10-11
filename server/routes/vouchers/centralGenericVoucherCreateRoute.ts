@@ -105,7 +105,9 @@ async function createCentralGenericVoucher(req: Request, res: Response, next: Ne
       const built = buildGenericVoucherPostingRequest({
         companyId,
         clientRequestId: req.body.clientRequestId,
-        voucher: req.body.voucher,
+        // Phase 22 (B), PE8: the form's display number (built from Date.now())
+        // is not the voucher number; the engine allocates the gapless one.
+        voucher: { ...req.body.voucher, voucherNumber: undefined },
         entries: resolvedEntries,
         exchangeRate: voucherExchangeRate,
         actor: {

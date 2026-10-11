@@ -397,7 +397,7 @@ export async function executeContainerOffloadLifecycle(
       .set({
         status: "OFFLOADED",
         offloadDate: input.offloadDate,
-        dutyFee: amount(input.duties) > 0 ? input.duties : "0",
+        dutyFee: amount(input.duties).greaterThan(0) ? input.duties : "0",
       })
       .where(eq(schema.containers.id, input.containerId));
 

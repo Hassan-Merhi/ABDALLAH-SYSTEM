@@ -26,16 +26,9 @@ import { generateInvoicePdf } from "../helpers/generateInvoicePdf";
 import { generateStockPdf } from "../helpers/generateStockPdf";
 import { getErpExportVisibility } from "../helpers/exportVisibility";
 import { sendWhatsAppFileByUploadPos, sendWhatsAppFileToChatIdPos } from "../services/whatsappService";
-import {
-  vouchers,
-  voucherEntries,
-  salesItems,
-  companies,
-  inventory,
-  stockItemLocationPrices,
-  type Voucher,
-} from "@shared/schema";
+import { salesItems, companies, inventory, stockItemLocationPrices, type Voucher } from "@shared/schema";
 import { MoneyDecimal } from "../lib/money";
+import { erpRequestSourceId, postErpVoucherTx, sessionPostingActor } from "../services/accounting/erpVoucherPosting";
 import { postSaleCogsTx, relievedValue } from "../services/accounting/perpetualInventory/saleCogs";
 import {
   assertNoBaleMirrorMovementTx,
@@ -247,21 +240,40 @@ export function registerPosImportRoutes(app: Express) {
       // Taking the transaction's return value rather than assigning an outer
       // `let` keeps the voucher's type: TypeScript cannot see that a callback ran.
       const createdVoucher = await db.transaction(async (tx): Promise<Voucher> => {
-        const voucherNumber = `SALES-${Date.now()}`;
+        // Phase 22 (B): the sale posts through the central engine first (number
+        // allocated there): its lines are the sale value, known from the items;
+        // the stock issues and sale items below then reference the voucher.
+        for (const item of items) {
+          totalSales = addInventoryValues(
+            totalSales,
+            multiplyInventoryValues(toInventoryDecimal(item.quantity), toInventoryDecimal(item.rate))
+          );
+        }
+        const totalSalesAmount = inventoryMoney(totalSales);
         let relieved = new MoneyDecimal(0);
-        const [voucher] = await tx
-          .insert(vouchers)
-          .values({
-            companyId: req.session.currentCompanyId!,
-            locationId,
-            locationName: location.name,
-            voucherNumber,
-            voucherType: "Sales",
-            voucherDate: saleDate,
-            description: `POS Import - ${items.length} items`,
-            totalAmount: "0",
-          })
-          .returning();
+        const { voucher } = await postErpVoucherTx(tx, {
+          companyId: req.session.currentCompanyId!,
+          locationId,
+          voucherType: "Sales",
+          voucherDate: saleDate,
+          description: `POS Import - ${items.length} items`,
+          lines: [
+            {
+              ledgerAccountId: cashAccountId,
+              debit: totalSalesAmount,
+              narration: `Cash from POS Sales - ${items.length} items`,
+            },
+            {
+              ledgerAccountId: salesRevenueAccount.id,
+              credit: totalSalesAmount,
+              narration: `Sales Revenue - ${items.length} items`,
+            },
+          ],
+          source: { type: "pos-import", id: `${req.session.currentCompanyId}:${erpRequestSourceId(req)}` },
+          actor: sessionPostingActor(req, "POS import"),
+          metadata: { locationName: location.name },
+        });
+        const voucherNumber = voucher.voucherNumber;
 
         for (const item of items) {
           const stockItem = await storage.getStockItemByCodeOrAlias(item.barcode, req.session.currentCompanyId!);
@@ -283,7 +295,6 @@ export function registerPosImportRoutes(app: Express) {
           const itemSales = multiplyInventoryValues(quantity, sellingPrice);
           const itemCost = multiplyInventoryValues(quantity, costPrice);
           const profit = subtractInventoryValues(itemSales, itemCost);
-          totalSales = addInventoryValues(totalSales, itemSales);
 
           const [locationPrice] = await tx
             .select()
@@ -348,22 +359,6 @@ export function registerPosImportRoutes(app: Express) {
           );
         }
 
-        const totalSalesAmount = inventoryMoney(totalSales);
-        await tx.insert(voucherEntries).values({
-          voucherId: voucher.id,
-          ledgerAccountId: cashAccountId,
-          debitAmount: totalSalesAmount,
-          creditAmount: "0",
-          narration: `Cash from POS Sales - ${items.length} items`,
-        });
-        await tx.insert(voucherEntries).values({
-          voucherId: voucher.id,
-          ledgerAccountId: salesRevenueAccount.id,
-          debitAmount: "0",
-          creditAmount: totalSalesAmount,
-          narration: `Sales Revenue - ${items.length} items`,
-        });
-        await tx.update(vouchers).set({ totalAmount: totalSalesAmount }).where(eq(vouchers.id, voucher.id));
         // Perpetual inventory (wave 8.1): the exact value the import took out of stock.
         await postSaleCogsTx(tx, {
           companyId: req.session.currentCompanyId!,

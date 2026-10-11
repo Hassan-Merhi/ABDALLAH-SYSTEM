@@ -41,6 +41,7 @@ const voucherReview = JSON.parse(
     wave16NoLongerCreates: number;
     wave18NoLongerCreates: number;
     phase19NoLongerCreates: number;
+    phase22EngineCompleted: number;
     migrationImportRepair: number;
     operationalWithoutRequestIdentity: number;
     phase3InfrastructureCompleted: number;
@@ -137,15 +138,17 @@ describe("write evidence ratchet", () => {
   // Wave 16 (A): balance-repair/undo.ts no longer inserts vouchers (it restores
   // the retired one). Wave 18 (B): the retired payroll migrate-city-split route
   // was the payroll migrations file's only voucher creator, so the active backlog is 12.
-  it("keeps only the exact 12 reviewed compatibility writers in the active voucher backlog", () => {
+  // Phase 22 (B / C): nine of them post through the central engine now
+  // (completed group phase-22-engine-writers), so the active backlog is 3.
+  it("keeps only the exact 3 reviewed compatibility writers in the active voucher backlog", () => {
     const classified = Object.values(voucherReview.reviewed).flatMap((group) => group.files);
 
     expect(voucherReview.reviewState).toBe("REVIEWED FILE BY FILE");
-    expect(voucherReview.summary.activeReviewed).toBe(12);
-    expect(voucherReview.summary.explicitReplayGuard).toBe(12);
+    expect(voucherReview.summary.activeReviewed).toBe(3);
+    expect(voucherReview.summary.explicitReplayGuard).toBe(3);
     expect(voucherReview.summary.migrationImportRepair).toBe(0);
     expect(voucherReview.summary.operationalWithoutRequestIdentity).toBe(0);
-    expect(baseline.voucherWritesWithoutRequestIdentity.ceiling).toBe(12);
+    expect(baseline.voucherWritesWithoutRequestIdentity.ceiling).toBe(3);
     expect([...classified, ...voucherReview.unreviewed].sort()).toEqual(
       [...baseline.voucherWritesWithoutRequestIdentity.files].sort()
     );
@@ -180,6 +183,7 @@ describe("write evidence ratchet", () => {
       "phase-6-intrinsic-replay-safe-writers": 2,
       "phase-7-post-review-safe-writers": 1,
       "phase-8-request-identity-writers": 1,
+      "phase-22-engine-writers": 9,
     };
 
     for (const [groupName, expectedCount] of Object.entries(expectedCounts)) {
@@ -219,7 +223,8 @@ describe("write evidence ratchet", () => {
         voucherReview.summary.phase8RequestIdentityCompleted +
         voucherReview.summary.wave16NoLongerCreates +
         voucherReview.summary.wave18NoLongerCreates +
-        voucherReview.summary.phase19NoLongerCreates
+        voucherReview.summary.phase19NoLongerCreates +
+        voucherReview.summary.phase22EngineCompleted
     ).toBe(voucherReview.summary.initialReviewed);
   });
 

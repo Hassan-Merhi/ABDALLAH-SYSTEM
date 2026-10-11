@@ -17,12 +17,12 @@ import {
   factoryContainers,
   factoryRawStock,
   factoryContainerCommissions,
-  voucherEntries,
   factoryDaybookEntries,
   vouchers,
 } from "@shared/schema";
 import { eq, and, or, inArray, ilike, isNull } from "drizzle-orm";
-import { normFactoryEntry } from "./_helpers";
+import { postFactoryVoucherTx } from "../../../services/factory/factoryVoucherPosting";
+import { toMoney } from "../../../lib/money";
 import { removeContainerCommissionJournalTx } from "../../../services/factory/containerCommissionJournal";
 import { retireVouchersTx, sessionRetirementActor } from "../../../services/accounting/voucherRetirement";
 
@@ -214,8 +214,9 @@ export function registerFactoryContainerDeleteRoutes(app: Express) {
           skipped++;
           continue;
         }
-        const goodsValue = parseFloat(container.ratePerKg || "0") * parseFloat(container.totalKg || "0");
-        if (goodsValue <= 0) {
+        // Exact (was a float product).
+        const goodsValue = toMoney(container.ratePerKg).times(toMoney(container.totalKg));
+        if (goodsValue.lessThanOrEqualTo(0)) {
           skipped++;
           continue;
         }
@@ -254,35 +255,31 @@ export function registerFactoryContainerDeleteRoutes(app: Express) {
 
         const today = getClientDate(req);
         const importCostAccId = await getOrCreateLedgerAccount(companyId, "FACTORY_IMPORT_COST", "Factory Import Cost");
-        const importVoucherNum = `FACTORY-IMPORT-${container.id}-${Date.now()}`;
-        await db.transaction(async (tx) => {
-          const [importVoucher] = await tx
-            .insert(vouchers)
-            .values({
-              companyId,
-              voucherType: "Journal",
-              voucherNumber: importVoucherNum,
-              voucherDate: container.arrivalDate || today,
-              description: `Goods import - container ${container.containerNumber}`,
-              totalAmount: String(goodsValue),
-              currency: container.currencyCode || "USD",
-              exchangeRate: String(backfillFxRate),
-              sourceModule: "FACTORY",
-            })
-            .returning();
-          await tx.insert(voucherEntries).values({
-            voucherId: importVoucher.id,
-            ledgerAccountId: importCostAccId,
-            ...normFactoryEntry(container.currencyCode || "USD", String(goodsValue), "0", backfillFxRate),
-            narration: `Goods import cost - container ${container.containerNumber}`,
-          });
-          await tx.insert(voucherEntries).values({
-            voucherId: importVoucher.id,
-            factorySupplierId: container.supplierId,
-            ...normFactoryEntry(container.currencyCode || "USD", "0", String(goodsValue), backfillFxRate),
-            narration: `Goods payable to supplier - container ${container.containerNumber}`,
-          });
-        });
+        // Phase 22 (C): through the engine with the container's goods identity
+        // (the create route's) and its FACTORY-IMPORT-{container}- family number.
+        await db.transaction((tx) =>
+          postFactoryVoucherTx(tx, {
+            companyId,
+            voucherNumber: (generation) => `FACTORY-IMPORT-${container.id}-${generation}`,
+            voucherDate: container.arrivalDate || today,
+            description: `Goods import - container ${container.containerNumber}`,
+            currency: container.currencyCode || "USD",
+            fxRateToUsd: String(backfillFxRate),
+            source: { sourceType: "factory-container-import", sourceId: container.id, phase: "goods" },
+            lines: [
+              {
+                ledgerAccountId: importCostAccId,
+                debit: goodsValue,
+                narration: `Goods import cost - container ${container.containerNumber}`,
+              },
+              {
+                factorySupplierId: container.supplierId,
+                credit: goodsValue,
+                narration: `Goods payable to supplier - container ${container.containerNumber}`,
+              },
+            ],
+          })
+        );
         created++;
       }
 
