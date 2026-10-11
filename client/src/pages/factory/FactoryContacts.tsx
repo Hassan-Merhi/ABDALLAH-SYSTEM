@@ -4,6 +4,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { PageHeader } from "@/components/PageHeader";
+import { DataTableToolbar } from "@/components/DataTableToolbar";
+import { TableViewOptions, type TableColumnOption } from "@/components/TableViewOptions";
+import { PaginationBar } from "@/components/PaginationBar";
+import { useTablePrefs } from "@/hooks/use-table-prefs";
+import { useCompany } from "@/contexts/CompanyContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,7 +27,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Search, Phone, Pencil, Trash2, Copy, BookMarked, X, Check } from "lucide-react";
+import { Plus, Phone, Pencil, Trash2, Copy, BookMarked, X, Check } from "lucide-react";
 
 interface PhoneEntry {
   label: string;
@@ -46,6 +51,14 @@ const EMPTY_FORM = {
   numbers: [{ label: "Mobile", number: "" }] as PhoneEntry[],
   notes: "",
 };
+
+const CONTACT_COLUMNS: TableColumnOption[] = [
+  { key: "name", label: "Name", required: true },
+  { key: "role", label: "Role" },
+  { key: "phones", label: "Phone Numbers", required: true },
+  { key: "notes", label: "Notes" },
+  { key: "actions", label: "Actions", required: true },
+];
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -71,6 +84,12 @@ export default function FactoryContacts() {
   const modeApiRequest = getApiRequest(appMode);
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { selectedCompany } = useCompany();
+  const { prefs, setPrefs } = useTablePrefs("factory-contacts", { companyId: selectedCompany?.id });
+  const [page, setPage] = useState(1);
+  const pageSize = prefs.pageSize ?? 25;
+  const visibility = prefs.columns ?? {};
+  const show = (key: string) => visibility[key] !== false;
 
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -92,6 +111,12 @@ export default function FactoryContacts() {
       (c) => searchAny(search, c.name, c.role, c.notes) || c.numbers.some((n) => searchAny(search, n.number, n.label))
     );
   }, [contacts, search]);
+  const orderedContacts = [...filtered].sort(
+    (a, b) => a.name.localeCompare(b.name) * (prefs.sortDir === "desc" ? -1 : 1)
+  );
+  const pages = Math.max(1, Math.ceil(orderedContacts.length / pageSize));
+  const safePage = Math.min(Math.max(1, page), pages);
+  const visibleContacts = orderedContacts.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   const saveMutation = useMutation({
     mutationFn: async (data: typeof EMPTY_FORM) => {
@@ -179,16 +204,20 @@ export default function FactoryContacts() {
       </PageHeader>
 
       <div className="flex-1 min-h-0 overflow-y-auto p-4">
-        {/* Search */}
-        <div className="relative mb-4 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search name, role, number…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
-        </div>
+        <DataTableToolbar
+          search={search}
+          onSearchChange={(value) => { setSearch(value); setPage(1); }}
+          searchPlaceholder="Search name, role, number…"
+          actions={
+            <TableViewOptions
+              columns={CONTACT_COLUMNS}
+              visibility={visibility}
+              density={prefs.density}
+              onVisibilityChange={(key, value) => setPrefs({ columns: { ...visibility, [key]: value } })}
+              onDensityChange={(value) => setPrefs({ density: value })}
+            />
+          }
+        />
 
         {isLoading ? (
           <div className="space-y-2">
@@ -211,21 +240,21 @@ export default function FactoryContacts() {
           </div>
         ) : (
           <div className="sm:rounded-md sm:border">
-            <Table mobileLayout="cards" data-testid="factory-contacts-table">
+            <Table mobileLayout="cards" density={prefs.density} data-testid="factory-contacts-table">
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[180px]">Name</TableHead>
-                  <TableHead className="w-[140px]">Role</TableHead>
+                  {show("role") && <TableHead className="w-[140px]">Role</TableHead>}
                   <TableHead>Phone Numbers</TableHead>
-                  <TableHead>Notes</TableHead>
+                  {show("notes") && <TableHead>Notes</TableHead>}
                   <TableHead className="w-[80px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((c) => (
+                {visibleContacts.map((c) => (
                   <TableRow key={c.id} className="group">
                     <TableCell className="font-semibold align-top py-3">{c.name}</TableCell>
-                    <TableCell className="align-top py-3">
+                    {show("role") && <TableCell className="align-top py-3">
                       {c.role ? (
                         <Badge variant="secondary" className="text-xs font-normal">
                           {c.role}
@@ -233,7 +262,7 @@ export default function FactoryContacts() {
                       ) : (
                         <span className="text-muted-foreground text-xs">—</span>
                       )}
-                    </TableCell>
+                    </TableCell>}
                     <TableCell className="align-top py-3">
                       {c.numbers.length > 0 ? (
                         <div className="space-y-1">
@@ -250,13 +279,13 @@ export default function FactoryContacts() {
                         <span className="text-muted-foreground text-xs">—</span>
                       )}
                     </TableCell>
-                    <TableCell className="align-top py-3 sm:max-w-[260px]">
+                    {show("notes") && <TableCell className="align-top py-3 sm:max-w-[260px]">
                       {c.notes ? (
                         <p className="text-xs text-muted-foreground whitespace-pre-wrap line-clamp-3">{c.notes}</p>
                       ) : (
                         <span className="text-muted-foreground text-xs">—</span>
                       )}
-                    </TableCell>
+                    </TableCell>}
                     <TableCell className="align-top py-3 text-right">
                       <div className="flex items-center justify-end gap-1 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 touch:opacity-100 sm:group-focus-within:opacity-100 touch:opacity-100">
                         <Button
@@ -287,6 +316,9 @@ export default function FactoryContacts() {
             </Table>
           </div>
         )}
+        <PaginationBar page={safePage} totalPages={pages} total={filtered.length} pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => { setPrefs({ pageSize: size }); setPage(1); }} noun="contacts" />
       </div>
 
       {/* Add / Edit Dialog */}
