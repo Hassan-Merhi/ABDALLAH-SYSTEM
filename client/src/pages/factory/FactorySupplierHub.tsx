@@ -46,7 +46,7 @@ export default function FactorySupplierHub() {
         className="flex flex-col h-full overflow-hidden"
       >
         <div className="border-b px-4 pt-3 shrink-0 overflow-x-auto">
-          <TabsList className="flex-nowrap">
+          <TabsList className="w-max max-w-full" aria-label="Factory supplier sections">
             {sections.includes("report") && (
               <TabsTrigger value="report" data-testid="tab-supplier-hub-report">
                 <FileText className="h-4 w-4 mr-2" />
