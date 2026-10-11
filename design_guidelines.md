@@ -265,3 +265,13 @@ authorization, and authoritative filters in their owning modules. Standard
 phone record lists use `mobileLayout="cards"`; financial ledgers and
 column-dependent matrices remain scrollable tables. For detailed usage, see
 [`docs/shared-ui-phase-3.md`](docs/shared-ui-phase-3.md).
+
+## Canonical Forms and Financial Display (Phase 4)
+
+Use the existing `FormField` / `FormControl` validation contract,
+`FormGrid`, `FormActionBar`, `DecimalInput`, `MoneyInput`,
+`FormSubmitButton`, and `ConfirmDialog` instead of bespoke controls.
+Explicit-currency amounts use `MoneyAmount` or
+`formatMoneyDisplay`, *never* implicit FX conversion. Await async
+confirmations and guard posting actions against repeat submissions.
+The full reference is [`docs/shared-ui-phase-4.md`](docs/shared-ui-phase-4.md).

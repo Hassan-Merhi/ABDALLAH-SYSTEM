@@ -65,3 +65,13 @@ The gate rejects root horizontal overflow, missing application shells, missing s
 4. For filter-heavy lists, use the shared persisted filter hook and add a reset-all control.
 5. Add the route to the rendered workspace matrix when it introduces a new interaction pattern rather than duplicating an already-covered list or detail pattern.
 6. Run `npm run audit:ux-consistency`, the frontend suite, and the responsive Phase 11 verifier.
+
+## Form and action reuse (Phase 4)
+
+The canonical form inputs, explicit-currency display, and protective async
+actions are documented in `docs/shared-ui-phase-4.md`. For incremental
+adoption, use `FormSubmitButton`, `MoneyInput` and
+`useSingleFlightAction` while preserving existing domain mutation callbacks.
+The scheduled no-checks architecture waves are tracked separately in
+`docs/shared-ui-continuation-roadmap.md`; they do not disable or change
+the project's existing CI configuration.
