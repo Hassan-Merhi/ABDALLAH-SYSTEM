@@ -1,133 +1,130 @@
-# Universal responsive pill tabs — implementation inventory
+# Universal responsive pill tabs
 
 **Branch:** `feat/universal-responsive-pill-tabs-20261011`  
-**Scope:** ERP, Factory, POS/Supplier Partner, Properties, Settings, and nested tab-based pages.  
-**Design reference:** Tracking Hub’s Containers OTW / GIT Tracking / Transporter Statement tab strip.
+**Scope:** secondary (in-page) tab bars in ERP, Factory, Payroll, POS settings, Supplier Partner, Properties, Settings, Import/Export and shared dialogs.  
+**Design reference:** Tracking Hub's Containers OTW / GIT Tracking / Transporter Statement strip.
+
+This page describes the tab standard as implemented. Phases 1–7 migrated the screens; Phase 8 audited, tested and fixed the result (see [Phase 8 audit and verification](#phase-8-audit-and-verification)).
 
 ## Component standard
 
-- Use `Tabs`, `TabsList`, `TabsTrigger`, and `TabsContent` from `client/src/components/ui/tabs.tsx` for local section selection.
-- For pages that intentionally render their content directly, use `TabsList` with `PillTabButton selected={...}` rather than duplicating the pill classes.
-- Both use one rounded, theme-aware pill container; selected tabs have a solid background, semibold foreground text, and a light shadow.
-- Mobile targets are at least 44px high; desktop targets are at least 36px. Labels stay in one line, overflow scrolls horizontally, and active tabs scroll into view.
-- Keyboard Left/Right, Home and End operate through the shared `TabsList`; arrow direction follows computed RTL direction. Existing responsive overflow fades are supplied by `mobile-browser-compat.css` and the shell's `useScrollOverflowProbe`.
-- Do not introduce another horizontal observer/mask subsystem or replace primary sidebar and bottom navigation with secondary tabs.
-- Do not alter access checks, the active-tab query parameters, translation labels or panel content.
-- Existing `variant="underline"` users are migrated to the default pill appearance.
+All secondary tab bars use `client/src/components/ui/tabs.tsx`:
 
-## Inventory and migration map
+| Export | Use |
+| --- | --- |
+| `Tabs` | Controlled (`value` + `onValueChange`) or uncontrolled (`defaultValue`) state. Supplies an id so tabs and panels can reference each other. |
+| `TabsList` | The pill container (`role="tablist"`, `aria-orientation="horizontal"`, `data-responsive-tabs="true"`). One row, never wraps, scrolls sideways. Owns arrow-key navigation. Always give it an `aria-label`. |
+| `TabsTrigger` | A tab bound to `Tabs` state. The selected trigger carries `aria-controls`, pointing at its mounted panel. |
+| `TabsContent` | The panel (`role="tabpanel"`, `aria-labelledby`). Only the selected panel is mounted. |
+| `PillTabButton` | For hubs that render panels directly (route-backed tabs, `useHubQueryState`, conditional JSX). Same look and keyboard behaviour, `selected` prop instead of `Tabs` state. |
+| `useActiveTabVisibility` | For bespoke tabs that cannot be a plain button (the editable Factory Status Builder pages). Keeps the selected tab scrolled into view. |
 
-| Surface | Located implementation | Migration approach |
+`variant="underline"` is still accepted for API compatibility; no screen uses it now.
+
+### Visual rules
+
+- Rounded-full outer container (`border`, `bg-muted/40`, `p-1`) and rounded-full tabs; the selected tab is `bg-background`, semibold, `text-foreground`, `shadow-sm`. Colours are theme tokens, so light and dark themes both work.
+- Tabs are at least **44px** high below the `sm` breakpoint (640px) and on any coarse-pointer device (phone landscape, tablets, including tab strips in portalled dialogs), and **36px** on desktop.
+- Labels are `whitespace-nowrap` and `shrink-0`: they never truncate, squeeze or wrap; the strip scrolls instead.
+- Hub pages wrap the list in `.erp-mobile-scroll-tabs` with `w-max min-w-full sm:min-w-0 sm:w-fit`, so the pill spans the width on phones and hugs its content on desktop.
+- Overflow fades come from the shell's `useScrollOverflowProbe` (`data-scroll-overflow`) and `mobile-browser-compat.css`. Only the edge that hides tabs fades. In Arabic the physical edge is mirrored, using `:dir(rtl)` with a `[dir="rtl"]` fallback for browsers without `:dir()`.
+
+### Behaviour rules
+
+- **Selected tab stays visible.** On selection, focus, container resize, text or zoom changes and width changes, the selected tab is scrolled into its strip (and the enclosing `.erp-mobile-scroll-tabs`), with clearance for the 2.5rem fade. Only the strip scrolls; the page never does. Height-only window resizes (a mobile toolbar collapsing during vertical scroll) are ignored, so they do not undo a sideways swipe.
+- **Keyboard:** Left/Right move and select (automatic activation), Home/End jump to the ends, and focus wraps. Disabled tabs and tabs that are not rendered are skipped. In RTL, Left moves to the next tab. The app-wide scroll-key handler (`client/src/app/useGlobalScrollKeys.ts`) leaves Left/Right/Home/End alone when a tab has focus. Before Phase 8 it swallowed them on any page that had a sideways-scrollable region.
+- **Touch:** the list is `touch-auto`, so sideways swipes scroll the strip and a vertical swipe that starts on the strip still scrolls the page.
+- **Permissions and URL state are owned by each page.** Pages compute the visible tabs from access and settings. They render only those tabs, and fall back to the first visible tab when the URL (`?tab=`, `?section=`) names a hidden one (`useHubQueryState` `allowedValues`, or an `effective…Tab` value). The tab primitive never changes access rules or query parameters.
+
+### Do not
+
+- Add a second horizontal observer or mask system, or copy pill classes into pages.
+- Put non-tab controls inside a `TabsList`. Put actions such as "Add page" or "New batch" beside it, inside the same scroll wrapper if they need to scroll with it.
+- Wrap a panel that already renders its own `TabsContent` in another `TabsContent`. That creates nested tabpanels with duplicate ids.
+- Restyle primary navigation, sidebars, bottom navigation, view-mode toggles, workflow progress steps or independent filters as tabs.
+
+## Migration map
+
+| Surface | Implementation | Approach |
 | --- | --- | --- |
-| Tracking | `TrackingHub.tsx`, `GITMockup.tsx` | Shared tab primitive and full-width scroll |
-| Stock and Inventory | `StockHub.tsx`, `InventoryHub.tsx` | Custom button rows replaced by shared tabs |
-| Parties and Sales Tools | `PartiesHub.tsx`, `SalesToolsHub.tsx` | Shared component; direct panel logic retained |
-| Accounting and Daybook | `AccountsLegacy.tsx`, `Daybook.tsx`, `FactoryDaybook.tsx` | Shared component already in use, with normal pill appearance |
-| Payroll | `PayrollView.tsx`, `BonusDialog.tsx`, `AdvancesTab.tsx`, `FactoryPayrollHub.tsx`, `factorypayroll/FactoryPayrollView.tsx`, `components/erprunpayroll/CompactRunPayrollSelection.tsx` | Standardized layout and former underline variants |
-| Factory Bales / Suppliers / Finance | `FactoryBalesHub.tsx`, `FactorySupplierHub.tsx`, `FactoryFinanceHub.tsx`, `FactoryPartiesHub.tsx`, `FactoryProductionIntelHub.tsx`, `DailyProductionReport.tsx` | Shared component with same one-row pill appearance |
-| Factory Loadings and Invoicing | `FactoryLoadingsHub.tsx`, `FactoryInvoicing.tsx` | Manual underline tab rows converted to shared pill buttons |
-| Factory Stock and Relabeling | `BaleStockEntry.tsx`, `FactorySheetsAndSacks.tsx`, `FactoryBaleRelabeling.tsx`, `WipersReEntry.tsx`, `FactoryStockAllocationV3.tsx`, `production-raw-stock/RawStockRecalculate.tsx`, `factorystatusbuilder/components/TabLabel.tsx` | Shared pill appearance, direct panel logic and existing routes; editable status tabs retain their special behavior |
-| POS / Supplier Partner | `SalesToolsHub.tsx`, `settings/PosSetupHub.tsx`, `sp/SpGoldenCoast.tsx`, `sp/SpReports.tsx` | Standardized section tabs, not the unrelated POS checkout/bottom navigation |
-| Properties | `PropertiesRentalsHub.tsx`, `property-rental/components/UnitActionDialog.tsx` | Standardized pill navigation inside hubs and dialogs |
-| Settings | `settings/SessionsHub.tsx`, `settings/ExportCenter.tsx`, `settings/FileStorageAndExport.tsx`, `settings/ApprovalsPage.tsx` | Standard pill appearance including previously underlined approval status tabs |
-| Shared dialogs and utilities | `components/CombinedImportDialog.tsx`, `components/ERPWorkerDetail.tsx`, `components/stockitemdetailsdialog/StockItemDetailsDialogView.tsx`, `components/FactoryCatalogTranslationEditor.tsx`, `components/NotificationsCenter.tsx` | Inherit shared design through `TabsList` or use `PillTabButton` for direct panel selection |
+| Tracking | `TrackingHub.tsx`, `GITMockup.tsx` | Shared tabs, full-width scroll strip |
+| Stock and Inventory | `StockHub.tsx`, `InventoryHub.tsx` | Custom button rows replaced by `Tabs`/`TabsContent`. Permission filtering and `?tab=` kept |
+| Parties and Sales Tools | `PartiesHub.tsx`, `SalesToolsHub.tsx` | Shared tabs. Role-aware visibility and lazy panels kept |
+| Accounting and Daybook | `AccountsLegacy.tsx`, `Daybook.tsx`, `factory/FactoryDaybook.tsx` | Scroll strip. The Accounts phone statement view still hides its tab strip |
+| ERP Payroll | `payroll/PayrollView.tsx`, `payroll/AdvancesTab.tsx`, `payroll/BonusDialog.tsx`, `erprunpayroll/ERPRunPayrollView.tsx`, `erprunpayroll/CompactRunPayrollSelection.tsx`, `ERPWorkerDetail.tsx` | Shared appearance. Former underline and grid variants removed |
+| Factory hubs | `FactoryBalesHub`, `FactorySupplierHub`, `FactoryFinanceHub`, `FactoryPartiesHub`, `FactoryProductionIntelHub`, `DailyProductionReport`, `FactoryKpis`, `FactoryProfitability` | Scroll strip, one row |
+| Factory sales | `FactoryLoadingsHub`, `FactoryInvoicing`, `FactoryDispatchBatches` | Manual underline rows and header buttons converted to `PillTabButton`. "New batch" stays a separate action |
+| Factory people | `FactoryPayrollHub`, `FactoryWorkersHub`, `FactoryEmployeesHub`, `factoryworkers/FactoryWorkersView`, `factoryworkerdetail/FactoryWorkerDetailView`, `factorypayroll/FactoryPayrollView`, `FactoryAdvancesTab`, `FactoryCustomerStatement` | Workers and Employees section dropdowns became tab strips. The test ids are now `tabs-workers-section` / `tab-workers-*` and `tabs-employees-section` / `tab-employees-*` |
+| Factory stock | `BaleStockEntry`, `FactorySheetsAndSacks`, `FactoryImport`, `FactoryBaleRelabeling`, `WipersReEntry`, `FactoryStockAllocationV3`, `production-raw-stock/RawStockRecalculate` | Shared pills. Relabeling and Wipers Re-Entry stay route-backed |
+| Status Builder | `FactoryStatusBuilder`, `factorystatusbuilder/components/TabLabel` | Editable pages are `role="tab"` inside a `TabsList`, with arrow keys, Enter/Space to select and F2 to rename (double-click still works). "Add page" sits beside the list |
+| POS settings and Supplier Partner | `settings/PosSetupHub.tsx`, `sp/SpGoldenCoast.tsx`, `sp/SpReports.tsx` | Scroll strip. POS checkout and cart navigation unchanged |
+| Properties | `properties/PropertiesRentalsHub.tsx`, `property-rental/components/UnitActionDialog.tsx` | Rental hub and all three unit-dialog layouts (formerly fixed grids) |
+| Settings and admin | `settings/SessionsHub.tsx`, `settings/ApprovalsPage.tsx`, `settings/ExportCenter.tsx`, `settings/FileStorageAndExport.tsx`, `settings/datatoolstab/components/MergeStockItemsLauncher.tsx` | Standard pills, including the formerly underlined approval tabs |
+| Shared dialogs | `CombinedImportDialog.tsx`, `ImportStockItems.tsx`, `stockitemdetailsdialog/StockItemDetailsDialogView.tsx`, `FactoryCatalogTranslationEditor.tsx`, `NotificationsCenter.tsx`, `suppliers/SupplierDetailDialog.tsx` | Independently scrollable strip inside the dialog |
 
-Other pages importing the shared tabs primitive inherit the pill design without a file-by-file restyle. Tab-shaped view-mode switches, workflow indicators, primary navigation and table controls are intentionally outside scope.
+Every other page that imports the shared primitive inherits the design without a page-level change.
 
-## Delivery constraints
+**Deliberate exclusions:** `Vouchers.tsx` / `vouchers/VoucherTabNav.tsx` (route sidebar and phone sheet), `FactoryProduction.tsx` (primary vertical navigation), the three `FactoryStockAllocationV5` filters (independent toggles), the Settings primary sidebar and phone section picker, the remote-support browser-tab selector, view-mode switches, progress steps, report filters and action buttons.
 
-All changes belong to `feat/universal-responsive-pill-tabs-20261011`. No backend, database, or API changes are required. Do not merge to `main` without approval.
+## Phase 8 audit and verification
 
-**User instruction:** Do not run CI, lint, unit tests, integration tests, browser tests, or responsive test suites as part of this work. Implementation is therefore not verified by automated checks; any untested behavior must not be described as proven.
+### Defects found and fixed
 
-## Implementation status
-
-The shared pill components and identified custom horizontal tab bars have been migrated on this feature branch. Existing screen-specific controls (sidebar menus, navigation sheets, view toggles and workflow steps) deliberately remain as their original controls. No automated or manual runtime tests were executed as requested; the changes have not been validated in a running browser, and should remain unmerged until accepted by the user.
-
-## Phases 3 and 4 — source implementation completed (11 October 2026)
-
-### Phase 3 — Core ERP
-
-- **Tracking:** `TrackingHub.tsx` keeps the complete Containers OTW / GIT Tracking / Transporter Statement labels, with a phone-safe horizontal strip and an accessible group label.
-- **GIT workbook:** `GITMockup.tsx` also uses the scrollable pill strip for its Detail, Truck / Location, and Agent / Duty tabs.
-- **Stock & Inventory:** `StockHub.tsx` and `InventoryHub.tsx` use the shared tabs rather than their former custom button rows; existing permission filtering and URL query-state logic remain in place.
-- **Sales Tools & Parties:** `SalesToolsHub.tsx` and `PartiesHub.tsx` use shared navigation and preserve role-aware visibility and lazy content.
-
-### Phase 4 — Accounting, vouchers, payroll and reports
-
-- **Accounts and Daybook:** `AccountsLegacy.tsx`, `Daybook.tsx`, and `factory/FactoryDaybook.tsx` use scrollable pill navigation. The Accounts statement-only phone view still hides its parent tab strip.
-- **Payroll:** `payroll/PayrollView.tsx`, `payroll/AdvancesTab.tsx`, `payroll/BonusDialog.tsx`, `components/erprunpayroll/ERPRunPayrollView.tsx`, `components/erprunpayroll/CompactRunPayrollSelection.tsx`, and `factory/factorypayroll/FactoryPayrollView.tsx` use the shared appearance, retaining their separate actions and selection logic.
-- **Financial and personnel details:** `components/ERPWorkerDetail.tsx`, `factory/factoryworkerdetail/FactoryWorkerDetailView.tsx`, `factory/FactoryCustomerStatement.tsx`, `factory/FactoryAdvancesTab.tsx`, and `suppliers/SupplierDetailDialog.tsx` have consistent pill navigation with horizontal overflow where applicable.
-- **Reports:** The production report tabs in `factory/DailyProductionReport.tsx` use a scrollable strip with full labels. Report views already using the shared `TabsList` inherit the global styling.
-- **Explicit non-tab exclusions:** `Vouchers.tsx` and `vouchers/VoucherTabNav.tsx` use a route/type sidebar and a phone selection sheet, not a horizontal secondary tab bar. Those remain unchanged to preserve the agreed navigation model. Segmented view-mode switches (e.g. Condensed/Detailed), workflow progress indicators, and report filters are also not reclassified as tabs.
-
-**Verification status:** Source changes are committed. No TypeScript command, linting, CI run, unit/integration/browser tests, runtime responsive checks, merge, or deployment were performed as requested. Implementation is complete at code level, not validated at runtime.
-
-## Phase 5 — Factory Mode source implementation (11 October 2026)
-
-Phase 5 is implemented on the same feature branch. The Factory surfaces reviewed and updated include:
-
-| Area | Factory screens | Status |
+| # | Problem | Fix |
 | --- | --- | --- |
-| Main hubs | `FactoryFinanceHub`, `FactoryPartiesHub`, `FactorySupplierHub`, `FactoryProductionIntelHub`, `FactoryBalesHub` | One-row pill navigation and horizontally scrollable tab containers |
-| Factory navigation | `FactoryInvoicing`, `FactoryLoadingsHub`, `FactoryPayrollHub`, `FactoryDaybook` | Reused shared tabs or `PillTabButton`, maintaining query-state/permission conditions |
-| Workers and employees | `FactoryWorkersHub`, `FactoryEmployeesHub`, `factoryworkers/FactoryWorkersView` | Replaced section dropdowns/uncoupled panels with shared pill tabs; preserved setting and permission filters |
-| Production and stock | `DailyProductionReport`, `FactoryKpis`, `FactoryProfitability`, `BaleStockEntry`, `FactoryStockAllocationV3`, `production-raw-stock/RawStockRecalculate` | Shared responsive tab strip and selected state |
-| Stock, dispatch and imports | `FactorySheetsAndSacks`, `FactoryDispatchBatches`, `FactoryImport` | Replaced bespoke button-style tab navigation with shared pills; left New Batch/action controls separate |
-| Customer and workers | `FactoryCustomerStatement`, `factoryworkerdetail/FactoryWorkerDetailView`, `FactoryAdvancesTab`, `factorypayroll/FactoryPayrollView` | Existing tab content and permissions preserved, unified responsive layout |
-| Relabeling and editable sheets | `FactoryBaleRelabeling`, `WipersReEntry`, `FactoryStatusBuilder`, `factorystatusbuilder/components/TabLabel` | Matched pill style, retained navigation, rename and delete controls, and added keyboard tab selection |
+| 1 | **Arrow keys did nothing on any tab strip in the running app.** `useGlobalScrollKeys` (a capture-phase window listener) treated a focused tab as a scroll request and called `preventDefault()` whenever any sideways-scrollable region existed, so `TabsList` saw an already-handled event. Isolated unit tests missed it because they did not mount the shell handler. | The handler skips Left/Right/Home/End when the target is inside `[role="tab"]`. A regression test mounts both. |
+| 2 | Inactive tabs set `aria-controls` to panels that are never mounted (dangling ARIA references). | `aria-controls` is set only on the selected tab. |
+| 3 | A height-only `resize` (mobile toolbars collapsing during vertical scroll) snapped the strip back to the selected tab, undoing the user's sideways swipe. | The window listener reacts to width changes only. Container changes still go through `ResizeObserver`. |
+| 4 | `FactoryWorkersView` wrapped panels that already render their own `TabsContent`, creating nested tabpanels with duplicate ids. | Wrapper removed. |
+| 5 | Status Builder: "Add page" (not a tab) sat inside the tablist. Editable tabs had no focus ring, no keyboard rename and no auto-reveal, and the delete control had no accessible name. | Button moved beside the list. Focus ring, F2 rename, `useActiveTabVisibility` and `aria-label` added. |
+| 6 | Tabs dropped to 36px on touch devices at or above 640px (phone landscape, tablets), and in dialogs, which portal outside `#main-content`. | Coarse-pointer rule in `mobile-browser-compat.css` keeps 44px. |
+| 7 | RTL fade rules relied on `:dir()` alone; browsers without it showed the fade on the wrong edge. | Forgiving `:is(:dir(rtl), [dir="rtl"] *)` fallback. |
+| 8 | The Workers/Employees tab conversion made the Attendance panel reachable from the page button sweep, exposing a crash when the API omits `employees`/`attendance`. | Null-safe iteration. Behaviour with real data unchanged. |
+| 9 | CI blockers introduced on the branch: 7 frontend tests failing, the Phase 6 and Wave 2 static verifiers failing on obsolete tokens (`touch-pan-x`, Factory Import `overflow-x-auto`), this doc missing from `config/doc-index.json` and `docs/README.md`, 48 changed files failing the changed-file Prettier check, and `FactoryStatusBuilder.tsx` growing past the 900-line cap. | Tests and verifiers updated to the intended new contracts (not weakened: each still asserts the behaviour, for example that `touch-pan-x` is absent so vertical swipes work). Doc indexed. Changed files formatted. File kept at 900 lines. |
 
-### Deliberate exclusions
+New behaviour tests: `tests/ui/universal-pill-tabs.test.tsx` covers ARIA wiring, Home/End/arrow navigation with wrap, skipping disabled and hidden tabs, RTL arrow direction, coexistence with the global scroll-key handler, `PillTabButton` strips, and width-only reveal. Three of these fail without the Phase 8 fixes.
 
-`FactoryProduction.tsx` is a primary vertical navigation sidebar; it is not a secondary horizontal tab bar. The three switches in `FactoryStockAllocationV5.tsx` are independent stock filters, not mutually exclusive pages. Report options, view-mode switches, progress steps, tables and form buttons remain specialized controls rather than being restyled as tabs.
+### Automated results (12 October 2026, local container)
 
-### Verification and delivery status
+| Check | Result |
+| --- | --- |
+| `npm run check` (TypeScript) | Pass |
+| `npm run lint` + `audit:lint-ratchet` | Pass: 3,799 files, 0 errors, 0 warnings |
+| Prettier on every changed file (CI's changed-file check) | Pass |
+| Frontend suite (`vitest.config.frontend.ts`) | Pass: 2,236 / 2,236. As pushed at the end of Phase 7: 7 failures |
+| `npm run build` (client, server bundle, runtime dependency checks) | Pass |
+| Static verifiers: Phase 6 core ERP, Phase 7 Factory, Waves 2–3, Phase 11 matrix, Program 7a/7d, Phase 1 critical flows, `audit:ux-consistency`, `audit:doc-index`, `audit:type-escapes`, god-file boundaries | Pass |
+| Browser smokes on the built app with a disposable Postgres fixture: Waves 2, 3, 4 | Pass: 54, 138 and 126 cases |
+| Phase 9 language smoke (English, Arabic, French at phone, tablet and desktop) and Phase 1 browser smoke | Pass, 30 Phase 1 cases, using the versions on `main` (#2175). The copies at this branch's base predate #2173's collapsed-sidebar and touch-opacity changes and fail identically on the base commit |
+| Factory mobile browser suite (`verify-factory-mobile-browser.mjs`, strict seeds/tables) | Pass: 528 cases |
+| Backend suite (`vitest.config.ts`) | Not meaningful in this container: DB-backed files fail identically on the base commit. The branch changes no server or shared code |
 
-**Phase 5 code implementation is complete, not proven error-free.** No TypeScript, lint, unit, integration, CI, browser, phone, responsive or accessibility test runs were initiated, per the user's instruction. Do not merge or deploy without separate approval; no PR or release is part of this phase.
+### Rendered tab-strip matrix
 
-## Phase 6 — POS, Supplier Partner, Properties, Settings and dialogs
+A Puppeteer script (kept outside the repository) logged in to the built app and measured every visible `TabsList` on 30 routes covering every migrated area. It checked one row, no wrapping, no clipped labels, pill radii, tab height, a single distinct selected tab kept in view, page horizontal overflow, correct fade state, RTL order and direction, and arrow-key selection without page scroll.
 
-Phase 6 source implementation is complete on `feat/universal-responsive-pill-tabs-20261011`. Responsive pill tabs use the existing `TabsList` / `TabsTrigger` components and the `erp-mobile-scroll-tabs` container rather than copying button styles between pages.
-
-| Scope | Updated surfaces | Implementation |
+| Configuration | Routes | Result |
 | --- | --- | --- |
-| Supplier Partner | `sp/SpGoldenCoast.tsx`, `sp/SpReports.tsx` | Scrollable pill tab bars with preserved reporting and partner state |
-| POS configuration | `settings/PosSetupHub.tsx` | POS Settings, Exchange Rates, Fiscal Period, Price Groups and Auto-Transfer share the same pill styling |
-| Properties | `properties/PropertiesRentalsHub.tsx`, `properties/property-rental/components/UnitActionDialog.tsx` | Rental hub and all three conditional unit-dialog tab layouts retain complete labels and scroll on narrow viewports |
-| Admin and settings | `settings/SessionsHub.tsx`, `settings/ApprovalsPage.tsx` | Session tabs and approval-status tabs use the standard navigation |
-| Files and exports | `settings/FileStorageAndExport.tsx`, `settings/ExportCenter.tsx`, `ImportStockItems.tsx`, `components/CombinedImportDialog.tsx` | Import/export method tabs use shared pills and preserve existing workflows |
-| Utility dialogs | `components/FactoryCatalogTranslationEditor.tsx`, `components/stockitemdetailsdialog/StockItemDetailsDialogView.tsx`, `settings/datatoolstab/components/MergeStockItemsLauncher.tsx`, `suppliers/SupplierDetailDialog.tsx` | All applicable dialog tabs use an independently scrollable strip with existing content/actions and icon/label semantics |
+| 320, 375, 390, 430 px (touch) | 30 each | Pass |
+| 768, 1024 px (touch) | 30 each | Pass |
+| 1280, 1440, 1920 px (desktop) | 30 each | Pass |
+| Phone landscape 844×390 | 8 | Pass |
+| Arabic RTL at 390 and 1440 | 8 each | Pass |
+| French at 390 | 8 | Pass |
+| Dark theme at 390 and 1440 | 8 each | Pass |
+| 125% root text at 390 | 8 | Pass |
+| 200% zoom (1280 wide at DPR 2) | 8 | Pass |
 
-### Exclusions
+The script ran 334 route/configuration cases with no layout or design failures. In the first run its keyboard probe flagged 11 cases where focus moved after selection. In those cases the newly shown panel autofocuses its scan or search input (Stock, Accounts Find Voucher, Bales barcode, Stock Entry), or the tab is route-backed (Bale Relabeling). In every case selection moved correctly. The probe now judges selection rather than focus.
 
-The POS checkout/cart navigation, phone product-choice sheet, Settings' primary sidebar/mobile section picker, remote-support **browser tab selector**, permission visibility checkboxes, and other view/filter/action controls are not secondary section-tab bars. They were intentionally left unchanged. The shared tab primitive already governs other dialogs and modules previously converted during Phases 2–5.
+### Not verified
 
-### Delivery boundary
+- **Real devices, Safari/WebKit and Firefox:** the only browser available was Chromium (headless, with device emulation). iPhone Safari momentum scrolling, Firefox rendering and real touch gestures were not exercised.
+- **Real swipe gestures:** emulated, not performed. Touch behaviour is asserted through computed `touch-action` and layout only.
+- **Production data and permission matrices:** the disposable fixture signs in as one Developer user. Permission-restricted tab visibility is covered by the existing unit suites (`hub-restricted-tabs`, `factory-tab-route-restrictions`, `factory-opt-in-tabs`, `factory-permission-query-gating`), not by rendered role-by-role runs.
 
-**Code-level migration complete; not runtime validated.** No TypeScript, lint, CI, unit, integration, browser, accessibility, or responsive test suites were invoked for this phase, at the user's request. There has been no merge to `main`, pull request, or deployment. A separate review/testing handoff remains necessary before production.
+## Phase 8 status
 
-## Phase 7 — responsive source hardening (12 October 2026)
+All in-scope defects found in the audit are fixed, and every check that can run in this environment passes. The branch merges cleanly with current `main` (verified with `git merge-tree`; not merged). On `main`, #2175/#2176 update the browser-smoke and source-text ratchet files that fail at this branch's base. A pull request is tested against the merge with `main`, so it picks those up.
 
-**Scope:** source-only responsive implementation, under the existing user requirement not to run testing, lint, CI or browser/device checks.
-
-### Implemented
-
-- **Shared tab component:** `client/src/components/ui/tabs.tsx` now keeps a horizontal, nonwrapping pill row; both the root tab strip and enclosing `.erp-mobile-scroll-tabs` scroller are considered when moving the selected tab into view. The active tab is repositioned when its dimensions, enclosing layout or browser window size changes, including text expansion and viewport zoom. Keyboard focus into a tab also reveals it.
-- **Phone/tablet interaction:** Touch scrolling allows both sideways tab swipes and normal vertical page swipes from the tab-bar area. Touch targets remain minimum 44px on small screens and 36px from the desktop breakpoint, with no label truncation or forced word wrapping.
-- **Keyboard and accessibility:** Shared tablists declare horizontal orientation; arrow/Home/End navigation skips visually hidden/disabled tabs, respects document direction, and retains focus styling inside the pill without clipping by the horizontal scroller. Reduced-motion users do not get unnecessary tab transitions.
-- **Settings:** `client/src/erp-mobile-operations.css` no longer overrides the universal one-row tabs with multirow wrapping on phones and short-height landscape layouts.
-- **RTL overflow indication:** `client/src/mobile-browser-compat.css` places the existing logical start/end edge fades on the proper physical side when content direction is RTL (Arabic); no second overflow-probe subsystem was added.
-- **Pill geometry:** `client/src/index.css` reserves the former 2px tablist bottom padding for legacy tablists only. The standardized pill retains balanced padding on every side at narrow widths.
-- **Permissions and routing:** Source changes are restricted to the shared visual primitive and responsive styles, without editing ERP/Factory/POS financial logic, tab access controls, URL syncing, or the underlying tab content.
-
-### Responsive handoff matrix
-
-| Width / environment | Source-level coverage | Runtime/device validation |
-| --- | --- | --- |
-| 320, 375, 390, 430 px phones | One-row scroll, 44px controls, preserved labels, selected tab visibility | **Not run** |
-| 768 and 1024 px tablets | Width-constrained strips, horizontal overflow fallback, preserved section content | **Not run** |
-| 1280, 1440, 1920 px desktops | Consistent 36px minimum tabs, pill shape, keyboard and direction behavior | **Not run** |
-| iPhone Safari, Firefox, Chrome, large text and zoom | Existing momentum scroll, resize-aware selected tab, RTL edge masks and reduced-motion styling | **Not run** |
-| Permission-filtered tabs and URL state | Existing feature logic left intact; visibility-aware arrow navigation | **Not run** |
-
-**Phase 7 source-code implementation is complete; its original acceptance criterion (responsive and browser checks passing) is explicitly unverified** because the user has prohibited tests and CI. Do not interpret this as a device compatibility guarantee. No merge, PR, release or deployment was performed.
+Outstanding before production: real-device Safari/iOS and Firefox checks, and a role-by-role permission walkthrough on staging. No merge to `main` and no deployment has been performed.
