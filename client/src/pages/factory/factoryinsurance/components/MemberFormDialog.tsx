@@ -6,10 +6,14 @@ import type { ClientErrorLike } from "@/lib/clientError";
  */
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
+import { FormSubmitButton } from "@/components/FormSubmitButton";
+import { MoneyInput } from "@/components/ui/decimal-input";
+import { FormGrid } from "@/components/ui/form";
+import { useSingleFlightAction } from "@/hooks/use-single-flight-action";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,6 +31,7 @@ function MemberFormDialog({
   existing?: InsuranceMember | null;
 }) {
   const { toast } = useToast();
+  const { execute: executeSave, pending: submitting } = useSingleFlightAction();
   const [name, setName] = useState(existing?.name ?? "");
   const [nationality, setNationality] = useState(existing?.nationality ?? "");
   const [positionWorking, setPositionWorking] = useState(existing?.positionWorking ?? "");
@@ -64,11 +69,12 @@ function MemberFormDialog({
   });
 
   const handleSubmit = () => {
+    if (submitting || saveMutation.isPending) return;
     if (!name.trim() || !startDate || !amount) {
       toast({ title: "Please fill in required fields", variant: "destructive" });
       return;
     }
-    saveMutation.mutate({
+    void executeSave(() => saveMutation.mutateAsync({
       name: name.trim(),
       nationality: nationality || null,
       positionWorking: positionWorking || null,
@@ -77,6 +83,8 @@ function MemberFormDialog({
       amount,
       dob: dob || null,
       notes: notes || null,
+    })).catch(() => {
+      // Existing mutation onError shows the error.
     });
   };
 
@@ -98,7 +106,7 @@ function MemberFormDialog({
               data-testid="input-member-name"
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <FormGrid minColumnWidth="10rem" className="gap-3">
             <div className="space-y-1">
               <Label>Nationality</Label>
               <Input
@@ -117,7 +125,7 @@ function MemberFormDialog({
                 data-testid="input-member-position"
               />
             </div>
-          </div>
+          </FormGrid>
           <div className="space-y-1">
             <Label>Insurance Number</Label>
             <Input
@@ -148,9 +156,8 @@ function MemberFormDialog({
             <Label>
               Monthly Amount <span className="text-destructive">*</span>
             </Label>
-            <Input
-              type="number"
-              min="0"
+            <MoneyInput
+                            min="0"
               step="0.01"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
@@ -174,10 +181,11 @@ function MemberFormDialog({
           <Button variant="outline" onClick={onClose} data-testid="button-cancel-member">
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={saveMutation.isPending} data-testid="button-save-member">
-            {saveMutation.isPending && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+          <FormSubmitButton type="button" onClick={handleSubmit}
+            pending={submitting || saveMutation.isPending} pendingLabel="Saving…"
+            data-testid="button-save-member">
             {existing ? "Save Changes" : "Add Member"}
-          </Button>
+          </FormSubmitButton>
         </DialogFooter>
       </DialogContent>
     </Dialog>

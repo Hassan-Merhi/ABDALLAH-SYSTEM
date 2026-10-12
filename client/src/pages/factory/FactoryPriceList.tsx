@@ -7,13 +7,14 @@ import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
+import { SearchField } from "@/components/ui/search-field";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Check, X, Pencil, Search, Tag, RefreshCw, AlertCircle, Download, Upload } from "lucide-react";
+import { Check, X, Pencil, Tag, RefreshCw, AlertCircle, Download, Upload } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { ExcelJS, readFile } from "@/lib/excelHelper";
 import { productMatchesSearch } from "@shared/factoryProductSearch";
@@ -271,16 +272,13 @@ export default function FactoryPriceList() {
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">
-        <div className="relative flex-1 min-w-[160px]">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-8"
-            data-testid="input-search"
-          />
-        </div>
+        <SearchField
+          value={search}
+          onValueChange={setSearch}
+          placeholder="Search..."
+          wrapperClassName="flex-1 min-w-[160px]"
+          data-testid="input-search"
+        />
         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
           <SelectTrigger className="w-[150px] sm:w-[180px]" data-testid="select-category-filter">
             <SelectValue placeholder="All Categories" />
