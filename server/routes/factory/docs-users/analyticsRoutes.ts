@@ -173,7 +173,7 @@ export function registerFactoryAnalyticsRoutes(app: Express) {
         pageSize = "50",
       } = req.query as Record<string, string>;
 
-      if (!["LOADING", "VERIFIED", "FINALIZED", "all"].includes(status)) {
+      if (!["LOADING", "VERIFIED", "FINALIZED", "VERIFIED_FINALIZED", "all"].includes(status)) {
         return res.status(400).json({ message: "Invalid status filter" });
       }
       if (!["true", "false"].includes(includeCharges)) {
@@ -192,10 +192,22 @@ export function registerFactoryAnalyticsRoutes(app: Express) {
       const orderFilters = [
         sql`co.company_id = ${companyId}`,
         sql`co.deleted_at IS NULL`,
-        status === "all" ? sql`co.status IN ('LOADING', 'VERIFIED', 'FINALIZED')` : sql`co.status = ${status}`,
+        status === "all"
+          ? sql`co.status IN ('LOADING', 'VERIFIED', 'FINALIZED')`
+          : status === "VERIFIED_FINALIZED"
+            ? sql`co.status IN ('VERIFIED', 'FINALIZED')`
+            : sql`co.status = ${status}`,
       ];
-      if (startDate) orderFilters.push(sql`co.order_date >= ${startDate}`);
-      if (endDate) orderFilters.push(sql`co.order_date <= ${endDate}`);
+      if (startDate) orderFilters.push(sql`(CASE
+              WHEN co.status = 'FINALIZED' THEN COALESCE(co.loading_finalized_at::date, co.finalized_at::date, co.verified_at::date, co.order_date)
+              WHEN co.status = 'VERIFIED' THEN COALESCE(co.loading_finalized_at::date, co.verified_at::date, co.order_date)
+              ELSE co.order_date
+            END) >= ${startDate}`);
+      if (endDate) orderFilters.push(sql`(CASE
+              WHEN co.status = 'FINALIZED' THEN COALESCE(co.loading_finalized_at::date, co.finalized_at::date, co.verified_at::date, co.order_date)
+              WHEN co.status = 'VERIFIED' THEN COALESCE(co.loading_finalized_at::date, co.verified_at::date, co.order_date)
+              ELSE co.order_date
+            END) <= ${endDate}`);
       if (customer?.trim()) {
         orderFilters.push(
           sql`lower(COALESCE(c.legal_name, '')) LIKE ${`%${customer.trim().toLowerCase().slice(0, 100)}%`}`
@@ -234,7 +246,11 @@ export function registerFactoryAnalyticsRoutes(app: Express) {
         WITH filtered_orders AS MATERIALIZED (
           SELECT
             co.id AS order_id,
-            co.order_date,
+            CASE
+              WHEN co.status = 'FINALIZED' THEN COALESCE(co.loading_finalized_at::date, co.finalized_at::date, co.verified_at::date, co.order_date)
+              WHEN co.status = 'VERIFIED' THEN COALESCE(co.loading_finalized_at::date, co.verified_at::date, co.order_date)
+              ELSE co.order_date
+            END AS order_date,
             co.customer_id,
             COALESCE(c.legal_name, 'Unknown customer') AS customer_name,
             co.invoice_number,
