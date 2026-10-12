@@ -94,3 +94,12 @@ associated form labels in the migrated workflows. See
 `docs/shared-ui-phase-6.md` for precise behavior and remaining boundaries.
 These changes were committed without running checks at the user's request;
 Render's independent verification is not replaced by this checkpoint.
+
+## Phase 7 — Safe architecture consolidation
+
+Fetch-request mechanics, stable pagination cache keys, legacy paginated
+list assembly and debounce timer behavior were deduplicated without removing
+legacy import paths. The targeted changes and remaining boundaries are
+documented in `docs/shared-ui-phase-7.md`. Phase 8 is an independent
+Claude code review and actual validation step, *not* covered by any earlier
+"committed" status. See `docs/shared-ui-phase-8-claude-handoff.md`.

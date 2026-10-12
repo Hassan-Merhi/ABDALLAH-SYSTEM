@@ -297,3 +297,14 @@ mutation dialog before the action resolves. Mobile card tables should not
 add redundant scroll-region tab stops, while wider data grids retain their
 keyboard scroll affordance. The implementation and exceptions are described
 in [`docs/shared-ui-phase-6.md`](docs/shared-ui-phase-6.md).
+
+## Phase 7 architecture consolidation
+
+Use `fetchRequestUtils.ts` for browser fetch URL, request method,
+rewrite mechanics and stable pagination query keys. Interceptors must retain
+their original endpoint routing, company scoping, captured previous fetch
+function and request-init forwarding. Use `legacyPaginatedListFetch.ts`
+only for endpoints whose public legacy contract is a flattened JSON array,
+and `use-debounce.ts` for new hooks (keep the `useDebouncedValue` name as
+a compatibility import). No untraced dynamic or side-effect file removals.
+See `docs/shared-ui-phase-7.md`.

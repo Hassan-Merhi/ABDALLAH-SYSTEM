@@ -2,10 +2,10 @@
 
 **Repository:** `Hassan-Merhi/ERP-FACTORY-SYSTEM`
 **Working branch:** `refactor/shared-ui-standardization-phases-1-5`
-**Latest completed implementation phase:** 6
-**Current next phase:** 7
+**Latest completed implementation phase:** 7
+**Current next phase:** 8 — Claude verification handoff
 **Created:** 2026-10-12
-**Last implementation checkpoint:** Phase 6 (2026-10-12)
+**Last implementation checkpoint:** Phase 7 (2026-10-12)
 
 Use this file as the resumable checkpoint for scheduled continuation. At the
 start of each future run, read this file from the working branch, inspect the
@@ -41,14 +41,22 @@ commit SHAs, remaining gaps and the newly chosen next phase.
   and safe async form closing. See `docs/shared-ui-phase-6.md`.
   Last implementation commit: `8085a97a7a5d1ad6d4e35f80d4ec96a0e7a19983`.
   Accessibility has NOT been certified or tested.
-- **Phase 7 — Architecture debt and dead-code cleanup:** PLANNED. Address
-  residual duplicated client services/hooks, unused exports and dead UI
-  helpers where they can be removed without changing API or domain behavior.
-  Avoid deleting code based solely on an absence from one search; account for
-  dynamic imports and test-only callers.
-- **Phase 8+ — New phases:** add whenever concrete unaddressed opportunities
-  are discovered. Record the exact scope, source evidence and safe boundaries
-  here, and continue them on the same branch.
+- **Phase 7 — Architecture debt and dead-code cleanup:** IMPLEMENTED.
+  Unified browser fetch-request and pagination key helpers across seven
+  interceptors; consolidated legacy flat-list pagination and two debounce
+  hooks; removed redundant local interfaces and confirmed dead imports.
+  All existing side-effect entry points and tenant-scoped query cache keys
+  were retained. See `docs/shared-ui-phase-7.md`. Last implementation
+  commit: `9cc134fa285ceba998ca696a2e07a22dced6a7b7`.
+  No checks run and no claim that the entire repository has zero dead code.
+- **Phase 8 — Claude review, validation and fixes:** NEXT — **not executed**.
+  Claude should run independently authorized verification, repair issues on
+  this same branch, and report readiness; see
+  `docs/shared-ui-phase-8-claude-handoff.md`. No merge/deployment without
+  explicit user authorization.
+- **Phase 9+ — Additional implementation if Claude finds issues:** define
+  only from concrete evidence and implement on the same branch. Keep Phase 8
+  validation and production approval as separate steps.
 
 ## Continuation instructions
 
