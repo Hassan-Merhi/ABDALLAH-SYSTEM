@@ -6,7 +6,6 @@ import { getApiRequest } from "@/lib/factoryApi";
 import { isBlockingQueryError } from "@/lib/abortError";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { SearchField } from "@/components/ui/search-field";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
