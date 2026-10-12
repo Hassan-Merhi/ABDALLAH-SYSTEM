@@ -210,11 +210,13 @@ describe("Priority Scan fixed palette write API", () => {
       expect(move.status).toBe(403);
       // Non-managers may still pick an approved color, but not a custom one.
       expect((await agent.put(configPath(orderId)).send({ color: "#614051", enabled: true })).status).toBe(200);
+      // #000000 joined the approved palette; a custom colour is still refused.
       expect((await agent.put(configPath(orderId)).send({ color: "#000000", enabled: true })).status).toBe(200);
+      expect((await agent.put(configPath(orderId)).send({ color: "#123456", enabled: true })).status).toBe(400);
     } finally {
       await setRole("Admin");
     }
-    expect(await storedConfig(orderId)).toMatchObject({ color: "#614051", enabled: true });
+    expect(await storedConfig(orderId)).toMatchObject({ color: "#000000", enabled: true });
   });
 
   it("cannot configure or move another company's loading", async () => {
