@@ -127,7 +127,13 @@ export function RetailCustomerPicker({
               </button>
             ))}
             {customersQuery.isLoading && <div role="status" className="p-2 text-xs text-muted-foreground">Searching…</div>}
-            {!customersQuery.isLoading && !(customersQuery.data ?? []).length && (
+            {customersQuery.isError && (
+              <div role="alert" className="flex items-center justify-between gap-2 p-2 text-xs text-destructive">
+                Customer search failed.
+                <Button type="button" size="sm" variant="outline" onClick={() => { void customersQuery.refetch(); }}>Retry</Button>
+              </div>
+            )}
+            {!customersQuery.isLoading && !customersQuery.isError && !(customersQuery.data ?? []).length && (
               <div role="status" className="p-2 text-xs text-muted-foreground">No customer matches.</div>
             )}
           </div>

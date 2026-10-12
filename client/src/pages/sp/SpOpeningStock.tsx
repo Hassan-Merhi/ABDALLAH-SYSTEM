@@ -1,5 +1,5 @@
 import type { ClientErrorLike } from "@/lib/clientError";
-import { useState, useEffect } from "react";
+import { useId, useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -39,6 +39,7 @@ interface OpeningStockRow {
 }
 
 export default function SpOpeningStock() {
+  const formId = useId();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { execute: executePost, pending: submitting } = useSingleFlightAction();
@@ -131,67 +132,73 @@ export default function SpOpeningStock() {
         </CardHeader>
         <CardContent className="space-y-4">
           <FormGrid minColumnWidth="10rem" className="gap-3">
-            <div className="col-span-2">
-              <label className="text-xs text-muted-foreground">Article Code *</label>
+            <div className="col-span-full">
+              <label htmlFor={`${formId}-article`} className="text-xs text-muted-foreground">Article Code *</label>
               <Input
                 value={articleCode}
                 onChange={(e) => setArticleCode(e.target.value)}
                 className="mt-1"
                 placeholder="e.g. RICE-25KG"
+                id={`${formId}-article`}
                 data-testid="input-sp-opn-article"
               />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Qty *</label>
+              <label htmlFor={`${formId}-quantity`} className="text-xs text-muted-foreground">Qty *</label>
               <DecimalInput
-                                step="0.01"
+                step="0.01"
                 value={qty}
                 onChange={(e) => setQty(e.target.value)}
                 className="mt-1"
                 placeholder="0"
+                id={`${formId}-quantity`}
                 data-testid="input-sp-opn-qty"
               />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Base Unit Cost $ (supplier cost)</label>
+              <label htmlFor={`${formId}-base`} className="text-xs text-muted-foreground">Base Unit Cost $ (supplier cost)</label>
               <MoneyInput
-                                step="0.0001"
+                step="0.0001"
                 value={baseUC}
                 onChange={(e) => setBaseUC(e.target.value)}
                 className="mt-1"
                 placeholder="0.0000"
+                id={`${formId}-base`}
                 data-testid="input-sp-opn-base"
               />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Landed Unit Cost $ (freight/duty etc.)</label>
+              <label htmlFor={`${formId}-landed`} className="text-xs text-muted-foreground">Landed Unit Cost $ (freight/duty etc.)</label>
               <MoneyInput
-                                step="0.0001"
+                step="0.0001"
                 value={landedUC}
                 onChange={(e) => setLandedUC(e.target.value)}
                 className="mt-1"
                 placeholder="0.0000"
+                id={`${formId}-landed`}
                 data-testid="input-sp-opn-landed"
               />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Final Unit Cost $ (auto = base + landed) *</label>
+              <label htmlFor={`${formId}-final`} className="text-xs text-muted-foreground">Final Unit Cost $ (auto = base + landed) *</label>
               <MoneyInput
-                                step="0.0001"
+                step="0.0001"
                 value={finalUC}
                 onChange={(e) => setFinalUC(e.target.value)}
                 className="mt-1"
                 placeholder="0.0000"
+                id={`${formId}-final`}
                 data-testid="input-sp-opn-final"
               />
             </div>
-            <div className="col-span-2">
-              <label className="text-xs text-muted-foreground">Notes / Description</label>
+            <div className="col-span-full">
+              <label htmlFor={`${formId}-notes`} className="text-xs text-muted-foreground">Notes / Description</label>
               <Input
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 className="mt-1"
                 placeholder="Optional"
+                id={`${formId}-notes`}
                 data-testid="input-sp-opn-notes"
               />
             </div>

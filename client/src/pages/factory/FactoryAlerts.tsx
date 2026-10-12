@@ -4,7 +4,7 @@ import { factoryApiRequest } from "@/lib/factoryApi";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "@/components/StatusBadge";
-import { LoadingState, EmptyState } from "@/components/ui/page-state";
+import { LoadingState, EmptyState, ErrorState } from "@/components/ui/page-state";
 import { Button } from "@/components/ui/button";
 import { Loader2, Bell, RefreshCw } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
@@ -81,8 +81,25 @@ export default function FactoryAlerts() {
           </CardTitle>
         </CardHeader>
         <CardContent>
+          {generateMutation.isError ? (
+            <p role="alert" className="mb-3 text-sm text-destructive">
+              Alert generation failed. Please try again.
+            </p>
+          ) : null}
+          {markReadMutation.isError ? (
+            <p role="alert" className="mb-3 text-sm text-destructive">
+              Could not mark the alert as read. Please try again.
+            </p>
+          ) : null}
           {alertsQuery.isLoading ? (
             <LoadingState title="Loading alerts..." data-testid="loading-spinner" />
+          ) : alertsQuery.isError ? (
+            <ErrorState
+              title="Alerts could not be loaded"
+              description="The alert service did not respond. Your alert records have not been changed."
+              actionLabel="Try again"
+              onAction={() => { void alertsQuery.refetch(); }}
+            />
           ) : alerts.length === 0 ? (
             <EmptyState title="No alerts found" description="Generated alerts will appear here."
               icon={Bell} data-testid="text-no-data" />

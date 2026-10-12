@@ -16,6 +16,7 @@ import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, keyStartsWith } from "@/lib/queryClient";
 import { PageHeader } from "@/components/PageHeader";
+import { ErrorState } from "@/components/ui/page-state";
 import { InvoiceSummaryBar } from "@/components/InvoiceSummaryBar";
 import type { FactoryMyAccess } from "@shared/apiTypes";
 
@@ -49,15 +50,15 @@ export default function FactoryPendingInvoices() {
   const { data: myAccess } = useQuery<FactoryMyAccess>({ queryKey: ["/api/factory/my-access"], staleTime: 5 * 60000 });
   const isAdmin = myAccess?.fullAccess === true;
 
-  const { data: pendingOrders = [], isLoading: pendingLoading } = useQuery<CustomerOrder[]>({
+  const { data: pendingOrders = [], isLoading: pendingLoading, isError: pendingError, refetch: refetchPending } = useQuery<CustomerOrder[]>({
     queryKey: ["/api/factory/customer-orders?status=PENDING_VERIFICATION&profile=summary&pageSize=250"],
   });
 
-  const { data: verifiedOrders = [], isLoading: verifiedLoading } = useQuery<CustomerOrder[]>({
+  const { data: verifiedOrders = [], isLoading: verifiedLoading, isError: verifiedError, refetch: refetchVerified } = useQuery<CustomerOrder[]>({
     queryKey: ["/api/factory/customer-orders?status=VERIFIED&profile=summary&pageSize=250"],
   });
 
-  const { data: finalizedOrders = [], isLoading: finalizedLoading } = useQuery<CustomerOrder[]>({
+  const { data: finalizedOrders = [], isLoading: finalizedLoading, isError: finalizedError, refetch: refetchFinalized } = useQuery<CustomerOrder[]>({
     queryKey: ["/api/factory/customer-orders?status=FINALIZED&profile=summary&pageSize=250"],
   });
 
@@ -82,6 +83,7 @@ export default function FactoryPendingInvoices() {
 
   const allOrders = [...pendingOrders, ...verifiedOrders, ...finalizedOrders];
   const isLoading = pendingLoading || verifiedLoading || finalizedLoading;
+  const hasLoadError = pendingError || verifiedError || finalizedError;
 
   const filteredOrders =
     statusFilter === "ALL"
@@ -129,7 +131,7 @@ export default function FactoryPendingInvoices() {
         </div>
       </div>
 
-      {!isLoading && allOrders.length > 0 && <InvoiceSummaryBar orders={allOrders} />}
+      {!isLoading && !hasLoadError && allOrders.length > 0 && <InvoiceSummaryBar orders={allOrders} />}
 
       {isLoading ? (
         <div className="space-y-3">
@@ -137,6 +139,17 @@ export default function FactoryPendingInvoices() {
             <Skeleton key={i} className="h-14 w-full" />
           ))}
         </div>
+      ) : hasLoadError ? (
+        <ErrorState
+          title="Invoices could not be loaded"
+          description="Some invoice statuses could not be retrieved. Retry to see a complete list."
+          actionLabel="Try again"
+          onAction={() => {
+            void refetchPending();
+            void refetchVerified();
+            void refetchFinalized();
+          }}
+        />
       ) : (
         <Card className="table-responsive">
           <Table mobileLayout="cards">

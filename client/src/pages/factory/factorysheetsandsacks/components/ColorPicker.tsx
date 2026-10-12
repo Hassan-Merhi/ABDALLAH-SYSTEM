@@ -11,17 +11,19 @@ export // ─── Color Picker ───────────────�
 function ColorPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Row color choices">
         {COLOR_PRESETS.map((c) => (
           <button
             key={c.value}
             type="button"
             title={c.label}
+            aria-label={c.label}
+            aria-pressed={value === c.value}
             onClick={() => onChange(c.value)}
             className="relative rounded-full border-2 transition-all focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
             style={{
-              width: 28,
-              height: 28,
+              width: 44,
+              height: 44,
               backgroundColor: c.value || "transparent",
               borderColor: value === c.value ? "#000" : c.value ? c.value : "#cbd5e1",
               boxShadow: value === c.value ? "0 0 0 2px rgba(0,0,0,0.25)" : undefined,
@@ -34,18 +36,19 @@ function ColorPicker({ value, onChange }: { value: string; onChange: (v: string)
             )}
             {value === c.value && c.value && (
               <span className="absolute inset-0 flex items-center justify-center">
-                <Check className="h-3 w-3" style={{ color: isLight(c.value) ? "#000" : "#fff" }} />
+                <Check aria-hidden="true" className="h-3 w-3" style={{ color: isLight(c.value) ? "#000" : "#fff" }} />
               </span>
             )}
           </button>
         ))}
         <div className="relative flex items-center" title="Custom color">
           <input
+            aria-label="Choose custom row color"
             type="color"
             value={value && !COLOR_PRESETS.some((c) => c.value === value) ? value : "#888888"}
             onChange={(e) => onChange(e.target.value)}
             className="rounded-full border-2 border-border cursor-pointer"
-            style={{ width: 28, height: 28, padding: 2 }}
+            style={{ width: 44, height: 44, padding: 2 }}
           />
         </div>
       </div>
