@@ -1,3 +1,4 @@
+import { resolveFetchUrl as resolveUrl, fetchRequestMethod as methodOf, replaceFetchInputUrl as replaceInputUrl } from "./fetchRequestUtils";
 import { queryClient } from "./queryClient";
 import {
   hasLoadedEveryRow,
@@ -107,28 +108,6 @@ if (typeof window !== "undefined" && !window.__erpDaybookPaginationInstalled) {
   let loadingMore = false;
   let wasOnRoute = ROUTES.has(window.location.pathname);
   let progressRoot: HTMLDivElement | null = null;
-
-  function resolveUrl(input: RequestInfo | URL): URL | null {
-    try {
-      if (typeof input === "string") return new URL(input, window.location.origin);
-      if (input instanceof URL) return new URL(input.toString());
-      if (input instanceof Request) return new URL(input.url, window.location.origin);
-    } catch {
-      return null;
-    }
-    return null;
-  }
-
-  function methodOf(input: RequestInfo | URL, init?: RequestInit): string {
-    return String(init?.method || (input instanceof Request ? input.method : "GET")).toUpperCase();
-  }
-
-  function replaceInputUrl(input: RequestInfo | URL, url: URL): RequestInfo | URL {
-    if (input instanceof Request) return new Request(url.toString(), input);
-    if (input instanceof URL) return url;
-    if (url.origin === window.location.origin) return `${url.pathname}${url.search}${url.hash}`;
-    return url.toString();
-  }
 
   function baseKey(url: URL): string {
     const params = new URLSearchParams(url.searchParams);
