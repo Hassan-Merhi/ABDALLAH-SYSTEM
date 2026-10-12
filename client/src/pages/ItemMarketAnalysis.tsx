@@ -4,9 +4,8 @@ import { BarChart3, Building2, ChevronDown, ChevronRight, Download, RefreshCw, S
 
 import { PageHeader } from "@/components/PageHeader";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
-import type { SalePriceExportRow } from "./itemMarketAnalysisExport";
 import { getTopProfitCompanyByItem, groupMarketRows } from "./itemMarketAnalysisGrouping";
+import { fetchSalePriceExportRows } from "./itemMarketAnalysisSalePrices";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -117,8 +116,10 @@ export default function ItemMarketAnalysis() {
   const comparableToSalesReport =
     selectedCompanyIds.length === 1 &&
     selectedCompanyIds[0] === selectedCompany?.id &&
-    !period.fromDate && !period.toDate &&
-    !debouncedSearch && selectedStockGroupNames.length === 0 &&
+    !period.fromDate &&
+    !period.toDate &&
+    !debouncedSearch &&
+    selectedStockGroupNames.length === 0 &&
     profitDirection === "all";
   const { data: salesReportReconciliation } = useQuery<{
     totalSales: number;
@@ -228,32 +229,10 @@ export default function ItemMarketAnalysis() {
     if (!data || isFetching || isExporting || search.trim() !== debouncedSearch) return;
     setIsExporting(true);
     try {
-      // Export the COMPLETE filtered arrays, not visibleRows/visibleGroupedRows
-      // which are deliberately capped at 250 items for screen performance.
-      const itemIdsByCompany = new Map<number, Set<number>>();
-      for (const row of rows) {
-        const ids = itemIdsByCompany.get(row.companyId) ?? new Set<number>();
-        ids.add(row.stockItemId);
-        itemIdsByCompany.set(row.companyId, ids);
-      }
-
-      const salePriceRows: SalePriceExportRow[] = [];
-      // The backend permits up to 5,000 items per company/request. Request
-      // smaller batches so large datasets export in full instead of returning
-      // a validation error. A failed batch aborts the entire export.
-      const maxItemsPerBatch = 2500;
-      for (const [companyId, itemIds] of itemIdsByCompany) {
-        const ids = [...itemIds];
-        for (let offset = 0; offset < ids.length; offset += maxItemsPerBatch) {
-          const response = await apiRequest("POST", "/api/reports/item-market-analysis/export-sale-prices", {
-            startDate: period.fromDate || undefined,
-            endDate: period.toDate || undefined,
-            companyItems: [{ companyId, stockItemIds: ids.slice(offset, offset + maxItemsPerBatch) }],
-          });
-          const salePrices = (await response.json()) as { rows: SalePriceExportRow[] };
-          salePriceRows.push(...salePrices.rows);
-        }
-      }
+      const salePriceRows = await fetchSalePriceExportRows(rows, {
+        startDate: period.fromDate,
+        endDate: period.toDate,
+      });
 
       const { exportItemMarketAnalysisExcel } = await import("./itemMarketAnalysisExport");
       await exportItemMarketAnalysisExcel({
@@ -340,21 +319,37 @@ export default function ItemMarketAnalysis() {
 
       {comparableToSalesReport && salesReportReconciliation && (
         <div className="grid gap-3 sm:grid-cols-2">
-          <MetricCard label="Sales Report Revenue (all sales, including credit)" value={formatAmount(salesReportReconciliation.totalSales)} />
-          <MetricCard label="Sales Report Cost Profit (reconciled COGS)" value={formatAmount(salesReportReconciliation.adjustedCostProfit)} />
+          <MetricCard
+            label="Sales Report Revenue (all sales, including credit)"
+            value={formatAmount(salesReportReconciliation.totalSales)}
+          />
+          <MetricCard
+            label="Sales Report Cost Profit (reconciled COGS)"
+            value={formatAmount(salesReportReconciliation.adjustedCostProfit)}
+          />
         </div>
       )}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <MetricCard label="Items" value={formatNumber(summary.itemCount)} />
         <MetricCard label="Imported Qty" value={formatNumber(summary.importedQty)} />
-        <MetricCard label="Sold Qty (Sales Report)" value={formatNumber(data?.salesReportTotals?.soldQty ?? summary.soldQty)} />
-        <MetricCard label="Total Sales (Sales Report)" value={formatAmount(data?.salesReportTotals?.revenue ?? summary.revenue)} />
+        <MetricCard
+          label="Sold Qty (Sales Report)"
+          value={formatNumber(data?.salesReportTotals?.soldQty ?? summary.soldQty)}
+        />
+        <MetricCard
+          label="Total Sales (Sales Report)"
+          value={formatAmount(data?.salesReportTotals?.revenue ?? summary.revenue)}
+        />
         <div className="rounded-xl border bg-card p-4">
           <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Cost Profit (Sales Report)
           </div>
-          <div className={`mt-1 text-xl font-semibold tabular-nums ${profitClass}`}>{data?.salesReportTotals ? formatAmount(reportedProfit) : "—"}</div>
-          <div className="text-xs text-muted-foreground">{reportedRevenue ? ((reportedProfit / reportedRevenue) * 100).toFixed(1) : "0.0"}% margin</div>
+          <div className={`mt-1 text-xl font-semibold tabular-nums ${profitClass}`}>
+            {data?.salesReportTotals ? formatAmount(reportedProfit) : "—"}
+          </div>
+          <div className="text-xs text-muted-foreground">
+            {reportedRevenue ? ((reportedProfit / reportedRevenue) * 100).toFixed(1) : "0.0"}% margin
+          </div>
         </div>
       </div>
 
