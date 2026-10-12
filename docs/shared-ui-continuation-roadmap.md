@@ -2,10 +2,10 @@
 
 **Repository:** `Hassan-Merhi/ERP-FACTORY-SYSTEM`
 **Working branch:** `refactor/shared-ui-standardization-phases-1-5`
-**Latest completed implementation phase:** 5
-**Current next phase:** 6
+**Latest completed implementation phase:** 6
+**Current next phase:** 7
 **Created:** 2026-10-12
-**Last implementation checkpoint:** Phase 5 (2026-10-12)
+**Last implementation checkpoint:** Phase 6 (2026-10-12)
 
 Use this file as the resumable checkpoint for scheduled continuation. At the
 start of each future run, read this file from the working branch, inspect the
@@ -34,10 +34,13 @@ commit SHAs, remaining gaps and the newly chosen next phase.
   implementation commit: `3431f69977d946784f0e78e7eae611aa4dec155d`.
   Remaining specialized-module UI adoption is not automatically considered
   production-verified and may be incorporated into subsequent targeted waves.
-- **Phase 6 — Accessibility and behavior hardening:** PLANNED. Improve
-  focus/keyboard semantics, form labeling, loading/empty/error feedback,
-  responsive mobile layouts, RTL and accessible submission affordances in the
-  areas not migrated during Phases 1–5.
+- **Phase 6 — Accessibility and behavior hardening:** IMPLEMENTED.
+  Hardened shared search/tabs/table/filters/pagination/confirmations and
+  migrated representative Factory, POS and inventory workflows for labelled
+  fields, keyboard actions, recoverable API errors, phone touch targets, RTL
+  and safe async form closing. See `docs/shared-ui-phase-6.md`.
+  Last implementation commit: `8085a97a7a5d1ad6d4e35f80d4ec96a0e7a19983`.
+  Accessibility has NOT been certified or tested.
 - **Phase 7 — Architecture debt and dead-code cleanup:** PLANNED. Address
   residual duplicated client services/hooks, unused exports and dead UI
   helpers where they can be removed without changing API or domain behavior.

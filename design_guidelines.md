@@ -286,3 +286,14 @@ keyboard selection behavior. Use `StatusBadge` for known semantic statuses,
 `PageState` for common loading/error/empty UX, and `ConfirmDialog` with
 an awaited promise for consequential deletion. See
 [`docs/shared-ui-phase-5.md`](docs/shared-ui-phase-5.md).
+
+## Phase 6 focus, keyboard and accessibility guidelines
+
+Prefer logical start/end spacing, screen-reader labels for icon controls,
+explicit field `htmlFor` associations, keyboard-operable disclosure
+actions and a single selected-state radio group for mutually exclusive
+options. Do not collapse failed fetches into empty states or close a pending
+mutation dialog before the action resolves. Mobile card tables should not
+add redundant scroll-region tab stops, while wider data grids retain their
+keyboard scroll affordance. The implementation and exceptions are described
+in [`docs/shared-ui-phase-6.md`](docs/shared-ui-phase-6.md).

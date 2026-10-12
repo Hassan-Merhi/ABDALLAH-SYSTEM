@@ -85,3 +85,12 @@ See `docs/shared-ui-phase-5.md` for migrated screens and remaining
 specialized-workflow boundaries. Phase 6 continues focus, keyboard,
 responsive and RTL hardening; see
 `docs/shared-ui-continuation-roadmap.md`.
+
+## Accessibility and interaction hardening (Phase 6)
+
+Shared controls now include better RTL focus handling, labelled pending
+actions, key-activated record rows, error-versus-empty messaging and
+associated form labels in the migrated workflows. See
+`docs/shared-ui-phase-6.md` for precise behavior and remaining boundaries.
+These changes were committed without running checks at the user's request;
+Render's independent verification is not replaced by this checkpoint.
