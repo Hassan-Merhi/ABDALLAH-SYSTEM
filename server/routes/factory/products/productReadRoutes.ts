@@ -38,6 +38,7 @@ export function registerFactoryProductReadRoutes(app: Express) {
             id: factoryBaleProducts.id,
             code: factoryBaleProducts.code,
             articleCode: factoryBaleProducts.articleCode,
+            labelDesignColor: factoryBaleProducts.labelDesignColor,
             name: factoryBaleProducts.name,
             nameAr: factoryBaleProducts.nameAr,
             weightPerBaleKg: factoryBaleProducts.weightPerBaleKg,
