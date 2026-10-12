@@ -79,7 +79,7 @@
 - `2cc0f032c3323d5017db0a4e6191479249d35047` — shared UI, RTL and density.
 - `202c2cb9acf43d2dd984947304494a16bdf2da31` — keyboard actions and dialog focus.
 - `64bf88c62d1eea5a573ec6f75427d8913c8da4b0` — proforma, insurance, POS payment labels.
-- `28c0c87fc5c965d3cfe2f22fd064c3ae1b918dd1` — Factory contact/customer/item labels.
+- `28c0c87fc5c0fe053b7e4ed809998a45a95d8362` — Factory contact/customer/item labels.
 - `536cfb26e6e5e6e9551678300a3424397473df49` — retryable errors, phone fields and color controls.
 - `5ad1d7377374a427d577780faef086adab50f6bc` — pending dialogs, feedback, touch targets.
 - `8085a97a7a5d1ad6d4e35f80d4ec96a0e7a19983` — native RTL tabs, picker and stock/invoice keys.
