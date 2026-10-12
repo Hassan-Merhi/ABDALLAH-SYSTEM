@@ -1,8 +1,5 @@
-import type { Express, Request, Response } from "express";
 import { sql } from "drizzle-orm";
-import { requireAuth, requireRole } from "../../auth";
 import { db } from "../../db";
-import { logger } from "../../lib/logger";
 import { ensurePhase2Schema, getSuspenseReview, pn } from "./spMigrationPhase2Common";
 import { buildCutoverReadiness } from "./spMigrationCutoverReadiness";
 import { ensureCutoverSchema, getLiveCutover } from "./spMigrationCutoverState";
@@ -233,29 +230,4 @@ export async function buildFinalSpVerification(sourceId: number, targetId: numbe
       fail: areas.filter((area) => area.status === "FAIL").length,
     },
   };
-}
-
-export function registerSpMigrationFinalVerificationRoutes(app: Express): void {
-  app.get(
-    "/api/sp/migration/final-verification",
-    requireAuth,
-    requireRole("Developer"),
-    async (req: Request, res: Response) => {
-      try {
-        const sourceId = Number.parseInt(String(req.query.sourceCompanyId ?? ""), 10);
-        const targetId = Number.parseInt(String(req.query.targetCompanyId ?? ""), 10);
-        if (!sourceId || !targetId) {
-          return res.status(400).json({ message: "sourceCompanyId and targetCompanyId are required" });
-        }
-        if (sourceId === targetId) {
-          return res.status(400).json({ message: "Source and target companies must be different" });
-        }
-        const report = await buildFinalSpVerification(sourceId, targetId);
-        return res.status(report.overall === "FAIL" ? 409 : 200).json(report);
-      } catch (error: unknown) {
-        logger.error("[SP Migration] final verification error", { error });
-        return res.status(500).json({ message: "Final Supplier Partner verification failed" });
-      }
-    }
-  );
 }
