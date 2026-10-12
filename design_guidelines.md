@@ -275,3 +275,14 @@ Explicit-currency amounts use `MoneyAmount` or
 `formatMoneyDisplay`, *never* implicit FX conversion. Await async
 confirmations and guard posting actions against repeat submissions.
 The full reference is [`docs/shared-ui-phase-4.md`](docs/shared-ui-phase-4.md).
+
+## Phase 5 reusable presentation contracts
+
+For all controlled standalone searches, prefer
+`@/components/ui/search-field` (including sidebars, lookup forms, and list
+filters). Table toolbars already use it. Keep bespoke scanner search handling
+only where replacing the native input would alter barcode focus or cashier
+keyboard selection behavior. Use `StatusBadge` for known semantic statuses,
+`PageState` for common loading/error/empty UX, and `ConfirmDialog` with
+an awaited promise for consequential deletion. See
+[`docs/shared-ui-phase-5.md`](docs/shared-ui-phase-5.md).

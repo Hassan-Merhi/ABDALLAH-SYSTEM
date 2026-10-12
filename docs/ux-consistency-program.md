@@ -75,3 +75,13 @@ adoption, use `FormSubmitButton`, `MoneyInput` and
 The scheduled no-checks architecture waves are tracked separately in
 `docs/shared-ui-continuation-roadmap.md`; they do not disable or change
 the project's existing CI configuration.
+
+## Cross-module adoption (Phase 5)
+
+The canonical `SearchField`, semantic `StatusBadge`, page states,
+`FormSubmitButton`, currency-specific amount controls, and awaited
+`ConfirmDialog` have been adopted across additional feature screens.
+See `docs/shared-ui-phase-5.md` for migrated screens and remaining
+specialized-workflow boundaries. Phase 6 continues focus, keyboard,
+responsive and RTL hardening; see
+`docs/shared-ui-continuation-roadmap.md`.
