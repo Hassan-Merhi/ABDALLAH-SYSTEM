@@ -316,12 +316,15 @@ describe("net position party lines equal the engine", () => {
     const supplier = await getPartyBalance(db, { companyId: erp, kind: "supplier", id: supplierId, asOf: AS_OF });
     expect(supplier?.historicalBaseClosing).toBe("-150.00");
     const snapshot = await calculateNetPositionAsOf(erp, AS_OF);
+    // #2178: an ERP employee is listed at Payroll's current balance (999), not
+    // as an aggregate "Payroll Payable" of the ledger's 300.
     expect(snapshot.onUsLines).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ label: "Supplier Payables", value: 150 }),
-        expect.objectContaining({ label: "Payroll Payable", value: 300 }),
+        expect.objectContaining({ label: "Pay Roll", value: 999, category: "Payroll" }),
       ])
     );
+    expect(snapshot.onUsLines.some((line) => line.label === "Payroll Payable")).toBe(false);
     expect(snapshot.forUsLines).toEqual(
       expect.arrayContaining([expect.objectContaining({ label: "Worker Advances (Prepaid)", value: 40 })])
     );
@@ -339,7 +342,7 @@ describe("net position party lines equal the engine", () => {
       [`${PREFIX} new customer`]: 620,
       "Worker Advances (Prepaid)": 40,
     });
-    expect(names(body.onUs.accounts)).toMatchObject({ [`${PREFIX} supplier`]: 150, "Payroll Payable": 300 });
+    expect(names(body.onUs.accounts)).toMatchObject({ [`${PREFIX} supplier`]: 150, "Pay Roll": 999 });
     // The CUST ledger is rolled into the customer, never listed on its own.
     expect(
       body.forUs.accounts.some(

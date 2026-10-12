@@ -150,6 +150,24 @@ Repository gates:
 - `config/doc-index.json` and `docs/README.md` now classify and link the
   nine shared-UI documents (`npm run audit:doc-index` failed before).
 
+### Repairs carried for `main` (merge gate)
+
+The PR cannot merge unless it is up to date with `main`, and `main` itself
+was red at the time: #2193 left `NetProfitDetails.tsx` failing `tsc` (the
+equity section has no `breakdown`, so the From/To difference helper now
+treats `breakdown` as optional), and #2178 changed net-position and
+employee-balance behaviour without updating its tests. Those five
+assertions were aligned to the behaviour #2178 introduced, not loosened:
+the all-time `/api/accounts/all` employee row is Payroll's stored current
+balance (the dated view still asserts the engine's exact sum), unmatched
+"missing-account" lines are excluded from the net position presentation,
+and an ERP employee is listed at Payroll's current balance in place of the
+aggregate "Payroll Payable". The four files pass locally (27 tests) on the
+merged tree; no server code was changed. Likewise, main's label commit
+(a black "HMD" printed inside the small priority colour box) left seven
+label-printing assertions expecting an empty box; they now assert the HMD
+text span the renderer emits.
+
 ### Verified unchanged (Phase 7 focus)
 
 The seven fetch interceptors keep their endpoint guards, registration

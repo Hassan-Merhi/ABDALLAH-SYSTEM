@@ -329,15 +329,18 @@ describe("1: /api/accounts/all on the balance engine", () => {
     // 70 + 5 + 7: the line also naming the bank ledger and company B's line are not the bank's.
     expect(byId("bank", ids.BANK)).toMatchObject({ balance: "82.00", balanceSide: "Dr" });
     expect(byId("ledger", ids.BANKLEDGER)).toMatchObject({ balance: "25.00", balanceSide: "Dr" });
-    // Employee, Cr positive: 40 (sideless: Cr) − 10 + 4.
-    expect(byId("employee", ids.EMP)).toMatchObject({ balance: "34.00", balanceSide: "Cr", openingBalanceSide: "Cr" });
+    // Employee: the all-time row is Payroll's current balance (#2178; 0 for this
+    // fixture) with the engine's opening side. The engine's 40 (sideless: Cr) − 10 + 4
+    // is asserted in the dated view below.
+    expect(byId("employee", ids.EMP)).toMatchObject({ balance: "0.00", balanceSide: "Cr", openingBalanceSide: "Cr" });
   });
 
   it("carries the engine's opening into a period", async () => {
     const accounts = await accountList({ startDate: daysAgo(5) });
     const byId = (type: string, id: number) => accounts.find((a) => a.type === type && a.accountId === id);
     expect(byId("bank", ids.BANK)).toMatchObject({ openingBalance: 75, openingBalanceSide: "Dr", balance: "82.00" });
-    expect(byId("employee", ids.EMP)).toMatchObject({ openingBalance: 30, openingBalanceSide: "Cr" });
+    // Employee, Cr positive: 40 (sideless: Cr) − 10 + 4.
+    expect(byId("employee", ids.EMP)).toMatchObject({ openingBalance: 30, openingBalanceSide: "Cr", balance: "34.00" });
   });
 });
 
