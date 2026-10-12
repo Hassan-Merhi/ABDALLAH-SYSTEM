@@ -13,7 +13,8 @@ const accessibility = await read("client/src/components/ui/responsive-accessibil
 const failures = [];
 
 for (const token of [
-  'role="region"',
+  // Card stacks are part of the page; only scrollable tables expose a labelled scroll region.
+  'role={cards ? undefined : "region"}',
   'data-horizontal-scroll="true"',
   'data-table-scroll-region="true"',
   "aria-describedby",
