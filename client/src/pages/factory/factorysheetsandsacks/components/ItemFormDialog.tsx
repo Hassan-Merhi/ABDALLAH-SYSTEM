@@ -9,12 +9,14 @@ import { useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
+import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { Input } from "@/components/ui/input";
+import { DecimalInput, MoneyInput } from "@/components/ui/decimal-input";
+import { FormGrid } from "@/components/ui/form";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2 } from "lucide-react";
 
 import type { SheetsAndSacksItem } from "../types";
 import { TYPES, fmt } from "../utils";
@@ -116,11 +118,11 @@ function ItemFormDialog({
             <Label>Size / Weight</Label>
             <Input value={size} onChange={(e) => setSize(e.target.value)} placeholder="e.g. 50kg, 100×80cm" />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <FormGrid minColumnWidth="9rem" className="gap-3">
             <div className="space-y-1.5">
               <Label>Qty (packs)</Label>
-              <Input
-                type="number"
+              <DecimalInput
+                step="1"
                 min="0"
                 value={packQty}
                 onChange={(e) => setPackQty(e.target.value)}
@@ -129,15 +131,15 @@ function ItemFormDialog({
             </div>
             <div className="space-y-1.5">
               <Label># / Pack (pcs)</Label>
-              <Input
-                type="number"
+              <DecimalInput
+                step="1"
                 min="0"
                 value={pcsPerPack}
                 onChange={(e) => setPcsPerPack(e.target.value)}
                 placeholder="0"
               />
             </div>
-          </div>
+          </FormGrid>
           <div className="rounded-md bg-muted/50 px-3 py-2 flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Total pcs</span>
             <span className="font-mono font-semibold">{totalPcs.toLocaleString("en-US")}</span>
@@ -176,10 +178,10 @@ function ItemFormDialog({
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={saveMutation.isPending}>
-            {saveMutation.isPending && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+          <FormSubmitButton type="button" onClick={handleSubmit}
+            pending={saveMutation.isPending} pendingLabel="Saving…">
             {existing ? "Update" : "Add Item"}
-          </Button>
+          </FormSubmitButton>
         </DialogFooter>
       </DialogContent>
     </Dialog>
