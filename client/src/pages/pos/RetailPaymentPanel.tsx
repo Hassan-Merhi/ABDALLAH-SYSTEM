@@ -66,7 +66,9 @@ export function RetailPaymentPanel({
         return (
           <div key={index} className="grid gap-2 rounded-md border bg-background p-2 md:grid-cols-[140px_1fr_1fr_auto]">
             <div>
-              <Label htmlFor={`${formId}-method-${index}`} className="text-xs">Method</Label>
+              <Label htmlFor={`${formId}-method-${index}`} className="text-xs">
+                Method
+              </Label>
               <select
                 id={`${formId}-method-${index}`}
                 className="mt-1 h-9 w-full rounded-md border bg-background px-2 text-sm"
@@ -87,7 +89,9 @@ export function RetailPaymentPanel({
               </select>
             </div>
             <div>
-              <Label htmlFor={`${formId}-amount-${index}`} className="text-xs">Amount</Label>
+              <Label htmlFor={`${formId}-amount-${index}`} className="text-xs">
+                Amount
+              </Label>
               <MoneyInput
                 id={`${formId}-amount-${index}`}
                 className="mt-1 h-9"
@@ -99,7 +103,9 @@ export function RetailPaymentPanel({
             </div>
             {payment.method === "cash" ? (
               <div>
-                <Label htmlFor={`${formId}-tendered-${index}`} className="text-xs">Tendered</Label>
+                <Label htmlFor={`${formId}-tendered-${index}`} className="text-xs">
+                  Tendered
+                </Label>
                 <MoneyInput
                   id={`${formId}-tendered-${index}`}
                   className="mt-1 h-9"
@@ -112,7 +118,9 @@ export function RetailPaymentPanel({
               </div>
             ) : (
               <div>
-                <Label htmlFor={`${formId}-reference-${index}`} className="text-xs">Reference</Label>
+                <Label htmlFor={`${formId}-reference-${index}`} className="text-xs">
+                  Reference
+                </Label>
                 <Input
                   id={`${formId}-reference-${index}`}
                   className="mt-1 h-9"

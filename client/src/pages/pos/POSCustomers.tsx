@@ -265,11 +265,13 @@ export default function POSCustomers() {
           onSearchChange={(value) => setFilter("searchQuery", value)}
           searchPlaceholder="Search customers..."
           searchTestId="input-search-customers"
-          actions={hasActiveFilters ? (
-            <Button variant="outline" type="button" onClick={resetFilters} data-testid="button-reset-filters">
-              Reset filters
-            </Button>
-          ) : undefined}
+          actions={
+            hasActiveFilters ? (
+              <Button variant="outline" type="button" onClick={resetFilters} data-testid="button-reset-filters">
+                Reset filters
+              </Button>
+            ) : undefined
+          }
         />
 
         {isLoading ? (

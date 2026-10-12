@@ -112,7 +112,12 @@ export default function FactoryContacts() {
   const orderedContacts = [...filtered].sort(
     (a, b) => a.name.localeCompare(b.name) * (prefs.sortDir === "desc" ? -1 : 1)
   );
-  const { page: safePage, setPage, totalPages: pages, paginate } = useClientTablePagination(orderedContacts.length, pageSize);
+  const {
+    page: safePage,
+    setPage,
+    totalPages: pages,
+    paginate,
+  } = useClientTablePagination(orderedContacts.length, pageSize);
   const visibleContacts = paginate(orderedContacts);
 
   const saveMutation = useMutation({
@@ -186,10 +191,12 @@ export default function FactoryContacts() {
       toast({ title: "Name is required", variant: "destructive" });
       return;
     }
-    void executeSave(() => saveMutation.mutateAsync({
-      ...form,
-      numbers: form.numbers.filter((n) => n.number.trim()),
-    })).catch(() => {
+    void executeSave(() =>
+      saveMutation.mutateAsync({
+        ...form,
+        numbers: form.numbers.filter((n) => n.number.trim()),
+      })
+    ).catch(() => {
       // Existing mutation.onError provides feedback.
     });
   };
@@ -206,7 +213,10 @@ export default function FactoryContacts() {
       <div className="flex-1 min-h-0 overflow-y-auto p-4">
         <DataTableToolbar
           search={search}
-          onSearchChange={(value) => { setSearch(value); setPage(1); }}
+          onSearchChange={(value) => {
+            setSearch(value);
+            setPage(1);
+          }}
           searchPlaceholder="Search name, role, number…"
           actions={
             <TableViewOptions
@@ -254,15 +264,17 @@ export default function FactoryContacts() {
                 {visibleContacts.map((c) => (
                   <TableRow key={c.id} className="group">
                     <TableCell className="font-semibold align-top py-3">{c.name}</TableCell>
-                    {show("role") && <TableCell className="align-top py-3">
-                      {c.role ? (
-                        <Badge variant="secondary" className="text-xs font-normal">
-                          {c.role}
-                        </Badge>
-                      ) : (
-                        <span className="text-muted-foreground text-xs">—</span>
-                      )}
-                    </TableCell>}
+                    {show("role") && (
+                      <TableCell className="align-top py-3">
+                        {c.role ? (
+                          <Badge variant="secondary" className="text-xs font-normal">
+                            {c.role}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
+                        )}
+                      </TableCell>
+                    )}
                     <TableCell className="align-top py-3">
                       {c.numbers.length > 0 ? (
                         <div className="space-y-1">
@@ -279,13 +291,15 @@ export default function FactoryContacts() {
                         <span className="text-muted-foreground text-xs">—</span>
                       )}
                     </TableCell>
-                    {show("notes") && <TableCell className="align-top py-3 sm:max-w-[260px]">
-                      {c.notes ? (
-                        <p className="text-xs text-muted-foreground whitespace-pre-wrap line-clamp-3">{c.notes}</p>
-                      ) : (
-                        <span className="text-muted-foreground text-xs">—</span>
-                      )}
-                    </TableCell>}
+                    {show("notes") && (
+                      <TableCell className="align-top py-3 sm:max-w-[260px]">
+                        {c.notes ? (
+                          <p className="text-xs text-muted-foreground whitespace-pre-wrap line-clamp-3">{c.notes}</p>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
+                        )}
+                      </TableCell>
+                    )}
                     <TableCell className="align-top py-3 text-right">
                       <div className="flex items-center justify-end gap-1 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 touch:opacity-100 sm:group-focus-within:opacity-100 touch:opacity-100">
                         <Button
@@ -316,9 +330,18 @@ export default function FactoryContacts() {
             </Table>
           </div>
         )}
-        <PaginationBar page={safePage} totalPages={pages} total={filtered.length} pageSize={pageSize}
+        <PaginationBar
+          page={safePage}
+          totalPages={pages}
+          total={filtered.length}
+          pageSize={pageSize}
           onPageChange={setPage}
-          onPageSizeChange={(size) => { setPrefs({ pageSize: size }); setPage(1); }} noun="contacts" />
+          onPageSizeChange={(size) => {
+            setPrefs({ pageSize: size });
+            setPage(1);
+          }}
+          noun="contacts"
+        />
       </div>
 
       {/* Add / Edit Dialog */}
@@ -417,8 +440,12 @@ export default function FactoryContacts() {
             <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saveMutation.isPending || saving}>
               Cancel
             </Button>
-            <FormSubmitButton type="button" onClick={handleSubmit}
-              pending={saveMutation.isPending || saving} pendingLabel="Saving…">
+            <FormSubmitButton
+              type="button"
+              onClick={handleSubmit}
+              pending={saveMutation.isPending || saving}
+              pendingLabel="Saving…"
+            >
               {editingContact ? "Save Changes" : "Add Contact"}
             </FormSubmitButton>
           </DialogFooter>
@@ -427,10 +454,16 @@ export default function FactoryContacts() {
 
       <ConfirmDialog
         open={!!deleteTarget}
-        onOpenChange={(isOpen) => { if (!isOpen) setDeleteTarget(null); }}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setDeleteTarget(null);
+        }}
         title="Delete Contact"
         tone="destructive"
-        description={<>Remove <strong>{deleteTarget?.name}</strong> from your contacts? This cannot be undone.</>}
+        description={
+          <>
+            Remove <strong>{deleteTarget?.name}</strong> from your contacts? This cannot be undone.
+          </>
+        }
         confirmText="Delete"
         loading={deleteMutation.isPending}
         onConfirm={async () => {

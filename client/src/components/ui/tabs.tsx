@@ -35,14 +35,7 @@ export interface TabsProps extends React.HTMLAttributes<HTMLDivElement> {
   onValueChange?: (value: string) => void;
 }
 
-function Tabs({
-  value: controlledValue,
-  defaultValue,
-  onValueChange,
-  className,
-  children,
-  ...props
-}: TabsProps) {
+function Tabs({ value: controlledValue, defaultValue, onValueChange, className, children, ...props }: TabsProps) {
   const baseId = React.useId();
   const [internalValue, setInternalValue] = React.useState<string | undefined>(defaultValue);
   const isControlled = controlledValue !== undefined;
@@ -53,15 +46,17 @@ function Tabs({
       if (!isControlled) setInternalValue(next);
       onValueChange?.(next);
     },
-    [activeValue, isControlled, onValueChange],
+    [activeValue, isControlled, onValueChange]
   );
   const context = React.useMemo(
     () => ({ value: activeValue, onValueChange: handleChange, baseId }),
-    [activeValue, handleChange, baseId],
+    [activeValue, handleChange, baseId]
   );
   return (
     <TabsContext.Provider value={context}>
-      <div className={cn("min-w-0", className)} {...props}>{children}</div>
+      <div className={cn("min-w-0", className)} {...props}>
+        {children}
+      </div>
     </TabsContext.Provider>
   );
 }
@@ -79,15 +74,21 @@ function handleListKeyDown(event: React.KeyboardEvent<HTMLDivElement>, activatio
   if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(key)) return;
   const list = event.currentTarget;
   const orientation = list.getAttribute("aria-orientation") === "vertical" ? "vertical" : "horizontal";
-  if (key.startsWith("Arrow") && !(
-    orientation === "vertical" ? key === "ArrowUp" || key === "ArrowDown" : key === "ArrowLeft" || key === "ArrowRight"
-  )) return;
-  const options = Array.from(list.querySelectorAll<HTMLButtonElement>('[role="tab"]:not(:disabled):not([aria-disabled="true"])'))
-    .filter((tab) =>
+  if (
+    key.startsWith("Arrow") &&
+    !(orientation === "vertical"
+      ? key === "ArrowUp" || key === "ArrowDown"
+      : key === "ArrowLeft" || key === "ArrowRight")
+  )
+    return;
+  const options = Array.from(
+    list.querySelectorAll<HTMLButtonElement>('[role="tab"]:not(:disabled):not([aria-disabled="true"])')
+  ).filter(
+    (tab) =>
       tab.closest('[role="tablist"]') === list &&
       !tab.closest('[hidden], [inert], [aria-hidden="true"]') &&
       getComputedStyle(tab).display !== "none"
-    );
+  );
   if (!options.length) return;
   const current = options.indexOf(document.activeElement as HTMLButtonElement);
   if (current < 0 && key !== "Home" && key !== "End") return;
@@ -105,7 +106,18 @@ function handleListKeyDown(event: React.KeyboardEvent<HTMLDivElement>, activatio
 }
 
 const TabsList = React.forwardRef<HTMLDivElement, TabsListProps>(
-  ({ className, variant = "pill", orientation = "horizontal", activationMode = "automatic", onKeyDown, children, ...props }, ref) => (
+  (
+    {
+      className,
+      variant = "pill",
+      orientation = "horizontal",
+      activationMode = "automatic",
+      onKeyDown,
+      children,
+      ...props
+    },
+    ref
+  ) => (
     <TabsAppearanceContext.Provider value={variant}>
       <div
         {...props}
@@ -125,13 +137,13 @@ const TabsList = React.forwardRef<HTMLDivElement, TabsListProps>(
           orientation === "vertical" && "flex-col items-stretch",
           variant === "pill" && "rounded-xl border border-border bg-muted/40 p-1 text-muted-foreground",
           variant === "underline" && "gap-0 border-b border-border bg-transparent p-0 text-muted-foreground",
-          className,
+          className
         )}
       >
         {children}
       </div>
     </TabsAppearanceContext.Provider>
-  ),
+  )
 );
 TabsList.displayName = "TabsList";
 
@@ -145,11 +157,14 @@ const TabsTrigger = React.forwardRef<HTMLButtonElement, TabsTriggerProps>(
     const variant = React.useContext(TabsAppearanceContext);
     const active = selectedValue === value;
     const internalRef = React.useRef<HTMLButtonElement | null>(null);
-    const setRef = React.useCallback((node: HTMLButtonElement | null) => {
-      internalRef.current = node;
-      if (typeof ref === "function") ref(node);
-      else if (ref) ref.current = node;
-    }, [ref]);
+    const setRef = React.useCallback(
+      (node: HTMLButtonElement | null) => {
+        internalRef.current = node;
+        if (typeof ref === "function") ref(node);
+        else if (ref) ref.current = node;
+      },
+      [ref]
+    );
 
     React.useEffect(() => {
       const node = internalRef.current;
@@ -180,17 +195,19 @@ const TabsTrigger = React.forwardRef<HTMLButtonElement, TabsTriggerProps>(
           "inline-flex min-h-11 shrink-0 touch-manipulation items-center justify-center gap-1.5 whitespace-nowrap text-sm font-medium transition-colors sm:min-h-9",
           "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
           "disabled:pointer-events-none disabled:opacity-40",
-          variant === "pill" && "rounded-lg px-3 py-2 text-muted-foreground hover:bg-background/60 hover:text-foreground sm:px-4",
+          variant === "pill" &&
+            "rounded-lg px-3 py-2 text-muted-foreground hover:bg-background/60 hover:text-foreground sm:px-4",
           variant === "pill" && active && "bg-background font-semibold text-foreground shadow-xs",
-          variant === "underline" && "rounded-none border-b-2 border-transparent px-4 py-2 text-muted-foreground hover:text-foreground",
+          variant === "underline" &&
+            "rounded-none border-b-2 border-transparent px-4 py-2 text-muted-foreground hover:text-foreground",
           variant === "underline" && active && "border-primary font-semibold text-foreground",
-          className,
+          className
         )}
       >
         {children}
       </button>
     );
-  },
+  }
 );
 TabsTrigger.displayName = "TabsTrigger";
 
@@ -217,13 +234,13 @@ const TabsContent = React.forwardRef<HTMLDivElement, TabsContentProps>(
         data-state={active ? "active" : "inactive"}
         className={cn(
           "mt-4 min-w-0 ring-offset-background focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-          className,
+          className
         )}
       >
         {children}
       </div>
     );
-  },
+  }
 );
 TabsContent.displayName = "TabsContent";
 

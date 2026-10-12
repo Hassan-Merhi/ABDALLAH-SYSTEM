@@ -8,18 +8,7 @@ import { customersApi } from "@/api/customersApi";
 import { drCrClass } from "@/lib/formatNumber";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
-import {
-  Plus,
-  Building2,
-  Pencil,
-  Users,
-  Wallet,
-  TrendingUp,
-  TrendingDown,
-  EyeOff,
-  Eye,
-  Printer,
-} from "lucide-react";
+import { Plus, Building2, Pencil, Users, Wallet, TrendingUp, TrendingDown, EyeOff, Eye, Printer } from "lucide-react";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -381,17 +370,23 @@ export default function Customers() {
         activeFilterCount={hasActiveFilters ? 1 : 0}
         onResetFilters={resetFilters}
         filters={
-          <Button variant="outline" type="button" onClick={() => setFilter("hideZero", !hideZero)}
-            data-testid="button-toggle-hide-zero">
+          <Button
+            variant="outline"
+            type="button"
+            onClick={() => setFilter("hideZero", !hideZero)}
+            data-testid="button-toggle-hide-zero"
+          >
             {hideZero ? <Eye className="mr-2 h-4 w-4" /> : <EyeOff className="mr-2 h-4 w-4" />}
             {hideZero ? "Show Zero" : "Hide Zero"}
           </Button>
         }
-        actions={hasActiveFilters ? (
-          <Button variant="outline" type="button" onClick={resetFilters} data-testid="button-reset-filters">
-            Reset filters
-          </Button>
-        ) : undefined}
+        actions={
+          hasActiveFilters ? (
+            <Button variant="outline" type="button" onClick={resetFilters} data-testid="button-reset-filters">
+              Reset filters
+            </Button>
+          ) : undefined
+        }
       />
 
       {/* Table */}

@@ -43,9 +43,21 @@ export default function InventoryHub({ access }: { access?: ErpFeatureAccess }) 
         </TabsList>
       </div>
 
-      {visibleValues.includes("by-location") && <TabsContent value="by-location" className="mt-0"><LocationInventory /></TabsContent>}
-      {visibleValues.includes("on-the-way") && <TabsContent value="on-the-way" className="mt-0"><StockOTW /></TabsContent>}
-      {visibleValues.includes("containers") && <TabsContent value="containers" className="mt-0"><Containers /></TabsContent>}
+      {visibleValues.includes("by-location") && (
+        <TabsContent value="by-location" className="mt-0">
+          <LocationInventory />
+        </TabsContent>
+      )}
+      {visibleValues.includes("on-the-way") && (
+        <TabsContent value="on-the-way" className="mt-0">
+          <StockOTW />
+        </TabsContent>
+      )}
+      {visibleValues.includes("containers") && (
+        <TabsContent value="containers" className="mt-0">
+          <Containers />
+        </TabsContent>
+      )}
     </Tabs>
   );
 }

@@ -75,16 +75,18 @@ function MemberFormDialog({
       toast({ title: "Please fill in required fields", variant: "destructive" });
       return;
     }
-    void executeSave(() => saveMutation.mutateAsync({
-      name: name.trim(),
-      nationality: nationality || null,
-      positionWorking: positionWorking || null,
-      insuranceNumber: insuranceNumber || null,
-      startDate,
-      amount,
-      dob: dob || null,
-      notes: notes || null,
-    })).catch(() => {
+    void executeSave(() =>
+      saveMutation.mutateAsync({
+        name: name.trim(),
+        nationality: nationality || null,
+        positionWorking: positionWorking || null,
+        insuranceNumber: insuranceNumber || null,
+        startDate,
+        amount,
+        dob: dob || null,
+        notes: notes || null,
+      })
+    ).catch(() => {
       // Existing mutation onError shows the error.
     });
   };
@@ -116,7 +118,7 @@ function MemberFormDialog({
                 onChange={(e) => setNationality(e.target.value)}
                 placeholder="e.g. Congolese"
                 id={`${formId}-nationality`}
-              data-testid="input-member-nationality"
+                data-testid="input-member-nationality"
               />
             </div>
             <div className="space-y-1">
@@ -126,7 +128,7 @@ function MemberFormDialog({
                 onChange={(e) => setPositionWorking(e.target.value)}
                 placeholder="e.g. Operator"
                 id={`${formId}-position`}
-              data-testid="input-member-position"
+                data-testid="input-member-position"
               />
             </div>
           </FormGrid>
@@ -150,13 +152,18 @@ function MemberFormDialog({
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
                 id={`${formId}-start`}
-              data-testid="input-member-startdate"
+                data-testid="input-member-startdate"
               />
             </div>
             <div className="space-y-1">
               <Label htmlFor={`${formId}-dob`}>Date of Birth</Label>
-              <Input type="date" value={dob} onChange={(e) => setDob(e.target.value)} id={`${formId}-dob`}
-              data-testid="input-member-dob" />
+              <Input
+                type="date"
+                value={dob}
+                onChange={(e) => setDob(e.target.value)}
+                id={`${formId}-dob`}
+                data-testid="input-member-dob"
+              />
             </div>
           </FormGrid>
           <div className="space-y-1">
@@ -190,9 +197,13 @@ function MemberFormDialog({
           <Button variant="outline" onClick={onClose} data-testid="button-cancel-member">
             Cancel
           </Button>
-          <FormSubmitButton type="button" onClick={handleSubmit}
-            pending={submitting || saveMutation.isPending} pendingLabel="Saving…"
-            data-testid="button-save-member">
+          <FormSubmitButton
+            type="button"
+            onClick={handleSubmit}
+            pending={submitting || saveMutation.isPending}
+            pendingLabel="Saving…"
+            data-testid="button-save-member"
+          >
             {existing ? "Save Changes" : "Add Member"}
           </FormSubmitButton>
         </DialogFooter>

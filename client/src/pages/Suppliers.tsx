@@ -233,18 +233,23 @@ export default function Suppliers() {
         activeFilterCount={hasActiveFilters ? 1 : 0}
         onResetFilters={resetFilters}
         filters={
-          <Button variant={hideZeroBalance ? "secondary" : "outline"} type="button"
+          <Button
+            variant={hideZeroBalance ? "secondary" : "outline"}
+            type="button"
             onClick={() => setFilter("hideZeroBalance", !hideZeroBalance)}
-            data-testid="button-toggle-zero-balance">
+            data-testid="button-toggle-zero-balance"
+          >
             {hideZeroBalance ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
             {hideZeroBalance ? "Hide Zero" : "Show All"}
           </Button>
         }
-        actions={hasActiveFilters ? (
-          <Button variant="outline" type="button" onClick={resetFilters} data-testid="button-reset-filters">
-            Reset filters
-          </Button>
-        ) : undefined}
+        actions={
+          hasActiveFilters ? (
+            <Button variant="outline" type="button" onClick={resetFilters} data-testid="button-reset-filters">
+              Reset filters
+            </Button>
+          ) : undefined
+        }
       />
 
       {/* Supplier list */}

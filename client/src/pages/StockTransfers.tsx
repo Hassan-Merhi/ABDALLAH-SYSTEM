@@ -10,17 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import {
-  ArrowRight,
-  ExternalLink,
-  Pencil,
-  Save,
-  X,
-  ArrowLeftRight,
-  Package,
-  DollarSign,
-  Clock,
-} from "lucide-react";
+import { ArrowRight, ExternalLink, Pencil, Save, X, ArrowLeftRight, Package, DollarSign, Clock } from "lucide-react";
 import { parseISO } from "date-fns";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useDateFormat } from "@/contexts/DateFormatContext";
@@ -205,12 +195,14 @@ export default function StockTransfers({ hideVoucherNotes = false }: StockTransf
         searchPlaceholder="Search by voucher, location, notes…"
         searchTestId="input-search"
         filters={<PeriodFilter value={period} onChange={(next) => setFilter("period", next)} />}
-        actions={hasActiveFilters ? (
-          <Button variant="outline" size="sm" type="button" onClick={resetFilters} data-testid="button-reset-filters">
-            <X className="mr-2 h-4 w-4" />
-            Reset filters
-          </Button>
-        ) : undefined}
+        actions={
+          hasActiveFilters ? (
+            <Button variant="outline" size="sm" type="button" onClick={resetFilters} data-testid="button-reset-filters">
+              <X className="mr-2 h-4 w-4" />
+              Reset filters
+            </Button>
+          ) : undefined
+        }
       />
 
       {/* Table */}

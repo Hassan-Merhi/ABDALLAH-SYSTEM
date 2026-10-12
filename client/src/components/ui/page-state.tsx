@@ -41,7 +41,7 @@ const PageState = React.forwardRef<HTMLDivElement, PageStateProps>(
       iconClassName,
       ...props
     },
-    ref,
+    ref
   ) => {
     const Icon = icon === undefined ? (layout === "legacy" ? null : Inbox) : icon;
     const hasPrimaryAction = Boolean(actionLabel && onAction);
@@ -56,20 +56,35 @@ const PageState = React.forwardRef<HTMLDivElement, PageStateProps>(
           layout === "legacy"
             ? "empty-state"
             : "flex min-h-48 min-w-0 flex-col items-center justify-center rounded-lg border border-dashed bg-card px-4 py-8 text-center sm:px-6 sm:py-10",
-          className,
+          className
         )}
         {...props}
       >
         {Icon ? (
-          <div className={layout === "legacy" ? "empty-state-icon" : "mb-4 rounded-full bg-muted p-3 text-muted-foreground"} aria-hidden="true">
+          <div
+            className={
+              layout === "legacy" ? "empty-state-icon" : "mb-4 rounded-full bg-muted p-3 text-muted-foreground"
+            }
+            aria-hidden="true"
+          >
             <Icon className={cn(layout === "legacy" ? "h-5 w-5" : "h-6 w-6", iconClassName)} />
           </div>
         ) : null}
-        <h3 className={layout === "legacy" ? "empty-state-title" : "max-w-xl text-base font-semibold text-foreground"}>{title}</h3>
+        <h3 className={layout === "legacy" ? "empty-state-title" : "max-w-xl text-base font-semibold text-foreground"}>
+          {title}
+        </h3>
         {description ? (
-          <p className={layout === "legacy" ? "empty-state-desc" : "mt-1 max-w-xl text-sm leading-5 text-muted-foreground"}>{description}</p>
+          <p
+            className={
+              layout === "legacy" ? "empty-state-desc" : "mt-1 max-w-xl text-sm leading-5 text-muted-foreground"
+            }
+          >
+            {description}
+          </p>
         ) : null}
-        {action ? <div className="mt-2">{action}</div> : hasPrimaryAction || hasSecondaryAction ? (
+        {action ? (
+          <div className="mt-2">{action}</div>
+        ) : hasPrimaryAction || hasSecondaryAction ? (
           <WorkspaceActions className="mt-4 w-full justify-center sm:w-auto">
             {hasSecondaryAction ? (
               <Button type="button" variant="ghost" onClick={onSecondaryAction} disabled={actionPending}>
@@ -92,7 +107,7 @@ const PageState = React.forwardRef<HTMLDivElement, PageStateProps>(
         ) : null}
       </div>
     );
-  },
+  }
 );
 PageState.displayName = "PageState";
 
@@ -142,15 +157,7 @@ export function SuccessState({
   description = "Your changes have been saved.",
   ...props
 }: Omit<PageStateProps, "icon" | "title"> & { title?: string }) {
-  return (
-    <PageState
-      icon={CheckCircle2}
-      title={title}
-      description={description}
-      aria-live="polite"
-      {...props}
-    />
-  );
+  return <PageState icon={CheckCircle2} title={title} description={description} aria-live="polite" {...props} />;
 }
 
 export { PageState };

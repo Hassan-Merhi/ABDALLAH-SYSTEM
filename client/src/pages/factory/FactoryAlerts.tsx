@@ -20,8 +20,7 @@ interface Alert {
 }
 
 function getSeverityBadge(severity: string) {
-  return <StatusBadge status={severity} label={severity} showIcon={false}
-    data-testid={`badge-severity-${severity}`} />;
+  return <StatusBadge status={severity} label={severity} showIcon={false} data-testid={`badge-severity-${severity}`} />;
 }
 
 export default function FactoryAlerts() {
@@ -98,11 +97,17 @@ export default function FactoryAlerts() {
               title="Alerts could not be loaded"
               description="The alert service did not respond. Your alert records have not been changed."
               actionLabel="Try again"
-              onAction={() => { void alertsQuery.refetch(); }}
+              onAction={() => {
+                void alertsQuery.refetch();
+              }}
             />
           ) : alerts.length === 0 ? (
-            <EmptyState title="No alerts found" description="Generated alerts will appear here."
-              icon={Bell} data-testid="text-no-data" />
+            <EmptyState
+              title="No alerts found"
+              description="Generated alerts will appear here."
+              icon={Bell}
+              data-testid="text-no-data"
+            />
           ) : (
             <div className="table-responsive">
               <Table mobileLayout="cards" data-testid="factory-alerts-table">

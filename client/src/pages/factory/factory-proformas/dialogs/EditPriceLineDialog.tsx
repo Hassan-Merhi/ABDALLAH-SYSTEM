@@ -43,9 +43,11 @@ export function EditPriceLineDialog({
             <p className="text-xs text-muted-foreground">{editingLine?.productName}</p>
           </div>
           <div>
-            <label htmlFor={`${formId}-product-name`} className="text-sm font-medium mb-1 block">Product Name</label>
+            <label htmlFor={`${formId}-product-name`} className="text-sm font-medium mb-1 block">
+              Product Name
+            </label>
             <Input
-                id={`${formId}-product-name`}
+              id={`${formId}-product-name`}
               value={editLineValues.productName}
               onChange={(e) => setEditLineValues({ ...editLineValues, productName: e.target.value })}
               data-testid="input-edit-line-product-name"
@@ -53,7 +55,9 @@ export function EditPriceLineDialog({
           </div>
           <FormGrid minColumnWidth="8rem">
             <div>
-              <label htmlFor={`${formId}-quantity`} className="text-sm font-medium mb-1 block">Quantity</label>
+              <label htmlFor={`${formId}-quantity`} className="text-sm font-medium mb-1 block">
+                Quantity
+              </label>
               <DecimalInput
                 id={`${formId}-quantity`}
                 step="1"
@@ -63,7 +67,9 @@ export function EditPriceLineDialog({
               />
             </div>
             <div>
-              <label htmlFor={`${formId}-price`} className="text-sm font-medium mb-1 block">Price per Bale</label>
+              <label htmlFor={`${formId}-price`} className="text-sm font-medium mb-1 block">
+                Price per Bale
+              </label>
               <MoneyInput
                 id={`${formId}-price`}
                 step="0.01"
@@ -73,7 +79,9 @@ export function EditPriceLineDialog({
               />
             </div>
             <div>
-              <label htmlFor={`${formId}-weight`} className="text-sm font-medium mb-1 block">KG / Bale</label>
+              <label htmlFor={`${formId}-weight`} className="text-sm font-medium mb-1 block">
+                KG / Bale
+              </label>
               <DecimalInput
                 id={`${formId}-weight`}
                 step="0.01"

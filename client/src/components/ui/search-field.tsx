@@ -5,8 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
-export interface SearchFieldProps
-  extends Omit<React.ComponentProps<typeof Input>, "type" | "value" | "onChange" | "defaultValue"> {
+export interface SearchFieldProps extends Omit<
+  React.ComponentProps<typeof Input>,
+  "type" | "value" | "onChange" | "defaultValue"
+> {
   value: string;
   onValueChange: (value: string) => void;
   /** Styles the outer search container instead of its input. */
@@ -37,14 +39,17 @@ export const SearchField = React.forwardRef<HTMLInputElement, SearchFieldProps>(
       "aria-label": ariaLabel,
       ...props
     },
-    ref,
+    ref
   ) => {
     const inputRef = React.useRef<HTMLInputElement | null>(null);
-    const setInputRef = React.useCallback((node: HTMLInputElement | null) => {
-      inputRef.current = node;
-      if (typeof ref === "function") ref(node);
-      else if (ref) ref.current = node;
-    }, [ref]);
+    const setInputRef = React.useCallback(
+      (node: HTMLInputElement | null) => {
+        inputRef.current = node;
+        if (typeof ref === "function") ref(node);
+        else if (ref) ref.current = node;
+      },
+      [ref]
+    );
     const clear = () => {
       onValueChange("");
       // The clear control disappears when the value empties; restore its focus
@@ -52,43 +57,43 @@ export const SearchField = React.forwardRef<HTMLInputElement, SearchFieldProps>(
       inputRef.current?.focus({ preventScroll: true });
     };
     return (
-    <div className={cn("relative min-w-0 w-full", wrapperClassName)}>
-      <Search
-        className="pointer-events-none absolute start-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-        aria-hidden="true"
-      />
-      <Input
-        {...props}
-        ref={setInputRef}
-        type="search"
-        value={value}
-        onChange={(event) => onValueChange(event.target.value)}
-        onKeyDown={(event) => {
-          onKeyDown?.(event);
-          if (!event.defaultPrevented && clearOnEscape && event.key === "Escape" && value) {
-            event.preventDefault();
-            clear();
-          }
-        }}
-        placeholder={placeholder}
-        aria-label={ariaLabel ?? placeholder}
-        className={cn("min-h-11 w-full ps-9 sm:min-h-9", showClear && "pe-11 sm:pe-9", className)}
-      />
-      {showClear && value.length > 0 ? (
-        <Button
-          type="button"
-          size="icon"
-          variant="ghost"
-          className="absolute end-0 top-1/2 h-11 w-11 -translate-y-1/2 sm:end-1 sm:h-8 sm:w-8"
-          aria-label="Clear search"
-          data-testid={clearTestId}
-          onClick={clear}
-        >
-          <X className="h-3.5 w-3.5" aria-hidden="true" />
-        </Button>
-      ) : null}
-    </div>
+      <div className={cn("relative min-w-0 w-full", wrapperClassName)}>
+        <Search
+          className="pointer-events-none absolute start-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+          aria-hidden="true"
+        />
+        <Input
+          {...props}
+          ref={setInputRef}
+          type="search"
+          value={value}
+          onChange={(event) => onValueChange(event.target.value)}
+          onKeyDown={(event) => {
+            onKeyDown?.(event);
+            if (!event.defaultPrevented && clearOnEscape && event.key === "Escape" && value) {
+              event.preventDefault();
+              clear();
+            }
+          }}
+          placeholder={placeholder}
+          aria-label={ariaLabel ?? placeholder}
+          className={cn("min-h-11 w-full ps-9 sm:min-h-9", showClear && "pe-11 sm:pe-9", className)}
+        />
+        {showClear && value.length > 0 ? (
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            className="absolute end-0 top-1/2 h-11 w-11 -translate-y-1/2 sm:end-1 sm:h-8 sm:w-8"
+            aria-label="Clear search"
+            data-testid={clearTestId}
+            onClick={clear}
+          >
+            <X className="h-3.5 w-3.5" aria-hidden="true" />
+          </Button>
+        ) : null}
+      </div>
     );
-  },
+  }
 );
 SearchField.displayName = "SearchField";

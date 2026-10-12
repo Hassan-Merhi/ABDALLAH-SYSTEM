@@ -1,4 +1,9 @@
-import { resolveFetchUrl as resolveUrl, fetchRequestMethod as getMethod, replaceFetchInputUrl as replaceInputUrl, fetchQueryCacheKey } from "./fetchRequestUtils";
+import {
+  resolveFetchUrl as resolveUrl,
+  fetchRequestMethod as getMethod,
+  replaceFetchInputUrl as replaceInputUrl,
+  fetchQueryCacheKey,
+} from "./fetchRequestUtils";
 import { queryClient } from "./queryClient";
 
 const STOCK_ENTRY_ENDPOINT = "/api/factory/bales/stock-entry-history";

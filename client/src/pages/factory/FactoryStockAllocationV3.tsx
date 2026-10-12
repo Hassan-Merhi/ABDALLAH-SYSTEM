@@ -109,7 +109,11 @@ export default function FactoryStockAllocationV3() {
   }
 
   return (
-    <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as Tab)} className="h-full flex flex-col overflow-hidden bg-background">
+    <Tabs
+      value={activeTab}
+      onValueChange={(value) => setActiveTab(value as Tab)}
+      className="h-full flex flex-col overflow-hidden bg-background"
+    >
       {/* Page header */}
       <div className="px-6 pt-5 pb-3 border-b shrink-0">
         <div className="flex items-center gap-3 mb-4 flex-wrap">

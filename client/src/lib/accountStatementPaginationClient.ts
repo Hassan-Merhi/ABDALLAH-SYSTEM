@@ -1,4 +1,9 @@
-import { resolveFetchUrl as resolveUrl, replaceFetchInputUrl as replaceInputUrl, fetchRequestMethod as methodOf, fetchQueryCacheKey } from "./fetchRequestUtils";
+import {
+  resolveFetchUrl as resolveUrl,
+  replaceFetchInputUrl as replaceInputUrl,
+  fetchRequestMethod as methodOf,
+  fetchQueryCacheKey,
+} from "./fetchRequestUtils";
 const ACCOUNT_ROUTE_SUFFIX = "/accounts";
 const ENDPOINT_PATTERN = /^\/api\/accounts\/(ledger|bank|fixed-asset|supplier|employee|customer)\/\d+\/transactions$/;
 const LEGACY_LIMIT = 100;

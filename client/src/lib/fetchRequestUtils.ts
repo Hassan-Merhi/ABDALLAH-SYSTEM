@@ -28,9 +28,7 @@ export function fetchRequestMethod(input: RequestInfo | URL, init?: RequestInit)
 export function replaceFetchInputUrl(input: RequestInfo | URL, url: URL): RequestInfo | URL {
   if (input instanceof Request) return new Request(url.toString(), input);
   if (input instanceof URL) return url;
-  return url.origin === window.location.origin
-    ? `${url.pathname}${url.search}${url.hash}`
-    : url.toString();
+  return url.origin === window.location.origin ? `${url.pathname}${url.search}${url.hash}` : url.toString();
 }
 
 /**
@@ -41,11 +39,7 @@ export function replaceFetchInputUrl(input: RequestInfo | URL, url: URL): Reques
  * Do not supply a company scope where the original interceptor omitted one,
  * or change the caller's parameter exclusions: both affect cache identity.
  */
-export function fetchQueryCacheKey(
-  url: URL,
-  omittedParams: readonly string[],
-  companyScope?: string,
-): string {
+export function fetchQueryCacheKey(url: URL, omittedParams: readonly string[], companyScope?: string): string {
   const params = new URLSearchParams(url.searchParams);
   for (const key of omittedParams) params.delete(key);
   params.sort();

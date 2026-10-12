@@ -56,12 +56,36 @@ export default function FactoryEmployeesHub() {
         </TabsList>
       </div>
 
-      {visibleValues.includes("employees") && <TabsContent value="employees" className="mt-0"><FactoryEmployees /></TabsContent>}
-      {visibleValues.includes("payroll") && <TabsContent value="payroll" className="mt-0"><FactoryEmployeePayrollTab /></TabsContent>}
-      {visibleValues.includes("attendance") && <TabsContent value="attendance" className="mt-0"><FactoryEmployeeAttendanceTab /></TabsContent>}
-      {visibleValues.includes("advances") && <TabsContent value="advances" className="mt-0"><FactoryEmployeeAdvancesTab /></TabsContent>}
-      {visibleValues.includes("bonuses") && <TabsContent value="bonuses" className="mt-0"><FactoryEmployeeBonusesTab /></TabsContent>}
-      {visibleValues.includes("withdrawals") && <TabsContent value="withdrawals" className="mt-0"><FactoryEmployeeWithdrawalsTab /></TabsContent>}
+      {visibleValues.includes("employees") && (
+        <TabsContent value="employees" className="mt-0">
+          <FactoryEmployees />
+        </TabsContent>
+      )}
+      {visibleValues.includes("payroll") && (
+        <TabsContent value="payroll" className="mt-0">
+          <FactoryEmployeePayrollTab />
+        </TabsContent>
+      )}
+      {visibleValues.includes("attendance") && (
+        <TabsContent value="attendance" className="mt-0">
+          <FactoryEmployeeAttendanceTab />
+        </TabsContent>
+      )}
+      {visibleValues.includes("advances") && (
+        <TabsContent value="advances" className="mt-0">
+          <FactoryEmployeeAdvancesTab />
+        </TabsContent>
+      )}
+      {visibleValues.includes("bonuses") && (
+        <TabsContent value="bonuses" className="mt-0">
+          <FactoryEmployeeBonusesTab />
+        </TabsContent>
+      )}
+      {visibleValues.includes("withdrawals") && (
+        <TabsContent value="withdrawals" className="mt-0">
+          <FactoryEmployeeWithdrawalsTab />
+        </TabsContent>
+      )}
     </Tabs>
   );
 }

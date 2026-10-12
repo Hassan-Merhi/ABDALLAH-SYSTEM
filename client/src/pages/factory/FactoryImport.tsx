@@ -38,8 +38,18 @@ export default function FactoryImport() {
   }
 
   return (
-    <Tabs value={activeTab} onValueChange={(value) => setRequestedTab(value as ImportTab)} className="min-w-0 space-y-4" data-testid="factory-import-page">
-      <TabsList variant="pill" className="w-max max-w-full" data-testid="factory-import-tabs" aria-label="Import sections">
+    <Tabs
+      value={activeTab}
+      onValueChange={(value) => setRequestedTab(value as ImportTab)}
+      className="min-w-0 space-y-4"
+      data-testid="factory-import-page"
+    >
+      <TabsList
+        variant="pill"
+        className="w-max max-w-full"
+        data-testid="factory-import-tabs"
+        aria-label="Import sections"
+      >
         {tabs.map((tab) => {
           const Icon = tab.icon;
           return (

@@ -139,12 +139,7 @@ export function EmployeeCrudDialogs({
                   <FormItem>
                     <FormLabel>Monthly Salary</FormLabel>
                     <FormControl>
-                      <MoneyInput
-                        step="0.01"
-                        placeholder="0.00"
-                        {...field}
-                        data-testid="input-monthly-salary"
-                      />
+                      <MoneyInput step="0.01" placeholder="0.00" {...field} data-testid="input-monthly-salary" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -291,8 +286,12 @@ export function EmployeeCrudDialogs({
                 >
                   Cancel
                 </Button>
-                <FormSubmitButton type="submit" pending={createEmployeeMutation.isPending}
-                  pendingLabel="Creating…" data-testid="button-submit-create">
+                <FormSubmitButton
+                  type="submit"
+                  pending={createEmployeeMutation.isPending}
+                  pendingLabel="Creating…"
+                  data-testid="button-submit-create"
+                >
                   Create Employee
                 </FormSubmitButton>
               </div>

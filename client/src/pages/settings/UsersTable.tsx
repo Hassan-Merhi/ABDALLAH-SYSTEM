@@ -33,7 +33,11 @@ export function UsersTable({ users, onEdit, onDelete, onResetPassword }: UsersTa
   const visibility = prefs.columns ?? {};
   const show = (column: string) => visibility[column] !== false;
   const filtered = users.filter((user) =>
-    [user.username, user.role].some((value) => String(value ?? "").toLowerCase().includes(search.toLowerCase().trim()))
+    [user.username, user.role].some((value) =>
+      String(value ?? "")
+        .toLowerCase()
+        .includes(search.toLowerCase().trim())
+    )
   );
   const { page: safePage, setPage, totalPages: pages, paginate } = useClientTablePagination(filtered.length, pageSize);
   const visible = paginate(filtered);
@@ -42,7 +46,10 @@ export function UsersTable({ users, onEdit, onDelete, onResetPassword }: UsersTa
     <div className="min-w-0 space-y-3">
       <DataTableToolbar
         search={search}
-        onSearchChange={(value) => { setSearch(value); setPage(1); }}
+        onSearchChange={(value) => {
+          setSearch(value);
+          setPage(1);
+        }}
         searchPlaceholder="Search users or roles..."
         actions={
           <TableViewOptions
@@ -65,23 +72,55 @@ export function UsersTable({ users, onEdit, onDelete, onResetPassword }: UsersTa
         </TableHeader>
         <TableBody>
           {visible.length === 0 ? (
-            <TableRow><TableCell colSpan={COLUMNS.filter((column) => column.required || show(column.key)).length} className="py-8 text-center text-muted-foreground">No matching users</TableCell></TableRow>
-          ) : visible.map((user) => (
-            <TableRow key={user.id}>
-              <TableCell className="font-medium">{user.username}</TableCell>
-              {show("role") && <TableCell>
-                <Badge variant="outline" className="capitalize">{user.role || "Normal User"}</Badge>
-              </TableCell>}
-              {show("status") && <TableCell>
-                <StatusBadge status={user.active ? "active" : "inactive"} showIcon={false} />
-              </TableCell>}
-              <TableCell className="space-x-2 text-right">
-                <Button size="icon" variant="ghost" onClick={() => onResetPassword(user)} title="Reset Password" aria-label={`Reset ${user.username} password`}><Key className="h-4 w-4" /></Button>
-                <Button size="icon" variant="ghost" onClick={() => onEdit(user)} aria-label={`Edit ${user.username}`}><Edit className="h-4 w-4" /></Button>
-                <Button size="icon" variant="ghost" onClick={() => onDelete(user)} aria-label={`Delete ${user.username}`}><Trash2 className="h-4 w-4" /></Button>
+            <TableRow>
+              <TableCell
+                colSpan={COLUMNS.filter((column) => column.required || show(column.key)).length}
+                className="py-8 text-center text-muted-foreground"
+              >
+                No matching users
               </TableCell>
             </TableRow>
-          ))}
+          ) : (
+            visible.map((user) => (
+              <TableRow key={user.id}>
+                <TableCell className="font-medium">{user.username}</TableCell>
+                {show("role") && (
+                  <TableCell>
+                    <Badge variant="outline" className="capitalize">
+                      {user.role || "Normal User"}
+                    </Badge>
+                  </TableCell>
+                )}
+                {show("status") && (
+                  <TableCell>
+                    <StatusBadge status={user.active ? "active" : "inactive"} showIcon={false} />
+                  </TableCell>
+                )}
+                <TableCell className="space-x-2 text-right">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => onResetPassword(user)}
+                    title="Reset Password"
+                    aria-label={`Reset ${user.username} password`}
+                  >
+                    <Key className="h-4 w-4" />
+                  </Button>
+                  <Button size="icon" variant="ghost" onClick={() => onEdit(user)} aria-label={`Edit ${user.username}`}>
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => onDelete(user)}
+                    aria-label={`Delete ${user.username}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))
+          )}
         </TableBody>
       </Table>
       <PaginationBar
@@ -90,7 +129,10 @@ export function UsersTable({ users, onEdit, onDelete, onResetPassword }: UsersTa
         total={filtered.length}
         pageSize={pageSize}
         onPageChange={setPage}
-        onPageSizeChange={(size) => { setPrefs({ pageSize: size }); setPage(1); }}
+        onPageSizeChange={(size) => {
+          setPrefs({ pageSize: size });
+          setPage(1);
+        }}
         noun="users"
       />
     </div>

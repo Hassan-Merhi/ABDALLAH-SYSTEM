@@ -33,7 +33,7 @@ export function formatMoneyDisplay(
     minimumFractionDigits = 0,
     maximumFractionDigits,
     placeholder = "—",
-  }: MoneyDisplayOptions,
+  }: MoneyDisplayOptions
 ): string {
   if (amount == null || amount === "") return placeholder;
   const numeric = typeof amount === "string" ? Number(amount.trim()) : amount;
@@ -51,11 +51,7 @@ export function formatMoneyDisplay(
 }
 
 /** Numeric-only formatting, e.g. a summary containing several currencies. */
-export function formatMoneyNumber(
-  amount: number | string | null | undefined,
-  decimals = 2,
-  locale = "en-US",
-): string {
+export function formatMoneyNumber(amount: number | string | null | undefined, decimals = 2, locale = "en-US"): string {
   if (amount == null || amount === "") return "—";
   const numeric = typeof amount === "string" ? Number(amount.trim()) : amount;
   return Number.isFinite(numeric)

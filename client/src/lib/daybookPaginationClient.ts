@@ -1,4 +1,9 @@
-import { resolveFetchUrl as resolveUrl, fetchRequestMethod as methodOf, replaceFetchInputUrl as replaceInputUrl, fetchQueryCacheKey } from "./fetchRequestUtils";
+import {
+  resolveFetchUrl as resolveUrl,
+  fetchRequestMethod as methodOf,
+  replaceFetchInputUrl as replaceInputUrl,
+  fetchQueryCacheKey,
+} from "./fetchRequestUtils";
 import { queryClient } from "./queryClient";
 import {
   hasLoadedEveryRow,
@@ -115,7 +120,7 @@ if (typeof window !== "undefined" && !window.__erpDaybookPaginationInstalled) {
     return fetchQueryCacheKey(
       url,
       ["pagination", "page", "limit", "pageSize", "offset", "fullAction"],
-      readActiveCompanyScope(),
+      readActiveCompanyScope()
     );
   }
 

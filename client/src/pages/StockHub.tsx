@@ -43,9 +43,21 @@ export default function StockHub({ access }: { access?: ErpFeatureAccess }) {
         </TabsList>
       </div>
 
-      {visibleValues.includes("items") && <TabsContent value="items" className="mt-0"><StockItems /></TabsContent>}
-      {visibleValues.includes("query") && <TabsContent value="query" className="mt-0"><StockQuery /></TabsContent>}
-      {visibleValues.includes("offload") && <TabsContent value="offload" className="mt-0"><OffloadItemSearch /></TabsContent>}
+      {visibleValues.includes("items") && (
+        <TabsContent value="items" className="mt-0">
+          <StockItems />
+        </TabsContent>
+      )}
+      {visibleValues.includes("query") && (
+        <TabsContent value="query" className="mt-0">
+          <StockQuery />
+        </TabsContent>
+      )}
+      {visibleValues.includes("offload") && (
+        <TabsContent value="offload" className="mt-0">
+          <OffloadItemSearch />
+        </TabsContent>
+      )}
     </Tabs>
   );
 }

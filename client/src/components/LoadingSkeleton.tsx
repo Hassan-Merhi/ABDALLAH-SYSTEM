@@ -48,7 +48,13 @@ export function LoadingSkeleton({
 
   if (variant === "kpi-grid") {
     return (
-      <div className={cn("grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3", className)} role="status" aria-label={label} aria-busy="true" data-testid={tid}>
+      <div
+        className={cn("grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3", className)}
+        role="status"
+        aria-label={label}
+        aria-busy="true"
+        data-testid={tid}
+      >
         {Array.from({ length: rows }).map((_, i) => (
           <Card key={i} className="p-5">
             <Skeleton className="h-16 w-full" />
@@ -101,7 +107,13 @@ export function LoadingSkeleton({
   }
 
   return (
-    <Card className={cn("p-5 space-y-3", className)} role="status" aria-label={label} aria-busy="true" data-testid={tid}>
+    <Card
+      className={cn("p-5 space-y-3", className)}
+      role="status"
+      aria-label={label}
+      aria-busy="true"
+      data-testid={tid}
+    >
       <Skeleton className="h-5 w-1/3" />
       {Array.from({ length: rows }).map((_, i) => (
         <Skeleton key={i} className="h-4 w-full" />

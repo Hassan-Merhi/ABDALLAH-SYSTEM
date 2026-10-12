@@ -183,13 +183,15 @@ export default function FactoryCustomers() {
   const handleCreate = () => {
     if (!formData.legalName.trim() || saving || createMutation.isPending) return;
     const days = formData.paymentTermsDays ? parseInt(formData.paymentTermsDays) : undefined;
-    void executeSave(() => createMutation.mutateAsync({
-      legalName: formData.legalName.trim(),
-      phone: formData.phone.trim() || undefined,
-      openingBalance: formData.openingBalance || undefined,
-      openingBalanceSide: formData.openingBalanceSide || undefined,
-      paymentTermsDays: days || undefined,
-    })).catch(() => {
+    void executeSave(() =>
+      createMutation.mutateAsync({
+        legalName: formData.legalName.trim(),
+        phone: formData.phone.trim() || undefined,
+        openingBalance: formData.openingBalance || undefined,
+        openingBalanceSide: formData.openingBalanceSide || undefined,
+        paymentTermsDays: days || undefined,
+      })
+    ).catch(() => {
       // Existing mutation.onError provides feedback.
     });
   };
@@ -197,14 +199,16 @@ export default function FactoryCustomers() {
   const handleUpdate = () => {
     if (!editingCustomer || !formData.legalName.trim() || saving || updateMutation.isPending) return;
     const days = formData.paymentTermsDays ? parseInt(formData.paymentTermsDays) : null;
-    void executeSave(() => updateMutation.mutateAsync({
-      id: editingCustomer.id,
-      data: {
-        legalName: formData.legalName.trim(),
-        phone: formData.phone.trim() || null,
-        paymentTermsDays: days,
-      },
-    })).catch(() => {
+    void executeSave(() =>
+      updateMutation.mutateAsync({
+        id: editingCustomer.id,
+        data: {
+          legalName: formData.legalName.trim(),
+          phone: formData.phone.trim() || null,
+          paymentTermsDays: days,
+        },
+      })
+    ).catch(() => {
       // Existing mutation.onError provides feedback.
     });
   };
@@ -238,7 +242,9 @@ export default function FactoryCustomers() {
           title="Customers could not be loaded"
           description={error?.message || "Please try again."}
           actionLabel="Retry"
-          onAction={() => { void refetchCustomers(); }}
+          onAction={() => {
+            void refetchCustomers();
+          }}
         />
       </div>
     );
@@ -257,7 +263,10 @@ export default function FactoryCustomers() {
           {zeroBalanceCount > 0 && (
             <Button
               variant="outline"
-              onClick={() => { setShowZeroBalance((visible) => !visible); setPage(1); }}
+              onClick={() => {
+                setShowZeroBalance((visible) => !visible);
+                setPage(1);
+              }}
               aria-pressed={showZeroBalance}
               data-testid="button-toggle-zero-balance"
               size="sm"
@@ -281,7 +290,10 @@ export default function FactoryCustomers() {
 
       <DataTableToolbar
         search={search}
-        onSearchChange={(value) => { setSearch(value); setPage(1); }}
+        onSearchChange={(value) => {
+          setSearch(value);
+          setPage(1);
+        }}
         searchPlaceholder="Search by name, code, or phone..."
         searchTestId="input-search-customers"
       />
@@ -381,9 +393,17 @@ export default function FactoryCustomers() {
           </Table>
         </div>
       </div>
-      <PaginationBar page={safePage} totalPages={totalPages} total={visibleCustomers.length}
-        pageSize={pageSize} onPageChange={setPage} noun="customers"
-        onPageSizeChange={(size) => { setPrefs({ pageSize: size }); setPage(1); }}
+      <PaginationBar
+        page={safePage}
+        totalPages={totalPages}
+        total={visibleCustomers.length}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        noun="customers"
+        onPageSizeChange={(size) => {
+          setPrefs({ pageSize: size });
+          setPage(1);
+        }}
       />
 
       {showDeleted && (
@@ -455,7 +475,9 @@ export default function FactoryCustomers() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label htmlFor={`${createFormId}-name`} className="text-sm font-medium mb-1 block">Name</label>
+              <label htmlFor={`${createFormId}-name`} className="text-sm font-medium mb-1 block">
+                Name
+              </label>
               <Input
                 value={formData.legalName}
                 onChange={(e) => setFormData({ ...formData, legalName: e.target.value })}
@@ -465,7 +487,9 @@ export default function FactoryCustomers() {
               />
             </div>
             <div>
-              <label htmlFor={`${createFormId}-phone`} className="text-sm font-medium mb-1 block">Phone</label>
+              <label htmlFor={`${createFormId}-phone`} className="text-sm font-medium mb-1 block">
+                Phone
+              </label>
               <Input
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
@@ -476,18 +500,22 @@ export default function FactoryCustomers() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label htmlFor={`${createFormId}-balance`} className="text-sm font-medium mb-1 block">Opening Balance</label>
+                <label htmlFor={`${createFormId}-balance`} className="text-sm font-medium mb-1 block">
+                  Opening Balance
+                </label>
                 <MoneyInput
                   step="0.01"
                   value={formData.openingBalance}
                   onChange={(e) => setFormData({ ...formData, openingBalance: e.target.value })}
                   placeholder="0.00"
                   id={`${createFormId}-balance`}
-                data-testid="input-customer-opening-balance"
+                  data-testid="input-customer-opening-balance"
                 />
               </div>
               <div>
-                <label htmlFor={`${createFormId}-side`} className="text-sm font-medium mb-1 block">Side</label>
+                <label htmlFor={`${createFormId}-side`} className="text-sm font-medium mb-1 block">
+                  Side
+                </label>
                 <Select
                   value={formData.openingBalanceSide}
                   onValueChange={(v) => setFormData({ ...formData, openingBalanceSide: v })}
@@ -503,7 +531,10 @@ export default function FactoryCustomers() {
               </div>
             </div>
             <div>
-              <label htmlFor={`${createFormId}-terms`} className="text-sm font-medium mb-1 block flex items-center gap-1">
+              <label
+                htmlFor={`${createFormId}-terms`}
+                className="text-sm font-medium mb-1 block flex items-center gap-1"
+              >
                 <Clock className="h-3.5 w-3.5" />
                 Payment Terms
               </label>
@@ -551,10 +582,14 @@ export default function FactoryCustomers() {
               >
                 Cancel
               </Button>
-              <FormSubmitButton type="button" onClick={handleCreate}
-                pending={createMutation.isPending || saving} pendingLabel="Creating…"
+              <FormSubmitButton
+                type="button"
+                onClick={handleCreate}
+                pending={createMutation.isPending || saving}
+                pendingLabel="Creating…"
                 disabled={!formData.legalName.trim()}
-                data-testid="button-submit-customer">
+                data-testid="button-submit-customer"
+              >
                 Create Customer
               </FormSubmitButton>
             </div>
@@ -582,7 +617,9 @@ export default function FactoryCustomers() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label htmlFor={`${editFormId}-name`} className="text-sm font-medium mb-1 block">Name</label>
+              <label htmlFor={`${editFormId}-name`} className="text-sm font-medium mb-1 block">
+                Name
+              </label>
               <Input
                 value={formData.legalName}
                 onChange={(e) => setFormData({ ...formData, legalName: e.target.value })}
@@ -592,7 +629,9 @@ export default function FactoryCustomers() {
               />
             </div>
             <div>
-              <label htmlFor={`${editFormId}-phone`} className="text-sm font-medium mb-1 block">Phone</label>
+              <label htmlFor={`${editFormId}-phone`} className="text-sm font-medium mb-1 block">
+                Phone
+              </label>
               <Input
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
@@ -659,7 +698,8 @@ export default function FactoryCustomers() {
               >
                 Cancel
               </Button>
-              <FormSubmitButton type="button"
+              <FormSubmitButton
+                type="button"
                 onClick={handleUpdate}
                 pending={updateMutation.isPending || saving}
                 pendingLabel="Saving…"

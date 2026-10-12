@@ -5,14 +5,7 @@ import { SearchField } from "@/components/ui/search-field";
 import { PageState } from "@/components/ui/page-state";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Bale } from "@shared/schema";
 import { Package, Trash2, Upload } from "lucide-react";
 

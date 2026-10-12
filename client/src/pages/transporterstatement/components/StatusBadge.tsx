@@ -19,7 +19,14 @@ export function StatusBadge({
   if (!status) return null;
   if (status === "partial") {
     const remaining = parseFloat(total || "0") - parseFloat(paidAmount || "0");
-    return <SharedStatusBadge status="partial" label={`Partial · ${fmtAmt(remaining.toFixed(2))} left`} showIcon={false} className="text-[11px]" />;
+    return (
+      <SharedStatusBadge
+        status="partial"
+        label={`Partial · ${fmtAmt(remaining.toFixed(2))} left`}
+        showIcon={false}
+        className="text-[11px]"
+      />
+    );
   }
   return <SharedStatusBadge status={status} showIcon={false} className="text-[11px]" />;
 }

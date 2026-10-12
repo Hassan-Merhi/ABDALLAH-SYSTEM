@@ -27,15 +27,20 @@ function parsePrefs(value: unknown): TablePrefs {
   const result: TablePrefs = {};
   if (typeof candidate.sortKey === "string") result.sortKey = candidate.sortKey;
   if (candidate.sortDir === "asc" || candidate.sortDir === "desc") result.sortDir = candidate.sortDir;
-  if (typeof candidate.pageSize === "number" && Number.isInteger(candidate.pageSize) &&
-      candidate.pageSize >= 1 && candidate.pageSize <= 500) result.pageSize = candidate.pageSize;
+  if (
+    typeof candidate.pageSize === "number" &&
+    Number.isInteger(candidate.pageSize) &&
+    candidate.pageSize >= 1 &&
+    candidate.pageSize <= 500
+  )
+    result.pageSize = candidate.pageSize;
   if (VALID_DENSITIES.includes(candidate.density as TableDensity)) result.density = candidate.density as TableDensity;
   if (candidate.filters && typeof candidate.filters === "object" && !Array.isArray(candidate.filters)) {
     result.filters = candidate.filters as Record<string, unknown>;
   }
   if (candidate.columns && typeof candidate.columns === "object" && !Array.isArray(candidate.columns)) {
     result.columns = Object.fromEntries(
-      Object.entries(candidate.columns).filter((entry): entry is [string, boolean] => typeof entry[1] === "boolean"),
+      Object.entries(candidate.columns).filter((entry): entry is [string, boolean] => typeof entry[1] === "boolean")
     );
   }
   return result;
@@ -77,7 +82,9 @@ export function useTablePrefs(pageKey: string, options: TablePrefsOptions = {}) 
   const prefs = state.key === storageKey ? state.prefs : readTablePrefs(storageKey);
 
   useEffect(() => {
-    setState((current) => current.key === storageKey ? current : { key: storageKey, prefs: readTablePrefs(storageKey) });
+    setState((current) =>
+      current.key === storageKey ? current : { key: storageKey, prefs: readTablePrefs(storageKey) }
+    );
   }, [storageKey]);
 
   const setPrefs = useCallback(
@@ -89,7 +96,7 @@ export function useTablePrefs(pageKey: string, options: TablePrefsOptions = {}) 
         return { key: storageKey, prefs: next };
       });
     },
-    [storageKey],
+    [storageKey]
   );
 
   const clearPrefs = useCallback(() => {

@@ -21,7 +21,7 @@ export const DecimalInput = React.forwardRef<HTMLInputElement, DecimalInputProps
         }
       }}
     />
-  ),
+  )
 );
 DecimalInput.displayName = "DecimalInput";
 
@@ -30,8 +30,6 @@ DecimalInput.displayName = "DecimalInput";
  * rounding, parsing or submission is performed by this component.
  */
 export const MoneyInput = React.forwardRef<HTMLInputElement, DecimalInputProps>(
-  ({ min = "0", step = "0.01", ...props }, ref) => (
-    <DecimalInput {...props} ref={ref} min={min} step={step} />
-  ),
+  ({ min = "0", step = "0.01", ...props }, ref) => <DecimalInput {...props} ref={ref} min={min} step={step} />
 );
 MoneyInput.displayName = "MoneyInput";

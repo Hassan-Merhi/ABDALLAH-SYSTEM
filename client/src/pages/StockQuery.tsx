@@ -83,8 +83,12 @@ export default function StockQuery() {
     <div className="flex flex-col gap-4 sm:p-4 md:p-6">
       {/* ── Header + Search ── */}
       <PageHeader title="Stock Query" subtitle="Click any item to view purchase history, sales, and inventory" />
-      <DataTableToolbar search={searchTerm} onSearchChange={setSearchTerm}
-        searchPlaceholder="Search by code or name..." searchTestId="input-stock-search" className="mb-0"
+      <DataTableToolbar
+        search={searchTerm}
+        onSearchChange={setSearchTerm}
+        searchPlaceholder="Search by code or name..."
+        searchTestId="input-stock-search"
+        className="mb-0"
       />
 
       {/* ── Result count ── */}

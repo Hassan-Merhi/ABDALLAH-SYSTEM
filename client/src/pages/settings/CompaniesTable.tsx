@@ -52,7 +52,10 @@ export function CompaniesTable({ companies, onEdit, onDelete }: CompaniesTablePr
     <div className="min-w-0 space-y-3">
       <DataTableToolbar
         search={search}
-        onSearchChange={(value) => { setSearch(value); setPage(1); }}
+        onSearchChange={(value) => {
+          setSearch(value);
+          setPage(1);
+        }}
         searchPlaceholder="Search companies..."
         actions={
           <TableViewOptions
@@ -68,17 +71,31 @@ export function CompaniesTable({ companies, onEdit, onDelete }: CompaniesTablePr
         <TableHeader>
           <TableRow>
             <TableHead>
-              <button type="button" className="flex items-center gap-1" onClick={() => toggleSort("name")} aria-label="Sort companies by name">
+              <button
+                type="button"
+                className="flex items-center gap-1"
+                onClick={() => toggleSort("name")}
+                aria-label="Sort companies by name"
+              >
                 Company Name
-                {sortKey === "name" && (sortDir === 1 ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
+                {sortKey === "name" &&
+                  (sortDir === 1 ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
               </button>
             </TableHead>
-            {show("code") && <TableHead>
-              <button type="button" className="flex items-center gap-1" onClick={() => toggleSort("code")} aria-label="Sort companies by code">
-                Code
-                {sortKey === "code" && (sortDir === 1 ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
-              </button>
-            </TableHead>}
+            {show("code") && (
+              <TableHead>
+                <button
+                  type="button"
+                  className="flex items-center gap-1"
+                  onClick={() => toggleSort("code")}
+                  aria-label="Sort companies by code"
+                >
+                  Code
+                  {sortKey === "code" &&
+                    (sortDir === 1 ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
+                </button>
+              </TableHead>
+            )}
             {show("type") && <TableHead>Type</TableHead>}
             {show("currency") && <TableHead>Currency</TableHead>}
             {show("status") && <TableHead>Status</TableHead>}
@@ -87,20 +104,57 @@ export function CompaniesTable({ companies, onEdit, onDelete }: CompaniesTablePr
         </TableHeader>
         <TableBody>
           {visible.length === 0 ? (
-            <TableRow><TableCell colSpan={COLUMNS.filter((column) => column.required || show(column.key)).length} className="py-8 text-center text-muted-foreground">No matching companies</TableCell></TableRow>
-          ) : visible.map((company) => (
-            <TableRow key={company.id}>
-              <TableCell className="font-medium">{company.name}</TableCell>
-              {show("code") && <TableCell className="font-mono text-xs uppercase">{company.code}</TableCell>}
-              {show("type") && <TableCell><Badge variant="outline" className="text-[11px] uppercase">{company.companyType}</Badge></TableCell>}
-              {show("currency") && <TableCell className="text-xs font-medium">{company.baseCurrency} / {company.displayCurrency}</TableCell>}
-              {show("status") && <TableCell><StatusBadge status={company.active ? "active" : "inactive"} showIcon={false} /></TableCell>}
-              <TableCell className="space-x-2 text-right">
-                <Button size="icon" variant="ghost" onClick={() => onEdit(company)} aria-label={`Edit ${company.name}`}><Edit className="h-4 w-4" /></Button>
-                <Button size="icon" variant="ghost" onClick={() => onDelete(company)} aria-label={`Delete ${company.name}`}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+            <TableRow>
+              <TableCell
+                colSpan={COLUMNS.filter((column) => column.required || show(column.key)).length}
+                className="py-8 text-center text-muted-foreground"
+              >
+                No matching companies
               </TableCell>
             </TableRow>
-          ))}
+          ) : (
+            visible.map((company) => (
+              <TableRow key={company.id}>
+                <TableCell className="font-medium">{company.name}</TableCell>
+                {show("code") && <TableCell className="font-mono text-xs uppercase">{company.code}</TableCell>}
+                {show("type") && (
+                  <TableCell>
+                    <Badge variant="outline" className="text-[11px] uppercase">
+                      {company.companyType}
+                    </Badge>
+                  </TableCell>
+                )}
+                {show("currency") && (
+                  <TableCell className="text-xs font-medium">
+                    {company.baseCurrency} / {company.displayCurrency}
+                  </TableCell>
+                )}
+                {show("status") && (
+                  <TableCell>
+                    <StatusBadge status={company.active ? "active" : "inactive"} showIcon={false} />
+                  </TableCell>
+                )}
+                <TableCell className="space-x-2 text-right">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => onEdit(company)}
+                    aria-label={`Edit ${company.name}`}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => onDelete(company)}
+                    aria-label={`Delete ${company.name}`}
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))
+          )}
         </TableBody>
       </Table>
       <PaginationBar
@@ -109,7 +163,10 @@ export function CompaniesTable({ companies, onEdit, onDelete }: CompaniesTablePr
         total={filtered.length}
         pageSize={pageSize}
         onPageChange={setPage}
-        onPageSizeChange={(size) => { setPrefs({ pageSize: size }); setPage(1); }}
+        onPageSizeChange={(size) => {
+          setPrefs({ pageSize: size });
+          setPage(1);
+        }}
         noun="companies"
       />
     </div>

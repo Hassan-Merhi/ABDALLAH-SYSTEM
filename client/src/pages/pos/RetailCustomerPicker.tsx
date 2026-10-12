@@ -73,7 +73,13 @@ export function RetailCustomerPicker({
             {customer.phone ? ` · ${customer.phone}` : ""}
           </div>
         </div>
-        <Button size="sm" variant="ghost" className="min-h-11 sm:min-h-8" onClick={() => onSelect(null)} data-testid="retail-pos-customer-clear">
+        <Button
+          size="sm"
+          variant="ghost"
+          className="min-h-11 sm:min-h-8"
+          onClick={() => onSelect(null)}
+          data-testid="retail-pos-customer-clear"
+        >
           <X className="mr-1 h-3.5 w-3.5" /> Walk-in
         </Button>
       </div>
@@ -98,8 +104,12 @@ export function RetailCustomerPicker({
         </Button>
       </div>
       {open && (
-        <div id={customerPickerId} role="region" aria-label="Select retail customer"
-          className="space-y-2 rounded-lg border p-2">
+        <div
+          id={customerPickerId}
+          role="region"
+          aria-label="Select retail customer"
+          className="space-y-2 rounded-lg border p-2"
+        >
           <SearchField
             autoFocus
             value={term}
@@ -107,8 +117,12 @@ export function RetailCustomerPicker({
             placeholder="Search name, phone or code"
             data-testid="retail-pos-customer-search"
           />
-          <div className="max-h-40 space-y-1 overflow-y-auto" role="group"
-            aria-label="Customer search results" aria-busy={customersQuery.isLoading}>
+          <div
+            className="max-h-40 space-y-1 overflow-y-auto"
+            role="group"
+            aria-label="Customer search results"
+            aria-busy={customersQuery.isLoading}
+          >
             {(customersQuery.data ?? []).map((entry: Customer) => (
               <button
                 key={entry.id}
@@ -130,15 +144,30 @@ export function RetailCustomerPicker({
                 </span>
               </button>
             ))}
-            {customersQuery.isLoading && <div role="status" className="p-2 text-xs text-muted-foreground">Searching…</div>}
+            {customersQuery.isLoading && (
+              <div role="status" className="p-2 text-xs text-muted-foreground">
+                Searching…
+              </div>
+            )}
             {customersQuery.isError && (
               <div role="alert" className="flex items-center justify-between gap-2 p-2 text-xs text-destructive">
                 Customer search failed.
-                <Button type="button" size="sm" variant="outline" onClick={() => { void customersQuery.refetch(); }}>Retry</Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    void customersQuery.refetch();
+                  }}
+                >
+                  Retry
+                </Button>
               </div>
             )}
             {!customersQuery.isLoading && !customersQuery.isError && !(customersQuery.data ?? []).length && (
-              <div role="status" className="p-2 text-xs text-muted-foreground">No customer matches.</div>
+              <div role="status" className="p-2 text-xs text-muted-foreground">
+                No customer matches.
+              </div>
             )}
           </div>
           {creating ? (

@@ -221,8 +221,12 @@ export function WorkerDialogs({
                 >
                   Cancel
                 </Button>
-                <FormSubmitButton type="submit" pending={createWorkerMutation.isPending}
-                  pendingLabel="Creating…" data-testid="button-submit-new-worker">
+                <FormSubmitButton
+                  type="submit"
+                  pending={createWorkerMutation.isPending}
+                  pendingLabel="Creating…"
+                  data-testid="button-submit-new-worker"
+                >
                   Create Worker
                 </FormSubmitButton>
               </div>

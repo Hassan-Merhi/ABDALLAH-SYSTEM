@@ -113,17 +113,27 @@ function ItemFormDialog({
             <Label htmlFor={`${formId}-name`}>
               Name <span className="text-destructive">*</span>
             </Label>
-            <Input id={`${formId}-name`} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Purple Sheet 50kg" />
+            <Input
+              id={`${formId}-name`}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Purple Sheet 50kg"
+            />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor={`${formId}-size`}>Size / Weight</Label>
-            <Input id={`${formId}-size`} value={size} onChange={(e) => setSize(e.target.value)} placeholder="e.g. 50kg, 100×80cm" />
+            <Input
+              id={`${formId}-size`}
+              value={size}
+              onChange={(e) => setSize(e.target.value)}
+              placeholder="e.g. 50kg, 100×80cm"
+            />
           </div>
           <FormGrid minColumnWidth="9rem" className="gap-3">
             <div className="space-y-1.5">
               <Label htmlFor={`${formId}-packs`}>Qty (packs)</Label>
               <DecimalInput
-              id={`${formId}-packs`}
+                id={`${formId}-packs`}
                 step="1"
                 min="0"
                 value={packQty}
@@ -134,7 +144,7 @@ function ItemFormDialog({
             <div className="space-y-1.5">
               <Label htmlFor={`${formId}-pieces`}># / Pack (pcs)</Label>
               <DecimalInput
-              id={`${formId}-pieces`}
+                id={`${formId}-pieces`}
                 step="1"
                 min="0"
                 value={pcsPerPack}
@@ -182,8 +192,12 @@ function ItemFormDialog({
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <FormSubmitButton type="button" onClick={handleSubmit}
-            pending={saveMutation.isPending} pendingLabel="Saving…">
+          <FormSubmitButton
+            type="button"
+            onClick={handleSubmit}
+            pending={saveMutation.isPending}
+            pendingLabel="Saving…"
+          >
             {existing ? "Update" : "Add Item"}
           </FormSubmitButton>
         </DialogFooter>

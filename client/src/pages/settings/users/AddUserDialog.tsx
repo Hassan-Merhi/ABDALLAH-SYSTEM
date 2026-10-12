@@ -158,9 +158,13 @@ export function AddUserDialog({ open, onOpenChange }: AddUserDialogProps) {
             <Button variant="outline" onClick={() => onOpenChange(false)} disabled={createMutation.isPending}>
               Cancel
             </Button>
-            <FormSubmitButton type="button" onClick={handleSubmit}
-              pending={createMutation.isPending} pendingLabel="Creating…"
-              data-testid="button-create-user-submit">
+            <FormSubmitButton
+              type="button"
+              onClick={handleSubmit}
+              pending={createMutation.isPending}
+              pendingLabel="Creating…"
+              data-testid="button-create-user-submit"
+            >
               Create User
             </FormSubmitButton>
           </DialogFooter>

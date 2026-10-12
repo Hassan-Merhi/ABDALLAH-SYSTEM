@@ -49,15 +49,30 @@ export default function FactoryPendingInvoices() {
   const { data: myAccess } = useQuery<FactoryMyAccess>({ queryKey: ["/api/factory/my-access"], staleTime: 5 * 60000 });
   const isAdmin = myAccess?.fullAccess === true;
 
-  const { data: pendingOrders = [], isLoading: pendingLoading, isError: pendingError, refetch: refetchPending } = useQuery<CustomerOrder[]>({
+  const {
+    data: pendingOrders = [],
+    isLoading: pendingLoading,
+    isError: pendingError,
+    refetch: refetchPending,
+  } = useQuery<CustomerOrder[]>({
     queryKey: ["/api/factory/customer-orders?status=PENDING_VERIFICATION&profile=summary&pageSize=250"],
   });
 
-  const { data: verifiedOrders = [], isLoading: verifiedLoading, isError: verifiedError, refetch: refetchVerified } = useQuery<CustomerOrder[]>({
+  const {
+    data: verifiedOrders = [],
+    isLoading: verifiedLoading,
+    isError: verifiedError,
+    refetch: refetchVerified,
+  } = useQuery<CustomerOrder[]>({
     queryKey: ["/api/factory/customer-orders?status=VERIFIED&profile=summary&pageSize=250"],
   });
 
-  const { data: finalizedOrders = [], isLoading: finalizedLoading, isError: finalizedError, refetch: refetchFinalized } = useQuery<CustomerOrder[]>({
+  const {
+    data: finalizedOrders = [],
+    isLoading: finalizedLoading,
+    isError: finalizedError,
+    refetch: refetchFinalized,
+  } = useQuery<CustomerOrder[]>({
     queryKey: ["/api/factory/customer-orders?status=FINALIZED&profile=summary&pageSize=250"],
   });
 
@@ -115,7 +130,12 @@ export default function FactoryPendingInvoices() {
             icon={<ClipboardCheck className="h-5 w-5" />}
           />
         </div>
-        <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Invoice status filters" data-testid="filter-tabs">
+        <div
+          className="flex flex-wrap items-center gap-2"
+          role="group"
+          aria-label="Invoice status filters"
+          data-testid="filter-tabs"
+        >
           {filters.map((f) => (
             <Button
               key={f.key}
@@ -297,10 +317,16 @@ export default function FactoryPendingInvoices() {
                           confirmButtonTestId={`button-confirm-delete-${order.id}`}
                           cancelButtonTestId={`button-cancel-delete-${order.id}`}
                           loading={deleteMutation.isPending}
-                          onConfirm={async () => { await deleteMutation.mutateAsync(order.id); }}
+                          onConfirm={async () => {
+                            await deleteMutation.mutateAsync(order.id);
+                          }}
                           trigger={
-                            <Button variant="ghost" size="icon" aria-label={`Delete invoice ${order.invoiceNumber || order.id}`}
-                              data-testid={`button-delete-order-${order.id}`}>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              aria-label={`Delete invoice ${order.invoiceNumber || order.id}`}
+                              data-testid={`button-delete-order-${order.id}`}
+                            >
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                           }

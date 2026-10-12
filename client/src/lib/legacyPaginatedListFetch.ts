@@ -26,7 +26,7 @@ export async function fetchLegacyPaginatedList(
   init: RequestInit | undefined,
   sourceUrl: URL,
   pageSize: number,
-  previousFetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
+  previousFetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
 ): Promise<Response> {
   const requestPage = (page: number): Promise<Response> => {
     const pageUrl = new URL(sourceUrl.toString());

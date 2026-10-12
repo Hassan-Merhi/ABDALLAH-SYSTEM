@@ -25,7 +25,7 @@ export const PageShell = React.forwardRef<HTMLElement, PageShellProps>(
     const classes = cn(PAGE_SHELL_CLASSES[layout], className);
     if (as === "section") return <section ref={ref} className={classes} {...props} />;
     return <div ref={ref as React.Ref<HTMLDivElement>} className={classes} {...props} />;
-  },
+  }
 );
 PageShell.displayName = "PageShell";
 

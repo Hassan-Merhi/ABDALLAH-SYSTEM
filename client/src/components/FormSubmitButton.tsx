@@ -17,6 +17,6 @@ export const FormSubmitButton = React.forwardRef<HTMLButtonElement, FormSubmitBu
       isLoading={pending || isLoading}
       loadingLabel={pendingLabel}
     />
-  ),
+  )
 );
 FormSubmitButton.displayName = "FormSubmitButton";

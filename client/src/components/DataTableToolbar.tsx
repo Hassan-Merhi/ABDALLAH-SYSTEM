@@ -49,32 +49,35 @@ export function DataTableToolbar({
     />
   ) : null;
 
-  const filterControls = filters ? (
-    <div className="flex min-w-0 flex-wrap items-center gap-2">{filters}</div>
-  ) : null;
+  const filterControls = filters ? <div className="flex min-w-0 flex-wrap items-center gap-2">{filters}</div> : null;
 
-  const left = mobileFilters && filters ? (
-    <ErpMobileFilters
-      label={filterLabel}
-      quick={searchControl}
-      activeCount={activeFilterCount}
-      canClear={activeFilterCount > 0 || Boolean(search)}
-      onClear={onResetFilters}
-      data-testid={testId ? `${testId}-filters` : "table-filters"}
-    >
-      {(layout) => layout === "inline" ? (
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-          {searchControl}
-          {filterControls}
-        </div>
-      ) : filterControls}
-    </ErpMobileFilters>
-  ) : (
-    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-      {searchControl}
-      {filterControls}
-    </div>
-  );
+  const left =
+    mobileFilters && filters ? (
+      <ErpMobileFilters
+        label={filterLabel}
+        quick={searchControl}
+        activeCount={activeFilterCount}
+        canClear={activeFilterCount > 0 || Boolean(search)}
+        onClear={onResetFilters}
+        data-testid={testId ? `${testId}-filters` : "table-filters"}
+      >
+        {(layout) =>
+          layout === "inline" ? (
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+              {searchControl}
+              {filterControls}
+            </div>
+          ) : (
+            filterControls
+          )
+        }
+      </ErpMobileFilters>
+    ) : (
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+        {searchControl}
+        {filterControls}
+      </div>
+    );
 
   return (
     <div

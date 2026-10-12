@@ -15,13 +15,6 @@ export interface CompactEmptyStateProps extends React.HTMLAttributes<HTMLDivElem
 }
 export function EmptyState({ icon, title, description, action, ...props }: CompactEmptyStateProps) {
   return (
-    <PageState
-      layout="legacy"
-      icon={icon ?? null}
-      title={title}
-      description={description}
-      action={action}
-      {...props}
-    />
+    <PageState layout="legacy" icon={icon ?? null} title={title} description={description} action={action} {...props} />
   );
 }

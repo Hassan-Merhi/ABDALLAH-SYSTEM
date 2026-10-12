@@ -46,7 +46,11 @@ export default function FactoryPayrollHub() {
   const tabs = allTabs.filter((tab) => sections.includes(tab.key));
 
   return (
-    <Tabs value={activeSection} onValueChange={(value) => setActiveSection(value as Section)} className="flex flex-col h-full overflow-hidden">
+    <Tabs
+      value={activeSection}
+      onValueChange={(value) => setActiveSection(value as Section)}
+      className="flex flex-col h-full overflow-hidden"
+    >
       <div className="border-b bg-background shrink-0">
         {/* Shared page-header grammar (accent bar, icon, subtitle) like the ERP and Properties pages. */}
         <div className="px-4 pt-3 [&>header]:mb-0 [&>header]:border-b-0 [&>header]:pb-2">

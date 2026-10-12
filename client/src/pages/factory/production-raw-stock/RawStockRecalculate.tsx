@@ -47,7 +47,11 @@ export default function RawStockRecalculate() {
   } = rawStock;
 
   return (
-    <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as (typeof tabs)[number]["id"])} className="space-y-6 p-6">
+    <Tabs
+      value={activeTab}
+      onValueChange={(value) => setActiveTab(value as (typeof tabs)[number]["id"])}
+      className="space-y-6 p-6"
+    >
       {/* Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
@@ -146,9 +150,9 @@ export default function RawStockRecalculate() {
 
       <TabsContent value={activeTab} className="mt-0 space-y-6">
         <RawStockOperationsPanel rawStock={rawStock} />
-      <RawStockHistoryPanel rawStock={rawStock} />
-      <RawStockReplayPanel rawStock={rawStock} />
-      <RawStockPartialFixPanel rawStock={rawStock} />
+        <RawStockHistoryPanel rawStock={rawStock} />
+        <RawStockReplayPanel rawStock={rawStock} />
+        <RawStockPartialFixPanel rawStock={rawStock} />
       </TabsContent>
 
       {/* Batch detail dialog */}

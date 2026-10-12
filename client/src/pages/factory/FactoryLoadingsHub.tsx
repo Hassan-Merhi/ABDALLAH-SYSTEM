@@ -53,7 +53,11 @@ export default function FactoryLoadingsHub() {
   }
 
   return (
-    <Tabs value={effectiveActiveTab} onValueChange={(value) => handleTabChange(value as LoadingsTab)} className="flex flex-col h-full overflow-hidden">
+    <Tabs
+      value={effectiveActiveTab}
+      onValueChange={(value) => handleTabChange(value as LoadingsTab)}
+      className="flex flex-col h-full overflow-hidden"
+    >
       <div className="border-b bg-background shrink-0">
         {/* Header row */}
         <div className="flex items-center gap-3 px-5 pt-4 pb-3">
@@ -69,9 +73,21 @@ export default function FactoryLoadingsHub() {
         </div>
         {/* Tab row */}
         <TabsList variant="underline" className="w-full px-4" aria-label="Loadings sections">
-          {showLoadings && <TabsTrigger value="loadings" data-testid="tab-container-loadings">Container Loadings</TabsTrigger>}
-          {showPending && <TabsTrigger value="pending" data-testid="tab-pending-loadings">Pending Loadings</TabsTrigger>}
-          {showPriority && <TabsTrigger value="priority" data-testid="tab-priority-scan">{priorityScanLabel}</TabsTrigger>}
+          {showLoadings && (
+            <TabsTrigger value="loadings" data-testid="tab-container-loadings">
+              Container Loadings
+            </TabsTrigger>
+          )}
+          {showPending && (
+            <TabsTrigger value="pending" data-testid="tab-pending-loadings">
+              Pending Loadings
+            </TabsTrigger>
+          )}
+          {showPriority && (
+            <TabsTrigger value="priority" data-testid="tab-priority-scan">
+              {priorityScanLabel}
+            </TabsTrigger>
+          )}
         </TabsList>
       </div>
 

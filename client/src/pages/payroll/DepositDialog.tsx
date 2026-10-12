@@ -31,12 +31,16 @@ export function DepositDialog({ open, onOpenChange, selectedEmployee, form, muta
         </DialogHeader>
 
         <Form {...form}>
-          <form noValidate onSubmit={form.handleSubmit((data) => {
-            if (mutation.isPending || submitting) return;
-            void executeDeposit(() => mutation.mutateAsync(data)).catch(() => {
-              // The mutation's existing onError handler owns error reporting.
-            });
-          })} className="space-y-4">
+          <form
+            noValidate
+            onSubmit={form.handleSubmit((data) => {
+              if (mutation.isPending || submitting) return;
+              void executeDeposit(() => mutation.mutateAsync(data)).catch(() => {
+                // The mutation's existing onError handler owns error reporting.
+              });
+            })}
+            className="space-y-4"
+          >
             <FormField
               control={form.control}
               name="amount"
@@ -88,7 +92,12 @@ export function DepositDialog({ open, onOpenChange, selectedEmployee, form, muta
               >
                 Cancel
               </Button>
-              <FormSubmitButton type="submit" pending={mutation.isPending || submitting} pendingLabel="Processing…" data-testid="button-submit-deposit">
+              <FormSubmitButton
+                type="submit"
+                pending={mutation.isPending || submitting}
+                pendingLabel="Processing…"
+                data-testid="button-submit-deposit"
+              >
                 Deposit
               </FormSubmitButton>
             </div>

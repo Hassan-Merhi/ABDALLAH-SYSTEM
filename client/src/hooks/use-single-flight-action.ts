@@ -9,7 +9,7 @@ export function useSingleFlightAction() {
   const lockedRef = useRef(false);
   const [pending, setPending] = useState(false);
 
-  const execute = useCallback(async <T,>(work: () => Promise<T>): Promise<T | undefined> => {
+  const execute = useCallback(async <T>(work: () => Promise<T>): Promise<T | undefined> => {
     if (lockedRef.current) return undefined;
     lockedRef.current = true;
     setPending(true);

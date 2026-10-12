@@ -2,11 +2,7 @@ import { fetchLegacyPaginatedList } from "./legacyPaginatedListFetch";
 import { resolveFetchUrl as resolveUrl, fetchRequestMethod } from "./fetchRequestUtils";
 import "./supplierPurchaseOrderPaginationClient";
 
-const ENDPOINTS = new Set([
-  "/api/containers",
-  "/api/containers/active",
-  "/api/containers/sold",
-]);
+const ENDPOINTS = new Set(["/api/containers", "/api/containers/active", "/api/containers/sold"]);
 const PAGE_SIZE = 250;
 
 declare global {
@@ -15,25 +11,15 @@ declare global {
   }
 }
 
-if (
-  typeof window !== "undefined" &&
-  !window.__erpContainerPaginationInstalled
-) {
+if (typeof window !== "undefined" && !window.__erpContainerPaginationInstalled) {
   window.__erpContainerPaginationInstalled = true;
   const previousFetch = window.fetch.bind(window);
 
-  window.fetch = async (
-    input: RequestInfo | URL,
-    init?: RequestInit,
-  ): Promise<Response> => {
+  window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const method = fetchRequestMethod(input, init);
     if (method !== "GET") return previousFetch(input, init);
     const url = resolveUrl(input);
-    if (
-      !url ||
-      !ENDPOINTS.has(url.pathname) ||
-      url.searchParams.has("pagination")
-    ) {
+    if (!url || !ENDPOINTS.has(url.pathname) || url.searchParams.has("pagination")) {
       return previousFetch(input, init);
     }
 

@@ -34,32 +34,66 @@ export function PaginationBar({
   if (total <= 0 && !onPageSizeChange) return null;
   if (pages <= 1 && !onPageSizeChange) return null;
 
-  const sizes = [...new Set([...pageSizeOptions, pageSize])].filter((size) => Number.isInteger(size) && size > 0).sort((a, b) => a - b);
+  const sizes = [...new Set([...pageSizeOptions, pageSize])]
+    .filter((size) => Number.isInteger(size) && size > 0)
+    .sort((a, b) => a - b);
 
   return (
-    <nav aria-label={ariaLabel ?? `Pagination for ${noun}`} className="flex min-w-0 flex-wrap items-center justify-between gap-3 border-t px-2 py-3" data-testid={testId}>
+    <nav
+      aria-label={ariaLabel ?? `Pagination for ${noun}`}
+      className="flex min-w-0 flex-wrap items-center justify-between gap-3 border-t px-2 py-3"
+      data-testid={testId}
+    >
       <p className="text-sm text-muted-foreground" aria-live="polite">
         Showing {start}–{end} of {total} {noun}
       </p>
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         {onPageSizeChange && (
           <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground" aria-hidden="true">Rows</span>
+            <span className="text-xs text-muted-foreground" aria-hidden="true">
+              Rows
+            </span>
             <Select value={String(pageSize)} onValueChange={(value) => onPageSizeChange(Number(value))}>
               <SelectTrigger className="h-9 w-20" aria-label="Rows per page">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {sizes.map((size) => <SelectItem key={size} value={String(size)}>{size}</SelectItem>)}
+                {sizes.map((size) => (
+                  <SelectItem key={size} value={String(size)}>
+                    {size}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
         )}
         {pages > 1 && (
           <>
-            <Button type="button" variant="outline" size="sm" className="min-h-11 sm:min-h-8" disabled={safePage <= 1} aria-label="Previous page" onClick={() => onPageChange(safePage - 1)}>Previous</Button>
-            <span className="min-w-20 text-center text-sm tabular-nums">Page {safePage} of {pages}</span>
-            <Button type="button" variant="outline" size="sm" className="min-h-11 sm:min-h-8" disabled={safePage >= pages} aria-label="Next page" onClick={() => onPageChange(safePage + 1)}>Next</Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="min-h-11 sm:min-h-8"
+              disabled={safePage <= 1}
+              aria-label="Previous page"
+              onClick={() => onPageChange(safePage - 1)}
+            >
+              Previous
+            </Button>
+            <span className="min-w-20 text-center text-sm tabular-nums">
+              Page {safePage} of {pages}
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="min-h-11 sm:min-h-8"
+              disabled={safePage >= pages}
+              aria-label="Next page"
+              onClick={() => onPageChange(safePage + 1)}
+            >
+              Next
+            </Button>
           </>
         )}
       </div>

@@ -1,4 +1,8 @@
-import { resolveFetchUrl as resolveUrl, fetchRequestMethod as requestMethod, fetchQueryCacheKey } from "./fetchRequestUtils";
+import {
+  resolveFetchUrl as resolveUrl,
+  fetchRequestMethod as requestMethod,
+  fetchQueryCacheKey,
+} from "./fetchRequestUtils";
 const BYPASS_HEADER = "x-phase4-bandwidth-bypass";
 const DAILY_PAGE_SIZE = 250;
 const DAILY_RECONCILE_MS = 10 * 60_000;

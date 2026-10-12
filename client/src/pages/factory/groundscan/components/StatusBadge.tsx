@@ -8,11 +8,7 @@ import { StatusBadge as SharedStatusBadge } from "@/components/StatusBadge";
 /** Domain-specific override: bales in a loading order show Loading. */
 export function StatusBadge({ status, isInLoadingOrder }: { status: string; isInLoadingOrder?: boolean }) {
   const current = (status || "").toUpperCase();
-  if (
-    current === "LOADING" ||
-    current === "LOADED" ||
-    (current === "IN_STOCK" && isInLoadingOrder)
-  ) {
+  if (current === "LOADING" || current === "LOADED" || (current === "IN_STOCK" && isInLoadingOrder)) {
     return <SharedStatusBadge status="loading" showIcon={false} />;
   }
   if (current === "IN_STOCK") return <SharedStatusBadge status="in_stock" showIcon={false} />;

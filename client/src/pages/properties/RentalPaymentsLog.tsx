@@ -263,22 +263,27 @@ export default function RentalPaymentsLog({
 
       <ConfirmDialog
         open={!!deleteTarget}
-        onOpenChange={(isOpen) => { if (!isOpen) setDeleteTarget(null); }}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setDeleteTarget(null);
+        }}
         title="Delete this payment?"
         tone="destructive"
         confirmText="Yes, Delete Payment"
         confirmButtonTestId="button-confirm-delete-payment"
         loading={deleteMutation.isPending}
-        description={deleteTarget ? (
-          <>
-            This will permanently remove the{" "}
-            <strong><MoneyAmount amount={deleteTarget.amount} currency={deleteTarget.currency ?? "USD"} /></strong>{" "}
-            payment from <strong>{deleteTarget.tenantName ?? "—"}</strong>{" "}
-            ({MONTH_NAMES[deleteTarget.forMonth]} {deleteTarget.forYear}). The accounting entry will be reversed,
-            and any inter-company transfer automatically created for this payment will be fully reversed in both
-            companies. This cannot be undone.
-          </>
-        ) : undefined}
+        description={
+          deleteTarget ? (
+            <>
+              This will permanently remove the{" "}
+              <strong>
+                <MoneyAmount amount={deleteTarget.amount} currency={deleteTarget.currency ?? "USD"} />
+              </strong>{" "}
+              payment from <strong>{deleteTarget.tenantName ?? "—"}</strong> ({MONTH_NAMES[deleteTarget.forMonth]}{" "}
+              {deleteTarget.forYear}). The accounting entry will be reversed, and any inter-company transfer
+              automatically created for this payment will be fully reversed in both companies. This cannot be undone.
+            </>
+          ) : undefined
+        }
         onConfirm={async () => {
           if (deleteTarget) await deleteMutation.mutateAsync(deleteTarget.id);
         }}

@@ -16,7 +16,9 @@ import { Loader2, ArrowRight } from "lucide-react";
 
 function fmt(v: number | string | undefined, dec = 2) {
   return formatMoneyDisplay(v ?? 0, {
-    currency: "USD", minimumFractionDigits: dec, maximumFractionDigits: dec,
+    currency: "USD",
+    minimumFractionDigits: dec,
+    maximumFractionDigits: dec,
   });
 }
 function num(v: string) {
@@ -100,14 +102,16 @@ export default function SpOpeningStock() {
       toast({ title: "Fill in article code, qty and final unit cost", variant: "destructive" });
       return;
     }
-    void executePost(() => mutation.mutateAsync({
-      articleCode: articleCode.trim(),
-      qty,
-      baseUnitCostUsd: baseUC || "0",
-      landedUnitCostUsd: landedUC || "0",
-      finalUnitCostUsd: finalUC,
-      notes,
-    })).catch(() => {
+    void executePost(() =>
+      mutation.mutateAsync({
+        articleCode: articleCode.trim(),
+        qty,
+        baseUnitCostUsd: baseUC || "0",
+        landedUnitCostUsd: landedUC || "0",
+        finalUnitCostUsd: finalUC,
+        notes,
+      })
+    ).catch(() => {
       // The mutation's onError handler already shows the posting failure.
     });
   };
@@ -133,7 +137,9 @@ export default function SpOpeningStock() {
         <CardContent className="space-y-4">
           <FormGrid minColumnWidth="10rem" className="gap-3">
             <div className="col-span-full">
-              <label htmlFor={`${formId}-article`} className="text-xs text-muted-foreground">Article Code *</label>
+              <label htmlFor={`${formId}-article`} className="text-xs text-muted-foreground">
+                Article Code *
+              </label>
               <Input
                 value={articleCode}
                 onChange={(e) => setArticleCode(e.target.value)}
@@ -144,7 +150,9 @@ export default function SpOpeningStock() {
               />
             </div>
             <div>
-              <label htmlFor={`${formId}-quantity`} className="text-xs text-muted-foreground">Qty *</label>
+              <label htmlFor={`${formId}-quantity`} className="text-xs text-muted-foreground">
+                Qty *
+              </label>
               <DecimalInput
                 step="0.01"
                 value={qty}
@@ -156,7 +164,9 @@ export default function SpOpeningStock() {
               />
             </div>
             <div>
-              <label htmlFor={`${formId}-base`} className="text-xs text-muted-foreground">Base Unit Cost $ (supplier cost)</label>
+              <label htmlFor={`${formId}-base`} className="text-xs text-muted-foreground">
+                Base Unit Cost $ (supplier cost)
+              </label>
               <MoneyInput
                 step="0.0001"
                 value={baseUC}
@@ -168,7 +178,9 @@ export default function SpOpeningStock() {
               />
             </div>
             <div>
-              <label htmlFor={`${formId}-landed`} className="text-xs text-muted-foreground">Landed Unit Cost $ (freight/duty etc.)</label>
+              <label htmlFor={`${formId}-landed`} className="text-xs text-muted-foreground">
+                Landed Unit Cost $ (freight/duty etc.)
+              </label>
               <MoneyInput
                 step="0.0001"
                 value={landedUC}
@@ -180,7 +192,9 @@ export default function SpOpeningStock() {
               />
             </div>
             <div>
-              <label htmlFor={`${formId}-final`} className="text-xs text-muted-foreground">Final Unit Cost $ (auto = base + landed) *</label>
+              <label htmlFor={`${formId}-final`} className="text-xs text-muted-foreground">
+                Final Unit Cost $ (auto = base + landed) *
+              </label>
               <MoneyInput
                 step="0.0001"
                 value={finalUC}
@@ -192,7 +206,9 @@ export default function SpOpeningStock() {
               />
             </div>
             <div className="col-span-full">
-              <label htmlFor={`${formId}-notes`} className="text-xs text-muted-foreground">Notes / Description</label>
+              <label htmlFor={`${formId}-notes`} className="text-xs text-muted-foreground">
+                Notes / Description
+              </label>
               <Input
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}

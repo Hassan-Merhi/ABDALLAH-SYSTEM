@@ -271,7 +271,11 @@ export default function FactoryDispatchBatches() {
   });
 
   return (
-    <Tabs value={effectiveActiveTab ?? ""} onValueChange={(value) => setActiveTab(value as "list" | "reports")} className="flex flex-col h-full">
+    <Tabs
+      value={effectiveActiveTab ?? ""}
+      onValueChange={(value) => setActiveTab(value as "list" | "reports")}
+      className="flex flex-col h-full"
+    >
       <PageHeader title="Dispatch Batches" subtitle="Manage local truck dispatch batches for bale sales">
         <div className="flex items-center gap-2 flex-wrap">
           <TabsList variant="pill" aria-label="Dispatch batch sections">

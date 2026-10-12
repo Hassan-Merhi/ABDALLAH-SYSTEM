@@ -195,12 +195,14 @@ export function ContainerListView({
               </SelectContent>
             </Select>
           }
-          actions={hasActiveFilters ? (
-            <Button variant="outline" type="button" onClick={onResetFilters} data-testid="button-reset-filters">
-              <RotateCcw className="mr-2 h-4 w-4" />
-              Reset filters
-            </Button>
-          ) : undefined}
+          actions={
+            hasActiveFilters ? (
+              <Button variant="outline" type="button" onClick={onResetFilters} data-testid="button-reset-filters">
+                <RotateCcw className="mr-2 h-4 w-4" />
+                Reset filters
+              </Button>
+            ) : undefined
+          }
         />
       </div>
 

@@ -41,10 +41,8 @@ export function AllItemsView({
       <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
         <span className="font-semibold text-foreground">{totalItems}</span> Items
         <span className="text-muted-foreground">·</span>
-        <span className="font-semibold text-foreground font-mono">
-          {Math.floor(totalQty).toLocaleString()}
-        </span>{" "}
-        BL total
+        <span className="font-semibold text-foreground font-mono">{Math.floor(totalQty).toLocaleString()}</span> BL
+        total
         {canViewCost && (
           <>
             <span className="text-muted-foreground">·</span>
