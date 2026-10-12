@@ -322,8 +322,14 @@ export default function FactoryContacts() {
       </div>
 
       {/* Add / Edit Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-md">
+      <Dialog
+        open={dialogOpen}
+        onOpenChange={(nextOpen) => {
+          if (saveMutation.isPending || saving) return;
+          setDialogOpen(nextOpen);
+        }}
+      >
+        <DialogContent className="max-w-md" aria-busy={saveMutation.isPending || saving}>
           <DialogHeader>
             <DialogTitle>{editingContact ? "Edit Contact" : "Add Contact"}</DialogTitle>
           </DialogHeader>
@@ -401,8 +407,14 @@ export default function FactoryContacts() {
             </div>
           </div>
 
+          {saveMutation.isError && (
+            <p role="alert" className="text-sm text-destructive">
+              Contact could not be saved. Please review the fields and try again.
+            </p>
+          )}
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saveMutation.isPending || saving}>
               Cancel
             </Button>
             <FormSubmitButton type="button" onClick={handleSubmit}

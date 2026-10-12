@@ -36,10 +36,10 @@ export function BalesTable({
   onNavigateImport,
 }: BalesTableProps) {
   return (
-    <Card className="p-6">
+    <Card className="p-3 sm:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
         <h2 className="text-lg font-semibold">All Bales ({bales.length})</h2>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
           <SearchField
             value={searchTerm}
             onValueChange={onSearchChange}
@@ -55,9 +55,10 @@ export function BalesTable({
       </div>
 
       {isLoading ? (
-        <div className="space-y-3">
+        <div role="status" aria-live="polite" aria-busy="true" className="space-y-3">
+          <span className="sr-only">Loading bales…</span>
           {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-14 w-full" />
+            <Skeleton key={i} className="h-14 w-full" aria-hidden="true" />
           ))}
         </div>
       ) : bales.length === 0 ? (

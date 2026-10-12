@@ -167,9 +167,13 @@ export function ConfirmDialog({
               )}
               <div className="min-w-0 flex-1 text-left">
                 <AlertDialogTitle ref={titleRef} tabIndex={-1} className="wrap-break-word focus-visible:outline-hidden">{headerTitle}</AlertDialogTitle>
-                {headerDescription && (
+                {headerDescription ? (
                   <AlertDialogDescription className="mt-1 whitespace-pre-line wrap-break-word leading-5">
                     {headerDescription}
+                  </AlertDialogDescription>
+                ) : (
+                  <AlertDialogDescription className="sr-only">
+                    Review the details and confirm or cancel this action.
                   </AlertDialogDescription>
                 )}
               </div>

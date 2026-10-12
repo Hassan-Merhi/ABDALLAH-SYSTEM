@@ -72,14 +72,14 @@ export const SearchField = React.forwardRef<HTMLInputElement, SearchFieldProps>(
         }}
         placeholder={placeholder}
         aria-label={ariaLabel ?? placeholder}
-        className={cn("w-full ps-9", showClear && "pe-9", className)}
+        className={cn("min-h-11 w-full ps-9 sm:min-h-9", showClear && "pe-11 sm:pe-9", className)}
       />
       {showClear && value.length > 0 ? (
         <Button
           type="button"
           size="icon"
           variant="ghost"
-          className="absolute end-1 top-1/2 h-9 w-9 -translate-y-1/2 sm:h-7 sm:w-7"
+          className="absolute end-0 top-1/2 h-11 w-11 -translate-y-1/2 sm:end-1 sm:h-8 sm:w-8"
           aria-label="Clear search"
           data-testid={clearTestId}
           onClick={clear}

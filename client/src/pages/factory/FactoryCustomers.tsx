@@ -20,6 +20,7 @@ import { useSingleFlightAction } from "@/hooks/use-single-flight-action";
 import { MoneyInput } from "@/components/ui/decimal-input";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { PageHeader } from "@/components/PageHeader";
+import { ErrorState } from "@/components/ui/page-state";
 import { DataTableToolbar } from "@/components/DataTableToolbar";
 import { PaginationBar } from "@/components/PaginationBar";
 import { useTablePrefs } from "@/hooks/use-table-prefs";
@@ -71,6 +72,7 @@ export default function FactoryCustomers() {
     isLoading,
     isError,
     error,
+    refetch: refetchCustomers,
   } = useQuery<Customer[]>({
     queryKey: ["/api/factory/customers"],
   });
@@ -232,9 +234,12 @@ export default function FactoryCustomers() {
     return (
       <div className="flex flex-col h-full p-6 gap-4">
         <PageHeader title="Customers" />
-        <div className="rounded-md border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
-          Failed to load customers: {error?.message || "Unknown error"}
-        </div>
+        <ErrorState
+          title="Customers could not be loaded"
+          description={error?.message || "Please try again."}
+          actionLabel="Retry"
+          onAction={() => { void refetchCustomers(); }}
+        />
       </div>
     );
   }
@@ -433,13 +438,14 @@ export default function FactoryCustomers() {
       <Dialog
         open={isCreateOpen}
         onOpenChange={(open) => {
+          if (createMutation.isPending || saving) return;
           if (!open) {
             setIsCreateOpen(false);
             resetForm();
           }
         }}
       >
-        <DialogContent>
+        <DialogContent aria-busy={createMutation.isPending || saving}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <User className="h-5 w-5" />
@@ -559,13 +565,14 @@ export default function FactoryCustomers() {
       <Dialog
         open={!!editingCustomer}
         onOpenChange={(open) => {
+          if (updateMutation.isPending || saving) return;
           if (!open) {
             setEditingCustomer(null);
             resetForm();
           }
         }}
       >
-        <DialogContent className="max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-h-[85vh] overflow-y-auto" aria-busy={updateMutation.isPending || saving}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Pencil className="h-5 w-5" />
