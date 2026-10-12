@@ -1,7 +1,7 @@
 {
   "formatVersion": 1,
   "description": "Ordered snapshot of every registered Express route (method, path, guard chain) and middleware mount. Regenerate with UPDATE_ROUTE_MANIFEST=1 only when a route change is intended; during a file split the manifest must not change at all.",
-  "routeCount": 2114,
+  "routeCount": 2107,
   "middlewareMountCount": 130,
   "routes": [
     "GET /api/admin/operational-monitoring [requireAuth > <anonymous> > <anonymous>]",
@@ -1924,13 +1924,6 @@
     "POST /api/sp/migration/cutover/rollback [requireAuth > <anonymous> > rollbackCutover]",
     "POST /api/sp/migration/cutover/cancel [requireAuth > <anonymous> > cancelPreparedCutover]",
     "POST /api/sp/migration/cutover/release-target-hold [requireAuth > <anonymous> > releaseTargetHold]",
-    "POST /api/sp/migration/cutover [requireAuth > <anonymous> > <anonymous>]",
-    "GET /api/sp/migration/cutover [requireAuth > <anonymous> > statusCutover]",
-    "GET /api/sp/migration/cutover/status [requireAuth > <anonymous> > statusCutover]",
-    "POST /api/sp/migration/cutover/prepare [requireAuth > <anonymous> > prepareCutover]",
-    "POST /api/sp/migration/cutover/finalize [requireAuth > <anonymous> > finalizeCutover]",
-    "POST /api/sp/migration/cutover/rollback [requireAuth > <anonymous> > rollbackCutover]",
-    "POST /api/sp/migration/cutover/cancel [requireAuth > <anonymous> > cancelPreparedCutover]",
     "POST /api/sp/migration/cutover [requireAuth > <anonymous> > <anonymous>]",
     "POST /api/sp/migration/gc-suspense-review/:targetEntryId/map [requireAuth > <anonymous> > mapSuspenseEntry]",
     "POST /api/sp/migration/gc-container-charge-review/:chargeId/map [requireAuth > <anonymous> > mapContainerCharge]",
