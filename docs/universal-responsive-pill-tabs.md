@@ -105,3 +105,29 @@ The POS checkout/cart navigation, phone product-choice sheet, Settings' primary 
 ### Delivery boundary
 
 **Code-level migration complete; not runtime validated.** No TypeScript, lint, CI, unit, integration, browser, accessibility, or responsive test suites were invoked for this phase, at the user's request. There has been no merge to `main`, pull request, or deployment. A separate review/testing handoff remains necessary before production.
+
+## Phase 7 — responsive source hardening (12 October 2026)
+
+**Scope:** source-only responsive implementation, under the existing user requirement not to run testing, lint, CI or browser/device checks.
+
+### Implemented
+
+- **Shared tab component:** `client/src/components/ui/tabs.tsx` now keeps a horizontal, nonwrapping pill row; both the root tab strip and enclosing `.erp-mobile-scroll-tabs` scroller are considered when moving the selected tab into view. The active tab is repositioned when its dimensions, enclosing layout or browser window size changes, including text expansion and viewport zoom. Keyboard focus into a tab also reveals it.
+- **Phone/tablet interaction:** Touch scrolling allows both sideways tab swipes and normal vertical page swipes from the tab-bar area. Touch targets remain minimum 44px on small screens and 36px from the desktop breakpoint, with no label truncation or forced word wrapping.
+- **Keyboard and accessibility:** Shared tablists declare horizontal orientation; arrow/Home/End navigation skips visually hidden/disabled tabs, respects document direction, and retains focus styling inside the pill without clipping by the horizontal scroller. Reduced-motion users do not get unnecessary tab transitions.
+- **Settings:** `client/src/erp-mobile-operations.css` no longer overrides the universal one-row tabs with multirow wrapping on phones and short-height landscape layouts.
+- **RTL overflow indication:** `client/src/mobile-browser-compat.css` places the existing logical start/end edge fades on the proper physical side when content direction is RTL (Arabic); no second overflow-probe subsystem was added.
+- **Pill geometry:** `client/src/index.css` reserves the former 2px tablist bottom padding for legacy tablists only. The standardized pill retains balanced padding on every side at narrow widths.
+- **Permissions and routing:** Source changes are restricted to the shared visual primitive and responsive styles, without editing ERP/Factory/POS financial logic, tab access controls, URL syncing, or the underlying tab content.
+
+### Responsive handoff matrix
+
+| Width / environment | Source-level coverage | Runtime/device validation |
+| --- | --- | --- |
+| 320, 375, 390, 430 px phones | One-row scroll, 44px controls, preserved labels, selected tab visibility | **Not run** |
+| 768 and 1024 px tablets | Width-constrained strips, horizontal overflow fallback, preserved section content | **Not run** |
+| 1280, 1440, 1920 px desktops | Consistent 36px minimum tabs, pill shape, keyboard and direction behavior | **Not run** |
+| iPhone Safari, Firefox, Chrome, large text and zoom | Existing momentum scroll, resize-aware selected tab, RTL edge masks and reduced-motion styling | **Not run** |
+| Permission-filtered tabs and URL state | Existing feature logic left intact; visibility-aware arrow navigation | **Not run** |
+
+**Phase 7 source-code implementation is complete; its original acceptance criterion (responsive and browser checks passing) is explicitly unverified** because the user has prohibited tests and CI. Do not interpret this as a device compatibility guarantee. No merge, PR, release or deployment was performed.
