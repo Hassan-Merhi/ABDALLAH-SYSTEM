@@ -42,11 +42,10 @@ function Tabs({ value: controlledValue, defaultValue, onValueChange, className, 
   const activeValue = isControlled ? controlledValue : internalValue;
   const handleChange = React.useCallback(
     (next: string) => {
-      if (next === activeValue) return;
       if (!isControlled) setInternalValue(next);
       onValueChange?.(next);
     },
-    [activeValue, isControlled, onValueChange]
+    [isControlled, onValueChange]
   );
   const context = React.useMemo(
     () => ({ value: activeValue, onValueChange: handleChange, baseId }),
@@ -101,8 +100,24 @@ function handleListKeyDown(event: React.KeyboardEvent<HTMLDivElement>, activatio
   event.preventDefault();
   const target = options[index];
   target.focus({ preventScroll: true });
-  target.scrollIntoView({ block: "nearest", inline: "nearest" });
+  revealTab(list, target);
   if (activationMode === "automatic") target.click();
+}
+
+/**
+ * Scrolls a sideways tab strip horizontally so the tab is visible, without
+ * scrolling the page itself (scrollIntoView can also move the page vertically,
+ * which would jump a deep-linked screen on load). Adjusting scrollLeft by a
+ * screen-space delta is direction-agnostic: in both LTR and RTL, decreasing
+ * scrollLeft reveals content on the left and increasing it reveals content on
+ * the right.
+ */
+function revealTab(list: HTMLElement, tab: HTMLElement) {
+  if (list.scrollWidth <= list.clientWidth) return;
+  const listBox = list.getBoundingClientRect();
+  const tabBox = tab.getBoundingClientRect();
+  if (tabBox.left < listBox.left) list.scrollLeft -= listBox.left - tabBox.left + 8;
+  else if (tabBox.right > listBox.right) list.scrollLeft += tabBox.right - listBox.right + 8;
 }
 
 const TabsList = React.forwardRef<HTMLDivElement, TabsListProps>(
@@ -123,7 +138,7 @@ const TabsList = React.forwardRef<HTMLDivElement, TabsListProps>(
         {...props}
         ref={ref}
         role="tablist"
-        aria-label={props["aria-label"] ?? "Sections"}
+        aria-label={props["aria-label"] ?? (props["aria-labelledby"] ? undefined : "Sections")}
         aria-orientation={orientation}
         data-responsive-tabs="true"
         data-tabs-variant={variant}
@@ -132,7 +147,8 @@ const TabsList = React.forwardRef<HTMLDivElement, TabsListProps>(
           if (!event.defaultPrevented) handleListKeyDown(event, activationMode);
         }}
         className={cn(
-          "flex max-w-full min-w-0 items-center justify-start gap-1",
+          "max-w-full min-w-0 items-center justify-start gap-1",
+          variant === "pill" ? "inline-flex" : "flex",
           orientation === "horizontal" && "overflow-x-auto overscroll-x-contain touch-pan-x scrollbar-gutter-stable",
           orientation === "vertical" && "flex-col items-stretch",
           variant === "pill" && "rounded-xl border border-border bg-muted/40 p-1 text-muted-foreground",
@@ -169,10 +185,8 @@ const TabsTrigger = React.forwardRef<HTMLButtonElement, TabsTriggerProps>(
     React.useEffect(() => {
       const node = internalRef.current;
       const list = node?.closest<HTMLElement>('[role="tablist"]');
-      if (!active || !node || !list || list.scrollWidth <= list.clientWidth) return;
-      // Browser-native scrolling handles negative/positive RTL scrollLeft
-      // conventions consistently; manual left/right arithmetic does not.
-      node.scrollIntoView({ block: "nearest", inline: "nearest" });
+      if (!active || !node || !list) return;
+      revealTab(list, node);
     }, [active]);
 
     return (
@@ -183,7 +197,8 @@ const TabsTrigger = React.forwardRef<HTMLButtonElement, TabsTriggerProps>(
         type="button"
         role="tab"
         aria-selected={active}
-        aria-controls={panelId(baseId, value)}
+        // Inactive panels are unmounted, so only the active trigger controls a live panel.
+        aria-controls={active ? panelId(baseId, value) : undefined}
         tabIndex={props.disabled ? -1 : active ? 0 : -1}
         data-state={active ? "active" : "inactive"}
         onClick={(event) => {
@@ -229,7 +244,6 @@ const TabsContent = React.forwardRef<HTMLDivElement, TabsContentProps>(
         id={props.id ?? panelId(baseId, value)}
         role="tabpanel"
         aria-labelledby={tabId(baseId, value)}
-        tabIndex={0}
         hidden={!active && selectedValue !== undefined}
         data-state={active ? "active" : "inactive"}
         className={cn(

@@ -5,9 +5,9 @@ import { useAppMode } from "@/contexts/AppModeContext";
 import { useLocation, useSearch } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Package } from "lucide-react";
+import { Package, Search } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
-import { DataTableToolbar } from "@/components/DataTableToolbar";
+import { SearchField } from "@/components/ui/search-field";
 
 interface StockItem {
   id: number;
@@ -83,12 +83,13 @@ export default function StockQuery() {
     <div className="flex flex-col gap-4 sm:p-4 md:p-6">
       {/* ── Header + Search ── */}
       <PageHeader title="Stock Query" subtitle="Click any item to view purchase history, sales, and inventory" />
-      <DataTableToolbar
-        search={searchTerm}
-        onSearchChange={setSearchTerm}
-        searchPlaceholder="Search by code or name..."
-        searchTestId="input-stock-search"
-        className="mb-0"
+      <SearchField
+        value={searchTerm}
+        onValueChange={setSearchTerm}
+        placeholder="Search by code or name..."
+        wrapperClassName="sm:max-w-md"
+        autoFocus
+        data-testid="input-stock-search"
       />
 
       {/* ── Result count ── */}

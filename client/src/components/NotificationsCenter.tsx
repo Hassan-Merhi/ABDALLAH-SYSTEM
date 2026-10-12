@@ -318,7 +318,12 @@ export function NotificationsCenter() {
             {/* Shared accessible notifications tabs. */}
             <TabsList variant="underline" className="w-full" aria-label="Notification categories">
               {TABS.map((tab) => (
-                <TabsTrigger key={tab.id} value={tab.id} data-testid={`tab-notif-${tab.id}`} className="flex-1 text-xs">
+                <TabsTrigger
+                  key={tab.id}
+                  value={tab.id}
+                  data-testid={`tab-notif-${tab.id}`}
+                  className="flex-1 shrink px-2 text-xs"
+                >
                   {tab.label}
                   {tab.id === "intercompany" && (icCountData?.count ?? 0) > 0 && (
                     <span className="ml-1 inline-flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-destructive px-0.5 text-[11px] font-bold text-destructive-foreground">

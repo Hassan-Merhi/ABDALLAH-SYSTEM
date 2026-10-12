@@ -3,7 +3,6 @@ import { useId, useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { DecimalInput, MoneyInput } from "@/components/ui/decimal-input";
@@ -15,7 +14,8 @@ import { useSingleFlightAction } from "@/hooks/use-single-flight-action";
 import { Loader2, ArrowRight } from "lucide-react";
 
 function fmt(v: number | string | undefined, dec = 2) {
-  return formatMoneyDisplay(v ?? 0, {
+  const n = parseFloat(String(v ?? "0"));
+  return formatMoneyDisplay(Number.isFinite(n) ? n : 0, {
     currency: "USD",
     minimumFractionDigits: dec,
     maximumFractionDigits: dec,

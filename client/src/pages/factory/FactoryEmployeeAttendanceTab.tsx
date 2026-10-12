@@ -148,8 +148,11 @@ export default function FactoryEmployeeAttendanceTab() {
     if (!data) return;
     const newMap: Record<number, AttendanceStatus> = {};
     const newNotes: Record<number, string> = {};
-    for (const e of data.employees) newMap[e.id] = "Present";
-    for (const a of data.attendance) {
+    // Guard the shape: a failed or unexpected payload must not crash the tab.
+    const employees = Array.isArray(data.employees) ? data.employees : [];
+    const attendance = Array.isArray(data.attendance) ? data.attendance : [];
+    for (const e of employees) newMap[e.id] = "Present";
+    for (const a of attendance) {
       newMap[a.employeeId] = a.status as AttendanceStatus;
       newNotes[a.employeeId] = a.notes || "";
     }

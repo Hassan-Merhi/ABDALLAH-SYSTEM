@@ -28,5 +28,7 @@ export function StatusBadge({
       />
     );
   }
-  return <SharedStatusBadge status={status} showIcon={false} className="text-[11px]" />;
+  if (status === "paid") return <SharedStatusBadge status="paid" showIcon={false} className="text-[11px]" />;
+  // Unpaid statements stay in the destructive tone this screen always used.
+  return <SharedStatusBadge status="error" label="Unpaid" showIcon={false} className="text-[11px]" />;
 }

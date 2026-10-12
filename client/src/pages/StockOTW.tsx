@@ -18,7 +18,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Package, Search, Ship, AlertCircle, ChevronRight, ChevronDown, X, Layers, FileDown } from "lucide-react";
+import { Package, Ship, AlertCircle, ChevronRight, ChevronDown, X, Layers, FileDown } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import type { Container } from "@shared/schema";

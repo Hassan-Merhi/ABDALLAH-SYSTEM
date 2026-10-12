@@ -41,7 +41,7 @@ export function ContainerFilters({
         value={searchTerm}
         onValueChange={onSearchChange}
         placeholder="Search by container number..."
-        wrapperClassName="sm:flex-1 sm:min-w-[200px]"
+        wrapperClassName="w-full min-w-0 sm:flex-1 sm:min-w-[200px]"
         data-testid="input-search-container"
       />
       <div className="flex w-full gap-1 overflow-x-auto pb-1 sm:w-auto sm:flex-wrap sm:overflow-visible sm:pb-0">

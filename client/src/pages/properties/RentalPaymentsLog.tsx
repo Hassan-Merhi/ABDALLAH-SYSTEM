@@ -250,7 +250,7 @@ export default function RentalPaymentsLog({
                       TOTAL
                     </td>
                     <td className="px-3 py-2 text-right tabular-nums font-bold text-green-700 dark:text-green-400">
-                      {fmtMoney(total)}
+                      {formatMoneyNumber(total)}
                     </td>
                     <td colSpan={4}></td>
                   </tr>

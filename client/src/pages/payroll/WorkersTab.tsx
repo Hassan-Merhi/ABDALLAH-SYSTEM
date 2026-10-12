@@ -4,7 +4,6 @@ import type { usePayrollModel } from "./usePayrollModel";
 type PayrollModel = ReturnType<typeof usePayrollModel>;
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { SearchField } from "@/components/ui/search-field";
 import { Badge } from "@/components/ui/badge";
 import {

@@ -192,7 +192,7 @@ describe("FactoryWorkersHub", () => {
   it("renders the section selector", async () => {
     const { default: FactoryWorkersHub } = await import("@/pages/factory/FactoryWorkersHub");
     renderWithProviders(<FactoryWorkersHub />);
-    expect(await screen.findByTestId("select-workers-section")).toBeInTheDocument();
+    expect(await screen.findByTestId("tabs-workers-section")).toBeInTheDocument();
   });
 });
 

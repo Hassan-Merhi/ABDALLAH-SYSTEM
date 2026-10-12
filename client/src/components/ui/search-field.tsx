@@ -70,9 +70,14 @@ export const SearchField = React.forwardRef<HTMLInputElement, SearchFieldProps>(
           onChange={(event) => onValueChange(event.target.value)}
           onKeyDown={(event) => {
             onKeyDown?.(event);
-            if (!event.defaultPrevented && clearOnEscape && event.key === "Escape" && value) {
+            if (event.defaultPrevented || event.key !== "Escape") return;
+            if (clearOnEscape && value) {
               event.preventDefault();
               clear();
+            } else {
+              // WebKit/Chrome clear type="search" inputs natively on Escape; keep
+              // the owner's opt-in the only path and let overlays handle the key.
+              event.preventDefault();
             }
           }}
           placeholder={placeholder}

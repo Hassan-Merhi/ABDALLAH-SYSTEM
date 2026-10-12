@@ -20,6 +20,14 @@ export const DecimalInput = React.forwardRef<HTMLInputElement, DecimalInputProps
           event.preventDefault();
         }
       }}
+      onWheel={(event) => {
+        props.onWheel?.(event);
+        // Wheel events on a focused number input also step the value; the
+        // wheel listener is passive, so drop focus instead of preventDefault.
+        if (!event.defaultPrevented && preventArrowStep && document.activeElement === event.currentTarget) {
+          event.currentTarget.blur();
+        }
+      }}
     />
   )
 );

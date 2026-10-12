@@ -31,7 +31,8 @@ export function PaginationBar({
   const safePage = Math.min(Math.max(1, page), pages);
   const start = total === 0 ? 0 : (safePage - 1) * pageSize + 1;
   const end = Math.min(total, safePage * pageSize);
-  if (total <= 0 && !onPageSizeChange) return null;
+  // Consumers render their own empty-result row; a 0–0 summary would only add noise.
+  if (total <= 0) return null;
   if (pages <= 1 && !onPageSizeChange) return null;
 
   const sizes = [...new Set([...pageSizeOptions, pageSize])]

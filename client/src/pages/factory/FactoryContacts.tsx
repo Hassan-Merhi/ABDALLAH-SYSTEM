@@ -157,12 +157,14 @@ export default function FactoryContacts() {
   });
 
   const openNew = () => {
+    saveMutation.reset();
     setEditingContact(null);
     setForm(EMPTY_FORM);
     setDialogOpen(true);
   };
 
   const openEdit = (c: Contact) => {
+    saveMutation.reset();
     setEditingContact(c);
     setForm({
       name: c.name,

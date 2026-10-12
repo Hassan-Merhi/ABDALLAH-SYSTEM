@@ -98,7 +98,8 @@ requireTokens("Bale Tracking", sources.tracking, [
 requireTokens("Factory Import", sources.imports, [
   'data-testid="factory-import-page"',
   'data-testid="factory-import-tabs"',
-  "overflow-x-auto",
+  // The shared responsive TabsList owns the phone overflow-x-auto strip.
+  "<TabsList",
   "shrink-0",
 ]);
 

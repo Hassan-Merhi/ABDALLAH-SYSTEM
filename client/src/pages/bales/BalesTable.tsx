@@ -90,7 +90,10 @@ export function BalesTable({
                 <TableCell className="text-right font-mono">{parseFloat(bale.weight).toLocaleString()}</TableCell>
                 <TableCell>{formatDisplayDate(bale.datePressed)}</TableCell>
                 <TableCell>
-                  <StatusBadge status={bale.status} showIcon={false} />
+                  <StatusBadge
+                    status={bale.status === "AVAILABLE" ? "available" : bale.status === "HOLD" ? "hold" : "sold"}
+                    showIcon={false}
+                  />
                 </TableCell>
                 <TableCell className="text-right">
                   <Button

@@ -45,6 +45,7 @@ export type StatusKind =
   | "break_even"
   | "no_data"
   | "partial"
+  | "hold"
   | "superseded"
   | "neutral";
 
@@ -98,6 +99,7 @@ const STATUS_MAP: Record<StatusKind, StatusMeta> = {
   break_even: { label: "Break Even", variant: "info", icon: CircleDot },
   no_data: { label: "No Data", variant: "warning", icon: AlertTriangle },
   partial: { label: "Partial", variant: "warning", icon: Clock },
+  hold: { label: "Hold", variant: "warning", icon: Clock },
   superseded: { label: "Superseded", variant: "muted", icon: CircleDot },
   neutral: { label: "—", variant: "muted", icon: CircleDot },
 };
@@ -121,7 +123,15 @@ export function StatusBadge({ status, label, showIcon = true, className, "data-t
   const text = label ?? meta.label;
   return (
     <Badge variant={meta.variant} className={cn("gap-1", className)} data-testid={testId ?? `badge-status-${key}`}>
-      {showIcon && Icon && <Icon className={cn("h-3 w-3", key === "in_progress" && "animate-spin")} />}
+      {showIcon && Icon && (
+        <Icon
+          className={cn(
+            "h-3 w-3",
+            (key === "in_progress" || key === "running") && "animate-spin motion-reduce:animate-none"
+          )}
+          aria-hidden="true"
+        />
+      )}
       {text}
     </Badge>
   );
