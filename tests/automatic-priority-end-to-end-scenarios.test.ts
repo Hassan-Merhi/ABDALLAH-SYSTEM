@@ -23,7 +23,7 @@ const REMOVE = "/api/factory/stock-entry/remove";
 const BATCH = "/api/factory/customer-orders/loading-list/automatic-print-preflight-batch";
 const JOGGER = "E2E-JOGGER";
 const OTHER = "E2E-OTHER";
-const RED = "#B22222";
+const RED = "#FF00FF";
 const BLUE = "#6A5ACD";
 const GREEN = "#7FFF00";
 
