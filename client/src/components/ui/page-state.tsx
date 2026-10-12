@@ -100,9 +100,11 @@ export function LoadingState({
   title = "Loading",
   description = "Please wait while the latest information is loaded.",
   className,
-}: Partial<Pick<PageStateProps, "title" | "description" | "className">>) {
+  ...props
+}: Omit<PageStateProps, "icon" | "title" | "description"> & { title?: string; description?: string }) {
   return (
     <PageState
+      {...props}
       className={className}
       icon={Loader2}
       iconClassName="animate-spin motion-reduce:animate-none"
