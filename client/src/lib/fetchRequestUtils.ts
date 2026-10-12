@@ -32,3 +32,23 @@ export function replaceFetchInputUrl(input: RequestInfo | URL, url: URL): Reques
     ? `${url.pathname}${url.search}${url.hash}`
     : url.toString();
 }
+
+/**
+ * Canonical key for the *same* endpoint and server-filtered query, independent
+ * of cursor/page-size mechanics. Caller supplies the exact pagination keys to
+ * omit and, where required, a company scope from the current session.
+ *
+ * Do not supply a company scope where the original interceptor omitted one,
+ * or change the caller's parameter exclusions: both affect cache identity.
+ */
+export function fetchQueryCacheKey(
+  url: URL,
+  omittedParams: readonly string[],
+  companyScope?: string,
+): string {
+  const params = new URLSearchParams(url.searchParams);
+  for (const key of omittedParams) params.delete(key);
+  params.sort();
+  const key = `${url.pathname}?${params.toString()}`;
+  return companyScope === undefined ? key : `${companyScope}|${key}`;
+}

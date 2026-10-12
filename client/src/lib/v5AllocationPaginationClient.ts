@@ -1,4 +1,4 @@
-import { resolveFetchUrl as resolveUrl, fetchRequestMethod as methodOf, replaceFetchInputUrl as replaceInputUrl } from "./fetchRequestUtils";
+import { resolveFetchUrl as resolveUrl, fetchRequestMethod as methodOf, replaceFetchInputUrl as replaceInputUrl, fetchQueryCacheKey } from "./fetchRequestUtils";
 import { queryClient } from "./queryClient";
 import {
   hasLoadedEveryRow,
@@ -138,14 +138,13 @@ if (typeof window !== "undefined" && !window.__erpV5AllocationPaginationInstalle
   let progressRoot: HTMLDivElement | null = null;
 
   function baseKey(url: URL): string {
-    const params = new URLSearchParams(url.searchParams);
-    for (const key of ["pagination", "page", "limit", "pageSize", "offset", "fullAction"]) params.delete(key);
-    params.sort();
-    // The active company travels in the session cookie rather than the URL, so
-    // two companies produce identical allocation URLs. Scoping the cache key on
-    // the active company keeps a switch from merging one company's products
-    // into another's table.
-    return `${readActiveCompanyScope()}|${url.pathname}?${params.toString()}`;
+    // The server identifies the company through a cookie, not the URL.
+    // Keep the active company in the key to avoid cross-company cache reuse.
+    return fetchQueryCacheKey(
+      url,
+      ["pagination", "page", "limit", "pageSize", "offset", "fullAction"],
+      readActiveCompanyScope(),
+    );
   }
 
   function hasFocusedDeepLink(): boolean {

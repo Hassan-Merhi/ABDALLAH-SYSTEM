@@ -1,4 +1,4 @@
-import { resolveFetchUrl as resolveUrl, fetchRequestMethod as requestMethod } from "./fetchRequestUtils";
+import { resolveFetchUrl as resolveUrl, fetchRequestMethod as requestMethod, fetchQueryCacheKey } from "./fetchRequestUtils";
 const BYPASS_HEADER = "x-phase4-bandwidth-bypass";
 const DAILY_PAGE_SIZE = 250;
 const DAILY_RECONCILE_MS = 10 * 60_000;
@@ -59,10 +59,7 @@ function jsonResponseFrom(source: Response, payload: unknown): Response {
 }
 
 function dailyKey(url: URL): string {
-  const params = new URLSearchParams(url.searchParams);
-  for (const name of ["page", "pageSize", "limit", "offset", "afterId"]) params.delete(name);
-  params.sort();
-  return `${url.pathname}?${params.toString()}`;
+  return fetchQueryCacheKey(url, ["page", "pageSize", "limit", "offset", "afterId"]);
 }
 
 function mergeRows(current: DailyScanRow[], incoming: DailyScanRow[]): DailyScanRow[] {

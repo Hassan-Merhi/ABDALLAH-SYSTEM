@@ -1,4 +1,4 @@
-import { resolveFetchUrl as resolveUrl, replaceFetchInputUrl as replaceInputUrl, fetchRequestMethod as methodOf } from "./fetchRequestUtils";
+import { resolveFetchUrl as resolveUrl, replaceFetchInputUrl as replaceInputUrl, fetchRequestMethod as methodOf, fetchQueryCacheKey } from "./fetchRequestUtils";
 const ACCOUNT_ROUTE_SUFFIX = "/accounts";
 const ENDPOINT_PATTERN = /^\/api\/accounts\/(ledger|bank|fixed-asset|supplier|employee|customer)\/\d+\/transactions$/;
 const LEGACY_LIMIT = 100;
@@ -57,14 +57,8 @@ if (typeof window !== "undefined" && !window.__erpAccountStatementPaginationInst
   window.__erpAccountStatementPaginationInstalled = true;
   const previousFetch = window.fetch.bind(window);
 
-  const baseKey = (url: URL): string => {
-    const params = new URLSearchParams(url.searchParams);
-    for (const key of ["continuous", "cursor", "pagination", "page", "limit", "pageSize", "offset"]) {
-      params.delete(key);
-    }
-    params.sort();
-    return `${url.pathname}?${params.toString()}`;
-  };
+  const baseKey = (url: URL): string =>
+    fetchQueryCacheKey(url, ["continuous", "cursor", "pagination", "page", "limit", "pageSize", "offset"]);
 
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     if (methodOf(input, init) !== "GET" || !onAccountsRoute()) return previousFetch(input, init);

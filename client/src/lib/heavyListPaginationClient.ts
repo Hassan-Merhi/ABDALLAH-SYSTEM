@@ -1,4 +1,4 @@
-import { resolveFetchUrl as resolveUrl, fetchRequestMethod as getMethod, replaceFetchInputUrl as replaceInputUrl } from "./fetchRequestUtils";
+import { resolveFetchUrl as resolveUrl, fetchRequestMethod as getMethod, replaceFetchInputUrl as replaceInputUrl, fetchQueryCacheKey } from "./fetchRequestUtils";
 import { queryClient } from "./queryClient";
 
 const STOCK_ENTRY_ENDPOINT = "/api/factory/bales/stock-entry-history";
@@ -34,10 +34,7 @@ if (typeof window !== "undefined" && !window.__erpHeavyListPaginationClientInsta
   let controlsRoot: HTMLDivElement | null = null;
 
   function buildBaseKey(url: URL): string {
-    const params = new URLSearchParams(url.searchParams);
-    for (const key of ["pagination", "page", "limit", "pageSize", "offset"]) params.delete(key);
-    params.sort();
-    return `${url.pathname}?${params.toString()}`;
+    return fetchQueryCacheKey(url, ["pagination", "page", "limit", "pageSize", "offset"]);
   }
 
   /**
