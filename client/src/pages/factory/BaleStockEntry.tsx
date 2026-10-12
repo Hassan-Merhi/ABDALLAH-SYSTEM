@@ -20,7 +20,7 @@ import { canUseFactorySurface } from "@/lib/factoryClientAccess";
 
 export default function BaleStockEntry() {
   const todayStr = new Date().toLocaleDateString("en-CA");
-  const [summaryDate, _setSummaryDate] = useState<string>(todayStr);
+  const [summaryDate] = useState<string>(todayStr);
   const { language } = useApplicationLanguage();
   const tr = (key: Parameters<typeof translateFactoryStaffTrackingText>[0]) =>
     translateFactoryStaffTrackingText(key, language);

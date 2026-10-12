@@ -8,13 +8,14 @@ habits; each rule below names the habit it stops.
 
 ## 1. Delete, do not rename to `_`
 
-ESLint ignores variables that start with `_` (`varsIgnorePattern: "^_"`). That exists for
-deliberately unused parameters and for omitting keys with a rest pattern
-(`const { id: _id, ...rest } = row`). It is **not** a way to keep code that no longer runs.
-The cleanup removed more than a hundred `_handleX`, `_xMutation`, `_xSchema` declarations that
-had been renamed instead of deleted, and about 420 `_`-prefixed unused bindings remain (mostly
-state destructured from split page models). When you stop using something, remove it and any
-state, query or import that only it needed.
+A leading `_` is allowed only for deliberately unused **parameters** and **caught errors**,
+and for keys omitted with a rest pattern (`const { id: _id, ...rest } = row`, covered by
+`ignoreRestSiblings`). It is **not** a way to keep code that no longer runs. The cleanup
+removed more than a hundred `_handleX`, `_xMutation`, `_xSchema` declarations and about 400
+`_`-prefixed destructured bindings that had been renamed instead of deleted, and then dropped
+`varsIgnorePattern: "^_"` from `eslint.config.js`, so an unused `_local` is now a lint warning
+(the warning ceiling is zero). When you stop using something, remove it and any state, query
+or import that only it needed.
 
 ## 2. One registration path per route
 

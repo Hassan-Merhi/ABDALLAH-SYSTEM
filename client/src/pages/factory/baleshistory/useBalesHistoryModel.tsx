@@ -63,7 +63,7 @@ export function useBalesHistoryModel() {
   const { colors: designColors } = useLabelDesignColors();
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [batchFilter, _setBatchFilter] = useState("all");
+  const [batchFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState(() => new Date().toLocaleDateString("en-CA"));
   const [currentPage, setCurrentPage] = useState(1);

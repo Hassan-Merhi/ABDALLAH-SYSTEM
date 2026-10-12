@@ -550,7 +550,6 @@ function GroupsView({
   groups,
   onSelectGroup,
   formatAmount,
-  isLoadingOtw: _isLoadingOtw,
 }: {
   groups: StockGroupSummary[];
   onSelectGroup: (id: number | null) => void;

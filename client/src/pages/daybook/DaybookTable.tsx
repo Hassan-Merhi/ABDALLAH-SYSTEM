@@ -70,7 +70,6 @@ export function DaybookTable({
   handleDelete,
   canEdit,
   canDelete,
-  daybookRowLimit: _daybookRowLimit,
   setDaybookRowLimit,
   DAYBOOK_PAGE_SIZE,
   navigate,

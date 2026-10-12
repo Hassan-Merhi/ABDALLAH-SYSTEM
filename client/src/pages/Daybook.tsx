@@ -468,7 +468,7 @@ export default function Daybook({ user }: { user?: DaybookUser | null } = {}) {
       }),
     [periodFilter.fromDate, periodFilter.toDate]
   );
-  const { data: offloads = [], isLoading: _offloadsLoading } = useQuery<OffloadListItem[]>({
+  const { data: offloads = [] } = useQuery<OffloadListItem[]>({
     queryKey: companyDataKey(offloadsUrl, selectedCompany?.id, "daybook-offloads"),
     queryFn: async ({ signal }) => {
       const response = await fetch(offloadsUrl, { credentials: "include", signal });

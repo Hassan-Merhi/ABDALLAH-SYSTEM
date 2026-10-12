@@ -293,7 +293,7 @@ export function registerAiAgentRoutes(app: Express) {
           .limit(50);
 
         res.json(tasks);
-      } catch (_err: unknown) {
+      } catch {
         res.status(500).json({ message: "Internal server error" });
       }
     }

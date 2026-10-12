@@ -74,7 +74,7 @@ export function registerSpMigrationRunRoutes(app: Express) {
       `)
         ).rows;
         return res.json({ runs });
-      } catch (_err: unknown) {
+      } catch {
         return res.status(500).json({ message: "Internal server error" });
       }
     }

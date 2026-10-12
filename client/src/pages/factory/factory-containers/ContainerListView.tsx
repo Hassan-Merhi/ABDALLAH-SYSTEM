@@ -47,7 +47,6 @@ interface ContainerListViewProps {
 export function ContainerListView({
   containers,
   filteredContainers,
-  suppliers: _suppliers,
   searchQuery,
   setSearchQuery,
   statusFilter,

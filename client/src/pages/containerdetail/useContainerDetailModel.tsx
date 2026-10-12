@@ -50,7 +50,7 @@ export function useContainerDetailModel({ id: idProp, forceErp }: { id?: string;
   const [showSellDialog, setShowSellDialog] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<(() => void) | null>(null);
   const { toast } = useToast();
-  const [_location, setLocation] = useLocation();
+  const [, setLocation] = useLocation();
   useEscapeToParent();
   const { selectedCompany } = useCompany();
   const { formatAmount } = useCurrencyContext();
@@ -112,7 +112,7 @@ export function useContainerDetailModel({ id: idProp, forceErp }: { id?: string;
 
   const containerSale = containerSales.find((sale: ContainerSale) => sale.containerId === parseInt(containerId!));
 
-  const { data: docsData, isLoading: _docsLoading } = useQuery<{
+  const { data: docsData } = useQuery<{
     documents: (typeof containerDocumentsTable.$inferSelect & { isGhost: boolean })[];
     docTypes: (typeof containerDocumentTypesTable.$inferSelect)[];
     completeness: { total: number; uploaded: number; complete: boolean };
@@ -126,7 +126,7 @@ export function useContainerDetailModel({ id: idProp, forceErp }: { id?: string;
     enabled: !!containerId,
   });
 
-  const { data: _freightData = [], isLoading: _freightLoading } = useQuery<
+  useQuery<
     (typeof containerFreightTable.$inferSelect & {
       payments?: unknown[];
       totalPaid?: number;

@@ -21,7 +21,7 @@ export function useBaleProductsModel() {
   const [importPreview, setImportPreview] = useState<ImportPreviewRow[]>([]);
   const [importError, setImportError] = useState("");
   const [importFile, setImportFile] = useState<File | null>(null);
-  const [condensedView, _setCondensedView] = useState(false);
+  const [condensedView] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [showCategories, setShowCategories] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set());
@@ -439,7 +439,7 @@ export function useBaleProductsModel() {
       XLSX.utils.book_append_sheet(wb, ws, "Bale Products");
       await XLSX.writeFile(wb, "bale_products_template.xlsx");
       toast({ title: "Template downloaded" });
-    } catch (_err) {
+    } catch {
       toast({ title: "Error", description: "Failed to generate template", variant: "destructive" });
     }
   };

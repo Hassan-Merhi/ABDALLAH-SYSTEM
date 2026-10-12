@@ -5,7 +5,6 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, keyStartsWith } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
-import { useCompany } from "@/contexts/CompanyContext";
 import { useLocation, useParams } from "wouter";
 import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
 import { CheckCircle } from "lucide-react";
@@ -14,7 +13,6 @@ import type { ComparisonItem, FinalizePreview, OrderDetail, VerificationSummary 
 
 export function useFactoryPendingInvoiceVerifyModel() {
   const { toast } = useToast();
-  const { selectedCompany: _selectedCompany } = useCompany();
   const [, navigate] = useLocation();
   useEscapeToParent("/factory/invoicing?tab=invoices");
   const appMode = useAppMode();

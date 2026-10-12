@@ -263,13 +263,7 @@ export function FactorySidebar({
     prevUnreadRef.current = count;
   }, [chatUnread?.count, toast]);
 
-  const {
-    sections: visibleSections,
-    isPinnedVisible,
-    isAdmin,
-    isDeveloper,
-    isPrivileged: _isPrivileged,
-  } = useFactoryVisibleSections(user);
+  const { sections: visibleSections, isPinnedVisible, isAdmin, isDeveloper } = useFactoryVisibleSections(user);
 
   const { openSections, toggleSection } = useOpenSections(visibleSections);
 

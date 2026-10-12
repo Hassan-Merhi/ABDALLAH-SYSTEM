@@ -185,7 +185,6 @@ export function writeSheet(
 ) {
   const {
     salesTotal,
-    directIncTotal: _directIncTotal,
     directIncDetails,
     totalIncome,
     indirectIncTotal,

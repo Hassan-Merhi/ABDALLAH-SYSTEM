@@ -82,7 +82,8 @@ behavioral effect is fewer wasted database/network reads.
 - **1,590 exports are used only inside their own file** (mostly component prop interfaces and
   local helper types). Un-exporting them is cosmetic churn across hundreds of files and would
   conflict with concurrent work; Phase 12 adds the tooling note for catching new ones.
-- About 30 remaining TypeScript "unused" diagnostics are destructured state setters, values
+- (Resolved in the Phase 13 follow-up, which also removed ~400 `_`-prefixed dead bindings and
+  tightened ESLint.) About 30 remaining TypeScript "unused" diagnostics are destructured state setters, values
   written in loops, or initializers performing I/O; each needs a human look.
 
 ## Appendix — removed exported declarations

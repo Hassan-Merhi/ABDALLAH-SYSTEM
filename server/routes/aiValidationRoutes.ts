@@ -224,7 +224,7 @@ async function runItemCodeCheck(
         // Check close matches
         const close = allDbCodes
           .map((dbCode) => ({ dbCode, dist: levenshtein(lower, dbCode) }))
-          .filter(({ dbCode: _dbCode, dist }) => dist > 0 && dist <= closeMatchThreshold(lower))
+          .filter(({ dist }) => dist > 0 && dist <= closeMatchThreshold(lower))
           .sort((a, b) => a.dist - b.dist)
           .slice(0, 3);
 

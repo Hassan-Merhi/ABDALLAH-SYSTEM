@@ -60,7 +60,7 @@ export async function buildCodeReadPrompt(
         const { content, totalLines, truncated } = await readProjectFile(fp);
         codeContext += `\n\n**File: ${fp}** (${totalLines} lines${truncated ? `, first 300 shown` : ""})\n\`\`\`typescript\n${content}\n\`\`\``;
         if (!codeReadFiles.includes(fp)) codeReadFiles.push(fp);
-      } catch (_err: unknown) {
+      } catch {
         // Still not found — fall back to grep by base name
         const basename = fp.replace(/.*\//, "").replace(/\.\w+$/, "");
         const grepResult = await grepProjectFiles(basename, ".").catch(() => "(not found)");

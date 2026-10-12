@@ -154,8 +154,15 @@ deleted files were updated.
    removed; others could exist.
 5. `main` has moved on since the baseline (at least 23 commits, later `c59862254`); expect merge
    conflicts in route registries, `lazyPages.ts`, `package.json` and the route manifest.
-6. About 420 `_`-prefixed unused bindings and 1,590 locally-used exports remain (backlog, not
-   bugs); see `dead-code-prevention.md`.
+6. 1,590 exports used only inside their own module remain (cosmetic backlog; un-exporting them
+   would touch hundreds of files and collide with concurrent work).
+7. Three audit-trail item diffs are computed and never written: `_itemDiff`/`_adjItemDiff` in
+   `vouchers/voucherPurchaseUpdateRoutes.ts` and `_xfrItemDiff` in `vouchers/transfer/transfer.ts`
+   call `buildItemLevelChanges(...)` but the result is not attached to the audit entry. Either
+   the audit is missing item-level detail or the calls are waste — an owner decision, so they
+   were left in place.
+8. `eslint.config.js` no longer ignores `_`-prefixed local variables (see Phase 13 follow-up
+   below). The static scan found none left, but ESLint itself has not been run.
 
 ## 13. Verification skipped (as instructed)
 
@@ -189,6 +196,18 @@ npm run build && npm run verify:server-bundle && npm run verify:runtime-dependen
 
 If the route-manifest test reports a difference, regenerate with `UPDATE_ROUTE_MANIFEST=1`
 only after confirming the difference is one of the removals listed in §9.
+
+## Phase 13 follow-up — `_`-binding backlog cleared
+
+After the first handoff, the remaining `_`-prefixed dead bindings were removed with
+syntax-only edits: 302 object-destructuring entries, 33 array-destructuring slots, 20
+`catch (_e)` bindings, 4 fully dead `useState` lines, unused context-hook reads in 14 components and one unused
+`companies` query in `customers-core/statement-excel.ts`, and the unused
+results of 5 `useQuery` calls (the queries themselves are kept, so network behaviour is
+unchanged). Static re-check: 0 TypeScript unused-declaration diagnostics, 0 new diagnostics
+against the previous commit, 0 broken source-text pins. `varsIgnorePattern` was then removed
+from the ESLint unused-vars rule. Remaining `_` names are rest-omit keys (23), parameters and
+caught errors, which the rule still allows.
 
 ## 15. Branch and commits
 

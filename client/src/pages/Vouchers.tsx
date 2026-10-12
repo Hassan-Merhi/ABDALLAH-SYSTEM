@@ -103,7 +103,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const [transactionRate, setTransactionRate] = useState<number | null>(null);
   const exchangeRate = transactionRate || dailyExchangeRate;
   const [voucherEffectiveDate, setVoucherEffectiveDate] = useState<string>("");
-  const [_location, setLocation] = useLocation();
+  const [, setLocation] = useLocation();
   const printRef = useRef<HTMLDivElement>(null);
   const isPOS = !!posUser;
   const posLocationId = posUser?.assignedLocationId;
@@ -195,19 +195,12 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     employees,
     fixedAssets,
     factorySuppliersList,
-    stockItems: _stockItems,
-    locations: _locations,
-    posLocationName: _posLocationName,
-    myLocations: _myLocations,
     sidebarAccounts,
     sidebarAccountsError,
     refetchSidebarAccounts,
     voucherToEdit,
-    supplierSearchResults: _supplierSearchResults,
-    customerSearchResults: _customerSearchResults,
     allAccounts,
     payFromAccounts,
-    liveAccountSearch: _liveAccountSearch,
     setLiveAccountSearch,
   } = useVoucherQueries({
     selectedCompany,
@@ -245,7 +238,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   });
 
   const fieldArray = useFieldArray({ control: form.control, name: "entries" });
-  const { append, remove: _remove } = fieldArray;
+  const { append } = fieldArray;
   const entries = form.watch("entries");
   const watchedEntries = useWatch({ control: form.control, name: "entries" });
   const total = entries.reduce((sum, entry) => sum + (parseFloat(entry.amount) || 0), 0);

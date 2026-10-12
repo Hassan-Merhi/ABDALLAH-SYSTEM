@@ -45,9 +45,9 @@ export function UserManagementDrawer({ user, open, onClose, companies, onUserDel
   const [hiddenErpCostFields, setHiddenErpCostFields] = useState<string[]>([]);
 
   const [newPassword, setNewPassword] = useState("");
-  const [_showPasswordReset, setShowPasswordReset] = useState(false);
+  const [, setShowPasswordReset] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [_advancedOpen, setAdvancedOpen] = useState(false);
+  const [, setAdvancedOpen] = useState(false);
   const [openTabGroups, setOpenTabGroups] = useState<Set<string>>(new Set());
 
   useEffect(() => {

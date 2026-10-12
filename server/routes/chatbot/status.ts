@@ -31,7 +31,7 @@ export function registerChatbotStatusRoutes(app: Express) {
           .where(eq(systemSettings.key, "ai_provider"))
           .limit(1),
       ]);
-      const [_user] = userRows;
+      userRows;
 
       // Get selected AI provider and check if its API key is configured
       const providerSetting = providerRows;

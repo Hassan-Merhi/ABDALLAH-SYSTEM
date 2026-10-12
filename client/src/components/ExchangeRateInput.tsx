@@ -15,7 +15,6 @@ interface ExchangeRateInputProps {
 export function ExchangeRateInput({
   value,
   onChange,
-  selectedCurrency: _selectedCurrency,
   disabled = false,
   showLabel = true,
   className = "",

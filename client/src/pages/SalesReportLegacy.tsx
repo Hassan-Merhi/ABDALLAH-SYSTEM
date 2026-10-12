@@ -10,7 +10,6 @@ import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/compon
 import { ErpMobileFilters } from "@/components/ui/erp-mobile-filters";
 import { useDateJump } from "@/hooks/use-date-jump";
 
-import { useToast } from "@/hooks/use-toast";
 import { PageHeader } from "@/components/PageHeader";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
@@ -60,7 +59,6 @@ export default function SalesReport() {
   const [isMultiCompanyMode, setIsMultiCompanyMode] = useState(false);
   const [selectedCompanies, setSelectedCompanies] = useState<string[]>([]);
   const [selectedRowDate, setSelectedRowDate] = useState<string | null>(null);
-  const { toast: _toast } = useToast();
   const { formatDisplayDate } = useDateFormat();
   const { formatAmount } = useCurrencyContext();
 
