@@ -17,7 +17,7 @@ import {
   factoryRawMaterialAdjustments,
   vouchers,
 } from "@shared/schema";
-import { eq, and, desc, sql, inArray, ilike, isNull } from "drizzle-orm";
+import { eq, and, desc, sql, ilike, isNull } from "drizzle-orm";
 import type Decimal from "decimal.js";
 import { MoneyDecimal, moneyString, parseMoneyInput, toMoney } from "../../../lib/money";
 import { postFactoryVoucherTx } from "../../../services/factory/factoryVoucherPosting";
@@ -721,6 +721,4 @@ export function registerRawStockAdjRoutes(app: Express) {
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });
-
-
 }
