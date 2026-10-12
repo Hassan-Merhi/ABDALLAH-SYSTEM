@@ -138,13 +138,13 @@ describe("Automatic Priority Printing labels", () => {
   function stripPriorityLogo(html: string): string {
     return html
       .replace(
-        /<div class="(?:logo-img|sticker-logo) priority-color-box"[^>]*>(?:<span class="priority-color-box-text">HMD<\/span>)?<\/div>/g,
+        /<div class="(?:logo-img|sticker-logo) priority-color-box"[^>]*><span class="priority-color-box-text">HMD<\/span><\/div>/g,
         "<LOGO>"
       )
       .replace(/<img class="(?:logo-img|sticker-logo)"[^>]*\/>/g, "<LOGO>");
   }
 
-  it("replaces the small logo with a solid rounded box in the saved legacy color carrying a black HMD", () => {
+  it("replaces the small logo with a solid rounded box in the saved legacy color, marked HMD", () => {
     const bale = label({ priorityColor: "#dc2626", priorityOrderId: 123, priorityNumber: 1 });
     for (const print of printers) {
       const html = print([bale]);
@@ -153,8 +153,8 @@ describe("Automatic Priority Printing labels", () => {
       expect(boxes).toHaveLength(1);
       const box = boxes[0] as HTMLElement;
       expect(box.tagName).toBe("DIV");
-      // The box prints a small black "HMD" inside the color (nothing else).
-      expect(box.childNodes).toHaveLength(1);
+      // Only the small black "HMD" mark sits inside the box (03cf7d27d).
+      expect(box.children).toHaveLength(1);
       expect(box.querySelector(".priority-color-box-text")?.textContent).toBe("HMD");
       expect(box.dataset.priorityColor).toBe("#dc2626");
       expect(box.style.backgroundColor).toBe("rgb(220, 38, 38)");
@@ -278,12 +278,12 @@ describe("Pressing/Production priority logo replacement", () => {
     const html = renderLegacyPriorityLogo({ referenceNumber: "R1", priorityColor: "Blue" });
     expect(html).toContain("background-color: #2563eb !important");
     expect(html).toContain('data-priority-color="#2563eb"');
-    // The ordinary logo text and subtitle are gone; the box carries only its small black HMD.
+    // The ordinary logo text is replaced; the box shows only its small "HMD" mark.
     expect(html).not.toContain('class="logo-text"');
     expect(html).not.toContain("INTERNATIONAL GROUP");
     const box = new DOMParser().parseFromString(html, "text/html").querySelector(".priority-color-box")!;
-    expect(box.childNodes).toHaveLength(1);
-    expect(box.querySelector(".priority-color-box-text")?.textContent).toBe("HMD");
+    expect(box.children).toHaveLength(1);
+    expect(box.textContent).toBe("HMD");
     expect(() => renderLegacyPriorityLogo({ referenceNumber: "R1", priorityColor: "url(x)" })).toThrow(
       /Unrecognized Priority Scan label color/
     );

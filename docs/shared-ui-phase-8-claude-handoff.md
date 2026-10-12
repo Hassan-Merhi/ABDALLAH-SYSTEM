@@ -153,20 +153,22 @@ Repository gates:
 ### Repairs carried for `main` (merge gate)
 
 The PR cannot merge unless it is up to date with `main`, and `main` itself
-was red at the time: #2193 left `NetProfitDetails.tsx` failing `tsc` (the
-equity section has no `breakdown`, so the From/To difference helper now
-treats `breakdown` as optional), and #2178 changed net-position and
-employee-balance behaviour without updating its tests. Those five
-assertions were aligned to the behaviour #2178 introduced, not loosened:
-the all-time `/api/accounts/all` employee row is Payroll's stored current
-balance (the dated view still asserts the engine's exact sum), unmatched
-"missing-account" lines are excluded from the net position presentation,
-and an ERP employee is listed at Payroll's current balance in place of the
-aggregate "Payroll Payable". The four files pass locally (27 tests) on the
-merged tree; no server code was changed. Likewise, main's label commit
-(a black "HMD" printed inside the small priority colour box) left seven
-label-printing assertions expecting an empty box; they now assert the HMD
-text span the renderer emits.
+was red at the time of the first merge: #2193 left `NetProfitDetails.tsx`
+failing `tsc` (the equity section has no `breakdown`), #2178 changed
+net-position and employee-balance behaviour without updating five of its
+backend assertions, and the label commit that prints "HMD" inside the
+priority colour box left seven label-printing assertions expecting an
+empty box. Commit `81bf8ebe` carried in-branch repairs for all of these
+(aligned to the behaviour the main commits introduced, no server or
+renderer code changed; 27 backend and 43 frontend tests passed locally
+against the CI schema push and startup migrations).
+
+`main` then repaired the same files itself in #2200 (`8f7699c0`), together
+with a `supertest` pin, a `react-is` dependency ordering fix, recharts v3
+chart adjustments and further stale-test alignments. The follow-up merge
+of `main` therefore resolves every conflicting file to `main`'s version
+exactly, so this PR carries no competing repair: the interim commit is
+fully superseded by `main`'s own fix.
 
 ### Verified unchanged (Phase 7 focus)
 

@@ -2,9 +2,8 @@
  * /api/accounts/all sums movements exactly:
  * - a ledger debited 1.015 shows "1.02" (the float path printed "1.01");
  * - a bank with opening 0.1 Dr plus 0.2 and 0.005 debits shows "0.31";
- * - an employee credited 1.005 shows "1.01" (the float path printed "1.00")
- *   in a dated view; the all-time view reports Payroll's stored current
- *   balance (#2178), here 2.005 → "2.01".
+ * - an employee credited 1.005 shows "1.01" (the float path printed "1.00") when a date
+ *   range reads the engine; without one the overview shows Payroll's current balance (#2178).
  */
 import { describe, expect, it, vi } from "vitest";
 
@@ -21,7 +20,7 @@ vi.mock("../server/storage", () => ({
     ],
     getAllFixedAssets: async () => [],
     getAllEmployees: async () => [
-      { id: 3, code: "E3", firstName: "A", lastName: "B", active: true, openingBalance: "0", currentBalance: "2.005" },
+      { id: 3, code: "E3", firstName: "A", lastName: "B", active: true, openingBalance: "0", currentBalance: "2.50" },
     ],
     getAllSuppliers: async () => [],
     getAllCustomers: async () => [],
@@ -64,7 +63,7 @@ vi.mock("../server/services/accounting/balances/ledgerBalanceEngine", async (imp
 import { serveAccountListForCompany } from "../server/routes/accounts/all";
 
 describe("account list balances", () => {
-  it("sums ledger, bank and employee movements exactly", async () => {
+  async function accountList(query: Record<string, string>) {
     let body: { accounts: Array<{ type: string; balance: unknown; balanceSide?: string }> } = { accounts: [] };
     const res = {
       status: () => res,
@@ -73,15 +72,20 @@ describe("account list balances", () => {
         return res;
       },
     };
-    await serveAccountListForCompany({ query: {}, headers: {} } as never, res as never, 7);
+    await serveAccountListForCompany({ query, headers: {} } as never, res as never, 7);
+    return body.accounts;
+  }
 
-    expect(body.accounts.find((a) => a.type === "ledger")).toMatchObject({ balance: "1.02", balanceSide: "Dr" });
-    expect(body.accounts.find((a) => a.type === "bank")).toMatchObject({ balance: "0.31", balanceSide: "Dr" });
-    // All-time: the employee row is Payroll's current balance (#2178), summed exactly.
-    expect(body.accounts.find((a) => a.type === "employee")).toMatchObject({ balance: "2.01", balanceSide: "Cr" });
+  it("sums ledger, bank and employee movements exactly", async () => {
+    const accounts = await accountList({ endDate: "2099-12-31" });
+    expect(accounts.find((a) => a.type === "ledger")).toMatchObject({ balance: "1.02", balanceSide: "Dr" });
+    expect(accounts.find((a) => a.type === "bank")).toMatchObject({ balance: "0.31", balanceSide: "Dr" });
+    expect(accounts.find((a) => a.type === "employee")).toMatchObject({ balance: "1.01", balanceSide: "Cr" });
+  });
 
-    // Dated: the engine's exact movement sum.
-    await serveAccountListForCompany({ query: { startDate: "2020-01-01" }, headers: {} } as never, res as never, 7);
-    expect(body.accounts.find((a) => a.type === "employee")).toMatchObject({ balance: "1.01", balanceSide: "Cr" });
+  it("shows Payroll's current employee balance in the all-time overview", async () => {
+    const accounts = await accountList({});
+    expect(accounts.find((a) => a.type === "ledger")).toMatchObject({ balance: "1.02", balanceSide: "Dr" });
+    expect(accounts.find((a) => a.type === "employee")).toMatchObject({ balance: "2.50", balanceSide: "Cr" });
   });
 });

@@ -369,10 +369,9 @@ describe("2: ledger balance and pre-period on the engine", () => {
 });
 
 describe("3: net positions read lines by the voucher's company", () => {
-  it("A's line on B's account is A's missing-account line, not B's", async () => {
+  it("A's line on B's account is neither a line of A's (missing accounts are excluded) nor B's", async () => {
+    // Since #2178 net position no longer presents lines on missing accounts.
     const a = await calculateNetPositionAsOf(ctx.companyId, today);
-    // #2178: unmatched (missing-account) lines are excluded from the net position
-    // presentation, so A's 60 on B's account is not listed for A either.
     const missing = a.forUsLines.filter((line) => line.category === MISSING_ACCOUNT_CATEGORY);
     expect(missing).toEqual([]);
     const b = await calculateNetPositionAsOf(companyB, today);

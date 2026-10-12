@@ -369,7 +369,7 @@ export default function NetProfitDetails() {
       }
     return rows.filter((a) => Math.abs(a.value) >= 0.005);
   };
-  // The equity section carries no breakdown, so it is optional here.
+  // Equity has no breakdown, so diff it only where the section carries one.
   const differenceSection = <T extends { total: number; breakdown?: BreakdownItem[]; accounts: AccountItem[] }>(
     closing: T,
     opening: T

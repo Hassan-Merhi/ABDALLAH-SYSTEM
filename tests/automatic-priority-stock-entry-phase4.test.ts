@@ -100,7 +100,7 @@ beforeAll(async () => {
   );
   unmatchedProductId = other.rows[0].id;
 
-  redOrderId = await addLoading(1, "#B22222", "10.00");
+  redOrderId = await addLoading(1, "#FF00FF", "10.00");
   blueOrderId = await addLoading(2, "#6A5ACD", "12.00");
 }, 120000);
 
@@ -169,7 +169,7 @@ describe("Phase 4: atomic new-stock priority routing", () => {
     }>;
     expect(assignments).toHaveLength(3);
     expect(assignments.map((a) => a.orderId)).toEqual([redOrderId, redOrderId, blueOrderId]);
-    expect(assignments.map((a) => a.color)).toEqual(["#B22222", "#B22222", "#6A5ACD"]);
+    expect(assignments.map((a) => a.color)).toEqual(["#FF00FF", "#FF00FF", "#6A5ACD"]);
     expect(assignments.map((a) => a.source)).toEqual(["stock-entry", "stock-entry", "stock-entry"]);
     expect(assignments.every((a) => !a.existing)).toBe(true);
 
@@ -203,7 +203,7 @@ describe("Phase 4: atomic new-stock priority routing", () => {
     expect(original.body.items[0]).toMatchObject({
       orderId: redOrderId,
       originalPriority: 1,
-      originalColor: "#B22222",
+      originalColor: "#FF00FF",
       allocationSource: "stock-entry",
       active: true,
     });
@@ -302,7 +302,7 @@ describe("Phase 4: atomic new-stock priority routing", () => {
     expect(await countRows("factory_priority_auto_allocations")).toBe(oldAssignments);
     const archived = await agent.get(HISTORY).query({ orderId: redOrderId });
     expect(archived.status).toBe(200);
-    expect(archived.body.items.every((item: { originalColor: string }) => item.originalColor === "#B22222")).toBe(true);
+    expect(archived.body.items.every((item: { originalColor: string }) => item.originalColor === "#FF00FF")).toBe(true);
   }, 60000);
 
   it("rolls back the complete Stock Entry if an item is invalid", async () => {

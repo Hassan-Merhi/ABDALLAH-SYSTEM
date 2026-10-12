@@ -219,8 +219,8 @@ beforeAll(async () => {
     [companyB, `${PREFIX}-BCASH-${ctx.companyId}`, `${PREFIX} B cash`]
   );
   ids.EMP = await insertId(
-    `INSERT INTO employees (company_id, code, first_name, last_name, join_date, opening_balance, opening_balance_side)
-     VALUES ($1, $2, 'W18', 'Employee', '2026-01-01', 40, NULL) RETURNING id`,
+    `INSERT INTO employees (company_id, code, first_name, last_name, join_date, opening_balance, opening_balance_side, current_balance)
+     VALUES ($1, $2, 'W18', 'Employee', '2026-01-01', 40, NULL, 52) RETURNING id`,
     [ctx.companyId, `${PREFIX}-EMP-${ctx.companyId}`]
   );
 
@@ -329,18 +329,23 @@ describe("1: /api/accounts/all on the balance engine", () => {
     // 70 + 5 + 7: the line also naming the bank ledger and company B's line are not the bank's.
     expect(byId("bank", ids.BANK)).toMatchObject({ balance: "82.00", balanceSide: "Dr" });
     expect(byId("ledger", ids.BANKLEDGER)).toMatchObject({ balance: "25.00", balanceSide: "Dr" });
-    // Employee: the all-time row is Payroll's current balance (#2178; 0 for this
-    // fixture) with the engine's opening side. The engine's 40 (sideless: Cr) − 10 + 4
-    // is asserted in the dated view below.
-    expect(byId("employee", ids.EMP)).toMatchObject({ balance: "0.00", balanceSide: "Cr", openingBalanceSide: "Cr" });
+    // Employee, Cr positive. Without a date range the all-time overview shows the payroll
+    // current balance (52), as Payroll does (#2178); the engine's opening side still applies.
+    // A dated range keeps the engine figure (see the next test).
+    expect(byId("employee", ids.EMP)).toMatchObject({ balance: "52.00", balanceSide: "Cr", openingBalanceSide: "Cr" });
   });
 
   it("carries the engine's opening into a period", async () => {
     const accounts = await accountList({ startDate: daysAgo(5) });
     const byId = (type: string, id: number) => accounts.find((a) => a.type === type && a.accountId === id);
     expect(byId("bank", ids.BANK)).toMatchObject({ openingBalance: 75, openingBalanceSide: "Dr", balance: "82.00" });
-    // Employee, Cr positive: 40 (sideless: Cr) − 10 + 4.
-    expect(byId("employee", ids.EMP)).toMatchObject({ openingBalance: 30, openingBalanceSide: "Cr", balance: "34.00" });
+    // A dated range reads the engine, not the payroll balance: 40 (sideless Cr) − 10 + 4.
+    expect(byId("employee", ids.EMP)).toMatchObject({
+      openingBalance: 30,
+      openingBalanceSide: "Cr",
+      balance: "34.00",
+      balanceSide: "Cr",
+    });
   });
 });
 
