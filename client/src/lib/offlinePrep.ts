@@ -544,7 +544,6 @@ export async function runOfflinePrep(companyId: number, onProgress: (p: PrepProg
     { label: "Employees", loader: () => import("@/pages/factory/FactoryEmployees") },
     // ── Intelligence ─────────────────────────────────────────────────────
     { label: "KPIs", loader: () => import("@/pages/factory/FactoryKpis") },
-    { label: "Cashflow", loader: () => import("@/pages/factory/FactoryCashflow") },
     { label: "Alerts", loader: () => import("@/pages/factory/FactoryAlerts") },
     { label: "Waste Intelligence", loader: () => import("@/pages/factory/FactoryWaste") },
     { label: "Production Summary", loader: () => import("@/pages/factory/ProductionSummary") },

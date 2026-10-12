@@ -159,13 +159,6 @@ const PAGES: PageCase[] = [
     factory: true,
   },
   {
-    name: "FactoryCashflow",
-    load: () => import("@/pages/factory/FactoryCashflow"),
-    landmark: "period-selector",
-    factory: true,
-    sweep: true,
-  },
-  {
     name: "FactoryContainerTracking",
     load: () => import("@/pages/factory/FactoryContainerTracking"),
     landmark: "input-tracking-search",
@@ -253,14 +246,6 @@ const PAGES: PageCase[] = [
     load: () => import("@/pages/factory/FactoryPartiesHub"),
     landmark: "tab-parties-customers",
     factory: true,
-    sweep: true,
-  },
-  {
-    name: "FactoryPayroll",
-    load: () => import("@/pages/factory/FactoryPayroll"),
-    landmark: "button-generate-payroll",
-    factory: true,
-    showsRows: true,
     sweep: true,
   },
   {

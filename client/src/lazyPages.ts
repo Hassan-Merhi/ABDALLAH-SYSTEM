@@ -26,7 +26,6 @@ export const AccountingCreate = lazy(() => import("@/pages/AccountingCreate"));
 export const POImport = lazy(() => import("@/pages/POImport"));
 export const AiValidationPage = lazy(() => import("@/pages/AiValidationPage"));
 export const AICommandCenter = lazy(() => import("@/pages/AICommandCenter"));
-export const ContainerDetail = lazy(() => import("@/pages/ContainerDetail"));
 export const ContainerDetailPage = lazy(() => import("@/pages/ContainerDetailPage"));
 export const LocationInventory = lazy(() => import("@/pages/LocationInventory"));
 export const Settings = lazy(() => import("@/pages/Settings"));
@@ -46,8 +45,6 @@ export const SupplierProfitCheck = lazy(() => import("@/pages/SupplierProfitChec
 export const ContainerVerification = lazy(() => import("@/pages/ContainerVerification"));
 export const StockOTW = lazy(() => import("@/pages/StockOTW"));
 export const Customers = lazy(() => import("@/pages/Customers"));
-export const Bales = lazy(() => import("@/pages/Bales"));
-export const ProductionBales = lazy(() => import("@/pages/ProductionBales"));
 export const BaleProducts = lazy(() => import("@/pages/BaleProducts"));
 export const OrphanedRecords = lazy(() => import("@/pages/OrphanedRecords"));
 export const DeletedItems = lazy(() => import("@/pages/DeletedItems"));
@@ -67,7 +64,6 @@ export const ClosingStockDetail = lazy(() => import("@/pages/ClosingStockDetail"
 export const LedgerMonthlySummary = lazy(() => import("@/pages/LedgerMonthlySummary"));
 export const LedgerVouchers = lazy(() => import("@/pages/LedgerVouchers"));
 export const VoucherDetail = lazy(() => import("@/pages/VoucherDetail"));
-export const PressingBales = lazy(() => import("@/pages/PressingBales"));
 export const BarcodeLookup = lazy(() => import("@/pages/BarcodeLookup"));
 export const BarcodeManager = lazy(() => import("@/pages/BarcodeManager"));
 export const ImportCycleDiagnostics = lazy(() => import("@/pages/ImportCycleDiagnostics"));
@@ -148,7 +144,6 @@ export const FactoryContainerCreate = lazy(() => import("@/pages/factory/Factory
 export const FactoryContainersHub = lazy(() => import("@/pages/factory/FactoryContainersHub"));
 export const FactoryStockItemDetail = lazy(() => import("@/pages/factory/FactoryStockItemDetail"));
 export const FactoryStockBaleList = lazy(() => import("@/pages/factory/FactoryStockBaleList"));
-export const FactoryNetProfitAnalytics = lazy(() => import("@/pages/factory/FactoryNetProfitAnalytics"));
 export const FactoryNetPosition = lazy(() => import("@/pages/factory/FactoryNetPosition"));
 export const FactoryNetPositionDetails = lazy(() => import("@/pages/factory/FactoryNetPositionDetails"));
 export const FactoryFinancialSnapshot = lazy(() => import("@/pages/factory/FactoryFinancialSnapshot"));
@@ -161,7 +156,6 @@ export const BaleProductImages = lazy(() => import("@/pages/factory/BaleProductI
 export const CustomerLogosSettings = lazy(() => import("@/pages/factory/CustomerLogosSettings"));
 export const LabelBannersSettings = lazy(() => import("@/pages/factory/LabelBannersSettings"));
 export const WipersReEntry = lazy(() => import("@/pages/factory/WipersReEntry"));
-export const FactoryUsers = lazy(() => import("@/pages/factory/FactoryUsers"));
 export const FactoryWorkersHub = lazy(() => import("@/pages/factory/FactoryWorkersHub"));
 export const FactoryWorkerDetail = lazy(() => import("@/pages/factory/FactoryWorkerDetail"));
 export const FactoryEmployeesHub = lazy(() => import("@/pages/factory/FactoryEmployeesHub"));
@@ -196,11 +190,9 @@ export const FactoryInvoiceLoadingScan = lazy(() => import("@/pages/factory/Fact
 export const FactoryTransporters = lazy(() => import("@/pages/factory/FactoryTransporters"));
 export const FactoryDashboardIntel = lazy(() => import("@/pages/factory/FactoryDashboard"));
 export const FactoryKpis = lazy(() => import("@/pages/factory/FactoryKpis"));
-export const FactoryProfitability = lazy(() => import("@/pages/factory/FactoryProfitability"));
 export const FactoryAlerts = lazy(() => import("@/pages/factory/FactoryAlerts"));
 export const FactorySupplierScoreboard = lazy(() => import("@/pages/factory/FactorySupplierScoreboard"));
 export const FactoryMixOptimizer = lazy(() => import("@/pages/factory/FactoryMixOptimizer"));
-export const FactoryCashflow = lazy(() => import("@/pages/factory/FactoryCashflow"));
 export const FactoryWaste = lazy(() => import("@/pages/factory/FactoryWaste"));
 export const FactorySupplierHub = lazy(() => import("@/pages/factory/FactorySupplierHub"));
 export const FactoryFinancialHub = lazy(() => import("@/pages/factory/FactoryFinancialHub"));
