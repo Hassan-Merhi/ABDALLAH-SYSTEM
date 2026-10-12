@@ -4,9 +4,9 @@
  * Extracted from pages/Agents.tsx; markup, styling, and test ids are
  * unchanged.
  */
-import { Search, Plus, Trash2, Users } from "lucide-react";
+import { Plus, Trash2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { SearchField } from "@/components/ui/search-field";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Account } from "./agentStatementMath";
 
@@ -69,16 +69,13 @@ export function AgentListPanel({
             {phone ? "Add Account" : "Add"}
           </Button>
         </div>
-        <div className="relative">
-          <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-          <Input
-            placeholder="Search agents..."
-            value={search}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className={`pl-8 ${phone ? "" : "h-8"} text-sm bg-muted/50 border-transparent focus:border-border focus:bg-background`}
-            data-testid="input-agent-search"
-          />
-        </div>
+        <SearchField
+          value={search}
+          onValueChange={onSearchChange}
+          placeholder="Search agents..."
+          className={`${phone ? "" : "h-8"} text-sm bg-muted/50 border-transparent focus:border-border focus:bg-background`}
+          data-testid="input-agent-search"
+        />
       </div>
 
       {/* Agent list */}

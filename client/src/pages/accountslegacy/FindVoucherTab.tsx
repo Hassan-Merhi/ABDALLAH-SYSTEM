@@ -5,9 +5,9 @@
  * Split out of AccountsLegacy.tsx unchanged — results still navigate to the
  * Vouchers page on the tab that voucherTypeToTab resolves.
  */
-import { FileText, Search } from "lucide-react";
+import { FileText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
+import { SearchField } from "@/components/ui/search-field";
 import { voucherTypeToTab } from "./utils";
 import type { AccountsLegacyModel } from "./useAccountsLegacyModel";
 
@@ -16,17 +16,13 @@ export function FindVoucherTab({ model }: { model: AccountsLegacyModel }) {
 
   return (
     <div className="space-y-4">
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search by voucher number, description, or amount (e.g. REC-001, duties, 3967)"
-          value={model.findQuery}
-          onChange={(e) => model.setFindQuery(e.target.value)}
-          className="pl-9"
-          data-testid="input-find-voucher"
-          autoFocus
-        />
-      </div>
+      <SearchField
+        placeholder="Search by voucher number, description, or amount (e.g. REC-001, duties, 3967)"
+        value={model.findQuery}
+        onValueChange={model.setFindQuery}
+        data-testid="input-find-voucher"
+        autoFocus
+      />
 
       {!debouncedFindQuery.trim() ? (
         <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
