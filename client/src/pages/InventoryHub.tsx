@@ -31,11 +31,7 @@ export default function InventoryHub({ access }: { access?: ErpFeatureAccess }) 
   }
 
   return (
-    <Tabs
-      value={activeTab}
-      onValueChange={(value) => setTab(value as (typeof TAB_VALUES)[number])}
-      className="min-w-0"
-    >
+    <Tabs value={activeTab} onValueChange={(value) => setTab(value as (typeof TAB_VALUES)[number])} className="min-w-0">
       <div className="erp-mobile-scroll-tabs mb-5 pb-1">
         <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Inventory sections">
           {visibleTabs.map(({ value, label, icon: Icon }) => (

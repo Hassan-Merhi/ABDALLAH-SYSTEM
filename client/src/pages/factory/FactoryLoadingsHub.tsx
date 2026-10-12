@@ -70,33 +70,33 @@ export default function FactoryLoadingsHub() {
         {/* Tab row */}
         <div className="erp-mobile-scroll-tabs px-4 pb-1">
           <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Factory sections">
-          {showLoadings && (
-            <PillTabButton
-              selected={effectiveActiveTab === "loadings"}
-              data-testid="tab-container-loadings"
-              onClick={() => handleTabChange("loadings")}
-            >
-              Container Loadings
-            </PillTabButton>
-          )}
-          {showPending && (
-            <PillTabButton
-              selected={effectiveActiveTab === "pending"}
-              data-testid="tab-pending-loadings"
-              onClick={() => handleTabChange("pending")}
-            >
-              Pending Loadings
-            </PillTabButton>
-          )}
-          {showPriority && (
-            <PillTabButton
-              selected={effectiveActiveTab === "priority"}
-              data-testid="tab-priority-scan"
-              onClick={() => handleTabChange("priority")}
-            >
-              {priorityScanLabel}
-            </PillTabButton>
-          )}
+            {showLoadings && (
+              <PillTabButton
+                selected={effectiveActiveTab === "loadings"}
+                data-testid="tab-container-loadings"
+                onClick={() => handleTabChange("loadings")}
+              >
+                Container Loadings
+              </PillTabButton>
+            )}
+            {showPending && (
+              <PillTabButton
+                selected={effectiveActiveTab === "pending"}
+                data-testid="tab-pending-loadings"
+                onClick={() => handleTabChange("pending")}
+              >
+                Pending Loadings
+              </PillTabButton>
+            )}
+            {showPriority && (
+              <PillTabButton
+                selected={effectiveActiveTab === "priority"}
+                data-testid="tab-priority-scan"
+                onClick={() => handleTabChange("priority")}
+              >
+                {priorityScanLabel}
+              </PillTabButton>
+            )}
           </TabsList>
         </div>
       </div>

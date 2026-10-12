@@ -187,271 +187,276 @@ export default function FactoryProfitability() {
       </div>
 
       {activeTab ? (
-      <Tabs
-        value={activeTab}
-        onValueChange={(value) => setRequestedTab(value as "bales" | "containers")}
-        data-testid="tabs-profitability"
-      >
-        <div className="erp-mobile-scroll-tabs pb-1">
-          <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Factory profitability sections">
-            {showBales && (
-            <TabsTrigger value="bales" data-testid="tab-bales">
-              Bale Costs
-            </TabsTrigger>
-          )}
-          {showContainers && (
-            <TabsTrigger value="containers" data-testid="tab-containers">
-              Container Profitability
-            </TabsTrigger>
-          )}
-          </TabsList>
-        </div>
+        <Tabs
+          value={activeTab}
+          onValueChange={(value) => setRequestedTab(value as "bales" | "containers")}
+          data-testid="tabs-profitability"
+        >
+          <div className="erp-mobile-scroll-tabs pb-1">
+            <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Factory profitability sections">
+              {showBales && (
+                <TabsTrigger value="bales" data-testid="tab-bales">
+                  Bale Costs
+                </TabsTrigger>
+              )}
+              {showContainers && (
+                <TabsTrigger value="containers" data-testid="tab-containers">
+                  Container Profitability
+                </TabsTrigger>
+              )}
+            </TabsList>
+          </div>
 
-        {showBales && <TabsContent value="bales">
-          {balesQuery.isLoading ? (
-            <div className="flex items-center justify-center py-12" data-testid="loading-spinner">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              <span className="ml-2 text-muted-foreground">Loading bale costs...</span>
-            </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Total Bales</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold" data-testid="text-total-bales">
-                      {balesSummary.totalBales}
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Avg Cost/Bale</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold" data-testid="text-avg-cost">
-                      {fmt(balesSummary.avgCost)}
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Avg Profit/Bale</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div
-                      className={`text-2xl font-bold ${profitColor(balesSummary.avgProfit)}`}
-                      data-testid="text-avg-profit"
-                    >
-                      {fmt(balesSummary.avgProfit)}
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Total Profit</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div
-                      className={`text-2xl font-bold ${profitColor(balesSummary.totalProfit)}`}
-                      data-testid="text-total-profit"
-                    >
-                      {fmt(balesSummary.totalProfit)}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Bale Cost Breakdown</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {!Array.isArray(balesQuery.data) || balesQuery.data.length === 0 ? (
-                    <div className="text-center py-8">
-                      <p className="text-muted-foreground" data-testid="text-no-data">
-                        No bale cost data for selected range
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="table-responsive">
-                      <Table>
-                        <TableHeader className="sticky top-0 z-30 bg-background">
-                          <TableRow>
-                            <TableHead>Bale Ref</TableHead>
-                            <TableHead>
-                              <HeaderTooltip label="Material Cost" tip="Raw material cost allocated to this bale" />
-                            </TableHead>
-                            <TableHead>
-                              <HeaderTooltip label="Labor Cost" tip="Worker wages attributed to this bale" />
-                            </TableHead>
-                            <TableHead>
-                              <HeaderTooltip label="Overhead" tip="Factory overhead (utilities, rent, etc.) per bale" />
-                            </TableHead>
-                            <TableHead>
-                              <HeaderTooltip label="Freight" tip="Shipping and transportation cost" />
-                            </TableHead>
-                            <TableHead>
-                              <HeaderTooltip label="Total Cost" tip="Material + Labor + Overhead + Freight" />
-                            </TableHead>
-                            <TableHead>Sale Price</TableHead>
-                            <TableHead>
-                              <HeaderTooltip label="Profit" tip="Sale Price - Total Cost" />
-                            </TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {balesQuery.data.map((bale, idx) => (
-                            <TableRow key={bale.baleRef ?? idx} data-testid={`row-bale-${idx}`}>
-                              <TableCell className="font-medium">{bale.baleRef}</TableCell>
-                              <TableCell className="font-mono text-sm">{fmt(bale.materialCost)}</TableCell>
-                              <TableCell className="font-mono text-sm">{fmt(bale.laborCost)}</TableCell>
-                              <TableCell className="font-mono text-sm">{fmt(bale.overhead)}</TableCell>
-                              <TableCell className="font-mono text-sm">{fmt(bale.freight)}</TableCell>
-                              <TableCell className="font-mono text-sm font-medium">{fmt(bale.totalCost)}</TableCell>
-                              <TableCell className="font-mono text-sm">{fmt(bale.salePrice)}</TableCell>
-                              <TableCell
-                                className={`font-mono text-sm font-medium ${profitColor(bale.profit)}`}
-                                data-testid={`text-bale-profit-${idx}`}
-                              >
-                                {fmt(bale.profit)}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </>
-          )}
-        </TabsContent>}
-
-        {showContainers && (
-          <TabsContent value="containers">
-            {containersQuery.isLoading ? (
-              <div className="flex items-center justify-center py-12" data-testid="loading-spinner">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                <span className="ml-2 text-muted-foreground">Loading container profitability...</span>
-              </div>
-            ) : (
-              <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold" data-testid="text-total-revenue">
-                        {fmt(containersSummary.totalRevenue)}
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Total Cost</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold" data-testid="text-container-total-cost">
-                        {fmt(containersSummary.totalCost)}
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Total Profit</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div
-                        className={`text-2xl font-bold ${profitColor(containersSummary.totalProfit)}`}
-                        data-testid="text-container-total-profit"
-                      >
-                        {fmt(containersSummary.totalProfit)}
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Avg Margin %</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold" data-testid="text-avg-margin">
-                        {containersSummary.avgMargin.toFixed(1)}%
-                      </div>
-                    </CardContent>
-                  </Card>
+          {showBales && (
+            <TabsContent value="bales">
+              {balesQuery.isLoading ? (
+                <div className="flex items-center justify-center py-12" data-testid="loading-spinner">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  <span className="ml-2 text-muted-foreground">Loading bale costs...</span>
                 </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Total Bales</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold" data-testid="text-total-bales">
+                          {balesSummary.totalBales}
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Avg Cost/Bale</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold" data-testid="text-avg-cost">
+                          {fmt(balesSummary.avgCost)}
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Avg Profit/Bale</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div
+                          className={`text-2xl font-bold ${profitColor(balesSummary.avgProfit)}`}
+                          data-testid="text-avg-profit"
+                        >
+                          {fmt(balesSummary.avgProfit)}
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Total Profit</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div
+                          className={`text-2xl font-bold ${profitColor(balesSummary.totalProfit)}`}
+                          data-testid="text-total-profit"
+                        >
+                          {fmt(balesSummary.totalProfit)}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
 
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Container Profitability</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {!Array.isArray(containersQuery.data) || containersQuery.data.length === 0 ? (
-                      <div className="text-center py-8">
-                        <p className="text-muted-foreground" data-testid="text-no-data">
-                          No container profitability data for selected range
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="table-responsive">
-                        <Table>
-                          <TableHeader className="sticky top-0 z-30 bg-background">
-                            <TableRow>
-                              <TableHead>Container Ref</TableHead>
-                              <TableHead>
-                                <HeaderTooltip label="Revenue" tip="Total sales revenue from this container" />
-                              </TableHead>
-                              <TableHead>
-                                <HeaderTooltip
-                                  label="Cost"
-                                  tip="Total cost including purchase, freight, and processing"
-                                />
-                              </TableHead>
-                              <TableHead>
-                                <HeaderTooltip label="Profit" tip="Revenue - Cost" />
-                              </TableHead>
-                              <TableHead>
-                                <HeaderTooltip label="Margin %" tip="(Profit / Revenue) x 100" />
-                              </TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {containersQuery.data.map((container, idx) => (
-                              <TableRow key={container.containerRef ?? idx} data-testid={`row-container-${idx}`}>
-                                <TableCell className="font-medium">{container.containerRef}</TableCell>
-                                <TableCell className="font-mono text-sm">{fmt(container.revenue)}</TableCell>
-                                <TableCell className="font-mono text-sm">{fmt(container.cost)}</TableCell>
-                                <TableCell
-                                  className={`font-mono text-sm font-medium ${profitColor(container.profit)}`}
-                                  data-testid={`text-container-profit-${idx}`}
-                                >
-                                  {fmt(container.profit)}
-                                </TableCell>
-                                <TableCell data-testid={`text-container-margin-${idx}`}>
-                                  <Badge
-                                    variant={marginBadgeVariant(container.marginPercent)}
-                                    className={marginBadgeClass(container.marginPercent)}
-                                  >
-                                    {container.marginPercent != null ? `${container.marginPercent.toFixed(1)}%` : "-"}
-                                  </Badge>
-                                </TableCell>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Bale Cost Breakdown</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {!Array.isArray(balesQuery.data) || balesQuery.data.length === 0 ? (
+                        <div className="text-center py-8">
+                          <p className="text-muted-foreground" data-testid="text-no-data">
+                            No bale cost data for selected range
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="table-responsive">
+                          <Table>
+                            <TableHeader className="sticky top-0 z-30 bg-background">
+                              <TableRow>
+                                <TableHead>Bale Ref</TableHead>
+                                <TableHead>
+                                  <HeaderTooltip label="Material Cost" tip="Raw material cost allocated to this bale" />
+                                </TableHead>
+                                <TableHead>
+                                  <HeaderTooltip label="Labor Cost" tip="Worker wages attributed to this bale" />
+                                </TableHead>
+                                <TableHead>
+                                  <HeaderTooltip
+                                    label="Overhead"
+                                    tip="Factory overhead (utilities, rent, etc.) per bale"
+                                  />
+                                </TableHead>
+                                <TableHead>
+                                  <HeaderTooltip label="Freight" tip="Shipping and transportation cost" />
+                                </TableHead>
+                                <TableHead>
+                                  <HeaderTooltip label="Total Cost" tip="Material + Labor + Overhead + Freight" />
+                                </TableHead>
+                                <TableHead>Sale Price</TableHead>
+                                <TableHead>
+                                  <HeaderTooltip label="Profit" tip="Sale Price - Total Cost" />
+                                </TableHead>
                               </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </>
-            )}
-          </TabsContent>
-        )}
-      </Tabs>
+                            </TableHeader>
+                            <TableBody>
+                              {balesQuery.data.map((bale, idx) => (
+                                <TableRow key={bale.baleRef ?? idx} data-testid={`row-bale-${idx}`}>
+                                  <TableCell className="font-medium">{bale.baleRef}</TableCell>
+                                  <TableCell className="font-mono text-sm">{fmt(bale.materialCost)}</TableCell>
+                                  <TableCell className="font-mono text-sm">{fmt(bale.laborCost)}</TableCell>
+                                  <TableCell className="font-mono text-sm">{fmt(bale.overhead)}</TableCell>
+                                  <TableCell className="font-mono text-sm">{fmt(bale.freight)}</TableCell>
+                                  <TableCell className="font-mono text-sm font-medium">{fmt(bale.totalCost)}</TableCell>
+                                  <TableCell className="font-mono text-sm">{fmt(bale.salePrice)}</TableCell>
+                                  <TableCell
+                                    className={`font-mono text-sm font-medium ${profitColor(bale.profit)}`}
+                                    data-testid={`text-bale-profit-${idx}`}
+                                  >
+                                    {fmt(bale.profit)}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </>
+              )}
+            </TabsContent>
+          )}
+
+          {showContainers && (
+            <TabsContent value="containers">
+              {containersQuery.isLoading ? (
+                <div className="flex items-center justify-center py-12" data-testid="loading-spinner">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  <span className="ml-2 text-muted-foreground">Loading container profitability...</span>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold" data-testid="text-total-revenue">
+                          {fmt(containersSummary.totalRevenue)}
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Total Cost</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold" data-testid="text-container-total-cost">
+                          {fmt(containersSummary.totalCost)}
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Total Profit</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div
+                          className={`text-2xl font-bold ${profitColor(containersSummary.totalProfit)}`}
+                          data-testid="text-container-total-profit"
+                        >
+                          {fmt(containersSummary.totalProfit)}
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Avg Margin %</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold" data-testid="text-avg-margin">
+                          {containersSummary.avgMargin.toFixed(1)}%
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Container Profitability</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {!Array.isArray(containersQuery.data) || containersQuery.data.length === 0 ? (
+                        <div className="text-center py-8">
+                          <p className="text-muted-foreground" data-testid="text-no-data">
+                            No container profitability data for selected range
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="table-responsive">
+                          <Table>
+                            <TableHeader className="sticky top-0 z-30 bg-background">
+                              <TableRow>
+                                <TableHead>Container Ref</TableHead>
+                                <TableHead>
+                                  <HeaderTooltip label="Revenue" tip="Total sales revenue from this container" />
+                                </TableHead>
+                                <TableHead>
+                                  <HeaderTooltip
+                                    label="Cost"
+                                    tip="Total cost including purchase, freight, and processing"
+                                  />
+                                </TableHead>
+                                <TableHead>
+                                  <HeaderTooltip label="Profit" tip="Revenue - Cost" />
+                                </TableHead>
+                                <TableHead>
+                                  <HeaderTooltip label="Margin %" tip="(Profit / Revenue) x 100" />
+                                </TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {containersQuery.data.map((container, idx) => (
+                                <TableRow key={container.containerRef ?? idx} data-testid={`row-container-${idx}`}>
+                                  <TableCell className="font-medium">{container.containerRef}</TableCell>
+                                  <TableCell className="font-mono text-sm">{fmt(container.revenue)}</TableCell>
+                                  <TableCell className="font-mono text-sm">{fmt(container.cost)}</TableCell>
+                                  <TableCell
+                                    className={`font-mono text-sm font-medium ${profitColor(container.profit)}`}
+                                    data-testid={`text-container-profit-${idx}`}
+                                  >
+                                    {fmt(container.profit)}
+                                  </TableCell>
+                                  <TableCell data-testid={`text-container-margin-${idx}`}>
+                                    <Badge
+                                      variant={marginBadgeVariant(container.marginPercent)}
+                                      className={marginBadgeClass(container.marginPercent)}
+                                    >
+                                      {container.marginPercent != null ? `${container.marginPercent.toFixed(1)}%` : "-"}
+                                    </Badge>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </>
+              )}
+            </TabsContent>
+          )}
+        </Tabs>
       ) : (
         <div className="rounded-md border p-6 text-sm text-muted-foreground">
           No Profitability tabs are available for this user.

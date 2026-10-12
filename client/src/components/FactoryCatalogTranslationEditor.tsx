@@ -82,10 +82,11 @@ export function FactoryCatalogTranslationEditor() {
   useEffect(() => setCategoryNameAr(selectedCategory?.nameAr ?? ""), [selectedCategory]);
 
   const productMutation = useMutation({
-    mutationFn: () => patchJson(`/api/factory/bale-products/${productId}`, {
-      nameAr: productNameAr.trim() || null,
-      descriptionAr: descriptionAr.trim() || null,
-    }),
+    mutationFn: () =>
+      patchJson(`/api/factory/bale-products/${productId}`, {
+        nameAr: productNameAr.trim() || null,
+        descriptionAr: descriptionAr.trim() || null,
+      }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-products"] });
       toast({ title: "Arabic product translation updated" });
@@ -94,9 +95,10 @@ export function FactoryCatalogTranslationEditor() {
   });
 
   const categoryMutation = useMutation({
-    mutationFn: () => patchJson(`/api/factory/categories/${categoryId}`, {
-      nameAr: categoryNameAr.trim() || null,
-    }),
+    mutationFn: () =>
+      patchJson(`/api/factory/categories/${categoryId}`, {
+        nameAr: categoryNameAr.trim() || null,
+      }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["/api/factory/categories"] });
       await queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-products"] });
@@ -116,21 +118,24 @@ export function FactoryCatalogTranslationEditor() {
           <DialogHeader>
             <DialogTitle>Edit Arabic catalog translations</DialogTitle>
             <DialogDescription>
-              Update Arabic text on the existing product or category record. English names and commercial fields are untouched.
+              Update Arabic text on the existing product or category record. English names and commercial fields are
+              untouched.
             </DialogDescription>
           </DialogHeader>
           <Tabs defaultValue="product">
             <div className="erp-mobile-scroll-tabs pb-1">
               <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Dialog sections">
-              <TabsTrigger value="product">Product</TabsTrigger>
-              <TabsTrigger value="category">Category</TabsTrigger>
-            </TabsList>
+                <TabsTrigger value="product">Product</TabsTrigger>
+                <TabsTrigger value="category">Category</TabsTrigger>
+              </TabsList>
             </div>
             <TabsContent value="product" className="space-y-4 pt-3">
               <div className="space-y-2">
                 <Label>Existing product</Label>
                 <Select value={productId} onValueChange={setProductId}>
-                  <SelectTrigger><SelectValue placeholder="Select article code or product" /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select article code or product" />
+                  </SelectTrigger>
                   <SelectContent>
                     {products.map((product) => (
                       <SelectItem key={product.id} value={String(product.id)}>
@@ -142,11 +147,21 @@ export function FactoryCatalogTranslationEditor() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="translation-product-ar">Arabic product name</Label>
-                <Input id="translation-product-ar" dir="rtl" value={productNameAr} onChange={(event) => setProductNameAr(event.target.value)} />
+                <Input
+                  id="translation-product-ar"
+                  dir="rtl"
+                  value={productNameAr}
+                  onChange={(event) => setProductNameAr(event.target.value)}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="translation-description-ar">Arabic description</Label>
-                <Textarea id="translation-description-ar" dir="rtl" value={descriptionAr} onChange={(event) => setDescriptionAr(event.target.value)} />
+                <Textarea
+                  id="translation-description-ar"
+                  dir="rtl"
+                  value={descriptionAr}
+                  onChange={(event) => setDescriptionAr(event.target.value)}
+                />
               </div>
               <div className="flex justify-end">
                 <Button disabled={!productId || productMutation.isPending} onClick={() => productMutation.mutate()}>
@@ -158,7 +173,9 @@ export function FactoryCatalogTranslationEditor() {
               <div className="space-y-2">
                 <Label>Existing category</Label>
                 <Select value={categoryId} onValueChange={setCategoryId}>
-                  <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
                   <SelectContent>
                     {categories.map((category) => (
                       <SelectItem key={category.id} value={String(category.id)}>
@@ -170,7 +187,12 @@ export function FactoryCatalogTranslationEditor() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="translation-category-ar">Arabic category name</Label>
-                <Input id="translation-category-ar" dir="rtl" value={categoryNameAr} onChange={(event) => setCategoryNameAr(event.target.value)} />
+                <Input
+                  id="translation-category-ar"
+                  dir="rtl"
+                  value={categoryNameAr}
+                  onChange={(event) => setCategoryNameAr(event.target.value)}
+                />
               </div>
               <div className="flex justify-end">
                 <Button disabled={!categoryId || categoryMutation.isPending} onClick={() => categoryMutation.mutate()}>

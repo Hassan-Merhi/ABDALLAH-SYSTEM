@@ -639,8 +639,8 @@ export default function Daybook({ user }: { user?: DaybookUser | null } = {}) {
       >
         <div className="erp-mobile-scroll-tabs pb-1">
           <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Daybook sections">
-          <TabsTrigger value="transactions">Transactions</TabsTrigger>
-          <TabsTrigger value="activity">Edits &amp; Activity</TabsTrigger>
+            <TabsTrigger value="transactions">Transactions</TabsTrigger>
+            <TabsTrigger value="activity">Edits &amp; Activity</TabsTrigger>
           </TabsList>
         </div>
 

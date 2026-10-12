@@ -110,11 +110,7 @@ export default function RawStockRecalculate() {
       {/* Tabs */}
       <TabsList className="w-max max-w-full" aria-label="Raw stock recalculation">
         {tabs.map((t) => (
-          <PillTabButton
-            key={t.id}
-            selected={activeTab === t.id}
-            onClick={() => setActiveTab(t.id)}
-          >
+          <PillTabButton key={t.id} selected={activeTab === t.id} onClick={() => setActiveTab(t.id)}>
             {t.label}
             {t.id === "sources" && (sourceMismatches?.length ?? 0) > 0 && (
               <span className="ml-1.5 rounded-full bg-red-500/15 text-red-600 text-[11px] px-1.5 py-0.5">

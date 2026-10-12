@@ -203,19 +203,13 @@ export default function FactorySheetsAndSacks() {
       {effectiveTab ? (
         <TabsList aria-label="Sheets and sacks sections" className="w-max max-w-full">
           {showStock && (
-            <PillTabButton
-              onClick={() => setActiveTab("stock")}
-              selected={effectiveTab === "stock"}
-            >
+            <PillTabButton onClick={() => setActiveTab("stock")} selected={effectiveTab === "stock"}>
               <Layers className="h-4 w-4" />
               Current Stock
             </PillTabButton>
           )}
           {showMovements && (
-            <PillTabButton
-              onClick={() => setActiveTab("movements")}
-              selected={effectiveTab === "movements"}
-            >
+            <PillTabButton onClick={() => setActiveTab("movements")} selected={effectiveTab === "movements"}>
               <History className="h-4 w-4" />
               Movement Log
             </PillTabButton>

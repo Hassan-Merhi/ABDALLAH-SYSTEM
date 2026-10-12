@@ -83,15 +83,15 @@ function UnitActionDialog({
             <Tabs defaultValue="contract" className="w-full">
               <div className="erp-mobile-scroll-tabs pb-1">
                 <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Rental unit actions">
-                <TabsTrigger value="info" data-testid={`tab-${testIdPrefix}-unit-info`}>
-                  <UserCog className="h-4 w-4 mr-1" />
-                  Edit Info
-                </TabsTrigger>
-                <TabsTrigger value="contract" data-testid={`tab-${testIdPrefix}-new-contract`}>
-                  <Plus className="h-4 w-4 mr-1" />
-                  New Contract
-                </TabsTrigger>
-              </TabsList>
+                  <TabsTrigger value="info" data-testid={`tab-${testIdPrefix}-unit-info`}>
+                    <UserCog className="h-4 w-4 mr-1" />
+                    Edit Info
+                  </TabsTrigger>
+                  <TabsTrigger value="contract" data-testid={`tab-${testIdPrefix}-new-contract`}>
+                    <Plus className="h-4 w-4 mr-1" />
+                    New Contract
+                  </TabsTrigger>
+                </TabsList>
               </div>
               <TabsContent value="info">
                 <VacantUnitInfoForm unit={unit} testIdPrefix={testIdPrefix} />
@@ -105,14 +105,14 @@ function UnitActionDialog({
           <Tabs defaultValue="payment" className="w-full">
             <div className="erp-mobile-scroll-tabs pb-1">
               <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Rental unit actions">
-              <TabsTrigger value="payment" data-testid={`tab-${testIdPrefix}-payment`}>
-                <DollarSign className="h-4 w-4 mr-1" />
-                Payment
-              </TabsTrigger>
-              <TabsTrigger value="ledger" data-testid={`tab-${testIdPrefix}-ledger`}>
-                Statement
-              </TabsTrigger>
-            </TabsList>
+                <TabsTrigger value="payment" data-testid={`tab-${testIdPrefix}-payment`}>
+                  <DollarSign className="h-4 w-4 mr-1" />
+                  Payment
+                </TabsTrigger>
+                <TabsTrigger value="ledger" data-testid={`tab-${testIdPrefix}-ledger`}>
+                  Statement
+                </TabsTrigger>
+              </TabsList>
             </div>
             <TabsContent value="payment">
               <PaymentForm
@@ -139,30 +139,30 @@ function UnitActionDialog({
           <Tabs defaultValue="payment" className="w-full">
             <div className="erp-mobile-scroll-tabs pb-1">
               <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Rental unit actions">
-              <TabsTrigger value="payment" data-testid={`tab-${testIdPrefix}-payment`}>
-                <DollarSign className="h-4 w-4 mr-1" />
-                Payment
-              </TabsTrigger>
-              <TabsTrigger value="ledger" data-testid={`tab-${testIdPrefix}-ledger`}>
-                Statement
-              </TabsTrigger>
-              <TabsTrigger value="edit" data-testid={`tab-${testIdPrefix}-edit`}>
-                <UserCog className="h-4 w-4 mr-1" />
-                Edit Info
-              </TabsTrigger>
-              <TabsTrigger value="modify" data-testid={`tab-${testIdPrefix}-modify`}>
-                <FileEdit className="h-4 w-4 mr-1" />
-                Modify Rent
-              </TabsTrigger>
-              <TabsTrigger value="guarantee" data-testid={`tab-${testIdPrefix}-guarantee`}>
-                <Send className="h-4 w-4 mr-1" />
-                Guarantee
-              </TabsTrigger>
-              <TabsTrigger value="end" data-testid={`tab-${testIdPrefix}-end`}>
-                <XCircle className="h-4 w-4 mr-1" />
-                End Contract
-              </TabsTrigger>
-            </TabsList>
+                <TabsTrigger value="payment" data-testid={`tab-${testIdPrefix}-payment`}>
+                  <DollarSign className="h-4 w-4 mr-1" />
+                  Payment
+                </TabsTrigger>
+                <TabsTrigger value="ledger" data-testid={`tab-${testIdPrefix}-ledger`}>
+                  Statement
+                </TabsTrigger>
+                <TabsTrigger value="edit" data-testid={`tab-${testIdPrefix}-edit`}>
+                  <UserCog className="h-4 w-4 mr-1" />
+                  Edit Info
+                </TabsTrigger>
+                <TabsTrigger value="modify" data-testid={`tab-${testIdPrefix}-modify`}>
+                  <FileEdit className="h-4 w-4 mr-1" />
+                  Modify Rent
+                </TabsTrigger>
+                <TabsTrigger value="guarantee" data-testid={`tab-${testIdPrefix}-guarantee`}>
+                  <Send className="h-4 w-4 mr-1" />
+                  Guarantee
+                </TabsTrigger>
+                <TabsTrigger value="end" data-testid={`tab-${testIdPrefix}-end`}>
+                  <XCircle className="h-4 w-4 mr-1" />
+                  End Contract
+                </TabsTrigger>
+              </TabsList>
             </div>
             <TabsContent value="payment">
               <PaymentForm

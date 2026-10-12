@@ -532,29 +532,31 @@ export default function FactoryStatusBuilder() {
 
         <StatusViewToggle viewMode={viewMode} onChange={setViewMode} />
 
-        {/* Tabs */}
         <div className="erp-mobile-scroll-tabs border-b px-4 pb-1">
-          <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Status sheet pages">
-          {localSheets.map((s, idx) => (
-            <TabLabel
-              key={s.id ?? `new-${idx}`}
-              name={s.name}
-              active={idx === activeIdx}
-              onActivate={() => setActiveIdx(idx)}
-              onRename={(v) => renameTab(idx, v)}
-              onDelete={() => deleteTab(idx)}
-              canDelete={localSheets.length > 1}
-            />
-          ))}
-          <button
-            data-testid="sb-button-add-tab"
-            onClick={addTab}
-            className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-full px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-background hover:text-foreground sm:min-h-9"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Add page
-          </button>
-          </TabsList>
+          <div className="flex w-max items-center gap-1">
+            <TabsList className="w-max" aria-label="Status sheet pages">
+              {localSheets.map((s, idx) => (
+                <TabLabel
+                  key={s.id ?? `new-${idx}`}
+                  name={s.name}
+                  active={idx === activeIdx}
+                  onActivate={() => setActiveIdx(idx)}
+                  onRename={(v) => renameTab(idx, v)}
+                  onDelete={() => deleteTab(idx)}
+                  canDelete={localSheets.length > 1}
+                />
+              ))}
+            </TabsList>
+            <button
+              type="button"
+              data-testid="sb-button-add-tab"
+              onClick={addTab}
+              className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-full px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring sm:min-h-9"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add page
+            </button>
+          </div>
         </div>
 
         {/* Content */}

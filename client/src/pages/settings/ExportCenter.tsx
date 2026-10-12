@@ -142,16 +142,16 @@ export function ExportCenter() {
       <Tabs defaultValue="daily" className="w-full">
         <div className="erp-mobile-scroll-tabs pb-1">
           <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Export sections">
-          <TabsTrigger value="daily">
-            <Download className="h-4 w-4" /> Daily Export
-          </TabsTrigger>
-          <TabsTrigger value="stock-containers">
-            <Building2 className="h-4 w-4" /> Stock &amp; Containers
-          </TabsTrigger>
-          <TabsTrigger value="wa-groups">
-            <MessageCircle className="h-4 w-4" /> POS / WA
-          </TabsTrigger>
-        </TabsList>
+            <TabsTrigger value="daily">
+              <Download className="h-4 w-4" /> Daily Export
+            </TabsTrigger>
+            <TabsTrigger value="stock-containers">
+              <Building2 className="h-4 w-4" /> Stock &amp; Containers
+            </TabsTrigger>
+            <TabsTrigger value="wa-groups">
+              <MessageCircle className="h-4 w-4" /> POS / WA
+            </TabsTrigger>
+          </TabsList>
         </div>
 
         <TabsContent value="daily">

@@ -148,8 +148,8 @@ export default function FactoryEmployeeAttendanceTab() {
     if (!data) return;
     const newMap: Record<number, AttendanceStatus> = {};
     const newNotes: Record<number, string> = {};
-    for (const e of data.employees) newMap[e.id] = "Present";
-    for (const a of data.attendance) {
+    for (const e of data.employees ?? []) newMap[e.id] = "Present";
+    for (const a of data.attendance ?? []) {
       newMap[a.employeeId] = a.status as AttendanceStatus;
       newNotes[a.employeeId] = a.notes || "";
     }
@@ -171,7 +171,7 @@ export default function FactoryEmployeeAttendanceTab() {
   });
 
   const handleSave = useCallback(() => {
-    if (!data?.employees.length) return;
+    if (!data?.employees?.length) return;
     const records = data.employees.map((e) => ({
       employeeId: e.id,
       attendanceDate: selectedDate,

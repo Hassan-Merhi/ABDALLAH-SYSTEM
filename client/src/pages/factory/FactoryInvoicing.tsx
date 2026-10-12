@@ -78,19 +78,19 @@ export default function FactoryInvoicing() {
 
         <div className="erp-mobile-scroll-tabs px-4 pb-1">
           <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Factory sections">
-          {tabs.map((tab) => {
-            const isActive = activeTab === tab.key;
-            return (
-              <PillTabButton
-                key={tab.key}
-                selected={isActive}
-                data-testid={`tab-${tab.key}`}
-                onClick={() => setActiveTab(tab.key)}
-              >
-                {tab.label}
-              </PillTabButton>
-            );
-          })}
+            {tabs.map((tab) => {
+              const isActive = activeTab === tab.key;
+              return (
+                <PillTabButton
+                  key={tab.key}
+                  selected={isActive}
+                  data-testid={`tab-${tab.key}`}
+                  onClick={() => setActiveTab(tab.key)}
+                >
+                  {tab.label}
+                </PillTabButton>
+              );
+            })}
           </TabsList>
         </div>
       </div>

@@ -308,7 +308,11 @@ export default function WipersReEntry() {
       <div className="erp-mobile-scroll-tabs px-3 pt-4 pb-1 sm:px-6">
         <TabsList aria-label="Bale relabeling sections" className="w-max min-w-full sm:min-w-0 sm:w-fit">
           {showRelabeling && (
-            <PillTabButton selected={false} onClick={() => navigate("/factory/bale-relabeling")} data-testid="tab-relabeling">
+            <PillTabButton
+              selected={false}
+              onClick={() => navigate("/factory/bale-relabeling")}
+              data-testid="tab-relabeling"
+            >
               Bale Relabeling
             </PillTabButton>
           )}

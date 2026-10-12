@@ -47,7 +47,11 @@ export default function FactoryEmployeesHub() {
   return (
     <Tabs value={effectiveTab} onValueChange={(value) => setTab(value as TabValue)}>
       <div className="erp-mobile-scroll-tabs mb-4 pb-1">
-        <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Employee sections">
+        <TabsList
+          className="w-max min-w-full sm:min-w-0 sm:w-fit"
+          aria-label="Employee sections"
+          data-testid="tabs-employees-section"
+        >
           {visibleOptions.map(({ value, label, icon: ItemIcon }) => (
             <TabsTrigger key={value} value={value} data-testid={`tab-employees-${value}`}>
               <ItemIcon className="h-4 w-4 shrink-0" />
@@ -57,12 +61,36 @@ export default function FactoryEmployeesHub() {
         </TabsList>
       </div>
 
-      {visibleValues.includes("employees") && <TabsContent value="employees" className="mt-0"><FactoryEmployees /></TabsContent>}
-      {visibleValues.includes("payroll") && <TabsContent value="payroll" className="mt-0"><FactoryEmployeePayrollTab /></TabsContent>}
-      {visibleValues.includes("attendance") && <TabsContent value="attendance" className="mt-0"><FactoryEmployeeAttendanceTab /></TabsContent>}
-      {visibleValues.includes("advances") && <TabsContent value="advances" className="mt-0"><FactoryEmployeeAdvancesTab /></TabsContent>}
-      {visibleValues.includes("bonuses") && <TabsContent value="bonuses" className="mt-0"><FactoryEmployeeBonusesTab /></TabsContent>}
-      {visibleValues.includes("withdrawals") && <TabsContent value="withdrawals" className="mt-0"><FactoryEmployeeWithdrawalsTab /></TabsContent>}
+      {visibleValues.includes("employees") && (
+        <TabsContent value="employees" className="mt-0">
+          <FactoryEmployees />
+        </TabsContent>
+      )}
+      {visibleValues.includes("payroll") && (
+        <TabsContent value="payroll" className="mt-0">
+          <FactoryEmployeePayrollTab />
+        </TabsContent>
+      )}
+      {visibleValues.includes("attendance") && (
+        <TabsContent value="attendance" className="mt-0">
+          <FactoryEmployeeAttendanceTab />
+        </TabsContent>
+      )}
+      {visibleValues.includes("advances") && (
+        <TabsContent value="advances" className="mt-0">
+          <FactoryEmployeeAdvancesTab />
+        </TabsContent>
+      )}
+      {visibleValues.includes("bonuses") && (
+        <TabsContent value="bonuses" className="mt-0">
+          <FactoryEmployeeBonusesTab />
+        </TabsContent>
+      )}
+      {visibleValues.includes("withdrawals") && (
+        <TabsContent value="withdrawals" className="mt-0">
+          <FactoryEmployeeWithdrawalsTab />
+        </TabsContent>
+      )}
     </Tabs>
   );
 }

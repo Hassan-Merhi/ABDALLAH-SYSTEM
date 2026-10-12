@@ -66,26 +66,26 @@ export default function FactoryBalesHub() {
         <div className="flex min-w-0 shrink-0 items-center gap-2 border-b px-4 pb-1">
           <div className="erp-mobile-scroll-tabs min-w-0 flex-1 pb-1">
             <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Bale explorer sections">
-            {show("history") && (
-              <TabsTrigger value="history" data-testid="tab-bales-history">
-                Bales
-              </TabsTrigger>
-            )}
-            {show("barcode") && (
-              <TabsTrigger value="barcode" data-testid="tab-barcode-lookup">
-                Barcode Lookup
-              </TabsTrigger>
-            )}
-            {show("products") && (
-              <TabsTrigger value="products" data-testid="tab-bale-products">
-                Bale Products
-              </TabsTrigger>
-            )}
-            {show("customer-loading") && (
-              <TabsTrigger value="customer-loading" data-testid="tab-customer-loading">
-                Customer Loading
-              </TabsTrigger>
-            )}
+              {show("history") && (
+                <TabsTrigger value="history" data-testid="tab-bales-history">
+                  Bales
+                </TabsTrigger>
+              )}
+              {show("barcode") && (
+                <TabsTrigger value="barcode" data-testid="tab-barcode-lookup">
+                  Barcode Lookup
+                </TabsTrigger>
+              )}
+              {show("products") && (
+                <TabsTrigger value="products" data-testid="tab-bale-products">
+                  Bale Products
+                </TabsTrigger>
+              )}
+              {show("customer-loading") && (
+                <TabsTrigger value="customer-loading" data-testid="tab-customer-loading">
+                  Customer Loading
+                </TabsTrigger>
+              )}
             </TabsList>
           </div>
           {activeTab === "products" && <FactoryArabicTranslationActions className="pb-1" />}

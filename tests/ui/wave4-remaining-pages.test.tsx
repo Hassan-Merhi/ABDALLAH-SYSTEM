@@ -204,7 +204,7 @@ const PAGES: PageCase[] = [
   {
     name: "FactoryEmployeesHub",
     load: () => import("@/pages/factory/FactoryEmployeesHub"),
-    landmark: "select-employees-section",
+    landmark: "tabs-employees-section",
     factory: true,
     sweep: true,
   },

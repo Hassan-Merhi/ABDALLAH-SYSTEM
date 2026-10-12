@@ -60,17 +60,20 @@ const TabsList = React.forwardRef<
     if (event.defaultPrevented || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
     // A few report hubs keep legacy tabs mounted but visually hidden.
     // Skip those during keyboard navigation instead of focusing an invisible control.
-    const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>(
-      '[role="tab"]:not(:disabled)'
-    )).filter((tab) => tab.getClientRects().length > 0 && getComputedStyle(tab).visibility !== "hidden");
+    const tabs = Array.from(
+      event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]:not(:disabled)')
+    ).filter((tab) => tab.getClientRects().length > 0 && getComputedStyle(tab).visibility !== "hidden");
     if (!tabs.length) return;
     const currentIndex = tabs.indexOf(document.activeElement as HTMLButtonElement);
     if (currentIndex < 0) return;
     const rtl = getComputedStyle(event.currentTarget).direction === "rtl";
     const previous = event.key === (rtl ? "ArrowRight" : "ArrowLeft");
-    const nextIndex = event.key === "Home" ? 0
-      : event.key === "End" ? tabs.length - 1
-      : (currentIndex + (previous ? -1 : 1) + tabs.length) % tabs.length;
+    const nextIndex =
+      event.key === "Home"
+        ? 0
+        : event.key === "End"
+          ? tabs.length - 1
+          : (currentIndex + (previous ? -1 : 1) + tabs.length) % tabs.length;
     event.preventDefault();
     tabs[nextIndex].focus();
     tabs[nextIndex].click();
@@ -109,6 +112,8 @@ const pillTriggerClasses = [
   "rounded-full px-3 py-1.5 text-muted-foreground hover:text-foreground sm:px-4",
 ].join(" ");
 
+const pillSelectedClasses = "bg-background font-semibold text-foreground shadow-sm";
+
 /** Scroll both levels when a strip lives inside the shared swipe container.
  * A nested, width-constrained list may scroll internally as well as its parent.
  * Use physical geometry so LTR and RTL browsers handle scrollLeft consistently.
@@ -138,8 +143,10 @@ function scrollSelectedTabIntoView(node: HTMLElement | null) {
 /** Reposition the active tab when zoom, container width, or its text changes.
  * The existing shell observer still owns overflow fades; this tracks only the
  * selected tab's visibility without creating another global scroll listener.
+ * Exported for bespoke tabs (e.g. the editable Status Builder pages) that
+ * cannot be a plain button but still live inside a shared `TabsList`.
  */
-function useActiveTabVisibility(ref: React.RefObject<HTMLButtonElement | null>, active: boolean) {
+function useActiveTabVisibility(ref: React.RefObject<HTMLElement | null>, active: boolean) {
   React.useEffect(() => {
     const node = ref.current;
     if (!active || !node) return;
@@ -152,10 +159,19 @@ function useActiveTabVisibility(ref: React.RefObject<HTMLButtonElement | null>, 
     const resize = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(update);
     const observed = [node, list, outer].filter((item): item is HTMLElement => item != null);
     observed.forEach((item) => resize?.observe(item));
-    window.addEventListener("resize", update, { passive: true });
+    // Mobile browsers fire height-only resizes while their toolbars collapse during
+    // vertical page scrolling; only a width change (rotation, zoom) can hide the tab,
+    // and reacting to height would undo a sideways swipe the user just made.
+    let lastWidth = window.innerWidth;
+    const onWindowResize = () => {
+      if (window.innerWidth === lastWidth) return;
+      lastWidth = window.innerWidth;
+      update();
+    };
+    window.addEventListener("resize", onWindowResize, { passive: true });
     return () => {
       resize?.disconnect();
-      window.removeEventListener("resize", update);
+      window.removeEventListener("resize", onWindowResize);
     };
   }, [active, ref]);
 }
@@ -184,7 +200,8 @@ const TabsTrigger = React.forwardRef<
       type="button"
       role="tab"
       aria-selected={active}
-      aria-controls={`${ctx.id}-panel-${value}`}
+      // Inactive panels are unmounted, so only the selected tab can reference one.
+      aria-controls={active ? `${ctx.id}-panel-${value}` : undefined}
       id={`${ctx.id}-tab-${value}`}
       tabIndex={active ? 0 : -1}
       data-state={active ? "active" : "inactive"}
@@ -192,11 +209,7 @@ const TabsTrigger = React.forwardRef<
         onClick?.(event);
         if (!event.defaultPrevented) ctx.onValueChange(value);
       }}
-      className={cn(
-        pillTriggerClasses,
-        active && "bg-background font-semibold text-foreground shadow-sm",
-        className
-      )}
+      className={cn(pillTriggerClasses, active && pillSelectedClasses, className)}
       {...props}
     >
       {children}
@@ -212,11 +225,14 @@ const PillTabButton = React.forwardRef<
   Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "aria-selected"> & { selected: boolean }
 >(({ selected, className, children, ...props }, ref) => {
   const localRef = React.useRef<HTMLButtonElement | null>(null);
-  const setRef = React.useCallback((node: HTMLButtonElement | null) => {
-    localRef.current = node;
-    if (typeof ref === "function") ref(node);
-    else if (ref) ref.current = node;
-  }, [ref]);
+  const setRef = React.useCallback(
+    (node: HTMLButtonElement | null) => {
+      localRef.current = node;
+      if (typeof ref === "function") ref(node);
+      else if (ref) ref.current = node;
+    },
+    [ref]
+  );
 
   useActiveTabVisibility(localRef, selected);
 
@@ -228,7 +244,7 @@ const PillTabButton = React.forwardRef<
       aria-selected={selected}
       tabIndex={selected ? 0 : -1}
       data-state={selected ? "active" : "inactive"}
-      className={cn(pillTriggerClasses, selected && "bg-background font-semibold text-foreground shadow-sm", className)}
+      className={cn(pillTriggerClasses, selected && pillSelectedClasses, className)}
       {...props}
     >
       {children}
@@ -236,7 +252,6 @@ const PillTabButton = React.forwardRef<
   );
 });
 PillTabButton.displayName = "PillTabButton";
-
 
 const TabsContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement> & { value: string }>(
   ({ className, value, children, ...props }, ref) => {
@@ -264,4 +279,4 @@ const TabsContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDi
 );
 TabsContent.displayName = "TabsContent";
 
-export { Tabs, TabsList, TabsTrigger, TabsContent, PillTabButton };
+export { Tabs, TabsList, TabsTrigger, TabsContent, PillTabButton, useActiveTabVisibility };

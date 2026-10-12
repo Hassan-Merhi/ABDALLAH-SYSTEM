@@ -202,15 +202,15 @@ export function SupplierDetailDialog({
           <div className="px-6 pt-3 pb-0 shrink-0 flex items-center gap-3 flex-wrap">
             <div className="erp-mobile-scroll-tabs min-w-0 max-w-full flex-1 pb-1">
               <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Supplier details">
-              <TabsTrigger value="transactions" data-testid="tab-transactions">
-                <DollarSign className="h-3.5 w-3.5 mr-1.5" />
-                Transactions
-              </TabsTrigger>
-              <TabsTrigger value="purchase-orders" data-testid="tab-purchase-orders">
-                <FileText className="h-3.5 w-3.5 mr-1.5" />
-                Purchase Orders {purchaseOrders.length > 0 && `(${purchaseOrders.length})`}
-              </TabsTrigger>
-            </TabsList>
+                <TabsTrigger value="transactions" data-testid="tab-transactions">
+                  <DollarSign className="h-3.5 w-3.5 mr-1.5" />
+                  Transactions
+                </TabsTrigger>
+                <TabsTrigger value="purchase-orders" data-testid="tab-purchase-orders">
+                  <FileText className="h-3.5 w-3.5 mr-1.5" />
+                  Purchase Orders {purchaseOrders.length > 0 && `(${purchaseOrders.length})`}
+                </TabsTrigger>
+              </TabsList>
             </div>
             {dialogTab === "transactions" && (
               <Button

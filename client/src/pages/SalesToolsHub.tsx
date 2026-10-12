@@ -65,9 +65,15 @@ export default function SalesToolsHub({ access }: { access?: ErpFeatureAccess })
 
       <div className="flex-1 min-w-0 overflow-auto">
         <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading…</div>}>
-          <TabsContent value="daybook" className="m-0"><POSDaybook /></TabsContent>
-          <TabsContent value="transfers" className="m-0"><StockTransfers hideVoucherNotes /></TabsContent>
-          <TabsContent value="pricelist" className="m-0"><POSPriceList /></TabsContent>
+          <TabsContent value="daybook" className="m-0">
+            <POSDaybook />
+          </TabsContent>
+          <TabsContent value="transfers" className="m-0">
+            <StockTransfers hideVoucherNotes />
+          </TabsContent>
+          <TabsContent value="pricelist" className="m-0">
+            <POSPriceList />
+          </TabsContent>
         </Suspense>
       </div>
     </Tabs>

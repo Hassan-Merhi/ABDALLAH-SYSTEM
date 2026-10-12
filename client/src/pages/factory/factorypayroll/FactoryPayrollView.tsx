@@ -167,16 +167,16 @@ export function FactoryPayrollView({ model }: { model: ReturnType<typeof useFact
         >
           <div className="erp-mobile-scroll-tabs pb-1">
             <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Factory payroll sections">
-            {showPayrollRecords && (
-              <TabsTrigger value="payroll" data-testid="tab-payroll-records">
-                <FileText className="mr-1 h-4 w-4" /> Payroll Records
-              </TabsTrigger>
-            )}
-            {showWorkerMaster && (
-              <TabsTrigger value="workers" data-testid="tab-worker-master">
-                <Table2 className="mr-1 h-4 w-4" /> Worker Master Sheet
-              </TabsTrigger>
-            )}
+              {showPayrollRecords && (
+                <TabsTrigger value="payroll" data-testid="tab-payroll-records">
+                  <FileText className="mr-1 h-4 w-4" /> Payroll Records
+                </TabsTrigger>
+              )}
+              {showWorkerMaster && (
+                <TabsTrigger value="workers" data-testid="tab-worker-master">
+                  <Table2 className="mr-1 h-4 w-4" /> Worker Master Sheet
+                </TabsTrigger>
+              )}
             </TabsList>
           </div>
 

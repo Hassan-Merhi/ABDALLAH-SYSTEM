@@ -598,19 +598,19 @@ export default function ImportStockItems() {
       <Tabs defaultValue="items">
         <div className="erp-mobile-scroll-tabs pb-1">
           <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Stock import sections">
-          <TabsTrigger value="items" data-testid="tab-new-items">
-            <Package className="h-4 w-4 mr-2" />
-            New Items
-          </TabsTrigger>
-          <TabsTrigger value="barcodes" data-testid="tab-barcodes">
-            <Barcode className="h-4 w-4 mr-2" />
-            Barcodes
-          </TabsTrigger>
-          <TabsTrigger value="categories" data-testid="tab-categories">
-            <Tag className="h-4 w-4 mr-2" />
-            Update Categories
-          </TabsTrigger>
-        </TabsList>
+            <TabsTrigger value="items" data-testid="tab-new-items">
+              <Package className="h-4 w-4 mr-2" />
+              New Items
+            </TabsTrigger>
+            <TabsTrigger value="barcodes" data-testid="tab-barcodes">
+              <Barcode className="h-4 w-4 mr-2" />
+              Barcodes
+            </TabsTrigger>
+            <TabsTrigger value="categories" data-testid="tab-categories">
+              <Tag className="h-4 w-4 mr-2" />
+              Update Categories
+            </TabsTrigger>
+          </TabsList>
         </div>
 
         <TabsContent value="items" className="mt-4">

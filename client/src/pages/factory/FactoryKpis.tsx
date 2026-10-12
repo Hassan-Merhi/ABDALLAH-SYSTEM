@@ -150,20 +150,20 @@ export default function FactoryKpis() {
           <div className="erp-mobile-scroll-tabs pb-1">
             <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Factory KPI sections">
               {showDaily && (
-              <TabsTrigger value="daily" data-testid="tab-daily">
-                Daily Production
-              </TabsTrigger>
-            )}
-            {showWorkers && (
-              <TabsTrigger value="workers" data-testid="tab-workers">
-                Worker Performance
-              </TabsTrigger>
-            )}
-            {showMixes && (
-              <TabsTrigger value="mixes" data-testid="tab-mixes">
-                Mix Efficiency
-              </TabsTrigger>
-            )}
+                <TabsTrigger value="daily" data-testid="tab-daily">
+                  Daily Production
+                </TabsTrigger>
+              )}
+              {showWorkers && (
+                <TabsTrigger value="workers" data-testid="tab-workers">
+                  Worker Performance
+                </TabsTrigger>
+              )}
+              {showMixes && (
+                <TabsTrigger value="mixes" data-testid="tab-mixes">
+                  Mix Efficiency
+                </TabsTrigger>
+              )}
             </TabsList>
           </div>
 

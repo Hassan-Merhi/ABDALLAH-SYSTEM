@@ -60,20 +60,20 @@ export default function FactoryPayrollHub() {
 
         <div className="erp-mobile-scroll-tabs px-4 pb-1">
           <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Factory sections">
-          {tabs.map(({ key, label, Icon }) => {
-            const active = activeSection === key;
-            return (
-              <PillTabButton
-                key={key}
-                selected={active}
-                data-testid={`tab-people-${key}`}
-                onClick={() => setActiveSection(key)}
-              >
-                <Icon className="h-3.5 w-3.5" />
-                {label}
-              </PillTabButton>
-            );
-          })}
+            {tabs.map(({ key, label, Icon }) => {
+              const active = activeSection === key;
+              return (
+                <PillTabButton
+                  key={key}
+                  selected={active}
+                  data-testid={`tab-people-${key}`}
+                  onClick={() => setActiveSection(key)}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {label}
+                </PillTabButton>
+              );
+            })}
           </TabsList>
         </div>
       </div>

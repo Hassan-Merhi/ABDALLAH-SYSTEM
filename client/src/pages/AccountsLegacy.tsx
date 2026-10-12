@@ -191,8 +191,8 @@ export default function Accounts() {
         >
           <div className={phoneStatementOpen ? "hidden" : "erp-mobile-scroll-tabs pb-1"}>
             <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Accounts sections">
-            {showViewAccounts && <TabsTrigger value="view">View Accounts</TabsTrigger>}
-            {showFindVoucher && <TabsTrigger value="find">Find Voucher</TabsTrigger>}
+              {showViewAccounts && <TabsTrigger value="view">View Accounts</TabsTrigger>}
+              {showFindVoucher && <TabsTrigger value="find">Find Voucher</TabsTrigger>}
             </TabsList>
           </div>
 

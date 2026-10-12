@@ -230,7 +230,11 @@ export default function FactoryBaleRelabeling() {
             Bale Relabeling
           </PillTabButton>
           {showWipersReEntry && (
-            <PillTabButton selected={false} onClick={() => navigate("/factory/bale-relabeling/wipers-re-entry")} data-testid="tab-wipers-re-entry">
+            <PillTabButton
+              selected={false}
+              onClick={() => navigate("/factory/bale-relabeling/wipers-re-entry")}
+              data-testid="tab-wipers-re-entry"
+            >
               Wipers Re-Entry by Date
             </PillTabButton>
           )}

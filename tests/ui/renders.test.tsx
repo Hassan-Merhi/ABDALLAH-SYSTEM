@@ -189,10 +189,12 @@ describe("Settings", () => {
 
 // ── 9. FactoryWorkersHub ──────────────────────────────────────────────────────
 describe("FactoryWorkersHub", () => {
-  it("renders the section selector", async () => {
+  it("renders the section tabs", async () => {
     const { default: FactoryWorkersHub } = await import("@/pages/factory/FactoryWorkersHub");
     renderWithProviders(<FactoryWorkersHub />);
-    expect(await screen.findByTestId("select-workers-section")).toBeInTheDocument();
+    const tabs = await screen.findByTestId("tabs-workers-section");
+    expect(tabs).toHaveAttribute("role", "tablist");
+    expect(tabs).toHaveAccessibleName("Worker sections");
   });
 });
 

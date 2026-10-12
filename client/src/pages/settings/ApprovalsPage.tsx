@@ -310,7 +310,7 @@ export function ApprovalsPage({ currentUser }: Props) {
                   <>
                     <TabsTrigger
                       value="pending"
-                      
+
                       data-testid="tab-approvals-pending"
                     >
                       <Clock className="h-3.5 w-3.5 mr-1.5" />
@@ -321,7 +321,7 @@ export function ApprovalsPage({ currentUser }: Props) {
                     </TabsTrigger>
                     <TabsTrigger
                       value="approved"
-                      
+
                       data-testid="tab-approvals-approved"
                     >
                       <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
@@ -329,7 +329,7 @@ export function ApprovalsPage({ currentUser }: Props) {
                     </TabsTrigger>
                     <TabsTrigger
                       value="rejected"
-                      
+
                       data-testid="tab-approvals-rejected"
                     >
                       <XCircle className="h-3.5 w-3.5 mr-1.5" />
@@ -337,7 +337,7 @@ export function ApprovalsPage({ currentUser }: Props) {
                     </TabsTrigger>
                     <TabsTrigger
                       value="executed"
-                      
+
                       data-testid="tab-approvals-executed"
                     >
                       <Play className="h-3.5 w-3.5 mr-1.5" />
@@ -347,7 +347,7 @@ export function ApprovalsPage({ currentUser }: Props) {
                 )}
                 <TabsTrigger
                   value="mine"
-                  
+
                   data-testid="tab-approvals-mine"
                 >
                   <MessageSquare className="h-3.5 w-3.5 mr-1.5" />

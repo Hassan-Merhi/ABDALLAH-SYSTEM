@@ -213,7 +213,8 @@ export function CompactRunPayrollSelection({ model }: CompactRunPayrollSelection
           <PlayCircle className="mr-2 h-4 w-4" />
           Run Payroll
         </PillTabButton>
-        <PillTabButton selected={false}
+        <PillTabButton
+          selected={false}
           onClick={() => {
             setActiveTab("history");
             setStep(1);

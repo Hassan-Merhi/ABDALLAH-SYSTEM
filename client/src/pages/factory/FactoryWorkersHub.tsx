@@ -85,7 +85,6 @@ export default function FactoryWorkersHub() {
     clearKeys: ["mode"],
   });
 
-
   if (visibleOptions.length === 0) {
     return <div className="p-4 text-sm text-muted-foreground">No Workers tabs are available for this user.</div>;
   }
@@ -93,7 +92,11 @@ export default function FactoryWorkersHub() {
   return (
     <Tabs value={tab} onValueChange={(value) => setTab(value as TabValue)}>
       <div className="erp-mobile-scroll-tabs mb-4 pb-1">
-        <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Worker sections">
+        <TabsList
+          className="w-max min-w-full sm:min-w-0 sm:w-fit"
+          aria-label="Worker sections"
+          data-testid="tabs-workers-section"
+        >
           {visibleOptions.map(({ value, label, icon: ItemIcon }) => (
             <TabsTrigger key={value} value={value} data-testid={`tab-workers-${value}`}>
               <ItemIcon className="h-4 w-4 shrink-0" />

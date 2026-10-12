@@ -23,15 +23,15 @@ export default function GITMockup({ embedded = false }: { embedded?: boolean } =
         <Tabs defaultValue="detail">
           <div className="erp-mobile-scroll-tabs pb-1">
             <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="GIT tracking sections">
-            <TabsTrigger value="detail" data-testid="tab-git-detail">
-              Detail
-            </TabsTrigger>
-            <TabsTrigger value="trucks" data-testid="tab-git-trucks">
-              Truck / Location
-            </TabsTrigger>
-            <TabsTrigger value="agents" data-testid="tab-git-agents">
-              Agent / Duty
-            </TabsTrigger>
+              <TabsTrigger value="detail" data-testid="tab-git-detail">
+                Detail
+              </TabsTrigger>
+              <TabsTrigger value="trucks" data-testid="tab-git-trucks">
+                Truck / Location
+              </TabsTrigger>
+              <TabsTrigger value="agents" data-testid="tab-git-agents">
+                Agent / Duty
+              </TabsTrigger>
             </TabsList>
           </div>
 

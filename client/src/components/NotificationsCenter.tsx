@@ -317,26 +317,26 @@ export function NotificationsCenter() {
           {/* Tab bar */}
           <div className="erp-mobile-scroll-tabs pb-1">
             <TabsList className="w-max max-w-full" aria-label="Notifications">
-            {TABS.map((tab) => (
-              <PillTabButton
-                key={tab.id}
-                data-testid={`tab-notif-${tab.id}`}
-                onClick={() => setActiveTab(tab.id)}
-                selected={activeTab === tab.id}
+              {TABS.map((tab) => (
+                <PillTabButton
+                  key={tab.id}
+                  data-testid={`tab-notif-${tab.id}`}
+                  onClick={() => setActiveTab(tab.id)}
+                  selected={activeTab === tab.id}
                 >
-                {tab.label}
-                {tab.id === "intercompany" && (icCountData?.count ?? 0) > 0 && (
-                  <span className="ml-1 inline-flex h-3.5 min-w-3.5 px-0.5 items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[11px] font-bold">
-                    {icCountData!.count}
-                  </span>
-                )}
-                {tab.id === "all" && (unreadData?.count ?? 0) > 0 && (
-                  <span className="ml-1 inline-flex h-3.5 min-w-3.5 px-0.5 items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[11px] font-bold">
-                    {unreadData!.count}
-                  </span>
-                )}
-              </PillTabButton>
-            ))}
+                  {tab.label}
+                  {tab.id === "intercompany" && (icCountData?.count ?? 0) > 0 && (
+                    <span className="ml-1 inline-flex h-3.5 min-w-3.5 px-0.5 items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[11px] font-bold">
+                      {icCountData!.count}
+                    </span>
+                  )}
+                  {tab.id === "all" && (unreadData?.count ?? 0) > 0 && (
+                    <span className="ml-1 inline-flex h-3.5 min-w-3.5 px-0.5 items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[11px] font-bold">
+                      {unreadData!.count}
+                    </span>
+                  )}
+                </PillTabButton>
+              ))}
             </TabsList>
           </div>
 

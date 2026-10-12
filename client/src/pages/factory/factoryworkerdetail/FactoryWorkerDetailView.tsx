@@ -337,31 +337,31 @@ export function FactoryWorkerDetailView({ model }: FactoryWorkerDetailModelProps
             >
               <div className="erp-mobile-scroll-tabs mb-4 pb-1">
                 <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Factory worker details">
-                {showProfile && (
-                  <TabsTrigger value="profile" data-testid="tab-profile">
-                    Profile
-                  </TabsTrigger>
-                )}
-                {showStatement && (
-                  <TabsTrigger value="statement" data-testid="tab-statement">
-                    Statement
-                  </TabsTrigger>
-                )}
-                {showAdvances && (
-                  <TabsTrigger value="advances" data-testid="tab-advances">
-                    Advances
-                  </TabsTrigger>
-                )}
-                {showBales && (
-                  <TabsTrigger value="bales" data-testid="tab-bales">
-                    Bales
-                  </TabsTrigger>
-                )}
-                {showDocuments && (
-                  <TabsTrigger value="documents" data-testid="tab-documents">
-                    Documents
-                  </TabsTrigger>
-                )}
+                  {showProfile && (
+                    <TabsTrigger value="profile" data-testid="tab-profile">
+                      Profile
+                    </TabsTrigger>
+                  )}
+                  {showStatement && (
+                    <TabsTrigger value="statement" data-testid="tab-statement">
+                      Statement
+                    </TabsTrigger>
+                  )}
+                  {showAdvances && (
+                    <TabsTrigger value="advances" data-testid="tab-advances">
+                      Advances
+                    </TabsTrigger>
+                  )}
+                  {showBales && (
+                    <TabsTrigger value="bales" data-testid="tab-bales">
+                      Bales
+                    </TabsTrigger>
+                  )}
+                  {showDocuments && (
+                    <TabsTrigger value="documents" data-testid="tab-documents">
+                      Documents
+                    </TabsTrigger>
+                  )}
                 </TabsList>
               </div>
 

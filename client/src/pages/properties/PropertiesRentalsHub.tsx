@@ -21,19 +21,19 @@ export default function PropertiesRentalsHub() {
       <Tabs value={tab} onValueChange={(value) => setTab(value as RentalTab)}>
         <div className="erp-mobile-scroll-tabs pb-1">
           <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Rental sections">
-          <TabsTrigger value="warehouses" data-testid="tab-properties-rentals-warehouses">
-            <Building2 className="mr-2 h-4 w-4" />
-            Warehouses
-          </TabsTrigger>
-          <TabsTrigger value="shops" data-testid="tab-properties-rentals-shops">
-            <Store className="mr-2 h-4 w-4" />
-            Shops
-          </TabsTrigger>
-          <TabsTrigger value="payments" data-testid="tab-properties-rentals-payments">
-            <ClipboardList className="mr-2 h-4 w-4" />
-            Payments
-          </TabsTrigger>
-        </TabsList>
+            <TabsTrigger value="warehouses" data-testid="tab-properties-rentals-warehouses">
+              <Building2 className="mr-2 h-4 w-4" />
+              Warehouses
+            </TabsTrigger>
+            <TabsTrigger value="shops" data-testid="tab-properties-rentals-shops">
+              <Store className="mr-2 h-4 w-4" />
+              Shops
+            </TabsTrigger>
+            <TabsTrigger value="payments" data-testid="tab-properties-rentals-payments">
+              <ClipboardList className="mr-2 h-4 w-4" />
+              Payments
+            </TabsTrigger>
+          </TabsList>
         </div>
 
         <TabsContent value="warehouses" className="mt-4">

@@ -119,6 +119,17 @@
     scrollbar-width: thin;
   }
 
+  /*
+   * Shared pill tabs are 44px on phones and compact (36px) from the sm breakpoint. A touch-first
+   * device wider than that (phone landscape, tablets) keeps the 44px target, including tab strips
+   * in dialogs, which portal outside #main-content and miss its touch-control rule.
+   */
+  @media (pointer: coarse) {
+    [data-responsive-tabs="true"] > [role="tab"] {
+      min-height: 2.75rem;
+    }
+  }
+
   .mobile-action-bar {
     padding-bottom: max(0.75rem, var(--safe-area-bottom));
   }
@@ -265,13 +276,18 @@
   }
 
   /* Scroll overflow states are logical inline start/end. RTL reverses
-   * their physical edge, while the two-edge fade remains symmetric. */
-  :is(.erp-mobile-scroll-tabs, [data-responsive-tabs="true"]):dir(rtl)[data-scroll-overflow="end"] {
+   * their physical edge, while the two-edge fade remains symmetric. The
+   * forgiving :is() keeps the [dir="rtl"] fallback (set on <html> by
+   * applyApplicationLanguageToDocument) for browsers without :dir(). */
+  :is(.erp-mobile-scroll-tabs, [data-responsive-tabs="true"]):is(:dir(rtl), [dir="rtl"] *)[data-scroll-overflow="end"] {
     -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 2.5rem), transparent);
     mask-image: linear-gradient(to left, #000 calc(100% - 2.5rem), transparent);
   }
 
-  :is(.erp-mobile-scroll-tabs, [data-responsive-tabs="true"]):dir(rtl)[data-scroll-overflow="start"] {
+  :is(.erp-mobile-scroll-tabs, [data-responsive-tabs="true"]):is(
+      :dir(rtl),
+      [dir="rtl"] *
+    )[data-scroll-overflow="start"] {
     -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 2.5rem), transparent);
     mask-image: linear-gradient(to right, #000 calc(100% - 2.5rem), transparent);
   }
