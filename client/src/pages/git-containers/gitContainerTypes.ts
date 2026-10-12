@@ -118,8 +118,6 @@ export const DEFAULT_OTW_COL_VIS: Record<OtwColId, boolean> = Object.fromEntries
 
 export const ACTIVE_STATUSES = ["OTW", "Sea", "At Port", "Left Dar", "At Border", "In Transit", "Arrived"] as const;
 
-export type ActiveStatus = (typeof ACTIVE_STATUSES)[number];
-
 export function parseNum(v: string | null | undefined): number {
   if (!v) return 0;
   const n = parseFloat(String(v).replace(/,/g, ""));

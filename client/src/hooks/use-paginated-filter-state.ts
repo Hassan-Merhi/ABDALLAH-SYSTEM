@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { isRecord } from "@shared/typeGuards";
 
 const FILTER_STATE_VERSION = 1;
 
@@ -13,10 +14,6 @@ export interface UsePaginatedFilterStateOptions<T extends Record<string, unknown
   createInitialFilters: () => T;
   storageKey?: string;
   initialPage?: number;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function restoreMatchingShape<T>(candidate: unknown, defaults: T): T {

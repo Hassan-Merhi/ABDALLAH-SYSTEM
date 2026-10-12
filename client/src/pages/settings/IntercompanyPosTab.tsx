@@ -6,7 +6,6 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 
 import { useToast } from "@/hooks/use-toast";
@@ -16,25 +15,6 @@ import { Loader2, ArrowLeftRight } from "lucide-react";
 import { type Company, type LedgerAccount } from "@shared/schema";
 import type { SettingsIntercompanyPosConfig } from "./settingsTypes";
 import { useCompany } from "@/contexts/CompanyContext";
-
-export function POSReceiptSettings() {
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3 p-3 rounded-md border border-border bg-muted/30">
-        <div className="flex-1">
-          <div className="font-medium text-sm">Profit/Loss Comparison on POS Receipts</div>
-          <div className="text-xs text-muted-foreground mt-1">
-            All POS invoices automatically include P/L Bale and Total P/L columns showing profit or loss vs. configured
-            price per item.
-          </div>
-        </div>
-        <Badge variant="secondary" className="shrink-0">
-          Always On
-        </Badge>
-      </div>
-    </div>
-  );
-}
 
 export function IntercompanyPosTab() {
   const { toast } = useToast();

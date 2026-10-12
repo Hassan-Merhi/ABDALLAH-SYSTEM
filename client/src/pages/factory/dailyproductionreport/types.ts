@@ -115,19 +115,3 @@ export interface SectionTotal {
   totalWeightKg: number;
   totalCost: number;
 }
-
-export interface LedgerData {
-  currentStock: BucketRow[];
-  wasteStock: BucketRow[];
-  sold: BucketRow[];
-  wasteDispatched: BucketRow[];
-  pendingLoading: BucketRow[];
-  totals: {
-    currentStock: SectionTotal;
-    wasteStock: SectionTotal;
-    sold: SectionTotal;
-    wasteDispatched: SectionTotal;
-    pendingLoading: SectionTotal;
-    grand: SectionTotal;
-  };
-}

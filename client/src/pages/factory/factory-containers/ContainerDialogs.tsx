@@ -1,6 +1,5 @@
-import { useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { AlertTriangle, FileSpreadsheet, RotateCcw } from "lucide-react";
+import { AlertTriangle, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -17,52 +16,6 @@ import { useAdminOverride } from "@/hooks/use-admin-override";
 import type { ContainerWithSupplier } from "./otwHelpers";
 
 // ── Import Dialog ─────────────────────────────────────────────────────────────
-
-interface ImportDialogProps {
-  open: boolean;
-  onClose: () => void;
-}
-
-export function ImportDialog({ open, onClose }: ImportDialogProps) {
-  const { toast: _toast } = useToast();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [_importPreview, setImportPreview] = [([]), (_v: unknown[]) => {}];
-
-  const handleClose = () => {
-    setImportPreview([]);
-    if (fileInputRef.current) fileInputRef.current.value = "";
-    onClose();
-  };
-
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(v) => {
-        if (!v) handleClose();
-      }}
-    >
-      <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <FileSpreadsheet className="h-5 w-5" />
-            Import Containers from Excel
-          </DialogTitle>
-          <DialogDescription>
-            Upload an Excel file (.xlsx) to bulk-import containers. New suppliers will be created automatically.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="py-4 text-muted-foreground text-sm">
-          Use the Import Excel button in the toolbar to upload containers.
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={handleClose}>
-            Close
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 // ── Bulk Delete Dialog ────────────────────────────────────────────────────────
 

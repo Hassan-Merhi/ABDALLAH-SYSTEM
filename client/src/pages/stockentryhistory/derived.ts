@@ -5,8 +5,3 @@ export interface StockEntryWorker {
   full_name?: string;
   name?: string;
 }
-
-export interface WorkerCategory {
-  id: number;
-  workerIds?: number[];
-}

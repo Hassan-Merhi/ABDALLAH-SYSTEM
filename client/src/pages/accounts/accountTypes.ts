@@ -41,21 +41,6 @@ export interface Transaction {
   currency?: string;
 }
 
-export interface GroupedVoucher {
-  voucherId: number;
-  voucherNumber: string;
-  voucherType: string;
-  voucherDate: string;
-  effectiveDate?: string | null;
-  voucherDescription: string;
-  narration: string;
-  totalDebit: number;
-  totalCredit: number;
-  runningBalance?: number;
-  runningBalanceCurrency?: string;
-  currency?: string;
-}
-
 export interface WaRule {
   id?: number;
   enabled: boolean;

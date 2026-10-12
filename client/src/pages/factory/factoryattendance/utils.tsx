@@ -29,17 +29,6 @@ export function todayStr() {
   return localDateStr(new Date());
 }
 
-export function currentMonthStart() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
-}
-
-export function currentMonthEnd() {
-  const d = new Date();
-  const last = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-  return localDateStr(last);
-}
-
 export function generateDateRange(start: string, end: string): string[] {
   const dates: string[] = [];
   const cur = new Date(start + "T00:00:00");

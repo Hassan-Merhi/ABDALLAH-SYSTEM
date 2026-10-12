@@ -1,3 +1,5 @@
+import { resolveRequestUrl, requestMethod } from "./fetchRequestInfo";
+
 const BYPASS_HEADER = "x-phase4-bandwidth-bypass";
 const DAILY_PAGE_SIZE = 250;
 const DAILY_RECONCILE_MS = 10 * 60_000;
@@ -35,21 +37,6 @@ type TimedResponse = {
 
 const dailyCache = new Map<string, DailyCacheEntry>();
 const proformaSummaryCache = new Map<string, TimedResponse>();
-
-function resolveUrl(input: RequestInfo | URL): URL | null {
-  try {
-    if (typeof input === "string") return new URL(input, window.location.origin);
-    if (input instanceof URL) return new URL(input.toString(), window.location.origin);
-    if (input instanceof Request) return new URL(input.url, window.location.origin);
-  } catch {
-    return null;
-  }
-  return null;
-}
-
-function requestMethod(input: RequestInfo | URL, init?: RequestInit): string {
-  return (init?.method || (input instanceof Request ? input.method : "GET")).toUpperCase();
-}
 
 function requestHeaders(input: RequestInfo | URL, init?: RequestInit): Headers {
   return new Headers(init?.headers || (input instanceof Request ? input.headers : undefined));
@@ -204,7 +191,7 @@ export function installPhase4BandwidthFetch(): void {
   const originalFetch = window.fetch.bind(window);
 
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-    const url = resolveUrl(input);
+    const url = resolveRequestUrl(input);
     if (!url || !url.pathname.startsWith("/api/")) return originalFetch(input, init);
 
     const headers = requestHeaders(input, init);
