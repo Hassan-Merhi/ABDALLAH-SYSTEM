@@ -1,7 +1,7 @@
 {
   "formatVersion": 1,
   "description": "Ordered snapshot of every registered Express route (method, path, guard chain) and middleware mount. Regenerate with UPDATE_ROUTE_MANIFEST=1 only when a route change is intended; during a file split the manifest must not change at all.",
-  "routeCount": 2079,
+  "routeCount": 2078,
   "middlewareMountCount": 130,
   "routes": [
     "GET /api/admin/operational-monitoring [requireAuth > <anonymous> > <anonymous>]",
@@ -1980,7 +1980,6 @@
     "GET /api/sp/migration/preview [requireAuth > <anonymous> > <anonymous> > <anonymous> > <anonymous>]",
     "GET /api/sp/migration/runs [requireAuth > <anonymous> > <anonymous> > <anonymous>]",
     "POST /api/sp/migration/rehearsal [requireAuth > <anonymous> > <anonymous> > <anonymous>]",
-    "POST /api/sp/migration/rollback [requireAuth > <anonymous> > <anonymous> > <anonymous> > <anonymous> > <anonymous>]",
     "POST /api/sp/migration/create-sp-company [requireAuth > <anonymous> > <anonymous>]",
     "GET /api/sp/migration/gc-preview [requireAuth > <anonymous> > <anonymous>]",
     "POST /api/sp/migration/gc-rehearsal [requireAuth > <anonymous> > <anonymous>]",
