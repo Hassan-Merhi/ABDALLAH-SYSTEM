@@ -17,7 +17,7 @@
 import React from "react";
 import { act, fireEvent, screen } from "@testing-library/react";
 import { renderWithProviders } from "./helpers";
-import { pageState, resetPageState, seededRecord, stubFetchRoutes, stubSeededFetch } from "./pageMocks";
+import { pageState, resetPageState, stubFetchRoutes, stubSeededFetch } from "./pageMocks";
 
 vi.mock("wouter", async () => (await import("./pageMocks")).wouterMock);
 vi.mock("@/contexts/AppModeContext", async () => (await import("./pageMocks")).appModeMock);
@@ -35,8 +35,6 @@ interface PageCase {
   factory?: boolean;
   showsRows?: boolean;
   sweep?: boolean;
-  /** Payloads for endpoints whose rows nest the record (see stubSeededFetch). */
-  seedRoutes?: Record<string, () => unknown>;
 }
 
 const PAGES: PageCase[] = [
@@ -351,7 +349,7 @@ describe("remaining pages — empty data", () => {
 describe("remaining pages — seeded data", () => {
   for (const page of PAGES) {
     it(`${page.name} keeps ${page.landmark}${page.showsRows ? " and renders rows" : ""}`, async () => {
-      stubSeededFetch(page.seedRoutes);
+      stubSeededFetch();
       await mount(page);
       expect(await screen.findByTestId(page.landmark)).toBeInTheDocument();
       if (page.showsRows) {
@@ -396,7 +394,7 @@ describe("remaining pages — button sweep", () => {
   for (const page of PAGES.filter((p) => p.sweep)) {
     it(`${page.name} survives pressing each of its buttons`, async () => {
       uncaught.length = 0;
-      stubSeededFetch(page.seedRoutes);
+      stubSeededFetch();
       const view = await mount(page);
       await act(async () => {
         await new Promise((resolve) => setTimeout(resolve, 200));
