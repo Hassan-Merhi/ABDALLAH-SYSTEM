@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Search, UserPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ export function RetailCustomerPicker({
   onSelect: (customer: Customer | null) => void;
 }) {
   const { toast } = useToast();
+  const customerPickerId = useId();
   const [open, setOpen] = useState(false);
   const [term, setTerm] = useState("");
   const [search, setSearch] = useState("");
@@ -72,7 +73,7 @@ export function RetailCustomerPicker({
             {customer.phone ? ` · ${customer.phone}` : ""}
           </div>
         </div>
-        <Button size="sm" variant="ghost" onClick={() => onSelect(null)} data-testid="retail-pos-customer-clear">
+        <Button size="sm" variant="ghost" className="min-h-11 sm:min-h-8" onClick={() => onSelect(null)} data-testid="retail-pos-customer-clear">
           <X className="mr-1 h-3.5 w-3.5" /> Walk-in
         </Button>
       </div>
@@ -89,13 +90,16 @@ export function RetailCustomerPicker({
           size="sm"
           variant="outline"
           onClick={() => setOpen((value) => !value)}
+          aria-expanded={open}
+          aria-controls={customerPickerId}
           data-testid="retail-pos-customer-open"
         >
           <Search className="mr-1 h-3.5 w-3.5" /> Add customer
         </Button>
       </div>
       {open && (
-        <div className="space-y-2 rounded-lg border p-2">
+        <div id={customerPickerId} role="region" aria-label="Select retail customer"
+          className="space-y-2 rounded-lg border p-2">
           <SearchField
             autoFocus
             value={term}
@@ -158,7 +162,7 @@ export function RetailCustomerPicker({
                 />
               </div>
               <div className="flex justify-end gap-2">
-                <Button size="sm" variant="ghost" onClick={() => setCreating(false)}>
+                <Button size="sm" variant="ghost" className="min-h-11 sm:min-h-8" onClick={() => setCreating(false)}>
                   Cancel
                 </Button>
                 <Button

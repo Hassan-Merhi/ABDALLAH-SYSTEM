@@ -107,7 +107,7 @@ export default function FactoryPendingInvoices() {
   ];
 
   return (
-    <div className="flex flex-col h-full p-6">
+    <div className="flex flex-col h-full p-3 sm:p-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
         <div>
           <PageHeader
@@ -116,12 +116,14 @@ export default function FactoryPendingInvoices() {
             icon={<ClipboardCheck className="h-5 w-5" />}
           />
         </div>
-        <div className="flex flex-wrap items-center gap-2" data-testid="filter-tabs">
+        <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Invoice status filters" data-testid="filter-tabs">
           {filters.map((f) => (
             <Button
               key={f.key}
               variant={statusFilter === f.key ? "default" : "outline"}
               size="sm"
+              className="min-h-11 sm:min-h-8"
+              aria-pressed={statusFilter === f.key}
               onClick={() => setStatusFilter(f.key)}
               data-testid={`button-filter-${f.key.toLowerCase()}`}
             >

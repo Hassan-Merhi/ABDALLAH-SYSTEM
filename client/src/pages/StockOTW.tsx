@@ -676,8 +676,17 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
                     <Fragment key={item.stockItemName}>
                       <TableRow
                         data-testid={`row-item-${index}`}
-                        className="hover-elevate cursor-pointer"
+                        className="hover-elevate cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                        tabIndex={0}
+                        aria-label={`${isExpanded ? "Collapse" : "Expand"} containers for ${item.stockItemName}`}
                         onClick={() => toggleItemExpanded(item.stockItemName)}
+                        onKeyDown={(event) => {
+                          if (event.target !== event.currentTarget) return;
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            toggleItemExpanded(item.stockItemName);
+                          }
+                        }}
                       >
                         <TableCell className="pl-4">
                           <Button

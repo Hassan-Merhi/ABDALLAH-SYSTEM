@@ -155,10 +155,9 @@ const TabsTrigger = React.forwardRef<HTMLButtonElement, TabsTriggerProps>(
       const node = internalRef.current;
       const list = node?.closest<HTMLElement>('[role="tablist"]');
       if (!active || !node || !list || list.scrollWidth <= list.clientWidth) return;
-      const listBox = list.getBoundingClientRect();
-      const box = node.getBoundingClientRect();
-      if (box.left < listBox.left) list.scrollLeft -= listBox.left - box.left + 8;
-      else if (box.right > listBox.right) list.scrollLeft += box.right - listBox.right + 8;
+      // Browser-native scrolling handles negative/positive RTL scrollLeft
+      // conventions consistently; manual left/right arithmetic does not.
+      node.scrollIntoView({ block: "nearest", inline: "nearest" });
     }, [active]);
 
     return (
