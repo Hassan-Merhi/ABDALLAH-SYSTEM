@@ -321,7 +321,10 @@ export default function NetProfitDetails() {
   const [fromDate, setFromDate] = useState<string>("");
   const [toDate, setToDate] = useState<string>("");
 
-  const toIsoDate = (date: Date) => [date.getFullYear(), String(date.getMonth() + 1).padStart(2, "0"), String(date.getDate()).padStart(2, "0")].join("-");
+  const toIsoDate = (date: Date) =>
+    [date.getFullYear(), String(date.getMonth() + 1).padStart(2, "0"), String(date.getDate()).padStart(2, "0")].join(
+      "-"
+    );
   const parseLocalDate = (value: string) => {
     if (!value) return undefined;
     const [year, month, day] = value.split("-").map(Number);
@@ -339,7 +342,10 @@ export default function NetProfitDetails() {
     setToDate(value);
     if (fromDate && value < fromDate) setFromDate(value);
   };
-  const clearDates = () => { setFromDate(""); setToDate(""); };
+  const clearDates = () => {
+    setFromDate("");
+    setToDate("");
+  };
   // A date range shows the CHANGE in balances over the selected period:
   // closing snapshot at To minus opening snapshot immediately before From.
   // A single To date remains an as-of balance sheet.
@@ -357,18 +363,28 @@ export default function NetProfitDetails() {
       seen.add(k);
       return { ...a, value: Math.round((a.value - (old.get(k) ?? 0)) * 100) / 100 };
     });
-    for (const a of opening) if (!seen.has(key(a))) {
-      rows.push({ ...a, value: -a.value });
-    }
+    for (const a of opening)
+      if (!seen.has(key(a))) {
+        rows.push({ ...a, value: -a.value });
+      }
     return rows.filter((a) => Math.abs(a.value) >= 0.005);
   };
-  const differenceSection = (
-    closing: NetProfitData["forUs"], opening: NetProfitData["forUs"],
-  ) => ({
+  // Equity has no breakdown, so diff it only where the section carries one.
+  const differenceSection = <T extends { total: number; breakdown?: BreakdownItem[]; accounts: AccountItem[] }>(
+    closing: T,
+    opening: T
+  ): T => ({
+    ...closing,
     total: Math.round((closing.total - opening.total) * 100) / 100,
-    breakdown: closing.breakdown.map((b) => ({
-      ...b, value: Math.round((b.value - (opening.breakdown.find((old) => old.name === b.name)?.value ?? 0)) * 100) / 100,
-    })),
+    ...(closing.breakdown
+      ? {
+          breakdown: closing.breakdown.map((b) => ({
+            ...b,
+            value:
+              Math.round((b.value - (opening.breakdown?.find((old) => old.name === b.name)?.value ?? 0)) * 100) / 100,
+          })),
+        }
+      : {}),
     accounts: differenceRows(closing.accounts, opening.accounts),
   });
   const periodEnd = toDate || (fromDate ? todayStr() : "");
@@ -389,9 +405,7 @@ export default function NetProfitDetails() {
         ...closing,
         forUs: differenceSection(closing.forUs, opening.forUs),
         onUs: differenceSection(closing.onUs, opening.onUs),
-        equity: closing.equity && opening.equity
-          ? differenceSection(closing.equity, opening.equity)
-          : closing.equity,
+        equity: closing.equity && opening.equity ? differenceSection(closing.equity, opening.equity) : closing.equity,
         income: differenceSection(closing.income, opening.income),
         expenses: differenceSection(closing.expenses, opening.expenses),
         forUsTotal: diff(closing.forUsTotal, opening.forUsTotal),
@@ -415,13 +429,12 @@ export default function NetProfitDetails() {
       const today = new Date().toLocaleDateString("en-CA");
       const start =
         fromDate ||
-        
         (() => {
           const d = new Date();
           d.setFullYear(d.getFullYear() - 1);
           return d.toLocaleDateString("en-CA");
         })();
-      const end = toDate ||  today;
+      const end = toDate || today;
       return apiRequest("POST", "/api/whatsapp/send-net-position", { startDate: start, endDate: end });
     },
     onSuccess: async (res) => {
@@ -521,13 +534,12 @@ export default function NetProfitDetails() {
                 const today = new Date().toLocaleDateString("en-CA");
                 const start =
                   fromDate ||
-                  
                   (() => {
                     const d = new Date();
                     d.setFullYear(d.getFullYear() - 1);
                     return d.toLocaleDateString("en-CA");
                   })();
-                const end = toDate ||  today;
+                const end = toDate || today;
                 window.open(`/api/reports/net-position-monthly-excel?startDate=${start}&endDate=${end}`, "_blank");
               }}
             >
@@ -563,8 +575,13 @@ export default function NetProfitDetails() {
             </Button>
           </PopoverTrigger>
           <PopoverContent align="start" className="w-auto p-0">
-            <CalendarPicker mode="single" selected={parseLocalDate(fromDate)} onSelect={selectFrom}
-              disabled={(date) => date > new Date()} initialFocus />
+            <CalendarPicker
+              mode="single"
+              selected={parseLocalDate(fromDate)}
+              onSelect={selectFrom}
+              disabled={(date) => date > new Date()}
+              initialFocus
+            />
           </PopoverContent>
         </Popover>
         <Label className="text-sm text-muted-foreground">To:</Label>
@@ -576,8 +593,13 @@ export default function NetProfitDetails() {
             </Button>
           </PopoverTrigger>
           <PopoverContent align="start" className="w-auto p-0">
-            <CalendarPicker mode="single" selected={parseLocalDate(toDate)} onSelect={selectTo}
-              disabled={(date) => date > new Date()} initialFocus />
+            <CalendarPicker
+              mode="single"
+              selected={parseLocalDate(toDate)}
+              onSelect={selectTo}
+              disabled={(date) => date > new Date()}
+              initialFocus
+            />
           </PopoverContent>
         </Popover>
         {isFiltered && (
@@ -732,7 +754,6 @@ export default function NetProfitDetails() {
       </div>
 
       {/* ── Amounts not yet in the ledger (never in the totals) ── */}
-
 
       {/* ── Partner capital / equity (Supplier Partner only) ── */}
       {showPartnerEquity && (

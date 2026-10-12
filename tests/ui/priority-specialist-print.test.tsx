@@ -95,7 +95,9 @@ function assertLabel(html: string, color?: string) {
     const box = doc.querySelector(".priority-color-box") as HTMLElement;
     expect(box).not.toBeNull();
     expect(box.dataset.priorityColor).toBe(color.toLowerCase());
-    expect(box.childNodes).toHaveLength(0);
+    // The box carries only the small black "HMD" mark (03cf7d27d), not the logo text.
+    expect(box.querySelector(".priority-color-box-text")?.textContent).toBe("HMD");
+    expect(box.children).toHaveLength(1);
     expect(box.style.getPropertyPriority("background-color")).toBe("important");
     expect(doc.querySelector(".logo-text")).toBeNull();
   } else {
