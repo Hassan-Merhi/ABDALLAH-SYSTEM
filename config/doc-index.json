@@ -383,6 +383,21 @@
     "docs/superpowers/plans/2026-10-05-retail-wave2-customers-pricing-tax-stock-count.md": "reference",
     "docs/superpowers/specs/2026-10-05-retail-wave2-customers-pricing-tax-stock-count-design.md": "reference",
     "docs/superpowers/specs/2026-10-03-retail-fashion-variants-wave1-design.md": "reference",
-    "docs/retail-fashion-inventory.md": "reference"
+    "docs/retail-fashion-inventory.md": "reference",
+    "docs/archive/engineering/dead-code/phase-1-report.md": "record",
+    "docs/archive/engineering/dead-code/phase-10-report.md": "record",
+    "docs/archive/engineering/dead-code/phase-2-report.md": "record",
+    "docs/archive/engineering/dead-code/phase-3-report.md": "record",
+    "docs/archive/engineering/dead-code/phase-4-report.md": "record",
+    "docs/archive/engineering/dead-code/phase-5-report.md": "record",
+    "docs/archive/engineering/dead-code/phase-6-report.md": "record",
+    "docs/archive/engineering/dead-code/phase-7-report.md": "record",
+    "docs/archive/engineering/dead-code/phase-8-report.md": "record",
+    "docs/archive/engineering/dead-code/phase-9-report.md": "record",
+    "docs/archive/root-reports/HARDENING_REPORT.md": "record",
+    "docs/archive/root-reports/UI_RESPONSIVENESS_AUDIT.md": "record",
+    "docs/archive/root-reports/UI_UX_AUDIT.md": "record",
+    "docs/archive/security/codeql-phase1-inventory.md": "record",
+    "docs/archive/engineering/dead-code/phase-11-report.md": "record"
   }
 }

@@ -75,7 +75,7 @@ const reviewedSpMounts: string[] = [];
 // removed first, then 8 more (the stock-transfer revision copies, the voucher-entry PATCH copy,
 // the import-export account-migration execute copy and the cross-company supplier purchase-order
 // reader). Every remaining overlap is a reviewed guard, fallback or conditional dispatch listed in
-// docs/engineering/dead-code/phase-3-route-disposition.json.
+// docs/archive/engineering/dead-code/phase-3-route-disposition.json.
 const MAX_SHADOWED_REGISTRATIONS = 77;
 let actual: SerializedRouteManifest;
 
