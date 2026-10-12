@@ -1,5 +1,5 @@
 import { searchAny } from "@shared/searchNormalization";
-import { useState, useMemo } from "react";
+import { useId, useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
@@ -65,7 +65,9 @@ function CopyButton({ text }: { text: string }) {
   return (
     <button
       onClick={handleCopy}
-      className="ml-1 text-muted-foreground hover:text-foreground transition-colors"
+      type="button"
+      aria-label={copied ? "Phone number copied" : "Copy phone number"}
+      className="ms-1 text-muted-foreground hover:text-foreground transition-colors"
       title="Copy"
     >
       {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
@@ -74,6 +76,7 @@ function CopyButton({ text }: { text: string }) {
 }
 
 export default function FactoryContacts() {
+  const formId = useId();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
   const queryClient = useQueryClient();
@@ -327,8 +330,9 @@ export default function FactoryContacts() {
 
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <Label>Name *</Label>
+              <Label htmlFor={`${formId}-name`}>Name *</Label>
               <Input
+                id={`${formId}-name`}
                 placeholder="e.g. Ahmed Karimi"
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
@@ -336,17 +340,18 @@ export default function FactoryContacts() {
             </div>
 
             <div className="space-y-1.5">
-              <Label>Role / Purpose</Label>
+              <Label htmlFor={`${formId}-role`}>Role / Purpose</Label>
               <Input
+                id={`${formId}-role`}
                 placeholder="e.g. Electrician, Plumber, Driver…"
                 value={form.role}
                 onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
               />
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2" role="group" aria-label="Phone Numbers">
               <div className="flex items-center justify-between">
-                <Label>Phone Numbers</Label>
+                <span className="text-sm font-medium">Phone Numbers</span>
                 <Button size="sm" variant="ghost" onClick={addNumber} type="button">
                   <Plus className="h-3.5 w-3.5 mr-1" />
                   Add
@@ -355,12 +360,14 @@ export default function FactoryContacts() {
               {form.numbers.map((n, i) => (
                 <div key={i} className="flex items-center gap-2">
                   <Input
+                    aria-label={`Phone ${i + 1} label`}
                     placeholder="Label (e.g. Mobile)"
                     value={n.label}
                     onChange={(e) => setNumber(i, "label", e.target.value)}
                     className="w-28 shrink-0 text-sm"
                   />
                   <Input
+                    aria-label={`Phone ${i + 1} number`}
                     placeholder="Number"
                     value={n.number}
                     onChange={(e) => setNumber(i, "number", e.target.value)}
@@ -372,6 +379,7 @@ export default function FactoryContacts() {
                       variant="ghost"
                       className="shrink-0 h-8 w-8 text-muted-foreground"
                       onClick={() => removeNumber(i)}
+                      aria-label={`Remove phone ${i + 1}`}
                       type="button"
                     >
                       <X className="h-4 w-4" />
@@ -382,8 +390,9 @@ export default function FactoryContacts() {
             </div>
 
             <div className="space-y-1.5">
-              <Label>Notes</Label>
+              <Label htmlFor={`${formId}-notes`}>Notes</Label>
               <Textarea
+                id={`${formId}-notes`}
                 placeholder="Anything extra — hours, location, rates…"
                 value={form.notes}
                 onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}

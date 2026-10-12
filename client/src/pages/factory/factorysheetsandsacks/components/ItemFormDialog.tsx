@@ -4,7 +4,7 @@ import type { ClientErrorLike } from "@/lib/clientError";
  *
  * Extracted from FactorySheetsAndSacks.tsx during the Phase 4 god-file split.
  */
-import { useState, useMemo } from "react";
+import { useId, useState, useMemo } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -33,6 +33,7 @@ function ItemFormDialog({
   existing?: SheetsAndSacksItem | null;
 }) {
   const { toast } = useToast();
+  const formId = useId();
   const [type, setType] = useState<string>(existing?.type ?? "Sheet");
   const [name, setName] = useState(existing?.name ?? "");
   const [size, setSize] = useState(existing?.size ?? "");
@@ -94,9 +95,9 @@ function ItemFormDialog({
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <Label>Type</Label>
+            <Label htmlFor={`${formId}-type`}>Type</Label>
             <Select value={type} onValueChange={setType}>
-              <SelectTrigger>
+              <SelectTrigger id={`${formId}-type`}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -109,19 +110,20 @@ function ItemFormDialog({
             </Select>
           </div>
           <div className="space-y-1.5">
-            <Label>
+            <Label htmlFor={`${formId}-name`}>
               Name <span className="text-destructive">*</span>
             </Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Purple Sheet 50kg" />
+            <Input id={`${formId}-name`} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Purple Sheet 50kg" />
           </div>
           <div className="space-y-1.5">
-            <Label>Size / Weight</Label>
-            <Input value={size} onChange={(e) => setSize(e.target.value)} placeholder="e.g. 50kg, 100×80cm" />
+            <Label htmlFor={`${formId}-size`}>Size / Weight</Label>
+            <Input id={`${formId}-size`} value={size} onChange={(e) => setSize(e.target.value)} placeholder="e.g. 50kg, 100×80cm" />
           </div>
           <FormGrid minColumnWidth="9rem" className="gap-3">
             <div className="space-y-1.5">
-              <Label>Qty (packs)</Label>
+              <Label htmlFor={`${formId}-packs`}>Qty (packs)</Label>
               <DecimalInput
+              id={`${formId}-packs`}
                 step="1"
                 min="0"
                 value={packQty}
@@ -130,8 +132,9 @@ function ItemFormDialog({
               />
             </div>
             <div className="space-y-1.5">
-              <Label># / Pack (pcs)</Label>
+              <Label htmlFor={`${formId}-pieces`}># / Pack (pcs)</Label>
               <DecimalInput
+              id={`${formId}-pieces`}
                 step="1"
                 min="0"
                 value={pcsPerPack}
@@ -145,9 +148,9 @@ function ItemFormDialog({
             <span className="font-mono font-semibold">{totalPcs.toLocaleString("en-US")}</span>
           </div>
           <div className="space-y-1.5">
-            <Label>Price per piece ($)</Label>
-            <Input
-              type="number"
+            <Label htmlFor={`${formId}-price`}>Price per piece ($)</Label>
+            <MoneyInput
+              id={`${formId}-price`}
               min="0"
               step="0.001"
               value={unitPrice}
@@ -160,12 +163,13 @@ function ItemFormDialog({
             <span className="font-mono font-semibold">${fmt(totalValue)}</span>
           </div>
           <div className="space-y-1.5">
-            <Label>Row Color</Label>
+            <p className="text-sm font-medium">Row Color</p>
             <ColorPicker value={rowColor} onChange={setRowColor} />
           </div>
           <div className="space-y-1.5">
-            <Label>Notes</Label>
+            <Label htmlFor={`${formId}-notes`}>Notes</Label>
             <Textarea
+              id={`${formId}-notes`}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Optional notes..."

@@ -8,7 +8,7 @@ import { drCrClass } from "@/lib/formatNumber";
 import { factoryApiRequest } from "@/lib/factoryApi";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useLocation } from "wouter";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -42,6 +42,8 @@ interface Customer extends LedgerSplitFields {
 }
 
 export default function FactoryCustomers() {
+  const createFormId = useId();
+  const editFormId = useId();
   const { toast } = useToast();
   const { execute: executeSave, pending: saving } = useSingleFlightAction();
   const { formatCashAmount } = useCurrencyContext();
@@ -447,41 +449,44 @@ export default function FactoryCustomers() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium mb-1 block">Name</label>
+              <label htmlFor={`${createFormId}-name`} className="text-sm font-medium mb-1 block">Name</label>
               <Input
                 value={formData.legalName}
                 onChange={(e) => setFormData({ ...formData, legalName: e.target.value })}
                 placeholder="Customer name"
+                id={`${createFormId}-name`}
                 data-testid="input-customer-name"
               />
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block">Phone</label>
+              <label htmlFor={`${createFormId}-phone`} className="text-sm font-medium mb-1 block">Phone</label>
               <Input
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 placeholder="Phone number"
+                id={`${createFormId}-phone`}
                 data-testid="input-customer-phone"
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-sm font-medium mb-1 block">Opening Balance</label>
+                <label htmlFor={`${createFormId}-balance`} className="text-sm font-medium mb-1 block">Opening Balance</label>
                 <MoneyInput
-                                    step="0.01"
+                  step="0.01"
                   value={formData.openingBalance}
                   onChange={(e) => setFormData({ ...formData, openingBalance: e.target.value })}
                   placeholder="0.00"
-                  data-testid="input-customer-opening-balance"
+                  id={`${createFormId}-balance`}
+                data-testid="input-customer-opening-balance"
                 />
               </div>
               <div>
-                <label className="text-sm font-medium mb-1 block">Side</label>
+                <label htmlFor={`${createFormId}-side`} className="text-sm font-medium mb-1 block">Side</label>
                 <Select
                   value={formData.openingBalanceSide}
                   onValueChange={(v) => setFormData({ ...formData, openingBalanceSide: v })}
                 >
-                  <SelectTrigger data-testid="select-balance-side">
+                  <SelectTrigger id={`${createFormId}-side`} data-testid="select-balance-side">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -492,7 +497,7 @@ export default function FactoryCustomers() {
               </div>
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block flex items-center gap-1">
+              <label htmlFor={`${createFormId}-terms`} className="text-sm font-medium mb-1 block flex items-center gap-1">
                 <Clock className="h-3.5 w-3.5" />
                 Payment Terms
               </label>
@@ -502,7 +507,7 @@ export default function FactoryCustomers() {
                   setFormData({ ...formData, paymentTermsDays: v === "none" ? "" : v === "custom" ? "" : v })
                 }
               >
-                <SelectTrigger data-testid="select-payment-terms">
+                <SelectTrigger id={`${createFormId}-terms`} data-testid="select-payment-terms">
                   <SelectValue placeholder="No payment terms" />
                 </SelectTrigger>
                 <SelectContent>
@@ -521,6 +526,7 @@ export default function FactoryCustomers() {
                   onChange={(e) => setFormData({ ...formData, paymentTermsDays: e.target.value })}
                   placeholder="Days"
                   className="mt-2"
+                  aria-label="Custom payment terms in days"
                   data-testid="input-custom-payment-terms"
                 />
               )}
@@ -569,25 +575,27 @@ export default function FactoryCustomers() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium mb-1 block">Name</label>
+              <label htmlFor={`${editFormId}-name`} className="text-sm font-medium mb-1 block">Name</label>
               <Input
                 value={formData.legalName}
                 onChange={(e) => setFormData({ ...formData, legalName: e.target.value })}
                 placeholder="Customer name"
+                id={`${editFormId}-name`}
                 data-testid="input-edit-customer-name"
               />
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block">Phone</label>
+              <label htmlFor={`${editFormId}-phone`} className="text-sm font-medium mb-1 block">Phone</label>
               <Input
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 placeholder="Phone number"
+                id={`${editFormId}-phone`}
                 data-testid="input-edit-customer-phone"
               />
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block flex items-center gap-1">
+              <label htmlFor={`${editFormId}-terms`} className="text-sm font-medium mb-1 block flex items-center gap-1">
                 <Clock className="h-3.5 w-3.5" />
                 Payment Terms
               </label>
@@ -605,7 +613,7 @@ export default function FactoryCustomers() {
                   else setFormData({ ...formData, paymentTermsDays: v });
                 }}
               >
-                <SelectTrigger data-testid="select-edit-payment-terms">
+                <SelectTrigger id={`${editFormId}-terms`} data-testid="select-edit-payment-terms">
                   <SelectValue placeholder="No payment terms" />
                 </SelectTrigger>
                 <SelectContent>
@@ -625,6 +633,7 @@ export default function FactoryCustomers() {
                   onChange={(e) => setFormData({ ...formData, paymentTermsDays: e.target.value })}
                   placeholder="Number of days"
                   className="mt-2"
+                  aria-label="Custom payment terms in days"
                   data-testid="input-edit-custom-payment-terms"
                 />
               )}
