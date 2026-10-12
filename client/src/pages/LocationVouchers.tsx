@@ -132,7 +132,6 @@ export default function LocationVouchers({ posUser }: { posUser?: unknown } = {}
 
   const isLoading = showAllMonths ? rangeLoading : monthLoading;
   const data = showAllMonths ? rangeData : monthData;
-  const _totals = data?.totals;
 
   const formatNumber = (num: number | null | undefined, decimals = 2) => {
     if (num == null || isNaN(num) || num === 0) return "";

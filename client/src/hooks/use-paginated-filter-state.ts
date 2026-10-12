@@ -3,10 +3,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 const FILTER_STATE_VERSION = 1;
 
 export type FilterStateAction<T> = T | ((current: T) => T);
-export type FilterFieldSetter<T extends Record<string, unknown>> = <K extends keyof T>(
-  key: K,
-  next: FilterStateAction<T[K]>
-) => void;
 
 interface StoredFilterState {
   version: number;

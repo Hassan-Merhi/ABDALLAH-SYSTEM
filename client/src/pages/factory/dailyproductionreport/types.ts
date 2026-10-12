@@ -131,14 +131,3 @@ export interface LedgerData {
     grand: SectionTotal;
   };
 }
-
-export interface LedgerSectionProps {
-  title: string;
-  subtitle: string;
-  icon: React.ReactNode;
-  badgeColor: string;
-  rows: BucketRow[];
-  total: SectionTotal;
-  defaultOpen?: boolean;
-  showSoldPrice?: boolean;
-}

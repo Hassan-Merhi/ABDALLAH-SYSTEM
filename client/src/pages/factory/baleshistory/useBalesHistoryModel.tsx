@@ -135,7 +135,6 @@ export function useBalesHistoryModel() {
   const { data: myAccess } = useQuery<{ fullAccess: boolean; pageKeys: string[]; hiddenCostFields: string[] }>({
     queryKey: ["/api/factory/my-access"],
   });
-  const _hiddenCost = myAccess?.hiddenCostFields ?? [];
 
   const { data: balesResponse, isLoading } = useQuery<BalesPage>({
     queryKey: [

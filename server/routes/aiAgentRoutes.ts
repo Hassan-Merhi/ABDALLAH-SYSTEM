@@ -502,7 +502,6 @@ export function registerAiAgentRoutes(app: Express) {
 
         // Check if there are more pending steps
         const hasMore = plan.steps.some((s) => s.status === "pending");
-        const _newTaskStatus = hasMore ? "running" : "completed";
 
         // If more steps, run them now
         if (hasMore) {

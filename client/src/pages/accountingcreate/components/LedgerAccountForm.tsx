@@ -13,8 +13,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
-import { useAppMode } from "@/contexts/AppModeContext";
-import { getApiRequest } from "@/lib/factoryApi";
 import { ChevronsUpDown, Check } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
@@ -36,8 +34,6 @@ function LedgerAccountForm({
 }) {
   const { toast: _toast } = useToast();
   const { selectedCompany } = useCompany();
-  const appMode = useAppMode();
-  const _modeApiRequest = getApiRequest(appMode);
   const accountType = form.watch("accountType");
   const openingBalance = form.watch("openingBalance");
   // Get available subtypes based on account type

@@ -39,7 +39,6 @@ export function useBaleProductsModel() {
     sellingPrice: "",
     labelDesignColor: "",
   });
-  const [_isGeneratingCode, setIsGeneratingCode] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<(() => void) | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [showHidden, setShowHidden] = useState(false);
@@ -358,24 +357,6 @@ export function useBaleProductsModel() {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
-
-  const _handleGradeChange = async (grade: string) => {
-    setEditForm((f) => ({ ...f, grade }));
-    if (!grade) return;
-    setIsGeneratingCode(true);
-    try {
-      const response = await modeApiRequest(
-        "GET",
-        `/api/factory/bale-products/generate-code?grade=${encodeURIComponent(grade)}`
-      );
-      const data = await response.json();
-      if (data.articleCode) setEditForm((f) => ({ ...f, articleCode: data.articleCode }));
-    } catch {
-      toast({ title: "Error", description: "Could not generate article code", variant: "destructive" });
-    } finally {
-      setIsGeneratingCode(false);
-    }
-  };
 
   const handleEditSubmit = () => {
     if (!editForm.name.trim()) return;

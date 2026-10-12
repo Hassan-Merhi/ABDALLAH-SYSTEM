@@ -58,7 +58,6 @@ import {
 } from "@/components/sidebar/sidebarPrimitives";
 import {
   FACTORY_PINNED_PAGES,
-  FACTORY_SETTINGS_PAGES,
   FACTORY_SIDEBAR_PAGES,
   factoryPageAllowsRole,
   hasFactoryPageKey,
@@ -139,10 +138,6 @@ export const FACTORY_NAV_SECTIONS: FactoryNavSection[] = FACTORY_SIDEBAR_GROUP_O
     })),
   };
 }).filter((section) => section.items.length > 0);
-
-export const FACTORY_NAV_PAGES: { key: string; label: string; group: string }[] = FACTORY_SETTINGS_PAGES.map(
-  ({ key, label, group }) => ({ key, label, group })
-);
 
 const FACTORY_PINNED_DEFAULTS: NavItem[] = FACTORY_PINNED_PAGES.map((page) => ({
   title: page.label,

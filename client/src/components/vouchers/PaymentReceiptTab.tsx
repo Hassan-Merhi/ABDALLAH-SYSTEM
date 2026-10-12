@@ -159,7 +159,6 @@ export function PaymentReceiptTab({
 
   // Tab-specific styling / labels
   const Icon = isPayment ? ArrowUpCircle : ArrowDownCircle;
-  const _iconColor = isPayment ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400";
   const accentColor = isPayment ? "#f59e0b" : "#10b981";
   const title = isPayment ? "Payment Voucher" : "Receipt Voucher";
   const accountLabel = isPayment ? "Pay From" : "Receive Into";

@@ -155,14 +155,6 @@
       "reason": "Tracking persistence receives company-authorized container IDs from its service caller."
     },
     {
-      "path": "server/services/container-tracking/track-due.ts",
-      "reason": "Scheduled tracking selects containers through the company-scoped scheduler context."
-    },
-    {
-      "path": "server/services/container-tracking/track-now.ts",
-      "reason": "Immediate tracking receives company-authorized container IDs from its caller."
-    },
-    {
       "path": "server/services/container-tracking/track-one.ts",
       "reason": "Single-container tracking receives a company-authorized container ID."
     },

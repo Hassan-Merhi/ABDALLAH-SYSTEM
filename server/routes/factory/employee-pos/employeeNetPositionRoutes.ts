@@ -218,7 +218,6 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         const isInsuranceMember = /^insurance\s*[-–]/i.test(a.name || "");
         return !isPayrollPayable && !isAccruedRentPayable && !isInsuranceMember;
       });
-      const _ledgerForUsTotal = round2(ledgerForUs.reduce((s: number, a) => s + a.value, 0));
       const ledgerOnUsTotal = round2(ledgerOnUs.reduce((s: number, a) => s + a.value, 0));
 
       // Inventory valuations - finished stock, raw material, stock on the

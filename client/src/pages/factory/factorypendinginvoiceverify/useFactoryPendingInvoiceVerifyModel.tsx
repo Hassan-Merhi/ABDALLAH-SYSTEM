@@ -502,21 +502,6 @@ export function useFactoryPendingInvoiceVerifyModel() {
     void downloadFromUrl(`/api/factory/customer-orders/${orderId}/loading-status-export`, "loading-status.xlsx");
   };
 
-  const _getComparisonRowClass = (status: ComparisonItem["status"]) => {
-    switch (status) {
-      case "LOADED_NOT_IN_PROFORMA":
-      case "MISSING_FROM_LOADED":
-        return "bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800";
-      case "UNDER_LOADED":
-        return "bg-yellow-50 dark:bg-yellow-950 border-yellow-200 dark:border-yellow-800";
-      case "OVER_LOADED":
-        return "bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800";
-      case "MATCH":
-      default:
-        return "";
-    }
-  };
-
   const getStatusBadge = (status: ComparisonItem["status"]) => {
     switch (status) {
       case "LOADED_NOT_IN_PROFORMA":

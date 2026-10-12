@@ -425,7 +425,6 @@ export function registerAiValidationRoutes(app: Express) {
 
       const files = req.files as Record<string, Express.Multer.File[]> | undefined;
       const f1 = files?.file1?.[0];
-      const _f2 = files?.file2?.[0];
 
       const REQUIRES_FILE: Record<string, boolean> = {
         item_code_check: true,

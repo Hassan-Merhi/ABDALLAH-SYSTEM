@@ -371,7 +371,6 @@ export function registerBalesReportRoutes(app: Express) {
       const fmtN = (v: string | number | null | undefined, dec = 3) =>
         Number(v || 0).toLocaleString("en-US", { minimumFractionDigits: dec, maximumFractionDigits: dec });
       const NAVY = "#1F3864";
-      const _LIGHT_BLUE = "#EFF3FB";
       const STRIPE = "#F8F8F8";
       const GROUP_BG = "#E8ECF4";
       const pageW = 515; // usable width with 40px margin each side

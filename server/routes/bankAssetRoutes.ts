@@ -8,7 +8,7 @@ import { requireAuth, requireRole } from "../auth";
 import { upload, logAudit } from "./_helpers";
 import { registerBankAccountRoutes } from "./bankAccountRoutes";
 import { fixedAssets, insertFixedAssetSchema } from "@shared/schema";
-import { eq, and, or, sql, isNull } from "drizzle-orm";
+import { eq, and, sql, isNull } from "drizzle-orm";
 import { buildAuditChanges } from "../services/audit";
 
 import { readExcel, sheetToJson } from "../excelHelper";

@@ -56,7 +56,6 @@ import { useVoucherHandlers } from "@/pages/vouchers/useVoucherHandlers";
 import { useSidebarSync } from "@/pages/vouchers/useSidebarSync";
 import { useAccountBalance } from "@/pages/vouchers/useAccountBalance";
 import { useVoucherHydration } from "@/pages/vouchers/useVoucherHydration";
-import { handlePaymentKeyDown } from "@/pages/vouchers/keyboardHandlers";
 import { exportVoucherHelper } from "@/pages/vouchers/voucherActions";
 import { voucherFormSchema } from "@/pages/vouchers/voucherTypes";
 import type { VoucherFormData } from "@/pages/vouchers/voucherTypes";
@@ -246,7 +245,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   });
 
   const fieldArray = useFieldArray({ control: form.control, name: "entries" });
-  const { fields, append, remove: _remove } = fieldArray;
+  const { append, remove: _remove } = fieldArray;
   const entries = form.watch("entries");
   const watchedEntries = useWatch({ control: form.control, name: "entries" });
   const total = entries.reduce((sum, entry) => sum + (parseFloat(entry.amount) || 0), 0);
@@ -502,10 +501,6 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       }
     }
   }, [watchedEntries, activeRowIndex]);
-
-  const _handleKeyDown = (e: React.KeyboardEvent, rowIndex: number, fieldName: "account" | "amount") => {
-    handlePaymentKeyDown(e, rowIndex, fieldName, fields.length, append);
-  };
 
   const handlePrint = useReactToPrint({
     contentRef: printRef,

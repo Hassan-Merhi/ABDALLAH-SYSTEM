@@ -33,7 +33,6 @@ import {
 import { toMoney } from "../lib/money";
 
 function buildSystemPrompt(context: ERPContext, userPreferences?: UserPreferences): string {
-  const _currency = userPreferences?.currency || "USD";
   const profitMargin =
     toMoney(context.profitAnalysis.totalSales).toNumber() > 0
       ? (

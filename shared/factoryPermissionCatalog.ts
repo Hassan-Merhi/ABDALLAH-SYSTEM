@@ -1,4 +1,4 @@
-import { FACTORY_ACCESS_REGISTRY, FACTORY_SETTINGS_PAGES, resolveFactoryPage } from "./factoryAccessRegistry";
+import { FACTORY_SETTINGS_PAGES, resolveFactoryPage } from "./factoryAccessRegistry";
 
 export interface FactoryTabDefinition {
   key: string;
@@ -246,5 +246,3 @@ export function normalizeFactoryHiddenFields(value: unknown): string[] {
   }
   return [...out];
 }
-
-export const FACTORY_CANONICAL_PAGE_KEYS = new Set(FACTORY_ACCESS_REGISTRY.map((page) => page.key));
