@@ -92,7 +92,7 @@ describe("Priority Scan fixed palette", () => {
     mount([{ id: 2, orderId: 99, color: "#7fff00", priority: 1, enabled: true }]);
     fireEvent.click(screen.getByTestId("button-set-priority-42"));
     expect(screen.getByRole("button", { name: "Use color #7FFF00" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Use color #FFD700" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Use color #FFE066" })).toBeEnabled();
   });
 
   it("cannot save when all approved colors are already active", () => {
@@ -166,7 +166,7 @@ describe("Priority Scan fixed palette", () => {
     mount([{ id: 1, orderId: 42, color: "Navy", priority: 1, enabled: true }], "User");
     fireEvent.click(screen.getByTestId("button-priority-config-42"));
     expect(screen.getByTestId("button-save-priority-42")).toBeDisabled();
-    fireEvent.click(screen.getByRole("button", { name: "Use color #FFD700" }));
+    fireEvent.click(screen.getByRole("button", { name: "Use color #FFE066" }));
     expect(screen.getByTestId("button-save-priority-42")).toBeEnabled();
   });
 
@@ -184,10 +184,10 @@ describe("Priority Scan fixed palette", () => {
     expect(screen.queryByTestId("button-priority-up-42")).toBeNull();
     fireEvent.click(screen.getByTestId("button-priority-config-42"));
     expect(screen.queryByTestId("select-priority-42")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Use color #B22222" }));
+    fireEvent.click(screen.getByRole("button", { name: "Use color #FF00FF" }));
     fireEvent.click(screen.getByTestId("button-save-priority-42"));
     await waitFor(() =>
-      expect(apiRequest).toHaveBeenCalledWith("PUT", expect.any(String), { color: "#B22222", enabled: true })
+      expect(apiRequest).toHaveBeenCalledWith("PUT", expect.any(String), { color: "#FF00FF", enabled: true })
     );
   });
 
