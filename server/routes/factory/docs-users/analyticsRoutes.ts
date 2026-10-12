@@ -199,13 +199,49 @@ export function registerFactoryAnalyticsRoutes(app: Express) {
             : sql`co.status = ${status}`,
       ];
       if (startDate) orderFilters.push(sql`(CASE
-              WHEN co.status = 'FINALIZED' THEN COALESCE(co.loading_finalized_at::date, co.finalized_at::date, co.verified_at::date, co.order_date)
-              WHEN co.status = 'VERIFIED' THEN COALESCE(co.loading_finalized_at::date, co.verified_at::date, co.order_date)
+              WHEN co.status = 'FINALIZED' THEN COALESCE((
+              SELECT fde.tx_date::date
+              FROM factory_daybook_entries fde
+              WHERE fde.company_id = co.company_id
+                AND fde.reference_table = 'customer_orders'
+                AND fde.reference_id = co.id
+                AND fde.tx_type = 'ORDER_VERIFIED'
+              ORDER BY fde.created_at DESC
+              LIMIT 1
+            ), co.loading_finalized_at::date, co.finalized_at::date, co.verified_at::date, co.order_date)
+              WHEN co.status = 'VERIFIED' THEN COALESCE((
+              SELECT fde.tx_date::date
+              FROM factory_daybook_entries fde
+              WHERE fde.company_id = co.company_id
+                AND fde.reference_table = 'customer_orders'
+                AND fde.reference_id = co.id
+                AND fde.tx_type = 'ORDER_VERIFIED'
+              ORDER BY fde.created_at DESC
+              LIMIT 1
+            ), co.loading_finalized_at::date, co.verified_at::date, co.order_date)
               ELSE co.order_date
             END) >= ${startDate}`);
       if (endDate) orderFilters.push(sql`(CASE
-              WHEN co.status = 'FINALIZED' THEN COALESCE(co.loading_finalized_at::date, co.finalized_at::date, co.verified_at::date, co.order_date)
-              WHEN co.status = 'VERIFIED' THEN COALESCE(co.loading_finalized_at::date, co.verified_at::date, co.order_date)
+              WHEN co.status = 'FINALIZED' THEN COALESCE((
+              SELECT fde.tx_date::date
+              FROM factory_daybook_entries fde
+              WHERE fde.company_id = co.company_id
+                AND fde.reference_table = 'customer_orders'
+                AND fde.reference_id = co.id
+                AND fde.tx_type = 'ORDER_VERIFIED'
+              ORDER BY fde.created_at DESC
+              LIMIT 1
+            ), co.loading_finalized_at::date, co.finalized_at::date, co.verified_at::date, co.order_date)
+              WHEN co.status = 'VERIFIED' THEN COALESCE((
+              SELECT fde.tx_date::date
+              FROM factory_daybook_entries fde
+              WHERE fde.company_id = co.company_id
+                AND fde.reference_table = 'customer_orders'
+                AND fde.reference_id = co.id
+                AND fde.tx_type = 'ORDER_VERIFIED'
+              ORDER BY fde.created_at DESC
+              LIMIT 1
+            ), co.loading_finalized_at::date, co.verified_at::date, co.order_date)
               ELSE co.order_date
             END) <= ${endDate}`);
       if (customer?.trim()) {
@@ -247,8 +283,26 @@ export function registerFactoryAnalyticsRoutes(app: Express) {
           SELECT
             co.id AS order_id,
             CASE
-              WHEN co.status = 'FINALIZED' THEN COALESCE(co.loading_finalized_at::date, co.finalized_at::date, co.verified_at::date, co.order_date)
-              WHEN co.status = 'VERIFIED' THEN COALESCE(co.loading_finalized_at::date, co.verified_at::date, co.order_date)
+              WHEN co.status = 'FINALIZED' THEN COALESCE((
+              SELECT fde.tx_date::date
+              FROM factory_daybook_entries fde
+              WHERE fde.company_id = co.company_id
+                AND fde.reference_table = 'customer_orders'
+                AND fde.reference_id = co.id
+                AND fde.tx_type = 'ORDER_VERIFIED'
+              ORDER BY fde.created_at DESC
+              LIMIT 1
+            ), co.loading_finalized_at::date, co.finalized_at::date, co.verified_at::date, co.order_date)
+              WHEN co.status = 'VERIFIED' THEN COALESCE((
+              SELECT fde.tx_date::date
+              FROM factory_daybook_entries fde
+              WHERE fde.company_id = co.company_id
+                AND fde.reference_table = 'customer_orders'
+                AND fde.reference_id = co.id
+                AND fde.tx_type = 'ORDER_VERIFIED'
+              ORDER BY fde.created_at DESC
+              LIMIT 1
+            ), co.loading_finalized_at::date, co.verified_at::date, co.order_date)
               ELSE co.order_date
             END AS order_date,
             co.customer_id,

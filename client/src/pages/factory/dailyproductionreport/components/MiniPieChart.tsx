@@ -87,7 +87,7 @@ function MiniPieChart({
                   ))}
                 </Pie>
                 <Tooltip
-                  formatter={(value: number) => [`${Math.round(value).toLocaleString()} kg`, ""]}
+                  formatter={(value) => [`${Math.round(Number(value)).toLocaleString()} kg`, ""]}
                   contentStyle={{ fontSize: 11, borderRadius: 6, maxWidth: "calc(100vw - 2rem)" }}
                 />
               </PieChart>

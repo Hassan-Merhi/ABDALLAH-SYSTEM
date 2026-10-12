@@ -188,7 +188,8 @@
     "ws": "^8.21.1",
     "xlsx-js-style": "^1.2.0",
     "zod": "^4.6.5",
-    "zod-validation-error": "^5.0.0"
+    "zod-validation-error": "^5.0.0",
+    "react-is": "17.0.2"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
