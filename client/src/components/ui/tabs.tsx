@@ -111,6 +111,7 @@ const TabsList = React.forwardRef<HTMLDivElement, TabsListProps>(
         {...props}
         ref={ref}
         role="tablist"
+        aria-label={props["aria-label"] ?? "Sections"}
         aria-orientation={orientation}
         data-responsive-tabs="true"
         data-tabs-variant={variant}

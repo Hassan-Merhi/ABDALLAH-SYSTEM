@@ -135,10 +135,10 @@ const Table = React.forwardRef<HTMLTableElement, TableProps>(
     return (
       <div
         ref={setWrapperRef}
-        role="region"
-        aria-label={scrollLabel}
-        aria-describedby={descriptionId}
-        tabIndex={0}
+        role={cards ? undefined : "region"}
+        aria-label={cards ? undefined : scrollLabel}
+        aria-describedby={cards ? undefined : descriptionId}
+        tabIndex={cards ? undefined : 0}
         data-horizontal-scroll="true"
         data-table-scroll-region="true"
         data-table-density={density}
@@ -160,7 +160,7 @@ const Table = React.forwardRef<HTMLTableElement, TableProps>(
           scrollMode === "page" && "print:overflow-visible",
           stickyFirstColumn &&
             !cards &&
-            "[&_tr>*:first-child]:sticky [&_tr>*:first-child]:left-0 [&_tr>*:first-child]:z-20 [&_thead_tr>*:first-child]:bg-muted [&_tbody_tr>*:first-child]:bg-background [&_tr>*:first-child]:shadow-[1px_0_0_hsl(var(--border))]",
+            "[&_tr>*:first-child]:sticky [&_tr>*:first-child]:start-0 [&_tr>*:first-child]:z-20 [&_thead_tr>*:first-child]:bg-muted [&_tbody_tr>*:first-child]:bg-background [&_tr>*:first-child]:shadow-[1px_0_0_hsl(var(--border))]",
           density === "compact" && "[&_thead_th]:py-1 [&_tbody_td]:py-1",
           density === "comfortable" && "[&_thead_th]:py-3 [&_tbody_td]:py-3",
           wrapperClassName,
