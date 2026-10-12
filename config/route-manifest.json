@@ -1,7 +1,7 @@
 {
   "formatVersion": 1,
   "description": "Ordered snapshot of every registered Express route (method, path, guard chain) and middleware mount. Regenerate with UPDATE_ROUTE_MANIFEST=1 only when a route change is intended; during a file split the manifest must not change at all.",
-  "routeCount": 2082,
+  "routeCount": 2079,
   "middlewareMountCount": 130,
   "routes": [
     "GET /api/admin/operational-monitoring [requireAuth > <anonymous> > <anonymous>]",
@@ -755,7 +755,6 @@
     "DELETE /api/properties/rental/payments/:id [requireAuth > <anonymous>]",
     "POST /api/properties/rental/payments [requireAuth > <anonymous>]",
     "POST /api/properties/rental/payments/bulk [requireAuth > <anonymous>]",
-    "DELETE /api/properties/rental/payments/:id [requireAuth > <anonymous>]",
     "GET /api/properties/rental/units/:id/detail [requireAuth > <anonymous>]",
     "GET /api/properties/rental/cash-accounts [requireAuth > <anonymous>]",
     "GET /api/properties/rental/payments [requireAuth > <anonymous>]",
@@ -792,7 +791,6 @@
     "DELETE /api/erp/rental/payments/:id [requireAuth > <anonymous>]",
     "POST /api/erp/rental/payments [requireAuth > <anonymous>]",
     "POST /api/erp/rental/payments/bulk [requireAuth > <anonymous>]",
-    "DELETE /api/erp/rental/payments/:id [requireAuth > <anonymous>]",
     "GET /api/erp/rental/units/:id/detail [requireAuth > <anonymous>]",
     "GET /api/erp/rental/cash-accounts [requireAuth > <anonymous>]",
     "GET /api/erp/rental/payments [requireAuth > <anonymous>]",
@@ -829,7 +827,6 @@
     "DELETE /api/factory/rental/payments/:id [requireAuth > <anonymous>]",
     "POST /api/factory/rental/payments [requireAuth > <anonymous>]",
     "POST /api/factory/rental/payments/bulk [requireAuth > <anonymous>]",
-    "DELETE /api/factory/rental/payments/:id [requireAuth > <anonymous>]",
     "GET /api/factory/rental/units/:id/detail [requireAuth > <anonymous>]",
     "GET /api/factory/rental/cash-accounts [requireAuth > <anonymous>]",
     "GET /api/factory/rental/payments [requireAuth > <anonymous>]",
