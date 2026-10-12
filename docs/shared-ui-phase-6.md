@@ -10,9 +10,10 @@
   large phone clear target, and accessible search naming. The owner continues
   to control all filtering, selected records and debounce behavior.
 - `ui/tabs.tsx`: tablist has an accessible name. Keyboard navigation continues
-  to honor horizontal/vertical orientation and RTL direction; scrolling the
-  active tab into view uses browser-native alignment rather than unreliable
-  arithmetic against an RTL scrollLeft.
+  to honor horizontal/vertical orientation and RTL direction. Phase 8 restored
+  the horizontal-only `scrollLeft` delta for keeping the active tab in view:
+  `scrollIntoView` also scrolls the page vertically on deep links, and a
+  relative `scrollLeft` delta is direction-agnostic in modern engines.
 - `TableViewOptions`: density is a single-selection radio group, while
   column visibility remains a checkbox group. Required identifying columns
   stay locked visible.

@@ -41,7 +41,7 @@ historical currency treatment, or workflow APIs.
 | Payroll | WorkersTab, EmployeeCrudDialogs, WorkerDialogs | SearchField, MoneyInput, pending submit |
 | Bales | BalesTable | SearchField, PageState, StatusBadge, mobile record cards |
 | POS | RetailCustomerPicker, POS PriceList table empty state | SearchField, PageState |
-| Settings | AuditLog, UsersTable, CompaniesTable, AddUserDialog | SearchField, StatusBadge, pending submit |
+| Settings | AuditLog, AddUserDialog (`UsersTable`/`CompaniesTable` were unreferenced and removed in Phase 8) | SearchField, StatusBadge, pending submit |
 | Factory | FactoryAlerts, FactoryPendingInvoices, FactoryPriceList, FactorySuppliersDirectory, insurance MemberFormDialog, sheets-and-sacks ItemFormDialog | SearchField, StatusBadge, PageState, ConfirmDialog, FormGrid, numeric inputs, single-flight submit |
 | Other lists | DataTableToolbar | SearchField composition |
 

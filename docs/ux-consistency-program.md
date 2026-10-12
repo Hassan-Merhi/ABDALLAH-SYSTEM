@@ -100,6 +100,13 @@ Render's independent verification is not replaced by this checkpoint.
 Fetch-request mechanics, stable pagination cache keys, legacy paginated
 list assembly and debounce timer behavior were deduplicated without removing
 legacy import paths. The targeted changes and remaining boundaries are
-documented in `docs/shared-ui-phase-7.md`. Phase 8 is an independent
-Claude code review and actual validation step, *not* covered by any earlier
-"committed" status. See `docs/shared-ui-phase-8-claude-handoff.md`.
+documented in `docs/shared-ui-phase-7.md`.
+
+## Phase 8 — Review and validation
+
+Phase 8 independently reviewed the Phases 1–7 diff, ran the repository's
+typecheck, lint, Prettier, frontend, build and audit gates, and fixed every
+confirmed defect on the branch. The execution record, commands, results and
+remaining limitations (backend suite and browser smokes are CI-run) are in
+`docs/shared-ui-phase-8-claude-handoff.md`; follow-up adoption work is
+scoped as Phase 9 in `docs/shared-ui-continuation-roadmap.md`.

@@ -63,8 +63,11 @@ density. Do not change calculations or authorization based on these settings.
 
 The following were migrated to common shared building blocks:
 
-- Settings Companies and Users: toolbar, phone table cards, view controls,
-  saved page size, and shared client-side pagination.
+- Settings Companies and Users: the standalone `UsersTable`/`CompaniesTable`
+  components migrated here were never imported by `Settings.tsx` (before or
+  after this phase) and were removed as confirmed dead code in Phase 8. The
+  live Settings tabs still use their own tables; adopting the shared toolbar,
+  view options and pagination there is tracked as Phase 9 follow-up work.
 - Factory Contacts: company-scoped preferences, phone cards, shared search,
   optional columns, row density and shared pagination.
 - Factory Customers: common search and pagination; balance calculations and

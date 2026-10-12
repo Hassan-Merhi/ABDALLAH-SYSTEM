@@ -46,3 +46,162 @@ without explicit approval.
 **Non-negotiable:** Protect financial/accounting accuracy, historical
 currency semantics, tenant boundaries, authorization rules, current Render
 configuration and all production data. No fabricated verification results.
+
+## Execution record (2026-10-12)
+
+Phase 8 was executed on `claude/erp-phase-8-review-iyue1u`, created from
+the tip of `refactor/shared-ui-standardization-phases-1-5` (`df6e48d`) with
+`origin/main` (`3a210f3`) merged in cleanly so verification covered the
+combined state. The full Phases 1–7 diff (103 files against base `d82e528`)
+was reviewed file by file, with three independent review passes over the
+Factory pages, the ERP/POS/Settings/Payroll/Properties pages and the shared
+primitives, and every confirmed finding was fixed on the branch.
+
+### Issues found and fixed
+
+Runtime and type errors (would have broken screens in production):
+
+- `StockQuery.tsx` rendered a `Search` icon whose import had been removed
+  (ReferenceError on the empty state). The page now uses `SearchField`
+  directly, which also restores the `autoFocus` the migration dropped.
+- `RentalPaymentsLog.tsx` still called the deleted `fmtMoney` helper in the
+  table footer (ReferenceError whenever rows exist). Uses `formatMoneyNumber`.
+- Unused imports left by migrations (`StockOTW`, `WorkersTab`,
+  `SpOpeningStock`) failed the zero-error lint gate.
+
+Shared primitive regressions against the base behaviour:
+
+- `ui/tabs.tsx`: `onValueChange` was no longer fired when the active tab was
+  re-clicked, which broke the "re-click resets the wizard" behaviour in
+  `ERPRunPayrollView` and `BonusDialog`; restored. Keeping the active tab in
+  view used `scrollIntoView`, which can scroll the page vertically on deep
+  links; the horizontal-only `scrollLeft` delta (direction-agnostic) is back
+  for both mount and keyboard navigation. `TabsContent` no longer adds an
+  extra `tabIndex=0` stop in front of every tabbed page, `aria-controls` is
+  only set for the mounted active panel, the default English tablist name is
+  not applied when `aria-labelledby` is supplied, and the pill variant is
+  `inline-flex` again so its muted background does not span the whole row.
+- `ui/search-field.tsx`: `type="search"` lets WebKit/Chrome clear the field
+  natively on Escape regardless of the `clearOnEscape` opt-in; Escape is now
+  prevented unless the owner opted in, so overlays still close and the query
+  survives.
+- `ui/table.tsx`: `density="compact"` was indistinguishable from standard on
+  desktop (cells were already `sm:py-1`); densities now differ at every
+  width, and the sticky first-column separator is mirrored in RTL.
+- `PaginationBar`: an empty filtered list rendered "Showing 0–0 of 0" plus a
+  rows selector next to the page's own empty row and announced it on every
+  keystroke; it returns `null` for `total <= 0` as before.
+- `StatusBadge`: icons are `aria-hidden`, spinners honour reduced motion and
+  `running` spins; a `hold` status was added for bales.
+- `DecimalInput`: wheel scrolling over a focused amount field no longer steps
+  the value (the field blurs instead), matching the arrow-key protection.
+
+Presentation regressions in migrated screens:
+
+- Transporter statements rendered **Unpaid** in the amber "warning" tone
+  instead of the destructive tone the screen always used; restored.
+- Bale lists showed mixed casing (`HOLD` fell through the registry) and
+  mapped statuses implicitly; AVAILABLE/HOLD/SOLD now map explicitly.
+- `NotificationsCenter` tabs could overflow the popover (`shrink-0` on
+  `flex-1` triggers); fixed.
+- `FactoryContacts` kept a previous failed-save message visible when the
+  dialog was reopened; the mutation is reset on open.
+- `FactoryEmployeeAttendanceTab` crashed on an unexpected payload shape
+  (`data.employees is not iterable`) once the hub tabs became clickable in
+  the button-sweep tests; the effect guards the shape.
+- `SpOpeningStock`'s preview formatter returned the placeholder for
+  non-numeric input instead of `$0.00`; NaN-safe again.
+
+Confirmed dead code removed:
+
+- `client/src/pages/settings/UsersTable.tsx` and `CompaniesTable.tsx`: no
+  import anywhere in `client/`, `tests/`, `scripts/` or `build/` before or
+  after Phases 3/5 (`Settings.tsx` renders its own tabs). The Phase 3/5
+  documents were corrected; adopting the shared list contract in the live
+  Settings tabs is Phase 9 work.
+
+Test and verifier contracts updated to the new markup (not loosened):
+
+- Hub section selectors are tablists now: `tabs-employees-section` and
+  `tabs-workers-section` landmarks replace the removed `select-*-section`
+  ids in `renders.test.tsx` and `wave4-remaining-pages.test.tsx`.
+- `ContainerListView` mount tests use the always-rendered
+  `select-filter-status` landmark (the search box requires the parent's
+  setter, which those harnesses do not pass).
+- `factory-mobile-behavior.test.tsx` mocks `CompanyContext` like the other
+  page suites, because contacts preferences are company-scoped now.
+- The Factory Import phone-scroll token (`overflow-x-auto`) moved into the
+  shared `TabsList`; the wave 2 test and verifier assert `<TabsList`
+  instead. `ContainerFilters` passes the full `w-full min-w-0 sm:flex-1
+  sm:min-w-[200px]` wrapper classes so the wave 3 token checks stay exact.
+- `erp-mobile-filters.test.tsx` expects the `region` landmark Phase 6 chose.
+
+Repository gates:
+
+- Prettier: 64 of the branch's changed files were unformatted and would have
+  failed the "Format changed source files" CI step; formatted.
+- `config/doc-index.json` and `docs/README.md` now classify and link the
+  nine shared-UI documents (`npm run audit:doc-index` failed before).
+
+### Verified unchanged (Phase 7 focus)
+
+The seven fetch interceptors keep their endpoint guards, registration
+flags, captured `previousFetch`, request/init forwarding and response
+identity; `fetchRequestUtils` is a pure extraction (URL inputs resolve
+identically, `RequestInit.method` still wins over `Request.method`).
+Daybook and V5 allocation cache keys still include `readActiveCompanyScope()`;
+account-statement, stock-entry and daily-scan keys keep their unscoped shape.
+`fetchLegacyPaginatedList` preserves the 250-row page size, `pagination=1`
+bypass, first-page failure passthrough, invalid-JSON fallback and
+`X-Total-Count`. `useDebouncedValue` is a pure alias of `useDebounce`.
+Side-effect registration still happens through `main.tsx` and the Vite
+`phase1PaginationPlugin` import injection, and the Phase 11 pagination
+verifiers pass. No accounting, FX, permission, inventory, POS scanner,
+payment, route or offline code was changed in Phase 8.
+
+### Commands run and results
+
+| Command | Result |
+|---|---|
+| `npm ci` | 1094 packages installed |
+| `npm run check` (tsc) | **2 errors before fixes** → 0 errors |
+| `npm run lint` (ESLint + warning ratchet, ceiling 0) | **3 errors before fixes** → 0 errors, 0 warnings |
+| `npm run format:check:changed` | **64 files unformatted** → all formatted |
+| `npm run test:frontend` (vitest, jsdom) | **12 failed / 2216 passed before fixes** → 242 files, 2228 tests passed |
+| `npm run build` (Vite + server bundle + bundle/dependency verifiers) | passed before and after fixes |
+| `npm run audit:doc-index` | **failed** (9 unregistered docs) → passes (237 docs) |
+| `npm run audit:ux-consistency` | passes (210 modules, 10 protected filter modules) |
+| `npm run audit:source-text-assertions`, `audit:type-escapes`, `audit:god-files` | pass |
+| `node scripts/verify-phase11-frontend-pagination.mjs`, `…-daybook-…`, `…-v5-…` | pass (before and after Prettier) |
+| `node scripts/verify-program7d-accessibility-responsive.mjs` | passes |
+| `node scripts/verify-mobile-responsive-wave2-factory-floor.mjs`, `…-wave3-erp-operations.mjs` | pass after the token updates |
+
+### Not run locally (limitations)
+
+- `npm run test:backend`: 939 backend files that CI shards with a prepared
+  PostgreSQL schema. The Phases 1–7 diff touches no `server/` or `shared/`
+  file, so the backend suite is unaffected by this branch; the merged
+  `origin/main` commits carry their own CI history.
+- Browser smokes (`scripts/verify-mobile-responsive-*-browser.mjs`,
+  `verify-erp-mobile-program.mjs`, Playwright/Puppeteer fixtures) need the
+  CI-provisioned fixture companies and a running server; they were not
+  executed. Responsive and accessibility coverage here comes from the jsdom
+  suites, the source-token verifiers and the Program 7D contract check.
+- No screen-reader or real-device pass was made; Phase 6 remains an
+  implementation checkpoint, not an accessibility certification.
+- Render deployment and GitHub workflow configuration were not touched.
+
+### Phase 8 commits
+
+- `ee9da83` — merge of `origin/main` into the review branch.
+- `0c94488` — Prettier formatting of the Phase 1–7 files (no semantic change).
+- `7612c13` — all code, test and verifier fixes listed above.
+- The commit carrying this record updates the shared-UI documents,
+  `config/doc-index.json` and `docs/README.md`.
+
+### Readiness
+
+Ready for human review. Typecheck, lint, Prettier gate, the complete
+frontend suite, the build and the repository audits pass locally on the
+combined branch-plus-main state. Merge still requires the Render/GitHub CI
+run (including backend tests and browser smokes) and explicit user approval.
