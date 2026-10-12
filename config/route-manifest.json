@@ -1,7 +1,7 @@
 {
   "formatVersion": 1,
   "description": "Ordered snapshot of every registered Express route (method, path, guard chain) and middleware mount. Regenerate with UPDATE_ROUTE_MANIFEST=1 only when a route change is intended; during a file split the manifest must not change at all.",
-  "routeCount": 2107,
+  "routeCount": 2105,
   "middlewareMountCount": 130,
   "routes": [
     "GET /api/admin/operational-monitoring [requireAuth > <anonymous> > <anonymous>]",
@@ -729,8 +729,6 @@
     "PUT /api/supplier-profit-check/po-overrides [requireAuth > <anonymous>]",
     "POST /api/supplier-profit-check/import-by-codes [requireAuth > <anonymous>]",
     "POST /api/supplier-profit-check/add-stock-item [requireAuth > <anonymous>]",
-    "GET /api/global/transactions [requireAuth > requireNonPOS > <anonymous>]",
-    "GET /api/global/transactions/voucher-types [requireAuth > requireNonPOS > <anonymous>]",
     "GET /api/global/transactions/:voucherId/detail [requireAuth > requireNonPOS > <anonymous>]",
     "GET /api/global/transactions/:voucherId/view-entries [requireAuth > requireNonPOS > <anonymous>]",
     "POST /api/golden-coast/accounting/phase1/setup-accounts [<anonymous> > <anonymous> > requireAuth > <anonymous> > <anonymous>]",
