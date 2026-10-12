@@ -2,13 +2,12 @@ import type { Express } from "express";
 import { errorStatus, getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { createHash } from "crypto";
-import Decimal from "decimal.js";
 import { db, pool } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole } from "../auth";
 import { upload, logAudit } from "./_helpers";
 import { registerBankAccountRoutes } from "./bankAccountRoutes";
-import { fixedAssets, insertFixedAssetSchema, exchangeRates } from "@shared/schema";
+import { fixedAssets, insertFixedAssetSchema } from "@shared/schema";
 import { eq, and, or, sql, isNull } from "drizzle-orm";
 import { buildAuditChanges } from "../services/audit";
 
