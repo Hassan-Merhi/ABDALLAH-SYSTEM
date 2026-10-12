@@ -152,8 +152,11 @@ deleted files were updated.
 4. The manifest edits, the lockfile edits and the test-suite case removals are unverified until
    §14 runs. Order-sensitive DB mocks were checked for the files where unused reads were
    removed; others could exist.
-5. `main` has moved on since the baseline (at least 23 commits, later `c59862254`); expect merge
-   conflicts in route registries, `lazyPages.ts`, `package.json` and the route manifest.
+5. `origin/main` (59 newer commits) was merged into the branch in `7265326db`. Only
+   `package.json`, `package-lock.json` and one deleted test conflicted; main's version bumps
+   were kept and the Phase 8 removals re-applied to its lockfile. The merged tree has no
+   unresolved imports and no new TypeScript diagnostics compared with `origin/main`, but the
+   merged lockfile is as unverified as the rest until `npm ci` runs.
 6. 1,590 exports used only inside their own module remain (cosmetic backlog; un-exporting them
    would touch hundreds of files and collide with concurrent work).
 7. Three audit-trail item diffs are computed and never written: `_itemDiff`/`_adjItemDiff` in
@@ -208,6 +211,12 @@ unchanged). Static re-check: 0 TypeScript unused-declaration diagnostics, 0 new 
 against the previous commit, 0 broken source-text pins. `varsIgnorePattern` was then removed
 from the ESLint unused-vars rule. Remaining `_` names are rest-omit keys (23), parameters and
 caught errors, which the rule still allows.
+
+## Follow-up commits
+
+- `af159468b` — `_`-binding backlog cleared and ESLint `varsIgnorePattern` removed (above).
+- `7265326db` — merge of `origin/main`; stale `config/company-scope-review.json` entry for the
+  stock registrar deleted in the first Phase 3 session removed (that audit fails on stale rows).
 
 ## 15. Branch and commits
 
