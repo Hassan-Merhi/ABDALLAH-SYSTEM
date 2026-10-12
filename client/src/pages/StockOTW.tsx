@@ -7,6 +7,7 @@ import { isBlockingQueryError } from "@/lib/abortError";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { SearchField } from "@/components/ui/search-field";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -502,16 +503,13 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
       {/* Inline filter row */}
       {stockItems.length > 0 && (
         <div className="flex flex-wrap gap-2 items-center">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by name, container, supplier, grade or category..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-              data-testid="input-search"
-            />
-          </div>
+          <SearchField
+            placeholder="Search by name, container, supplier, grade or category..."
+            value={searchTerm}
+            onValueChange={setSearchTerm}
+            wrapperClassName="flex-1 min-w-[200px]"
+            data-testid="input-search"
+          />
           {gradeOptions.length > 0 && (
             <Select value={selectedGrade} onValueChange={setSelectedGrade}>
               <SelectTrigger className="w-[140px]" data-testid="select-grade-filter">

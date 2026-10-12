@@ -8,6 +8,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SearchField } from "@/components/ui/search-field";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -279,16 +280,12 @@ export default function AccountGroups() {
               <Plus className="h-4 w-4 mr-2" />
               New Group
             </Button>
-            <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search groups…"
-                value={groupSearch}
-                onChange={(e) => setGroupSearch(e.target.value)}
-                className="pl-8"
-                data-testid="input-group-search"
-              />
-            </div>
+            <SearchField
+              placeholder="Search groups…"
+              value={groupSearch}
+              onValueChange={setGroupSearch}
+              data-testid="input-group-search"
+            />
           </div>
 
           <div className="flex-1 overflow-y-auto p-2 space-y-1">

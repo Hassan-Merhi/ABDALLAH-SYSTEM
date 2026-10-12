@@ -5,6 +5,7 @@ type PayrollModel = ReturnType<typeof usePayrollModel>;
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { SearchField } from "@/components/ui/search-field";
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
@@ -200,16 +201,14 @@ export function WorkersTab({
       <Card className="border-border/70 bg-card/60 p-3 shadow-xs">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center">
-            <div className="relative min-w-0 flex-1 sm:max-w-md">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search workers by name, code, or department..."
-                className="h-10 pl-9"
-                data-testid="input-search-workers"
-              />
-            </div>
+            <SearchField
+              value={search}
+              onValueChange={setSearch}
+              placeholder="Search workers by name, code, or department..."
+              className="h-10"
+              wrapperClassName="flex-1 sm:max-w-md"
+              data-testid="input-search-workers"
+            />
             <div className="flex items-center gap-1 rounded-lg border bg-muted/30 p-1">
               {(["all", "active", "inactive"] as const).map((status) => (
                 <Button

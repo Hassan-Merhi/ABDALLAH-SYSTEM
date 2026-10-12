@@ -3,6 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { Search, UserPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SearchField } from "@/components/ui/search-field";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { createRetailCustomer, searchRetailCustomers } from "./retailWave2Api";
@@ -95,10 +96,10 @@ export function RetailCustomerPicker({
       </div>
       {open && (
         <div className="space-y-2 rounded-lg border p-2">
-          <Input
+          <SearchField
             autoFocus
             value={term}
-            onChange={(event) => setTerm(event.target.value)}
+            onValueChange={setTerm}
             placeholder="Search name, phone or code"
             data-testid="retail-pos-customer-search"
           />
