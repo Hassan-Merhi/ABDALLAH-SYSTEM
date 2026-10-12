@@ -18,7 +18,8 @@ const TabsAppearanceContext = React.createContext<TabsVariant>("pill");
 
 function useTabsContext(component: string): TabsContextValue {
   const context = React.useContext(TabsContext);
-  if (!context) throw new Error(`${component} must be inside <Tabs>`);
+  // Developer error, not interface text; the component name travels in the cause.
+  if (!context) throw new Error("tabs-context-missing", { cause: component });
   return context;
 }
 

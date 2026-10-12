@@ -138,6 +138,13 @@ Test and verifier contracts updated to the new markup (not loosened):
 
 Repository gates:
 
+- The PR untranslated-text ratchet (`Classified untranslated-text audit`)
+  rejected the branch: Phases 1–6 added 34 English interface literals
+  (section tablist names, pagination controls, error-state messages, colour
+  picker labels) and the Tabs developer error. The literals are registered
+  in the EN/FR/AR application catalogs so the runtime translator covers
+  them, and the developer error is an identifier (`tabs-context-missing`).
+
 - Prettier: 64 of the branch's changed files were unformatted and would have
   failed the "Format changed source files" CI step; formatted.
 - `config/doc-index.json` and `docs/README.md` now classify and link the
