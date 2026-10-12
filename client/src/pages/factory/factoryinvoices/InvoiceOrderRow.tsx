@@ -101,6 +101,17 @@ export function InvoiceOrderRow({
   const expected = parseFloat(order.proformaExpectedBales || "0");
   const overloaded = getOverloadedBales(order);
 
+  // The table date follows the actual verification/finalization event, not loading creation.
+  const eventTimestamp = order.status === "FINALIZED"
+    ? (order.finalizedAt || order.verifiedAt || order.loadingFinalizedAt)
+    : order.status === "VERIFIED"
+      ? (order.verifiedAt || order.loadingFinalizedAt)
+      : null;
+  const eventDate = eventTimestamp ? new Date(eventTimestamp) : null;
+  const displayDate = eventDate && !Number.isNaN(eventDate.getTime())
+    ? formatDisplayDate(`${eventDate.getFullYear()}-${String(eventDate.getMonth() + 1).padStart(2, "0")}-${String(eventDate.getDate()).padStart(2, "0")}`)
+    : order.orderDate ? formatDisplayDate(order.orderDate) : "-";
+
   return (
     <TableRow
       key={order.id}
@@ -155,7 +166,7 @@ export function InvoiceOrderRow({
         {order.containerNotes || <span className="text-muted-foreground/50">—</span>}
       </TableCell>
       <TableCell className="font-mono text-sm" data-testid={`text-order-date-${order.id}`}>
-        {order.orderDate ? formatDisplayDate(order.orderDate) : "-"}
+        {displayDate}
       </TableCell>
       <TableCell>{getStatusBadge(order.status)}</TableCell>
       <TableCell
