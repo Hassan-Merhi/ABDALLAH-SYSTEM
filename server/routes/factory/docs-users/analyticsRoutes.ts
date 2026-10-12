@@ -199,13 +199,13 @@ export function registerFactoryAnalyticsRoutes(app: Express) {
             : sql`co.status = ${status}`,
       ];
       if (startDate) orderFilters.push(sql`(CASE
-              WHEN co.status = 'FINALIZED' THEN COALESCE(co.finalized_at::date, co.verified_at::date, co.loading_finalized_at::date, co.order_date)
-              WHEN co.status = 'VERIFIED' THEN COALESCE(co.verified_at::date, co.loading_finalized_at::date, co.order_date)
+              WHEN co.status = 'FINALIZED' THEN COALESCE(co.loading_finalized_at::date, co.finalized_at::date, co.verified_at::date, co.order_date)
+              WHEN co.status = 'VERIFIED' THEN COALESCE(co.loading_finalized_at::date, co.verified_at::date, co.order_date)
               ELSE co.order_date
             END) >= ${startDate}`);
       if (endDate) orderFilters.push(sql`(CASE
-              WHEN co.status = 'FINALIZED' THEN COALESCE(co.finalized_at::date, co.verified_at::date, co.loading_finalized_at::date, co.order_date)
-              WHEN co.status = 'VERIFIED' THEN COALESCE(co.verified_at::date, co.loading_finalized_at::date, co.order_date)
+              WHEN co.status = 'FINALIZED' THEN COALESCE(co.loading_finalized_at::date, co.finalized_at::date, co.verified_at::date, co.order_date)
+              WHEN co.status = 'VERIFIED' THEN COALESCE(co.loading_finalized_at::date, co.verified_at::date, co.order_date)
               ELSE co.order_date
             END) <= ${endDate}`);
       if (customer?.trim()) {
@@ -247,8 +247,8 @@ export function registerFactoryAnalyticsRoutes(app: Express) {
           SELECT
             co.id AS order_id,
             CASE
-              WHEN co.status = 'FINALIZED' THEN COALESCE(co.finalized_at::date, co.verified_at::date, co.loading_finalized_at::date, co.order_date)
-              WHEN co.status = 'VERIFIED' THEN COALESCE(co.verified_at::date, co.loading_finalized_at::date, co.order_date)
+              WHEN co.status = 'FINALIZED' THEN COALESCE(co.loading_finalized_at::date, co.finalized_at::date, co.verified_at::date, co.order_date)
+              WHEN co.status = 'VERIFIED' THEN COALESCE(co.loading_finalized_at::date, co.verified_at::date, co.order_date)
               ELSE co.order_date
             END AS order_date,
             co.customer_id,
