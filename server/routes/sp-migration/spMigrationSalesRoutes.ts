@@ -1,5 +1,5 @@
 /**
- * SP migration routes - Read-only historical sales copy, container migration and profit opening balances.
+ * SP migration routes - unique profit opening balance endpoint.
  *
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
@@ -10,8 +10,6 @@ import { db } from "../../db";
 import { requireAuth, requireRole } from "../../auth";
 import { sql } from "drizzle-orm";
 import { pn, getCompanyRow, logRun, trackRow } from "./_helpers";
-
-
 import { parseMoneyInput } from "../../lib/money";
 
 export function registerSpMigrationSalesRoutes(app: Express) {
