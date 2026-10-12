@@ -399,6 +399,7 @@
     "docs/archive/root-reports/UI_UX_AUDIT.md": "record",
     "docs/archive/security/codeql-phase1-inventory.md": "record",
     "docs/archive/engineering/dead-code/phase-11-report.md": "record",
-    "docs/dead-code-prevention.md": "reference"
+    "docs/dead-code-prevention.md": "reference",
+    "docs/dead-code-cleanup-final-report.md": "reference"
   }
 }
