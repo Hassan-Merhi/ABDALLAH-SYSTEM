@@ -1,4 +1,3 @@
-
 export interface EnrichedContainerRow {
   id: number;
   containerNumber: string;
@@ -82,7 +81,6 @@ export interface GitContainersResponse {
   };
 }
 
-
 export const OTW_COLS = [
   { id: "supplier", label: "Supplier" },
   { id: "company", label: "Company" },
@@ -112,9 +110,7 @@ export type OtwColId = (typeof OTW_COLS)[number]["id"];
  * "ALL" = no filter applied; object = custom selection of specific YYYY-MM-DD dates
  * plus an optional "include containers with no ETA" flag.
  */
-export type EtaFilterValue =
-  | "ALL"
-  | { selectedDates: string[]; includeNoEta: boolean };
+export type EtaFilterValue = "ALL" | { selectedDates: string[]; includeNoEta: boolean };
 
 export const DEFAULT_OTW_COL_VIS: Record<OtwColId, boolean> = Object.fromEntries(
   OTW_COLS.map((c) => [c.id, true])
@@ -141,8 +137,6 @@ export function fmtDate(d: string | null | undefined) {
   const [y, m, day] = parts;
   return `${day}/${m}/${y.slice(2)}`;
 }
-
-export type PriorityTier = "high" | "medium" | "low";
 
 export interface DrawerForm {
   eta: string;
