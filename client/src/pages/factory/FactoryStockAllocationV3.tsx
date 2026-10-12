@@ -1,3 +1,4 @@
+import { TabsList, PillTabButton } from "@/components/ui/tabs";
 import type { ClientErrorLike } from "@/lib/clientError";
 // LEGACY — Stock Allocation V3. Superseded by FactoryStockAllocationV5. Kept as fallback only. Route: /factory/stock-allocation-v3 (not in sidebar).
 import { useState } from "react";
@@ -156,17 +157,13 @@ export default function FactoryStockAllocationV3() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 flex-wrap">
+        <TabsList className="w-max max-w-full" aria-label="Stock allocation sections">
           {TABS.map((tab) => (
-            <button
+            <PillTabButton
               key={tab}
               onClick={() => setActiveTab(tab)}
               data-testid={`button-v3-tab-${tab}`}
-              className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                activeTab === tab
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                  : "text-muted-foreground hover:bg-sidebar-accent/40"
-              }`}
+              selected={activeTab === tab}
             >
               {TAB_LABELS[tab]}
               {tab === "expected" && expectedLoads.length > 0 && (
@@ -179,9 +176,9 @@ export default function FactoryStockAllocationV3() {
                   {loadingLoads.length}
                 </span>
               )}
-            </button>
+            </PillTabButton>
           ))}
-        </div>
+        </TabsList>
       </div>
 
       {/* Tab body */}

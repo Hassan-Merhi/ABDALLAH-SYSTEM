@@ -1,5 +1,5 @@
 import { Package, Search, Truck } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useHubQueryState } from "@/hooks/use-hub-query-state";
 import StockItems from "@/pages/StockItems";
 import StockQuery from "@/pages/StockQuery";
@@ -31,32 +31,26 @@ export default function StockHub({ access }: { access?: ErpFeatureAccess }) {
   }
 
   return (
-    <div className="min-w-0">
+    <Tabs value={activeTab} onValueChange={(value) => setTab(value as (typeof TAB_VALUES)[number])} className="min-w-0">
       <div className="erp-mobile-scroll-tabs mb-5 pb-1">
-        <div className="flex gap-1 p-1 rounded-xl border bg-card w-max min-w-full sm:min-w-0 sm:w-fit h-auto">
+        <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Stock sections">
           {visibleTabs.map(({ value, label, icon: Icon }) => (
-            <button
-              key={value}
-              type="button"
-              data-testid={`tab-stock-${value}`}
-              onClick={() => setTab(value)}
-              className={cn(
-                "inline-flex shrink-0 items-center gap-2 px-4 h-9 rounded-lg text-sm font-normal transition-colors",
-                activeTab === value
-                  ? "bg-accent text-accent-foreground font-medium"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
+            <TabsTrigger key={value} value={value} data-testid={`tab-stock-${value}`}>
               <Icon className="h-4 w-4 shrink-0" />
               {label}
-            </button>
+            </TabsTrigger>
           ))}
-        </div>
+        </TabsList>
       </div>
-
-      {activeTab === "items" && visibleValues.includes("items") && <StockItems />}
-      {activeTab === "query" && visibleValues.includes("query") && <StockQuery />}
-      {activeTab === "offload" && visibleValues.includes("offload") && <OffloadItemSearch />}
-    </div>
+      <TabsContent value="items" className="m-0">
+        {visibleValues.includes("items") && <StockItems />}
+      </TabsContent>
+      <TabsContent value="query" className="m-0">
+        {visibleValues.includes("query") && <StockQuery />}
+      </TabsContent>
+      <TabsContent value="offload" className="m-0">
+        {visibleValues.includes("offload") && <OffloadItemSearch />}
+      </TabsContent>
+    </Tabs>
   );
 }

@@ -1,5 +1,5 @@
 import { MapPin, Ship, Package } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useHubQueryState } from "@/hooks/use-hub-query-state";
 import LocationInventory from "@/pages/LocationInventory";
 import StockOTW from "@/pages/StockOTW";
@@ -31,32 +31,26 @@ export default function InventoryHub({ access }: { access?: ErpFeatureAccess }) 
   }
 
   return (
-    <div className="min-w-0">
+    <Tabs value={activeTab} onValueChange={(value) => setTab(value as (typeof TAB_VALUES)[number])} className="min-w-0">
       <div className="erp-mobile-scroll-tabs mb-5 pb-1">
-        <div className="flex gap-1 p-1 rounded-xl border bg-card w-max min-w-full sm:min-w-0 sm:w-fit h-auto">
+        <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Inventory sections">
           {visibleTabs.map(({ value, label, icon: Icon }) => (
-            <button
-              key={value}
-              type="button"
-              data-testid={`tab-${value}`}
-              onClick={() => setTab(value)}
-              className={cn(
-                "inline-flex shrink-0 items-center gap-2 px-4 h-9 rounded-lg text-sm font-normal transition-colors",
-                activeTab === value
-                  ? "bg-accent text-accent-foreground font-medium"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
+            <TabsTrigger key={value} value={value} data-testid={`tab-${value}`}>
               <Icon className="h-4 w-4 shrink-0" />
               {label}
-            </button>
+            </TabsTrigger>
           ))}
-        </div>
+        </TabsList>
       </div>
-
-      {activeTab === "by-location" && visibleValues.includes("by-location") && <LocationInventory />}
-      {activeTab === "on-the-way" && visibleValues.includes("on-the-way") && <StockOTW />}
-      {activeTab === "containers" && visibleValues.includes("containers") && <Containers />}
-    </div>
+      <TabsContent value="by-location" className="m-0">
+        {visibleValues.includes("by-location") && <LocationInventory />}
+      </TabsContent>
+      <TabsContent value="on-the-way" className="m-0">
+        {visibleValues.includes("on-the-way") && <StockOTW />}
+      </TabsContent>
+      <TabsContent value="containers" className="m-0">
+        {visibleValues.includes("containers") && <Containers />}
+      </TabsContent>
+    </Tabs>
   );
 }

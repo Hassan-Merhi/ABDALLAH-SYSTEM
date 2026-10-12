@@ -213,21 +213,23 @@ export function ERPRunPayrollView({ model }: ERPRunPayrollViewProps) {
           setStep(1);
         }}
       >
-        <TabsList>
-          <TabsTrigger value="run" data-testid="tab-run-payroll">
-            <PlayCircle className="h-4 w-4 mr-2" />
-            Run Payroll
-          </TabsTrigger>
-          <TabsTrigger value="history" data-testid="tab-payroll-history">
-            <History className="h-4 w-4 mr-2" />
-            Payroll History
-            {payrollRuns.filter((r) => r.status === "DRAFT").length > 0 && (
-              <Badge variant="outline" className="ml-2 text-xs no-default-active-elevate">
-                {payrollRuns.filter((r) => r.status === "DRAFT").length} draft
-              </Badge>
-            )}
-          </TabsTrigger>
-        </TabsList>
+        <div className="erp-mobile-scroll-tabs pb-1">
+          <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Payroll run sections">
+            <TabsTrigger value="run" data-testid="tab-run-payroll">
+              <PlayCircle className="h-4 w-4 mr-2" />
+              Run Payroll
+            </TabsTrigger>
+            <TabsTrigger value="history" data-testid="tab-payroll-history">
+              <History className="h-4 w-4 mr-2" />
+              Payroll History
+              {payrollRuns.filter((r) => r.status === "DRAFT").length > 0 && (
+                <Badge variant="outline" className="ml-2 text-xs no-default-active-elevate">
+                  {payrollRuns.filter((r) => r.status === "DRAFT").length} draft
+                </Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="run" className="mt-4">
           {step === 1 ? (

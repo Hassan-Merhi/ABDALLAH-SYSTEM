@@ -37,8 +37,8 @@ export default function TrackingHub() {
           onValueChange={(value) => setTab(value as (typeof TAB_VALUES)[number])}
           className="flex flex-col flex-1 overflow-hidden"
         >
-          <div className="erp-mobile-scroll-tabs mt-3 mb-2 shrink-0 pb-1">
-            <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit">
+          <div className="erp-mobile-scroll-tabs mt-3 mb-2 shrink-0 px-3 pb-1 sm:px-0">
+            <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Tracking sections">
               <TabsTrigger value="containers-otw" data-testid="tab-tracking-containers-otw">
                 Containers OTW
               </TabsTrigger>

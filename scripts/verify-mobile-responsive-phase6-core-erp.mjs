@@ -36,7 +36,9 @@ for (const token of [
 for (const token of [
   'role="tablist"',
   'data-responsive-tabs="true"',
-  "overflow-x-auto overscroll-x-contain touch-pan-x",
+  // touch-auto (not pan-x) so a vertical page swipe that starts on the strip still scrolls the page.
+  "overflow-x-auto overscroll-x-contain touch-auto",
+  "flex-nowrap",
   'role="tab"',
   "aria-selected={active}",
   "min-h-11",

@@ -426,26 +426,28 @@ export default function FactoryCustomerStatement() {
           onValueChange={(value) => setRequestedCustomerTab(value as "statement" | "pricelist")}
           className="flex-1"
         >
-          <TabsList className="mb-4">
-            {showStatementTab && (
-              <TabsTrigger value="statement" data-testid="tab-statement">
-                Statement
-              </TabsTrigger>
-            )}
-            {showPriceListTab && (
-              <TabsTrigger value="pricelist" data-testid="tab-pricelist">
-                Price List
-                {(priceListQuery.data?.length ?? 0) > 0 && (
-                  <Badge
-                    variant="secondary"
-                    className="ml-2 text-[11px] no-default-hover-elevate no-default-active-elevate"
-                  >
-                    {priceListQuery.data!.length}
-                  </Badge>
-                )}
-              </TabsTrigger>
-            )}
-          </TabsList>
+          <div className="erp-mobile-scroll-tabs mb-4 pb-1">
+            <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Customer statement sections">
+              {showStatementTab && (
+                <TabsTrigger value="statement" data-testid="tab-statement">
+                  Statement
+                </TabsTrigger>
+              )}
+              {showPriceListTab && (
+                <TabsTrigger value="pricelist" data-testid="tab-pricelist">
+                  Price List
+                  {(priceListQuery.data?.length ?? 0) > 0 && (
+                    <Badge
+                      variant="secondary"
+                      className="ml-2 text-[11px] no-default-hover-elevate no-default-active-elevate"
+                    >
+                      {priceListQuery.data!.length}
+                    </Badge>
+                  )}
+                </TabsTrigger>
+              )}
+            </TabsList>
+          </div>
 
           {/* ─── Statement Tab ─── */}
           {showStatementTab && (

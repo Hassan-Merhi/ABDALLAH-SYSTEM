@@ -21,22 +21,24 @@ export function SessionsHub({ isAdmin, isDev }: { isAdmin: boolean; isDev: boole
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="flex flex-wrap gap-1">
-          <TabsTrigger value="sessions" className="flex items-center gap-1">
-            <Shield className="h-3.5 w-3.5" />
-            Active Sessions
-          </TabsTrigger>
-          <TabsTrigger value="login-history" className="flex items-center gap-1">
-            <History className="h-3.5 w-3.5" />
-            Login History
-          </TabsTrigger>
-          {isDev && (
-            <TabsTrigger value="watch" className="flex items-center gap-1">
-              <Activity className="h-3.5 w-3.5" />
-              Active Users Watch
+        <div className="erp-mobile-scroll-tabs pb-1">
+          <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Session sections">
+            <TabsTrigger value="sessions" className="flex items-center gap-1">
+              <Shield className="h-3.5 w-3.5" />
+              Active Sessions
             </TabsTrigger>
-          )}
-        </TabsList>
+            <TabsTrigger value="login-history" className="flex items-center gap-1">
+              <History className="h-3.5 w-3.5" />
+              Login History
+            </TabsTrigger>
+            {isDev && (
+              <TabsTrigger value="watch" className="flex items-center gap-1">
+                <Activity className="h-3.5 w-3.5" />
+                Active Users Watch
+              </TabsTrigger>
+            )}
+          </TabsList>
+        </div>
 
         <TabsContent value="sessions" className="mt-4">
           <ActiveSessionsTab isAdmin={isAdmin} />
