@@ -16,6 +16,9 @@ export interface CustomerOrder {
   companyId: number;
   customerId: number;
   orderDate: string;
+  verifiedAt?: string | null;
+  loadingFinalizedAt?: string | null;
+  finalizedAt?: string | null;
   status: string;
   invoiceNumber?: string;
   subtotalBales: string;
