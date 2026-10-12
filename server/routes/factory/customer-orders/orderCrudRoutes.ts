@@ -93,6 +93,7 @@ export function registerOrderCrudRoutes(app: Express) {
           loadingStartedAt: customerOrders.loadingStartedAt,
           loadingFinalizedAt: customerOrders.loadingFinalizedAt,
           verifiedAt: customerOrders.verifiedAt,
+          finalizedAt: customerOrders.finalizedAt,
           createdAt: customerOrders.createdAt,
           updatedAt: customerOrders.updatedAt,
           customerName: customers.legalName,
