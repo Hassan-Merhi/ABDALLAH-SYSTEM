@@ -1,7 +1,7 @@
 {
   "formatVersion": 1,
   "description": "Ordered snapshot of every registered Express route (method, path, guard chain) and middleware mount. Regenerate with UPDATE_ROUTE_MANIFEST=1 only when a route change is intended; during a file split the manifest must not change at all.",
-  "routeCount": 2105,
+  "routeCount": 2103,
   "middlewareMountCount": 130,
   "routes": [
     "GET /api/admin/operational-monitoring [requireAuth > <anonymous> > <anonymous>]",
@@ -2015,8 +2015,6 @@
     "POST /api/sp/migration/opening-balance [requireAuth > <anonymous> > <anonymous>]",
     "POST /api/sp/migration/gc-stock-master [requireAuth > <anonymous> > <anonymous>]",
     "POST /api/sp/migration/gc-stock-opening [requireAuth > <anonymous> > <anonymous>]",
-    "POST /api/sp/migration/gc-sales-readonly [requireAuth > <anonymous> > <anonymous>]",
-    "POST /api/sp/migration/gc-containers [requireAuth > <anonymous> > <anonymous>]",
     "POST /api/sp/migration/gc-profit-opening [requireAuth > <anonymous> > <anonymous>]",
     "GET /api/sp/migration/gc-reconciliation [requireAuth > <anonymous> > <anonymous>]",
     "ACL /api/sp/migration/cutover [requireAuth > <anonymous>]",
