@@ -31,9 +31,17 @@ export function useGlobalScrollKeys(handleGoBack: () => void): void {
       if (
         role &&
         [
-          "listbox", "option", "combobox", "menu", "menuitem",
-          "menuitemcheckbox", "menuitemradio", "slider", "spinbutton",
-          "treeitem", "tree",
+          "listbox",
+          "option",
+          "combobox",
+          "menu",
+          "menuitem",
+          "menuitemcheckbox",
+          "menuitemradio",
+          "slider",
+          "spinbutton",
+          "treeitem",
+          "tree",
         ].includes(role)
       )
         return true;
@@ -48,25 +56,17 @@ export function useGlobalScrollKeys(handleGoBack: () => void): void {
       if (axis === "y") {
         const ov = s.overflowY;
         if (ov !== "auto" && ov !== "scroll" && ov !== "overlay") return false;
-        return direction > 0
-          ? el.scrollTop < el.scrollHeight - el.clientHeight - 1
-          : el.scrollTop > 0;
+        return direction > 0 ? el.scrollTop < el.scrollHeight - el.clientHeight - 1 : el.scrollTop > 0;
       } else {
         const ov = s.overflowX;
         if (ov !== "auto" && ov !== "scroll" && ov !== "overlay") return false;
-        return direction > 0
-          ? el.scrollLeft < el.scrollWidth - el.clientWidth - 1
-          : el.scrollLeft > 0;
+        return direction > 0 ? el.scrollLeft < el.scrollWidth - el.clientWidth - 1 : el.scrollLeft > 0;
       }
     }
 
     // Walks up the DOM from `start` and returns the first ancestor that can
     // actually scroll in the given axis and direction.
-    function getScrollableAncestor(
-      start: Element | null,
-      axis: "x" | "y",
-      direction: number,
-    ): Element | null {
+    function getScrollableAncestor(start: Element | null, axis: "x" | "y", direction: number): Element | null {
       let el: Element | null = start;
       while (el && el !== document.body && el !== document.documentElement) {
         if (canScroll(el, axis, direction)) return el;
@@ -77,11 +77,7 @@ export function useGlobalScrollKeys(handleGoBack: () => void): void {
 
     // Full resolution strategy — returns the best scroll target or null.
     // Null means "nothing can scroll; do not preventDefault".
-    function getBestScrollTarget(
-      eventTarget: HTMLElement,
-      axis: "x" | "y",
-      direction: number,
-    ): Element | null {
+    function getBestScrollTarget(eventTarget: HTMLElement, axis: "x" | "y", direction: number): Element | null {
       // 1. Walk up from the element that received the keydown event
       const fromTarget = getScrollableAncestor(eventTarget, axis, direction);
       if (fromTarget) return fromTarget;
@@ -95,9 +91,7 @@ export function useGlobalScrollKeys(handleGoBack: () => void): void {
 
       // 3. Try #main-content directly (the primary scroll container in all
       //    shells). Falls back to the first <main> for non-shell pages.
-      const main =
-        document.getElementById("main-content") ??
-        document.querySelector<HTMLElement>("main");
+      const main = document.getElementById("main-content") ?? document.querySelector<HTMLElement>("main");
       if (main && canScroll(main, axis, direction)) return main;
 
       // 4. Scan inside <main> (or body) for Tailwind overflow class elements
@@ -145,21 +139,18 @@ export function useGlobalScrollKeys(handleGoBack: () => void): void {
       // We intercept these only when we find a container that CAN scroll.
       // If nothing can scroll, we return early and let the browser / local
       // handlers handle the key (cursor movement, Radix navigation, etc.).
-      const scrollKeys = [
-        "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight",
-        "PageUp", "PageDown", "Home", "End",
-      ];
+      const scrollKeys = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "PageUp", "PageDown", "Home", "End"];
       if (scrollKeys.includes(e.key)) {
         // Always let editable elements and ARIA widgets handle their own arrows
         if (isEditableTarget(target)) return;
+        // A focused tab's Left/Right/Home/End move between tabs (the shared TabsList
+        // handles them); scrolling an unrelated container here would swallow them.
+        if (target.closest('[role="tab"]') && ["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
 
         const isHorizontal = e.key === "ArrowLeft" || e.key === "ArrowRight";
         const axis: "x" | "y" = isHorizontal ? "x" : "y";
         const direction =
-          e.key === "ArrowDown" || e.key === "ArrowRight" ||
-          e.key === "PageDown" || e.key === "End"
-            ? 1
-            : -1;
+          e.key === "ArrowDown" || e.key === "ArrowRight" || e.key === "PageDown" || e.key === "End" ? 1 : -1;
 
         const scrollTarget = getBestScrollTarget(target, axis, direction);
         if (!scrollTarget) {
@@ -215,7 +206,7 @@ export function useGlobalScrollKeys(handleGoBack: () => void): void {
       }
 
       const hasOpenOverlay = document.querySelector(
-        '[data-state="open"][role="dialog"], [data-state="open"][role="alertdialog"], [data-state="open"][data-radix-popper-content-wrapper], [data-state="open"][role="listbox"], [data-state="open"][role="menu"]',
+        '[data-state="open"][role="dialog"], [data-state="open"][role="alertdialog"], [data-state="open"][data-radix-popper-content-wrapper], [data-state="open"][role="listbox"], [data-state="open"][role="menu"]'
       );
       if (hasOpenOverlay) return;
 

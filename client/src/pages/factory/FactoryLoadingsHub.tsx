@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import FactoryContainerLoadingScan from "./FactoryContainerLoadingScan";
 import FactoryPendingLoadings from "./FactoryPendingLoadings";
 import FactoryPriorityScan from "./FactoryPriorityScan";
 import { Truck } from "lucide-react";
 import type { FactoryMyAccess } from "@shared/apiTypes";
+import { TabsList, PillTabButton } from "@/components/ui/tabs";
 import { useHubQueryState } from "@/hooks/use-hub-query-state";
 import { useApplicationLanguage } from "@/contexts/ApplicationLanguageContext";
 import { translatePriorityScanText } from "@/i18n/priorityScanTranslations";
@@ -53,11 +53,7 @@ export default function FactoryLoadingsHub() {
   }
 
   return (
-    <Tabs
-      value={effectiveActiveTab}
-      onValueChange={(value) => handleTabChange(value as LoadingsTab)}
-      className="flex flex-col h-full overflow-hidden"
-    >
+    <div className="flex flex-col h-full overflow-hidden">
       <div className="border-b bg-background shrink-0">
         {/* Header row */}
         <div className="flex items-center gap-3 px-5 pt-4 pb-3">
@@ -72,33 +68,47 @@ export default function FactoryLoadingsHub() {
           </div>
         </div>
         {/* Tab row */}
-        <TabsList variant="underline" className="w-full px-4" aria-label="Loadings sections">
-          {showLoadings && (
-            <TabsTrigger value="loadings" data-testid="tab-container-loadings">
-              Container Loadings
-            </TabsTrigger>
-          )}
-          {showPending && (
-            <TabsTrigger value="pending" data-testid="tab-pending-loadings">
-              Pending Loadings
-            </TabsTrigger>
-          )}
-          {showPriority && (
-            <TabsTrigger value="priority" data-testid="tab-priority-scan">
-              {priorityScanLabel}
-            </TabsTrigger>
-          )}
-        </TabsList>
+        <div className="erp-mobile-scroll-tabs px-4 pb-1">
+          <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Factory sections">
+            {showLoadings && (
+              <PillTabButton
+                selected={effectiveActiveTab === "loadings"}
+                data-testid="tab-container-loadings"
+                onClick={() => handleTabChange("loadings")}
+              >
+                Container Loadings
+              </PillTabButton>
+            )}
+            {showPending && (
+              <PillTabButton
+                selected={effectiveActiveTab === "pending"}
+                data-testid="tab-pending-loadings"
+                onClick={() => handleTabChange("pending")}
+              >
+                Pending Loadings
+              </PillTabButton>
+            )}
+            {showPriority && (
+              <PillTabButton
+                selected={effectiveActiveTab === "priority"}
+                data-testid="tab-priority-scan"
+                onClick={() => handleTabChange("priority")}
+              >
+                {priorityScanLabel}
+              </PillTabButton>
+            )}
+          </TabsList>
+        </div>
       </div>
 
-      <TabsContent value={effectiveActiveTab} className="flex-1 overflow-auto min-h-0 mt-0">
+      <div className="flex-1 overflow-auto min-h-0">
         {!effectiveActiveTab && (
           <div className="p-6 text-sm text-muted-foreground">No Loadings tabs are available for this user.</div>
         )}
         {effectiveActiveTab === "loadings" && showLoadings && <FactoryContainerLoadingScan />}
         {effectiveActiveTab === "pending" && showPending && <FactoryPendingLoadings />}
         {effectiveActiveTab === "priority" && showPriority && <FactoryPriorityScan />}
-      </TabsContent>
-    </Tabs>
+      </div>
+    </div>
   );
 }

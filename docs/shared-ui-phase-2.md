@@ -2,6 +2,19 @@
 
 Phase 2 of the cross-module shared UI standardization program.
 
+> **Superseded on merge.** While this program was in review, the universal
+> responsive pill tabs (#2185, `docs/universal-responsive-pill-tabs.md`)
+> became the shared tab standard on `main`. The component described below
+> was replaced by that implementation when the branch was brought up to
+> date: there is one pill appearance (`variant="underline"` is accepted but
+> no longer styled differently), `orientation`, `activationMode` and
+> `forceMount` do not exist, hubs that render their panels directly use
+> `PillTabButton`, and the keyboard, reveal-on-resize and ARIA behaviour is
+> the one documented and tested there (`tests/ui/universal-pill-tabs.test.tsx`).
+> The rules in this page that still hold are the usage rules: no handwritten
+> tab rows, permission and URL state owned by the page, one `TabsList` per
+> section selector with an `aria-label`.
+
 ## One shared implementation
 
 Use `Tabs`, `TabsList`, `TabsTrigger` and `TabsContent` from

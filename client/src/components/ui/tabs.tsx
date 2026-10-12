@@ -1,59 +1,47 @@
 import * as React from "react";
+
 import { cn } from "@/lib/utils";
 
-/**
- * One tab interaction and presentation contract across ERP, Factory, POS,
- * Properties, and Supplier Partner. Controlled tabs preserve the caller's
- * route/query state. Uncontrolled tabs preserve defaultValue semantics.
- */
-export type TabsVariant = "pill" | "underline";
-
 type TabsContextValue = {
+  id: string;
   value: string | undefined;
   onValueChange: (value: string) => void;
-  baseId: string;
 };
-const TabsContext = React.createContext<TabsContextValue | null>(null);
-const TabsAppearanceContext = React.createContext<TabsVariant>("pill");
 
-function useTabsContext(component: string): TabsContextValue {
-  const context = React.useContext(TabsContext);
-  // Developer error, not interface text; the component name travels in the cause.
-  if (!context) throw new Error("tabs-context-missing", { cause: component });
-  return context;
-}
+const TabsContext = React.createContext<TabsContextValue>({
+  id: "tabs",
+  value: undefined,
+  onValueChange: () => {},
+});
 
-function tabId(baseId: string, value: string) {
-  return `${baseId}-tab-${encodeURIComponent(value)}`;
-}
-function panelId(baseId: string, value: string) {
-  return `${baseId}-panel-${encodeURIComponent(value)}`;
-}
-
-export interface TabsProps extends React.HTMLAttributes<HTMLDivElement> {
+function Tabs({
+  value: controlledValue,
+  defaultValue,
+  onValueChange,
+  className,
+  children,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement> & {
   value?: string;
   defaultValue?: string;
   onValueChange?: (value: string) => void;
-}
-
-function Tabs({ value: controlledValue, defaultValue, onValueChange, className, children, ...props }: TabsProps) {
-  const baseId = React.useId();
+}) {
+  const id = React.useId();
   const [internalValue, setInternalValue] = React.useState<string | undefined>(defaultValue);
+
   const isControlled = controlledValue !== undefined;
   const activeValue = isControlled ? controlledValue : internalValue;
+
   const handleChange = React.useCallback(
-    (next: string) => {
-      if (!isControlled) setInternalValue(next);
-      onValueChange?.(next);
+    (val: string) => {
+      if (!isControlled) setInternalValue(val);
+      onValueChange?.(val);
     },
     [isControlled, onValueChange]
   );
-  const context = React.useMemo(
-    () => ({ value: activeValue, onValueChange: handleChange, baseId }),
-    [activeValue, handleChange, baseId]
-  );
+
   return (
-    <TabsContext.Provider value={context}>
+    <TabsContext.Provider value={{ id, value: activeValue, onValueChange: handleChange }}>
       <div className={cn("min-w-0", className)} {...props}>
         {children}
       </div>
@@ -61,196 +49,230 @@ function Tabs({ value: controlledValue, defaultValue, onValueChange, className, 
   );
 }
 
-export interface TabsListProps extends React.HTMLAttributes<HTMLDivElement> {
-  variant?: TabsVariant;
-  /** Horizontal tab strips scroll on narrow screens instead of clipping. */
-  orientation?: "horizontal" | "vertical";
-  activationMode?: "automatic" | "manual";
-}
+// The pill treatment is shared by ERP, Factory, POS, Payroll and Properties.
+// Overflow is scrollable; the fade is only visible when there are hidden tabs.
+const TabsList = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement> & { variant?: "pill" | "underline" }
+>(({ className, variant = "pill", onKeyDown, onFocusCapture, ...props }, ref) => {
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    onKeyDown?.(event);
+    if (event.defaultPrevented || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    // Alt+Left/Right (browser Back/Forward) and Ctrl/Meta+Home/End belong to the browser.
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+    // A few report hubs keep legacy tabs mounted but visually hidden.
+    // Skip those during keyboard navigation instead of focusing an invisible control.
+    const tabs = Array.from(
+      event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]:not(:disabled)')
+    ).filter((tab) => tab.getClientRects().length > 0 && getComputedStyle(tab).visibility !== "hidden");
+    if (!tabs.length) return;
+    const currentIndex = tabs.indexOf(document.activeElement as HTMLButtonElement);
+    if (currentIndex < 0) return;
+    const rtl = getComputedStyle(event.currentTarget).direction === "rtl";
+    const previous = event.key === (rtl ? "ArrowRight" : "ArrowLeft");
+    const nextIndex =
+      event.key === "Home"
+        ? 0
+        : event.key === "End"
+          ? tabs.length - 1
+          : (currentIndex + (previous ? -1 : 1) + tabs.length) % tabs.length;
+    event.preventDefault();
+    tabs[nextIndex].focus();
+    tabs[nextIndex].click();
+  };
 
-/** Moves focus through visible, enabled tabs and supports Home/End and RTL. */
-function handleListKeyDown(event: React.KeyboardEvent<HTMLDivElement>, activationMode: "automatic" | "manual") {
-  const key = event.key;
-  if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(key)) return;
-  const list = event.currentTarget;
-  const orientation = list.getAttribute("aria-orientation") === "vertical" ? "vertical" : "horizontal";
-  if (
-    key.startsWith("Arrow") &&
-    !(orientation === "vertical"
-      ? key === "ArrowUp" || key === "ArrowDown"
-      : key === "ArrowLeft" || key === "ArrowRight")
-  )
-    return;
-  const options = Array.from(
-    list.querySelectorAll<HTMLButtonElement>('[role="tab"]:not(:disabled):not([aria-disabled="true"])')
-  ).filter(
-    (tab) =>
-      tab.closest('[role="tablist"]') === list &&
-      !tab.closest('[hidden], [inert], [aria-hidden="true"]') &&
-      getComputedStyle(tab).display !== "none"
+  return (
+    <div
+      ref={ref}
+      role="tablist"
+      data-responsive-tabs="true"
+      data-variant={variant}
+      aria-orientation="horizontal"
+      onKeyDown={handleKeyDown}
+      onFocusCapture={(event) => {
+        onFocusCapture?.(event);
+        if (event.defaultPrevented) return;
+        const focused = (event.target as HTMLElement).closest<HTMLElement>('[role="tab"]');
+        if (focused && event.currentTarget.contains(focused)) scrollSelectedTabIntoView(focused);
+      }}
+      className={cn(
+        "inline-flex min-w-0 max-w-full flex-nowrap items-center justify-start gap-1 overflow-x-auto overscroll-x-contain touch-auto",
+        variant === "pill" && "rounded-full border border-border bg-muted/40 p-1 text-muted-foreground",
+        variant === "underline" && "border-b border-border bg-transparent p-0 text-muted-foreground",
+        className
+      )}
+      {...props}
+    />
   );
-  if (!options.length) return;
-  const current = options.indexOf(document.activeElement as HTMLButtonElement);
-  if (current < 0 && key !== "Home" && key !== "End") return;
-  const rtl = getComputedStyle(list).direction === "rtl";
-  const previous = key === "ArrowUp" || (rtl ? key === "ArrowRight" : key === "ArrowLeft");
-  let index: number;
-  if (key === "Home") index = 0;
-  else if (key === "End") index = options.length - 1;
-  else index = (current + (previous ? -1 : 1) + options.length) % options.length;
-  event.preventDefault();
-  const target = options[index];
-  target.focus({ preventScroll: true });
-  revealTab(list, target);
-  if (activationMode === "automatic") target.click();
-}
-
-/**
- * Scrolls a sideways tab strip horizontally so the tab is visible, without
- * scrolling the page itself (scrollIntoView can also move the page vertically,
- * which would jump a deep-linked screen on load). Adjusting scrollLeft by a
- * screen-space delta is direction-agnostic: in both LTR and RTL, decreasing
- * scrollLeft reveals content on the left and increasing it reveals content on
- * the right.
- */
-function revealTab(list: HTMLElement, tab: HTMLElement) {
-  if (list.scrollWidth <= list.clientWidth) return;
-  const listBox = list.getBoundingClientRect();
-  const tabBox = tab.getBoundingClientRect();
-  if (tabBox.left < listBox.left) list.scrollLeft -= listBox.left - tabBox.left + 8;
-  else if (tabBox.right > listBox.right) list.scrollLeft += tabBox.right - listBox.right + 8;
-}
-
-const TabsList = React.forwardRef<HTMLDivElement, TabsListProps>(
-  (
-    {
-      className,
-      variant = "pill",
-      orientation = "horizontal",
-      activationMode = "automatic",
-      onKeyDown,
-      children,
-      ...props
-    },
-    ref
-  ) => (
-    <TabsAppearanceContext.Provider value={variant}>
-      <div
-        {...props}
-        ref={ref}
-        role="tablist"
-        aria-label={props["aria-label"] ?? (props["aria-labelledby"] ? undefined : "Sections")}
-        aria-orientation={orientation}
-        data-responsive-tabs="true"
-        data-tabs-variant={variant}
-        onKeyDown={(event) => {
-          onKeyDown?.(event);
-          if (!event.defaultPrevented) handleListKeyDown(event, activationMode);
-        }}
-        className={cn(
-          "max-w-full min-w-0 items-center justify-start gap-1",
-          variant === "pill" ? "inline-flex" : "flex",
-          orientation === "horizontal" && "overflow-x-auto overscroll-x-contain touch-pan-x scrollbar-gutter-stable",
-          orientation === "vertical" && "flex-col items-stretch",
-          variant === "pill" && "rounded-xl border border-border bg-muted/40 p-1 text-muted-foreground",
-          variant === "underline" && "gap-0 border-b border-border bg-transparent p-0 text-muted-foreground",
-          className
-        )}
-      >
-        {children}
-      </div>
-    </TabsAppearanceContext.Provider>
-  )
-);
+});
 TabsList.displayName = "TabsList";
 
-export interface TabsTriggerProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  value: string;
+const pillTriggerClasses = [
+  "inline-flex min-h-11 shrink-0 touch-manipulation items-center justify-center gap-1.5 whitespace-nowrap text-sm font-medium transition-all motion-reduce:transition-none sm:min-h-9",
+  "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+  "disabled:pointer-events-none disabled:opacity-40",
+  "rounded-full px-3 py-1.5 text-muted-foreground hover:text-foreground sm:px-4",
+].join(" ");
+
+const pillSelectedClasses = "bg-background font-semibold text-foreground shadow-sm";
+
+/** Scroll both levels when a strip lives inside the shared swipe container.
+ * A nested, width-constrained list may scroll internally as well as its parent.
+ * Use physical geometry so LTR and RTL browsers handle scrollLeft consistently.
+ */
+function scrollSelectedTabIntoView(node: HTMLElement | null) {
+  const list = node?.closest<HTMLElement>('[role="tablist"]');
+  if (!node || !list) return;
+
+  const outer = list.closest<HTMLElement>(".erp-mobile-scroll-tabs");
+  const scrollables = outer && outer !== list ? [list, outer] : [list];
+
+  for (const scroller of scrollables) {
+    if (scroller.scrollWidth <= scroller.clientWidth + 1) continue;
+    const view = scroller.getBoundingClientRect();
+    const tab = node.getBoundingClientRect();
+    // Keep the selected label beyond the 2.5rem overflow fade when there are
+    // tabs on either side. At a hard scroll boundary, the scroll is clamped.
+    const gap = Math.min(40, scroller.clientWidth / 8);
+    if (tab.left < view.left + gap) {
+      scroller.scrollLeft -= view.left + gap - tab.left;
+    } else if (tab.right > view.right - gap) {
+      scroller.scrollLeft += tab.right - view.right + gap;
+    }
+  }
 }
 
-const TabsTrigger = React.forwardRef<HTMLButtonElement, TabsTriggerProps>(
-  ({ className, value, onClick, children, onKeyDown, ...props }, ref) => {
-    const { value: selectedValue, onValueChange, baseId } = useTabsContext("TabsTrigger");
-    const variant = React.useContext(TabsAppearanceContext);
-    const active = selectedValue === value;
-    const internalRef = React.useRef<HTMLButtonElement | null>(null);
-    const setRef = React.useCallback(
-      (node: HTMLButtonElement | null) => {
-        internalRef.current = node;
-        if (typeof ref === "function") ref(node);
-        else if (ref) ref.current = node;
-      },
-      [ref]
-    );
+/** Reposition the active tab when zoom, container width, or its text changes.
+ * The existing shell observer still owns overflow fades; this tracks only the
+ * selected tab's visibility without creating another global scroll listener.
+ * Exported for bespoke tabs (e.g. the editable Status Builder pages) that
+ * cannot be a plain button but still live inside a shared `TabsList`.
+ */
+function useActiveTabVisibility(ref: React.RefObject<HTMLElement | null>, active: boolean) {
+  React.useEffect(() => {
+    const node = ref.current;
+    if (!active || !node) return;
 
-    React.useEffect(() => {
-      const node = internalRef.current;
-      const list = node?.closest<HTMLElement>('[role="tablist"]');
-      if (!active || !node || !list) return;
-      revealTab(list, node);
-    }, [active]);
+    const list = node.closest<HTMLElement>('[role="tablist"]');
+    const outer = list?.closest<HTMLElement>(".erp-mobile-scroll-tabs");
+    const update = () => scrollSelectedTabIntoView(node);
+    update();
 
-    return (
-      <button
-        {...props}
-        ref={setRef}
-        id={props.id ?? tabId(baseId, value)}
-        type="button"
-        role="tab"
-        aria-selected={active}
-        // Inactive panels are unmounted, so only the active trigger controls a live panel.
-        aria-controls={active ? panelId(baseId, value) : undefined}
-        tabIndex={props.disabled ? -1 : active ? 0 : -1}
-        data-state={active ? "active" : "inactive"}
-        onClick={(event) => {
-          onClick?.(event);
-          if (!event.defaultPrevented && !props.disabled) onValueChange(value);
-        }}
-        onKeyDown={onKeyDown}
-        className={cn(
-          "inline-flex min-h-11 shrink-0 touch-manipulation items-center justify-center gap-1.5 whitespace-nowrap text-sm font-medium transition-colors sm:min-h-9",
-          "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-          "disabled:pointer-events-none disabled:opacity-40",
-          variant === "pill" &&
-            "rounded-lg px-3 py-2 text-muted-foreground hover:bg-background/60 hover:text-foreground sm:px-4",
-          variant === "pill" && active && "bg-background font-semibold text-foreground shadow-xs",
-          variant === "underline" &&
-            "rounded-none border-b-2 border-transparent px-4 py-2 text-muted-foreground hover:text-foreground",
-          variant === "underline" && active && "border-primary font-semibold text-foreground",
-          className
-        )}
-      >
-        {children}
-      </button>
-    );
-  }
-);
+    const resize = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(update);
+    const observed = [node, list, outer].filter((item): item is HTMLElement => item != null);
+    observed.forEach((item) => resize?.observe(item));
+    // Mobile browsers fire height-only resizes while their toolbars collapse during
+    // vertical page scrolling; only a width change (rotation, zoom) can hide the tab,
+    // and reacting to height would undo a sideways swipe the user just made.
+    let lastWidth = window.innerWidth;
+    const onWindowResize = () => {
+      if (window.innerWidth === lastWidth) return;
+      lastWidth = window.innerWidth;
+      update();
+    };
+    window.addEventListener("resize", onWindowResize, { passive: true });
+    return () => {
+      resize?.disconnect();
+      window.removeEventListener("resize", onWindowResize);
+    };
+  }, [active, ref]);
+}
+
+const TabsTrigger = React.forwardRef<
+  HTMLButtonElement,
+  React.ButtonHTMLAttributes<HTMLButtonElement> & { value: string }
+>(({ className, value, onClick, children, ...props }, ref) => {
+  const ctx = React.useContext(TabsContext);
+  const active = ctx.value === value;
+  const localRef = React.useRef<HTMLButtonElement | null>(null);
+  const setRef = React.useCallback(
+    (node: HTMLButtonElement | null) => {
+      localRef.current = node;
+      if (typeof ref === "function") ref(node);
+      else if (ref) ref.current = node;
+    },
+    [ref]
+  );
+
+  useActiveTabVisibility(localRef, active);
+
+  return (
+    <button
+      ref={setRef}
+      type="button"
+      role="tab"
+      aria-selected={active}
+      // Inactive panels are unmounted, so only the selected tab can reference one.
+      aria-controls={active ? `${ctx.id}-panel-${value}` : undefined}
+      id={`${ctx.id}-tab-${value}`}
+      tabIndex={active ? 0 : -1}
+      data-state={active ? "active" : "inactive"}
+      onClick={(event) => {
+        onClick?.(event);
+        if (!event.defaultPrevented) ctx.onValueChange(value);
+      }}
+      className={cn(pillTriggerClasses, active && pillSelectedClasses, className)}
+      {...props}
+    >
+      {children}
+    </button>
+  );
+});
 TabsTrigger.displayName = "TabsTrigger";
 
-export interface TabsContentProps extends React.HTMLAttributes<HTMLDivElement> {
-  value: string;
-  /** Keep hidden panels mounted for expensive forms when explicitly desired. */
-  forceMount?: boolean;
-}
-const TabsContent = React.forwardRef<HTMLDivElement, TabsContentProps>(
-  ({ className, value, children, forceMount = false, ...props }, ref) => {
-    const { value: selectedValue, baseId } = useTabsContext("TabsContent");
-    const active = selectedValue === value;
-    // Preserve the previous fallback behavior when Tabs has no selected value.
-    if (!active && selectedValue !== undefined && !forceMount) return null;
+// For hubs that render their panels directly (rather than using TabsContent),
+// use this button inside TabsList to keep existing navigation logic intact.
+const PillTabButton = React.forwardRef<
+  HTMLButtonElement,
+  Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "aria-selected"> & { selected: boolean }
+>(({ selected, className, children, ...props }, ref) => {
+  const localRef = React.useRef<HTMLButtonElement | null>(null);
+  const setRef = React.useCallback(
+    (node: HTMLButtonElement | null) => {
+      localRef.current = node;
+      if (typeof ref === "function") ref(node);
+      else if (ref) ref.current = node;
+    },
+    [ref]
+  );
+
+  useActiveTabVisibility(localRef, selected);
+
+  return (
+    <button
+      ref={setRef}
+      type="button"
+      role="tab"
+      aria-selected={selected}
+      tabIndex={selected ? 0 : -1}
+      data-state={selected ? "active" : "inactive"}
+      className={cn(pillTriggerClasses, selected && pillSelectedClasses, className)}
+      {...props}
+    >
+      {children}
+    </button>
+  );
+});
+PillTabButton.displayName = "PillTabButton";
+
+const TabsContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement> & { value: string }>(
+  ({ className, value, children, ...props }, ref) => {
+    const ctx = React.useContext(TabsContext);
+
+    if (ctx.value !== undefined && ctx.value !== value) return null;
+
     return (
       <div
-        {...props}
         ref={ref}
-        id={props.id ?? panelId(baseId, value)}
         role="tabpanel"
-        aria-labelledby={tabId(baseId, value)}
-        hidden={!active && selectedValue !== undefined}
-        data-state={active ? "active" : "inactive"}
+        id={`${ctx.id}-panel-${value}`}
+        aria-labelledby={`${ctx.id}-tab-${value}`}
+        data-state={ctx.value === value ? "active" : "inactive"}
         className={cn(
           "mt-4 min-w-0 ring-offset-background focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
           className
         )}
+        {...props}
       >
         {children}
       </div>
@@ -259,4 +281,4 @@ const TabsContent = React.forwardRef<HTMLDivElement, TabsContentProps>(
 );
 TabsContent.displayName = "TabsContent";
 
-export { Tabs, TabsList, TabsTrigger, TabsContent };
+export { Tabs, TabsList, TabsTrigger, TabsContent, PillTabButton, useActiveTabVisibility };

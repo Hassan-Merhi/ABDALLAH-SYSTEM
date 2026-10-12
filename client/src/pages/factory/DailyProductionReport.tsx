@@ -69,41 +69,47 @@ export default function DailyProductionReport() {
           onValueChange={(value) => setActiveTab(value as OverviewTab)}
           className="flex flex-col flex-1 overflow-hidden"
         >
-          <TabsList className="mx-4 mt-3 mb-0 shrink-0 w-fit" data-testid="tabs-production-analytics">
-            {show("otw-tracking") && (
-              <TabsTrigger value="otw-tracking" data-testid="tab-otw-tracking">
-                <Truck className="h-4 w-4 mr-1.5" /> OTW Tracking
+          <div className="erp-mobile-scroll-tabs mx-4 mt-3 mb-0 shrink-0 pb-1">
+            <TabsList
+              className="w-max min-w-full sm:min-w-0 sm:w-fit"
+              aria-label="Production reports"
+              data-testid="tabs-production-analytics"
+            >
+              {show("otw-tracking") && (
+                <TabsTrigger value="otw-tracking" data-testid="tab-otw-tracking">
+                  <Truck className="h-4 w-4 mr-1.5" /> OTW Tracking
+                </TabsTrigger>
+              )}
+              {show("production") && (
+                <TabsTrigger value="production" data-testid="tab-production">
+                  <FlaskConical className="h-4 w-4 mr-1.5" /> Production
+                </TabsTrigger>
+              )}
+              {show("comparison") && (
+                <TabsTrigger value="comparison" data-testid="tab-comparison">
+                  <Tag className="h-4 w-4 mr-1.5" /> Comparison
+                </TabsTrigger>
+              )}
+              {show("product-comparison") && (
+                <TabsTrigger value="product-comparison" data-testid="tab-product-comparison">
+                  <BarChart3 className="h-4 w-4 mr-1.5" /> {productComparisonCopy.tabLabel}
+                </TabsTrigger>
+              )}
+              {show("shipping") && (
+                <TabsTrigger value="shipping" data-testid="tab-shipping">
+                  <Ship className="h-4 w-4 mr-1.5" /> Shipping
+                </TabsTrigger>
+              )}
+              {show("sheets") && (
+                <TabsTrigger value="sheets" data-testid="tab-sheets">
+                  Sheets
+                </TabsTrigger>
+              )}
+              <TabsTrigger value="container-tracking" data-testid="tab-container-tracking" className="hidden">
+                Container Tracking
               </TabsTrigger>
-            )}
-            {show("production") && (
-              <TabsTrigger value="production" data-testid="tab-production">
-                <FlaskConical className="h-4 w-4 mr-1.5" /> Production
-              </TabsTrigger>
-            )}
-            {show("comparison") && (
-              <TabsTrigger value="comparison" data-testid="tab-comparison">
-                <Tag className="h-4 w-4 mr-1.5" /> Comparison
-              </TabsTrigger>
-            )}
-            {show("product-comparison") && (
-              <TabsTrigger value="product-comparison" data-testid="tab-product-comparison">
-                <BarChart3 className="h-4 w-4 mr-1.5" /> {productComparisonCopy.tabLabel}
-              </TabsTrigger>
-            )}
-            {show("shipping") && (
-              <TabsTrigger value="shipping" data-testid="tab-shipping">
-                <Ship className="h-4 w-4 mr-1.5" /> Shipping
-              </TabsTrigger>
-            )}
-            {show("sheets") && (
-              <TabsTrigger value="sheets" data-testid="tab-sheets">
-                Sheets
-              </TabsTrigger>
-            )}
-            <TabsTrigger value="container-tracking" data-testid="tab-container-tracking" className="hidden">
-              Container Tracking
-            </TabsTrigger>
-          </TabsList>
+            </TabsList>
+          </div>
 
           {show("otw-tracking") && (
             <TabsContent value="otw-tracking" className="flex-1 overflow-y-auto p-4 mt-0 data-[state=inactive]:hidden">

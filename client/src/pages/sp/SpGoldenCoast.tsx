@@ -69,13 +69,19 @@ export default function SpGoldenCoast() {
       </div>
 
       <Tabs value={tab} onValueChange={(value) => setTab(value as GoldenCoastTab)}>
-        <TabsList className="flex h-auto flex-wrap gap-1" data-testid="tabs-golden-coast">
-          <TabsTrigger value="overview">{releaseDebtEnglish("Overview")}</TabsTrigger>
-          <TabsTrigger value="hadi">{releaseDebtEnglish("HADI")}</TabsTrigger>
-          <TabsTrigger value="savings">{releaseDebtEnglish("Hassan Savings")}</TabsTrigger>
-          <TabsTrigger value="sales-cash">{releaseDebtEnglish("GC Sales Cash")}</TabsTrigger>
-          <TabsTrigger value="monthly-close">{releaseDebtEnglish("Monthly close")}</TabsTrigger>
-        </TabsList>
+        <div className="erp-mobile-scroll-tabs pb-1">
+          <TabsList
+            className="w-max min-w-full sm:min-w-0 sm:w-fit"
+            data-testid="tabs-golden-coast"
+            aria-label="Golden Coast sections"
+          >
+            <TabsTrigger value="overview">{releaseDebtEnglish("Overview")}</TabsTrigger>
+            <TabsTrigger value="hadi">{releaseDebtEnglish("HADI")}</TabsTrigger>
+            <TabsTrigger value="savings">{releaseDebtEnglish("Hassan Savings")}</TabsTrigger>
+            <TabsTrigger value="sales-cash">{releaseDebtEnglish("GC Sales Cash")}</TabsTrigger>
+            <TabsTrigger value="monthly-close">{releaseDebtEnglish("Monthly close")}</TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="overview" className="mt-5 space-y-5">
           <GoldenCoastOverview onOpenTab={setTab} />

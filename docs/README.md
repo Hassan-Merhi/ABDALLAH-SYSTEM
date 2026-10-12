@@ -71,6 +71,7 @@ failure, so a correct document cannot quietly become undiscoverable.
 | [mobile-tablet-web-regression.md](mobile-tablet-web-regression.md) | Browser regression checklist |
 | [erp-mobile-program.md](erp-mobile-program.md) | ERP phone contracts, route certification and phase status |
 | [factory-mobile-audit.md](factory-mobile-audit.md) | Factory mode phone layouts and mobile audit status |
+| [universal-responsive-pill-tabs.md](universal-responsive-pill-tabs.md) | Shared pill tab component standard, migration map and verification status |
 | [ux-consistency-program.md](ux-consistency-program.md) | Shared responsive, translation, route-boundary, and filter-state contracts |
 | [shared-ui-continuation-roadmap.md](shared-ui-continuation-roadmap.md) | Shared UI standardization phase status, checkpoints and Phase 8 verification record |
 | [shared-ui-phase-1.md](shared-ui-phase-1.md) | Canonical page shells, page states, skeletons and status badges |

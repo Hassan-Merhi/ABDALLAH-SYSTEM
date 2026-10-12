@@ -47,8 +47,8 @@ export default function FactoryProductionIntelHub() {
         onValueChange={(value) => setSection(value as Section)}
         className="flex flex-col h-full overflow-hidden"
       >
-        <div className="border-b px-4 pt-3 shrink-0 overflow-x-auto">
-          <TabsList className="flex-nowrap">
+        <div className="erp-mobile-scroll-tabs border-b px-4 pt-3 pb-1 shrink-0">
+          <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Production intelligence sections">
             {sections.includes("production-summary") && (
               <TabsTrigger value="production-summary" data-testid="tab-production-intel-summary">
                 <BarChart3 className="h-4 w-4 mr-2" />

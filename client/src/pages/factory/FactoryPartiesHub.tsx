@@ -52,8 +52,8 @@ export default function FactoryPartiesHub() {
             showBackButton={false}
           />
         </div>
-        <div className="border-b px-4 shrink-0 overflow-x-auto">
-          <TabsList className="flex-nowrap">
+        <div className="erp-mobile-scroll-tabs border-b px-4 pb-1 shrink-0">
+          <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Factory parties sections">
             {showCustomers && (
               <TabsTrigger value="customers" data-testid="tab-parties-customers">
                 <Users className="h-4 w-4 mr-2" />

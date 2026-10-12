@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { HardHat, DollarSign, CalendarDays, Banknote, Gift, BarChart3 } from "lucide-react";
 import FactoryWorkers from "@/pages/factory/FactoryWorkers";
 import FactoryPayrollTab from "@/pages/factory/FactoryPayrollTab";
@@ -93,7 +93,6 @@ export default function FactoryWorkersHub() {
     <Tabs value={tab} onValueChange={(value) => setTab(value as TabValue)}>
       <div className="erp-mobile-scroll-tabs mb-4 pb-1">
         <TabsList
-          variant="pill"
           className="w-max min-w-full sm:min-w-0 sm:w-fit"
           aria-label="Worker sections"
           data-testid="tabs-workers-section"

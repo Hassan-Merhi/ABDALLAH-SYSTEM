@@ -1,10 +1,10 @@
+import { TabsList, PillTabButton } from "@/components/ui/tabs";
 import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -145,11 +145,7 @@ export default function FactorySheetsAndSacks() {
   );
 
   return (
-    <Tabs
-      value={effectiveTab ?? ""}
-      onValueChange={(value) => setActiveTab(value as "stock" | "movements")}
-      className="space-y-6 p-6"
-    >
+    <div className="space-y-6 p-6">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <PageHeader title="Sheets & Sacks" subtitle="Track packaging materials inventory" />
@@ -203,20 +199,20 @@ export default function FactorySheetsAndSacks() {
         </Card>
       </div>
 
-      {/* Shared tab strip for phone and desktop; hidden sections stay inaccessible. */}
+      {/* Tab switcher */}
       {effectiveTab ? (
-        <TabsList variant="underline" aria-label="Sheets and sacks sections">
+        <TabsList aria-label="Sheets and sacks sections" className="w-max max-w-full">
           {showStock && (
-            <TabsTrigger value="stock">
+            <PillTabButton onClick={() => setActiveTab("stock")} selected={effectiveTab === "stock"}>
               <Layers className="h-4 w-4" />
               Current Stock
-            </TabsTrigger>
+            </PillTabButton>
           )}
           {showMovements && (
-            <TabsTrigger value="movements">
+            <PillTabButton onClick={() => setActiveTab("movements")} selected={effectiveTab === "movements"}>
               <History className="h-4 w-4" />
               Movement Log
-            </TabsTrigger>
+            </PillTabButton>
           )}
         </TabsList>
       ) : (
@@ -225,201 +221,193 @@ export default function FactorySheetsAndSacks() {
         </div>
       )}
 
-      {effectiveTab && (
-        <TabsContent value={effectiveTab} className="mt-0 space-y-6">
-          {/* ─── CURRENT STOCK TAB ───────────────────────────────────────────── */}
-          {effectiveTab === "stock" && (
-            <>
-              {/* Filters */}
-              <div className="flex items-center gap-3 flex-wrap">
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search by name, size..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="pl-8 w-64"
-                  />
+      {/* ─── CURRENT STOCK TAB ───────────────────────────────────────────── */}
+      {effectiveTab === "stock" && (
+        <>
+          {/* Filters */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by name, size..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-8 w-64"
+              />
+            </div>
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="w-36">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                {TYPES.map((t) => (
+                  <SelectItem key={t} value={t}>
+                    {t}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {(search || typeFilter !== "all") && (
+              <span className="text-xs text-muted-foreground">
+                Showing {filtered.length} of {items.length} items
+              </span>
+            )}
+          </div>
+
+          {/* Table */}
+          <Card>
+            <CardContent className="p-0">
+              {isLoading ? (
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                 </div>
-                <Select value={typeFilter} onValueChange={setTypeFilter}>
-                  <SelectTrigger className="w-36">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Types</SelectItem>
-                    {TYPES.map((t) => (
-                      <SelectItem key={t} value={t}>
-                        {t}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {(search || typeFilter !== "all") && (
-                  <span className="text-xs text-muted-foreground">
-                    Showing {filtered.length} of {items.length} items
-                  </span>
-                )}
-              </div>
-
-              {/* Table */}
-              <Card>
-                <CardContent className="p-0">
-                  {isLoading ? (
-                    <div className="flex items-center justify-center py-16">
-                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                    </div>
-                  ) : filtered.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-                      <Layers className="h-10 w-10 mb-3 opacity-25" />
-                      <p className="text-sm font-medium">
-                        {items.length === 0
-                          ? "No items yet. Add your first sheet or sack."
-                          : "No items match your search."}
-                      </p>
-                      {items.length === 0 && canEdit && (
-                        <Button variant="outline" className="mt-4" onClick={() => setShowAddDialog(true)}>
-                          <Plus className="h-4 w-4 mr-1" />
-                          Add Item
-                        </Button>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <Table mobileLayout="cards" data-testid="factory-sheets-sacks-table">
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-6" />
-                            <TableHead>Name</TableHead>
-                            <TableHead>Type</TableHead>
-                            <TableHead>Size / Weight</TableHead>
-                            <TableHead className="text-right">Qty (packs)</TableHead>
-                            <TableHead className="text-right"># / Pack</TableHead>
-                            <TableHead className="text-right">Total Pcs</TableHead>
-                            <TableHead className="text-right">Price / Pc</TableHead>
-                            <TableHead className="text-right">Total Value</TableHead>
-                            <TableHead>Notes</TableHead>
-                            {canEdit && <TableHead className="text-right">Actions</TableHead>}
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {filtered.map((item) => {
-                            const totalPcs = parseFloat(item.quantity || "0");
-                            const totalVal = totalPcs * parseFloat(item.unitPrice || "0");
-                            const bg = item.rowColor ? `${item.rowColor}18` : undefined;
-                            return (
-                              <TableRow key={item.id} style={bg ? { backgroundColor: bg } : undefined}>
-                                <TableCell className="px-2">
-                                  {item.rowColor ? (
-                                    <span
-                                      className="inline-block rounded-full border border-border/50"
-                                      style={{ width: 14, height: 14, backgroundColor: item.rowColor }}
-                                    />
-                                  ) : (
-                                    <span
-                                      className="inline-block rounded-full border border-border/30 bg-transparent"
-                                      style={{ width: 14, height: 14 }}
-                                    />
-                                  )}
-                                </TableCell>
-                                <TableCell className="font-medium">{item.name}</TableCell>
-                                <TableCell>{typeBadge(item.type)}</TableCell>
-                                <TableCell className="text-muted-foreground">{item.size || "—"}</TableCell>
-                                <TableCell className="text-right font-mono">{fmtInt(item.packQty)}</TableCell>
-                                <TableCell className="text-right font-mono">{fmtInt(item.pcsPerPack)}</TableCell>
-                                <TableCell className="text-right font-mono">
-                                  {totalPcs > 0 ? totalPcs.toLocaleString("en-US") : "0"}
-                                </TableCell>
-                                <TableCell className="text-right font-mono">${fmt(item.unitPrice)}</TableCell>
-                                <TableCell className="text-right font-mono font-medium">${fmt(totalVal)}</TableCell>
-                                <TableCell className="text-muted-foreground text-sm sm:max-w-xs sm:truncate">
-                                  {item.notes || "—"}
-                                </TableCell>
-                                {canEdit && (
-                                  <TableCell className="text-right">
-                                    <div className="flex items-center justify-end gap-1">
-                                      <Button
-                                        size="icon"
-                                        variant="ghost"
-                                        onClick={() => setRestockItem(item)}
-                                        title="Add Stock"
-                                        aria-label={`Add Stock ${item.name}`}
-                                      >
-                                        <PlusCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
-                                      </Button>
-                                      <Button
-                                        size="icon"
-                                        variant="ghost"
-                                        onClick={() => setDeductItem(item)}
-                                        title="Deduct"
-                                        aria-label={`Deduct ${item.name}`}
-                                      >
-                                        <MinusCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                                      </Button>
-                                      <Button
-                                        size="icon"
-                                        variant="ghost"
-                                        onClick={() => setEditItem(item)}
-                                        title="Edit"
-                                        aria-label={`Edit ${item.name}`}
-                                      >
-                                        <Pencil className="h-4 w-4" />
-                                      </Button>
-                                      <Button
-                                        size="icon"
-                                        variant="ghost"
-                                        onClick={() => setDeleteItem(item)}
-                                        title="Delete"
-                                        aria-label={`Delete ${item.name}`}
-                                      >
-                                        <Trash2 className="h-4 w-4 text-destructive" />
-                                      </Button>
-                                    </div>
-                                  </TableCell>
-                                )}
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                        <tfoot className="border-t-2 bg-muted/40 font-semibold">
-                          <tr>
-                            <td className="w-6 px-2 py-3" />
-                            <td className="py-3 px-4 text-sm text-muted-foreground">
-                              Totals <span className="font-normal">({filtered.length} items)</span>
-                            </td>
-                            <td className="py-3 px-4" />
-                            {/* Type */}
-                            <td className="py-3 px-4" />
-                            {/* Size */}
-                            <td className="py-3 px-4 text-right font-mono text-sm">
-                              {colTotals.packQty > 0 ? colTotals.packQty.toLocaleString("en-US") : "—"}
-                            </td>
-                            <td className="py-3 px-4" />
-                            {/* # / Pack */}
-                            <td className="py-3 px-4 text-right font-mono text-sm">
-                              {colTotals.pcs.toLocaleString("en-US")}
-                            </td>
-                            <td className="py-3 px-4" />
-                            {/* Price / Pc */}
-                            <td className="py-3 px-4 text-right font-mono text-sm font-bold">
-                              ${fmt(colTotals.value)}
-                            </td>
-                            <td className="py-3 px-4" />
-                            {/* Notes */}
-                            {canEdit && <td className="py-3 px-4" />}
-                          </tr>
-                        </tfoot>
-                      </Table>
-                    </div>
+              ) : filtered.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                  <Layers className="h-10 w-10 mb-3 opacity-25" />
+                  <p className="text-sm font-medium">
+                    {items.length === 0 ? "No items yet. Add your first sheet or sack." : "No items match your search."}
+                  </p>
+                  {items.length === 0 && canEdit && (
+                    <Button variant="outline" className="mt-4" onClick={() => setShowAddDialog(true)}>
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add Item
+                    </Button>
                   )}
-                </CardContent>
-              </Card>
-            </>
-          )}
-
-          {/* ─── MOVEMENT LOG TAB ─────────────────────────────────────────────── */}
-          {effectiveTab === "movements" && <MovementLog items={items} />}
-        </TabsContent>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table mobileLayout="cards" data-testid="factory-sheets-sacks-table">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-6" />
+                        <TableHead>Name</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Size / Weight</TableHead>
+                        <TableHead className="text-right">Qty (packs)</TableHead>
+                        <TableHead className="text-right"># / Pack</TableHead>
+                        <TableHead className="text-right">Total Pcs</TableHead>
+                        <TableHead className="text-right">Price / Pc</TableHead>
+                        <TableHead className="text-right">Total Value</TableHead>
+                        <TableHead>Notes</TableHead>
+                        {canEdit && <TableHead className="text-right">Actions</TableHead>}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filtered.map((item) => {
+                        const totalPcs = parseFloat(item.quantity || "0");
+                        const totalVal = totalPcs * parseFloat(item.unitPrice || "0");
+                        const bg = item.rowColor ? `${item.rowColor}18` : undefined;
+                        return (
+                          <TableRow key={item.id} style={bg ? { backgroundColor: bg } : undefined}>
+                            <TableCell className="px-2">
+                              {item.rowColor ? (
+                                <span
+                                  className="inline-block rounded-full border border-border/50"
+                                  style={{ width: 14, height: 14, backgroundColor: item.rowColor }}
+                                />
+                              ) : (
+                                <span
+                                  className="inline-block rounded-full border border-border/30 bg-transparent"
+                                  style={{ width: 14, height: 14 }}
+                                />
+                              )}
+                            </TableCell>
+                            <TableCell className="font-medium">{item.name}</TableCell>
+                            <TableCell>{typeBadge(item.type)}</TableCell>
+                            <TableCell className="text-muted-foreground">{item.size || "—"}</TableCell>
+                            <TableCell className="text-right font-mono">{fmtInt(item.packQty)}</TableCell>
+                            <TableCell className="text-right font-mono">{fmtInt(item.pcsPerPack)}</TableCell>
+                            <TableCell className="text-right font-mono">
+                              {totalPcs > 0 ? totalPcs.toLocaleString("en-US") : "0"}
+                            </TableCell>
+                            <TableCell className="text-right font-mono">${fmt(item.unitPrice)}</TableCell>
+                            <TableCell className="text-right font-mono font-medium">${fmt(totalVal)}</TableCell>
+                            <TableCell className="text-muted-foreground text-sm sm:max-w-xs sm:truncate">
+                              {item.notes || "—"}
+                            </TableCell>
+                            {canEdit && (
+                              <TableCell className="text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={() => setRestockItem(item)}
+                                    title="Add Stock"
+                                    aria-label={`Add Stock ${item.name}`}
+                                  >
+                                    <PlusCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                                  </Button>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={() => setDeductItem(item)}
+                                    title="Deduct"
+                                    aria-label={`Deduct ${item.name}`}
+                                  >
+                                    <MinusCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                                  </Button>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={() => setEditItem(item)}
+                                    title="Edit"
+                                    aria-label={`Edit ${item.name}`}
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={() => setDeleteItem(item)}
+                                    title="Delete"
+                                    aria-label={`Delete ${item.name}`}
+                                  >
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            )}
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                    <tfoot className="border-t-2 bg-muted/40 font-semibold">
+                      <tr>
+                        <td className="w-6 px-2 py-3" />
+                        <td className="py-3 px-4 text-sm text-muted-foreground">
+                          Totals <span className="font-normal">({filtered.length} items)</span>
+                        </td>
+                        <td className="py-3 px-4" />
+                        {/* Type */}
+                        <td className="py-3 px-4" />
+                        {/* Size */}
+                        <td className="py-3 px-4 text-right font-mono text-sm">
+                          {colTotals.packQty > 0 ? colTotals.packQty.toLocaleString("en-US") : "—"}
+                        </td>
+                        <td className="py-3 px-4" />
+                        {/* # / Pack */}
+                        <td className="py-3 px-4 text-right font-mono text-sm">
+                          {colTotals.pcs.toLocaleString("en-US")}
+                        </td>
+                        <td className="py-3 px-4" />
+                        {/* Price / Pc */}
+                        <td className="py-3 px-4 text-right font-mono text-sm font-bold">${fmt(colTotals.value)}</td>
+                        <td className="py-3 px-4" />
+                        {/* Notes */}
+                        {canEdit && <td className="py-3 px-4" />}
+                      </tr>
+                    </tfoot>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </>
       )}
+
+      {/* ─── MOVEMENT LOG TAB ─────────────────────────────────────────────── */}
+      {effectiveTab === "movements" && <MovementLog items={items} />}
 
       {/* Dialogs */}
       {(showAddDialog || editItem) && (
@@ -455,6 +443,6 @@ export default function FactorySheetsAndSacks() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Tabs>
+    </div>
   );
 }

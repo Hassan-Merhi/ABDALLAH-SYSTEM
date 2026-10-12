@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Users, Package, Boxes } from "lucide-react";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { TabsList, PillTabButton } from "@/components/ui/tabs";
 
 import type { ImportTab } from "./factoryimport/types";
 import { SupplierImport } from "./factoryimport/components/SupplierImport";
@@ -38,36 +38,33 @@ export default function FactoryImport() {
   }
 
   return (
-    <Tabs
-      value={activeTab}
-      onValueChange={(value) => setRequestedTab(value as ImportTab)}
-      className="min-w-0 space-y-4"
-      data-testid="factory-import-page"
-    >
-      <TabsList
-        variant="pill"
-        className="w-max max-w-full"
-        data-testid="factory-import-tabs"
-        aria-label="Import sections"
-      >
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          return (
-            <TabsTrigger key={tab.key} value={tab.key} data-testid={`tab-import-${tab.key}`}>
-              <Icon className="h-4 w-4 shrink-0" />
-              {tab.label}
-            </TabsTrigger>
-          );
-        })}
-      </TabsList>
+    <div className="min-w-0 space-y-4" data-testid="factory-import-page">
+      <div className="erp-mobile-scroll-tabs pb-1" data-testid="factory-import-tabs">
+        <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Factory import sections">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <PillTabButton
+                key={tab.key}
+                selected={activeTab === tab.key}
+                onClick={() => setRequestedTab(tab.key)}
+                data-testid={`tab-import-${tab.key}`}
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                {tab.label}
+              </PillTabButton>
+            );
+          })}
+        </TabsList>
+      </div>
 
-      <TabsContent value={activeTab} className="mt-0 min-w-0">
+      <div className="min-w-0">
         {activeTab === "suppliers" && <SupplierImport />}
         {activeTab === "raw-stock" && <RawStockImport />}
         {activeTab === "bales" && <BaleImport />}
         {activeTab === "opening-stock" && <OpeningStockImport />}
         {activeTab === "ob-edit" && <SupplierObEdit />}
-      </TabsContent>
-    </Tabs>
+      </div>
+    </div>
   );
 }

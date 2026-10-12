@@ -4,8 +4,8 @@
  * Extracted from FactoryStatusBuilder.tsx during the Phase 4 god-file split.
  */
 import { useState, useEffect, useRef } from "react";
-import {} from "@/components/ui/dialog";
 import { X } from "lucide-react";
+import { useActiveTabVisibility } from "@/components/ui/tabs";
 
 export function TabLabel({
   name,
@@ -25,6 +25,8 @@ export function TabLabel({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(name);
   const inputRef = useRef<HTMLInputElement>(null);
+  const tabRef = useRef<HTMLDivElement>(null);
+  useActiveTabVisibility(tabRef, active);
 
   const commit = () => {
     const v = draft.trim();
@@ -39,18 +41,29 @@ export function TabLabel({
 
   return (
     <div
+      ref={tabRef}
       data-testid={`sb-tab-${name}`}
+      role="tab"
+      aria-selected={active}
+      tabIndex={active ? 0 : -1}
       onClick={onActivate}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onActivate();
+        } else if (event.key === "F2") {
+          // Keyboard equivalent of double-click rename.
+          event.preventDefault();
+          setEditing(true);
+          setDraft(name);
+        }
+      }}
       onDoubleClick={() => {
         setEditing(true);
         setDraft(name);
       }}
-      className={`relative flex items-center gap-1.5 px-3 py-2 cursor-pointer border-b-2 select-none whitespace-nowrap transition-colors
-        ${
-          active
-            ? "border-primary text-foreground font-medium"
-            : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted"
-        }`}
+      className={`relative flex min-h-11 sm:min-h-9 shrink-0 items-center gap-1.5 rounded-full px-3 py-2 cursor-pointer select-none whitespace-nowrap transition-colors motion-reduce:transition-none focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${active ? "bg-background text-foreground font-semibold shadow-sm" : "text-muted-foreground hover:text-foreground hover:bg-muted/50"}`}
     >
       {editing ? (
         <input
@@ -75,6 +88,8 @@ export function TabLabel({
       )}
       {active && canDelete && (
         <button
+          type="button"
+          aria-label={`Delete page ${name}`}
           data-testid={`sb-tab-delete-${name}`}
           onClick={(e) => {
             e.stopPropagation();

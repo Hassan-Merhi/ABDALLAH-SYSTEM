@@ -304,13 +304,13 @@ export function ApprovalsPage({ currentUser }: Props) {
       <Card>
         <CardContent className="p-0">
           <Tabs value={tab} onValueChange={setTab}>
-            <div className="border-b px-4 pt-2">
-              <TabsList className="bg-transparent p-0 h-auto gap-1">
+            <div className="erp-mobile-scroll-tabs px-4 pt-2 pb-1">
+              <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Approval sections">
                 {isAdmin && (
                   <>
                     <TabsTrigger
                       value="pending"
-                      className="rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent pb-2 px-3 text-sm"
+
                       data-testid="tab-approvals-pending"
                     >
                       <Clock className="h-3.5 w-3.5 mr-1.5" />
@@ -321,7 +321,7 @@ export function ApprovalsPage({ currentUser }: Props) {
                     </TabsTrigger>
                     <TabsTrigger
                       value="approved"
-                      className="rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent pb-2 px-3 text-sm"
+
                       data-testid="tab-approvals-approved"
                     >
                       <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
@@ -329,7 +329,7 @@ export function ApprovalsPage({ currentUser }: Props) {
                     </TabsTrigger>
                     <TabsTrigger
                       value="rejected"
-                      className="rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent pb-2 px-3 text-sm"
+
                       data-testid="tab-approvals-rejected"
                     >
                       <XCircle className="h-3.5 w-3.5 mr-1.5" />
@@ -337,7 +337,7 @@ export function ApprovalsPage({ currentUser }: Props) {
                     </TabsTrigger>
                     <TabsTrigger
                       value="executed"
-                      className="rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent pb-2 px-3 text-sm"
+
                       data-testid="tab-approvals-executed"
                     >
                       <Play className="h-3.5 w-3.5 mr-1.5" />
@@ -347,7 +347,7 @@ export function ApprovalsPage({ currentUser }: Props) {
                 )}
                 <TabsTrigger
                   value="mine"
-                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent pb-2 px-3 text-sm"
+
                   data-testid="tab-approvals-mine"
                 >
                   <MessageSquare className="h-3.5 w-3.5 mr-1.5" />

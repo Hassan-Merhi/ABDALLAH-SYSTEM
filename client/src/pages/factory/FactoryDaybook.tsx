@@ -35,10 +35,9 @@ export default function FactoryDaybook() {
   const hiddenTabs = myAccess?.hiddenCostFields ?? [];
   const showTransactions = !hiddenTabs.includes("hide_tab_daybook_transactions");
   const showActivity = !hiddenTabs.includes("hide_tab_daybook_activity");
-  const visibleTabs = [
-    showTransactions ? "transactions" : null,
-    showActivity ? "activity" : null,
-  ].filter((value): value is "transactions" | "activity" => value !== null);
+  const visibleTabs = [showTransactions ? "transactions" : null, showActivity ? "activity" : null].filter(
+    (value): value is "transactions" | "activity" => value !== null
+  );
   const effectiveTab = visibleTabs.includes(activeDaybookTab) ? activeDaybookTab : visibleTabs[0];
 
   useEffect(() => {
@@ -54,28 +53,30 @@ export default function FactoryDaybook() {
         <div>
           <PageHeader title="Factory Daybook" subtitle="All factory transactions in one view" />
         </div>
-        {showTransactions && <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="outline"
-              disabled={model.filteredEntries.length === 0 || model.isExportingDetailed}
-              data-testid="button-export-excel"
-              className="gap-2"
-            >
-              <FileDown className="w-4 h-4" />
-              {model.isExportingDetailed ? "Exporting..." : "Export"}
-              <ChevronDown className="w-4 h-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={model.handleExportToExcel} data-testid="export-simple">
-              Summary Export
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={model.handleExportDetailedToExcel} data-testid="export-detailed">
-              Detailed Export (with entries)
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>}
+        {showTransactions && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                disabled={model.filteredEntries.length === 0 || model.isExportingDetailed}
+                data-testid="button-export-excel"
+                className="gap-2"
+              >
+                <FileDown className="w-4 h-4" />
+                {model.isExportingDetailed ? "Exporting..." : "Export"}
+                <ChevronDown className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={model.handleExportToExcel} data-testid="export-simple">
+                Summary Export
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={model.handleExportDetailedToExcel} data-testid="export-detailed">
+                Detailed Export (with entries)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
 
       {/* Tab selector: Transactions / Edits & Activity */}
@@ -84,14 +85,13 @@ export default function FactoryDaybook() {
           No Daybook tabs are available for this user.
         </div>
       ) : (
-        <Tabs
-          value={effectiveTab}
-          onValueChange={(value) => setActiveDaybookTab(value as "transactions" | "activity")}
-        >
-          <TabsList className="w-fit">
-            {showTransactions && <TabsTrigger value="transactions">Transactions</TabsTrigger>}
-            {showActivity && <TabsTrigger value="activity">Edits &amp; Activity</TabsTrigger>}
-          </TabsList>
+        <Tabs value={effectiveTab} onValueChange={(value) => setActiveDaybookTab(value as "transactions" | "activity")}>
+          <div className="erp-mobile-scroll-tabs pb-1">
+            <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Factory daybook sections">
+              {showTransactions && <TabsTrigger value="transactions">Transactions</TabsTrigger>}
+              {showActivity && <TabsTrigger value="activity">Edits &amp; Activity</TabsTrigger>}
+            </TabsList>
+          </div>
 
           {showTransactions && (
             <TabsContent value="transactions" className="space-y-4 mt-2">

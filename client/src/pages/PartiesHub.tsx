@@ -40,7 +40,7 @@ export default function PartiesHub({ access }: { access?: ErpFeatureAccess }) {
       >
         <div className="border-b bg-background px-3 sm:px-4 pt-3">
           <div className="erp-mobile-scroll-tabs pb-1">
-            <TabsList className="h-9 w-max min-w-full sm:min-w-0 sm:w-fit">
+            <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Parties sections">
               {visibleTabs.map((t) => (
                 <TabsTrigger key={t.key} value={t.key} className="flex shrink-0 items-center gap-1.5 text-sm">
                   <t.icon className="h-3.5 w-3.5" />

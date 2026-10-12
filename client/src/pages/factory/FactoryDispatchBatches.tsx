@@ -1,10 +1,10 @@
+import { TabsList, PillTabButton } from "@/components/ui/tabs";
 import { searchAny } from "@shared/searchNormalization";
 import type { ClientErrorLike } from "@/lib/clientError";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import { useLocation, useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -271,27 +271,9 @@ export default function FactoryDispatchBatches() {
   });
 
   return (
-    <Tabs
-      value={effectiveActiveTab ?? ""}
-      onValueChange={(value) => setActiveTab(value as "list" | "reports")}
-      className="flex flex-col h-full"
-    >
+    <div className="flex flex-col h-full">
       <PageHeader title="Dispatch Batches" subtitle="Manage local truck dispatch batches for bale sales">
         <div className="flex items-center gap-2 flex-wrap">
-          <TabsList variant="pill" aria-label="Dispatch batch sections">
-            {showBatches && (
-              <TabsTrigger value="list" data-testid="button-tab-list">
-                <Truck className="h-3.5 w-3.5" />
-                Batches
-              </TabsTrigger>
-            )}
-            {showReports && (
-              <TabsTrigger value="reports" data-testid="button-tab-reports">
-                <BarChart2 className="h-3.5 w-3.5" />
-                Reports
-              </TabsTrigger>
-            )}
-          </TabsList>
           {showBatches && (
             <Button onClick={() => setCreateOpen(true)} data-testid="button-new-dispatch-batch">
               <Plus className="w-4 h-4 mr-2" />
@@ -301,7 +283,34 @@ export default function FactoryDispatchBatches() {
         </div>
       </PageHeader>
 
-      <TabsContent value={effectiveActiveTab ?? ""} className="flex-1 overflow-auto p-4 space-y-4 mt-0">
+      {effectiveActiveTab && (
+        <div className="erp-mobile-scroll-tabs shrink-0 px-4 pt-2 pb-1">
+          <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Dispatch batches sections">
+            {showBatches && (
+              <PillTabButton
+                selected={effectiveActiveTab === "list"}
+                onClick={() => setActiveTab("list")}
+                data-testid="button-tab-list"
+              >
+                <Truck className="h-4 w-4 shrink-0" />
+                Batches
+              </PillTabButton>
+            )}
+            {showReports && (
+              <PillTabButton
+                selected={effectiveActiveTab === "reports"}
+                onClick={() => setActiveTab("reports")}
+                data-testid="button-tab-reports"
+              >
+                <BarChart2 className="h-4 w-4 shrink-0" />
+                Reports
+              </PillTabButton>
+            )}
+          </TabsList>
+        </div>
+      )}
+
+      <div className="flex-1 overflow-auto p-4 space-y-4">
         {!effectiveActiveTab && (
           <div className="rounded-md border p-6 text-sm text-muted-foreground">
             No Dispatch Batches tabs are available for this user.
@@ -542,7 +551,7 @@ export default function FactoryDispatchBatches() {
             </Card>
           </>
         )}
-      </TabsContent>
+      </div>
 
       <Dialog
         open={createOpen}
@@ -716,6 +725,6 @@ export default function FactoryDispatchBatches() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </Tabs>
+    </div>
   );
 }

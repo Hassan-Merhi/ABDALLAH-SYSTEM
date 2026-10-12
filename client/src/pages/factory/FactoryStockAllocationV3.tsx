@@ -1,3 +1,4 @@
+import { TabsList, PillTabButton } from "@/components/ui/tabs";
 import type { ClientErrorLike } from "@/lib/clientError";
 // LEGACY — Stock Allocation V3. Superseded by FactoryStockAllocationV5. Kept as fallback only. Route: /factory/stock-allocation-v3 (not in sidebar).
 import { useState } from "react";
@@ -5,7 +6,6 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { PageHeader } from "@/components/PageHeader";
@@ -109,11 +109,7 @@ export default function FactoryStockAllocationV3() {
   }
 
   return (
-    <Tabs
-      value={activeTab}
-      onValueChange={(value) => setActiveTab(value as Tab)}
-      className="h-full flex flex-col overflow-hidden bg-background"
-    >
+    <div className="h-full flex flex-col overflow-hidden bg-background">
       {/* Page header */}
       <div className="px-6 pt-5 pb-3 border-b shrink-0">
         <div className="flex items-center gap-3 mb-4 flex-wrap">
@@ -160,10 +156,15 @@ export default function FactoryStockAllocationV3() {
           </Card>
         </div>
 
-        {/* Shared tab strip — V3 remains a legacy fallback. */}
-        <TabsList variant="pill" aria-label="Stock allocation sections" className="w-full">
+        {/* Tabs */}
+        <TabsList className="w-max max-w-full" aria-label="Stock allocation sections">
           {TABS.map((tab) => (
-            <TabsTrigger key={tab} value={tab} data-testid={`button-v3-tab-${tab}`}>
+            <PillTabButton
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              data-testid={`button-v3-tab-${tab}`}
+              selected={activeTab === tab}
+            >
               {TAB_LABELS[tab]}
               {tab === "expected" && expectedLoads.length > 0 && (
                 <span className="ml-1.5 rounded-sm bg-info/10 px-1 text-xs text-info">{expectedLoads.length}</span>
@@ -171,13 +172,13 @@ export default function FactoryStockAllocationV3() {
               {tab === "loading" && loadingLoads.length > 0 && (
                 <span className="ml-1.5 rounded-sm bg-warning/10 px-1 text-xs text-warning">{loadingLoads.length}</span>
               )}
-            </TabsTrigger>
+            </PillTabButton>
           ))}
         </TabsList>
       </div>
 
       {/* Tab body */}
-      <TabsContent value={activeTab} className="flex-1 overflow-y-auto p-4 sm:p-6 mt-0">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6">
         {/* ── Stock Overview ── */}
         {activeTab === "overview" && (
           <div>
@@ -467,7 +468,7 @@ export default function FactoryStockAllocationV3() {
             )}
           </div>
         )}
-      </TabsContent>
+      </div>
 
       {/* Cancel confirmation */}
       <AlertDialog
@@ -498,6 +499,6 @@ export default function FactoryStockAllocationV3() {
         open={!!createLoadProforma}
         onClose={() => setCreateLoadProforma(null)}
       />
-    </Tabs>
+    </div>
   );
 }

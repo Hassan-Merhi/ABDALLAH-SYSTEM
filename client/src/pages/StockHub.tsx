@@ -33,7 +33,7 @@ export default function StockHub({ access }: { access?: ErpFeatureAccess }) {
   return (
     <Tabs value={activeTab} onValueChange={(value) => setTab(value as (typeof TAB_VALUES)[number])} className="min-w-0">
       <div className="erp-mobile-scroll-tabs mb-5 pb-1">
-        <TabsList variant="pill" className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Stock sections">
+        <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Stock sections">
           {visibleTabs.map(({ value, label, icon: Icon }) => (
             <TabsTrigger key={value} value={value} data-testid={`tab-stock-${value}`}>
               <Icon className="h-4 w-4 shrink-0" />
@@ -42,22 +42,15 @@ export default function StockHub({ access }: { access?: ErpFeatureAccess }) {
           ))}
         </TabsList>
       </div>
-
-      {visibleValues.includes("items") && (
-        <TabsContent value="items" className="mt-0">
-          <StockItems />
-        </TabsContent>
-      )}
-      {visibleValues.includes("query") && (
-        <TabsContent value="query" className="mt-0">
-          <StockQuery />
-        </TabsContent>
-      )}
-      {visibleValues.includes("offload") && (
-        <TabsContent value="offload" className="mt-0">
-          <OffloadItemSearch />
-        </TabsContent>
-      )}
+      <TabsContent value="items" className="m-0">
+        {visibleValues.includes("items") && <StockItems />}
+      </TabsContent>
+      <TabsContent value="query" className="m-0">
+        {visibleValues.includes("query") && <StockQuery />}
+      </TabsContent>
+      <TabsContent value="offload" className="m-0">
+        {visibleValues.includes("offload") && <OffloadItemSearch />}
+      </TabsContent>
     </Tabs>
   );
 }

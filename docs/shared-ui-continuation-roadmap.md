@@ -18,9 +18,10 @@ commit SHAs, remaining gaps and the newly chosen next phase.
 - **Phase 1 — Common UI foundations:** implemented. Page shells, action
   bars, status badges, empty/loading presentations. See
   `docs/shared-ui-phase-1.md`.
-- **Phase 2 — Shared responsive tabs:** implemented. Unified desktop/phone
-  presentation and keyboard interactions, migrated selected hubs. See
-  `docs/shared-ui-phase-2.md`.
+- **Phase 2 — Shared responsive tabs:** implemented, then superseded on
+  merge by the universal responsive pill tabs (#2185,
+  `docs/universal-responsive-pill-tabs.md`), which is now the shared tab
+  standard; the usage rules in `docs/shared-ui-phase-2.md` still apply.
 - **Phase 3 — Tables, filters, pagination and view preferences:** implemented
   for canonical primitives and selected ERP, Factory, POS, Properties and
   Settings lists. See `docs/shared-ui-phase-3.md`.

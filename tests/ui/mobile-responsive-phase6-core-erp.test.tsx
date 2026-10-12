@@ -85,7 +85,9 @@ describe("Mobile responsiveness Phase 6 core ERP", () => {
     const list = screen.getByRole("tablist", { name: "Daybook sections" });
     expect(list).toHaveAttribute("data-responsive-tabs", "true");
     expect(list.className).toContain("overflow-x-auto");
-    expect(list.className).toContain("touch-pan-x");
+    expect(list.className).toContain("flex-nowrap");
+    // pan-x alone would block a vertical page swipe that starts on the strip.
+    expect(list.className).not.toContain("touch-pan-x");
     const [entries, summary] = screen.getAllByRole("tab");
     expect(entries).toHaveAttribute("aria-selected", "true");
     expect(summary).toHaveAttribute("aria-selected", "false");

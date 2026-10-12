@@ -33,7 +33,7 @@ export default function InventoryHub({ access }: { access?: ErpFeatureAccess }) 
   return (
     <Tabs value={activeTab} onValueChange={(value) => setTab(value as (typeof TAB_VALUES)[number])} className="min-w-0">
       <div className="erp-mobile-scroll-tabs mb-5 pb-1">
-        <TabsList variant="pill" className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Inventory sections">
+        <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Inventory sections">
           {visibleTabs.map(({ value, label, icon: Icon }) => (
             <TabsTrigger key={value} value={value} data-testid={`tab-${value}`}>
               <Icon className="h-4 w-4 shrink-0" />
@@ -42,22 +42,15 @@ export default function InventoryHub({ access }: { access?: ErpFeatureAccess }) 
           ))}
         </TabsList>
       </div>
-
-      {visibleValues.includes("by-location") && (
-        <TabsContent value="by-location" className="mt-0">
-          <LocationInventory />
-        </TabsContent>
-      )}
-      {visibleValues.includes("on-the-way") && (
-        <TabsContent value="on-the-way" className="mt-0">
-          <StockOTW />
-        </TabsContent>
-      )}
-      {visibleValues.includes("containers") && (
-        <TabsContent value="containers" className="mt-0">
-          <Containers />
-        </TabsContent>
-      )}
+      <TabsContent value="by-location" className="m-0">
+        {visibleValues.includes("by-location") && <LocationInventory />}
+      </TabsContent>
+      <TabsContent value="on-the-way" className="m-0">
+        {visibleValues.includes("on-the-way") && <StockOTW />}
+      </TabsContent>
+      <TabsContent value="containers" className="m-0">
+        {visibleValues.includes("containers") && <Containers />}
+      </TabsContent>
     </Tabs>
   );
 }

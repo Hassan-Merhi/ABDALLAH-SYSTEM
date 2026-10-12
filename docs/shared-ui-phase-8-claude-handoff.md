@@ -170,6 +170,41 @@ of `main` therefore resolves every conflicting file to `main`'s version
 exactly, so this PR carries no competing repair: the interim commit is
 fully superseded by `main`'s own fix.
 
+### Tabs standard convergence (#2185)
+
+After every required check had passed on the merged head, `main` gained
+#2185, "Universal responsive pill tabs", which rewrote `ui/tabs.tsx` and
+migrated the same hubs this program's Phase 2 had migrated. The resulting
+merge conflicted in 18 files (the tabs component, 14 pages, the wave 2
+verifier and two tests). Both sides changed the same logic, and `main`'s
+version is the repository's documented, tested standard, so the conflicts
+were resolved to `main`:
+
+- `ui/tabs.tsx` is `main`'s component exactly. The Phase 8 tabs fixes listed
+  above are therefore moot: `main`'s component already fires
+  `onValueChange` on re-click, scrolls only the strip (never the page), sets
+  `aria-controls` only on the selected tab and adds no extra `tabIndex`
+  stop. Its own suite (`tests/ui/universal-pill-tabs.test.tsx`) pins that
+  behaviour.
+- `NotificationsCenter`, `InventoryHub`, `StockHub`, `FactoryDispatchBatches`,
+  `FactoryEmployeeAttendanceTab`, `FactoryEmployeesHub`, `FactoryImport`,
+  `FactoryInvoicing`, `FactoryLoadingsHub`, `FactoryPayrollHub`,
+  `FactorySheetsAndSacks`, `FactoryStockAllocationV3`, `FactoryWorkersHub`
+  and `RawStockRecalculate` carry `main`'s pill migration (hunk-level
+  resolution left `Tabs` wrappers around `PillTabButton` strips, and two
+  tab bars in the notifications popover, so the nine affected files were
+  taken from `main` whole). The only Phase 6 change re-applied on top is
+  the semantic colour tokens on the count badges in `FactoryStockAllocationV3`
+  and `RawStockRecalculate`.
+- The wave 2 verifier and test assert `erp-mobile-scroll-tabs` and
+  `PillTabButton` (`main`'s contract) instead of `<TabsList`;
+  `renders.test.tsx` asserts the workers tablist's role and accessible name.
+- `docs/shared-ui-phase-2.md` and the roadmap record Phase 2 as superseded
+  by the universal pill tabs; its usage rules still apply.
+
+No other file of this branch used the removed tabs API (`orientation`,
+`activationMode`, `forceMount`, `TabsVariant`), so nothing else changed.
+
 ### Verified unchanged (Phase 7 focus)
 
 The seven fetch interceptors keep their endpoint guards, registration

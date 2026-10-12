@@ -98,8 +98,9 @@ requireTokens("Bale Tracking", sources.tracking, [
 requireTokens("Factory Import", sources.imports, [
   'data-testid="factory-import-page"',
   'data-testid="factory-import-tabs"',
-  // The shared responsive TabsList owns the phone overflow-x-auto strip.
-  "<TabsList",
+  // The shared sideways-scrolling strip and pill tabs replaced the bespoke overflow row.
+  "erp-mobile-scroll-tabs",
+  "PillTabButton",
   "shrink-0",
 ]);
 

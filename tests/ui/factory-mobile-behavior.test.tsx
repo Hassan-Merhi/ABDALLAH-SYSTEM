@@ -161,7 +161,8 @@ describe("Factory phone interactions", () => {
           </TabsList>
         </Tabs>
       );
-      expect(screen.getByRole("tablist").scrollLeft).toBe(228);
+      // Past the far edge by the overflow-fade clearance: min(40px, clientWidth / 8).
+      expect(screen.getByRole("tablist").scrollLeft).toBe(520 - 300 + 300 / 8);
     } finally {
       spy.mockRestore();
       delete (HTMLElement.prototype as unknown as Record<string, unknown>).scrollWidth;

@@ -24,31 +24,32 @@ export function FactoryWorkersView({ model }: FactoryWorkersModelProps) {
   return (
     <div className="space-y-5">
       {activeTab ? (
-      <Tabs value={activeTab} onValueChange={(value) => setRequestedTab(value as "workers" | "categories")}>
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <TabsList>
-            {showWorkersList && (
-              <TabsTrigger value="workers" data-testid="tab-workers">
-                Workers
-              </TabsTrigger>
-            )}
-            {showCategories && (
-              <TabsTrigger value="categories" data-testid="tab-categories">
-                <Layers className="h-3.5 w-3.5 mr-1.5" />
-                Categories
-                {categories.length > 0 && (
-                  <Badge variant="secondary" className="ml-1.5 text-xs no-default-active-elevate">
-                    {categories.length}
-                  </Badge>
-                )}
-              </TabsTrigger>
-            )}
-          </TabsList>
-        </div>
+        <Tabs value={activeTab} onValueChange={(value) => setRequestedTab(value as "workers" | "categories")}>
+          <div className="erp-mobile-scroll-tabs pb-1">
+            <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Factory worker list sections">
+              {showWorkersList && (
+                <TabsTrigger value="workers" data-testid="tab-workers">
+                  Workers
+                </TabsTrigger>
+              )}
+              {showCategories && (
+                <TabsTrigger value="categories" data-testid="tab-categories">
+                  <Layers className="h-3.5 w-3.5 mr-1.5" />
+                  Categories
+                  {categories.length > 0 && (
+                    <Badge variant="secondary" className="ml-1.5 text-xs no-default-active-elevate">
+                      {categories.length}
+                    </Badge>
+                  )}
+                </TabsTrigger>
+              )}
+            </TabsList>
+          </div>
 
-        {showWorkersList && <FactoryWorkersRosterPanel model={model} />}
-        {showCategories && <FactoryWorkerCategoriesPanel model={model} />}
-      </Tabs>
+          {/* Each panel renders its own TabsContent. */}
+          {showWorkersList && <FactoryWorkersRosterPanel model={model} />}
+          {showCategories && <FactoryWorkerCategoriesPanel model={model} />}
+        </Tabs>
       ) : (
         <div className="rounded-md border p-4 text-sm text-muted-foreground">
           No Workers List tabs are available for this user.

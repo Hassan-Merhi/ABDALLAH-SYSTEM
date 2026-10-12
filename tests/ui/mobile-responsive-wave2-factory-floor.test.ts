@@ -70,8 +70,7 @@ describe("Mobile Wave 2 Factory floor workflows", () => {
     expect(tracking).toContain("grid grid-cols-1 gap-x-6 gap-y-2 text-sm min-[420px]:grid-cols-2");
 
     expect(imports).toContain('data-testid="factory-import-tabs"');
-    // The shared responsive TabsList owns the phone overflow-x-auto strip.
-    expect(imports).toContain("<TabsList");
+    expect(imports).toContain("erp-mobile-scroll-tabs");
 
     expect(relabeling).toContain('data-testid="relabeling-progress-strip"');
     expect(relabeling).toContain("overflow-x-auto");

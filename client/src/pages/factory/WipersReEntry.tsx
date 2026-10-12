@@ -1,3 +1,4 @@
+import { TabsList, PillTabButton } from "@/components/ui/tabs";
 import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -304,22 +305,21 @@ export default function WipersReEntry() {
   return (
     <div className="flex flex-col h-full overflow-y-auto">
       {/* Sub-nav tabs */}
-      <div className="border-b px-6 flex items-center gap-1 pt-4">
-        {showRelabeling && (
-          <button
-            onClick={() => navigate("/factory/bale-relabeling")}
-            className="px-4 py-2 text-sm font-medium rounded-t-md text-muted-foreground hover-elevate"
-            data-testid="tab-relabeling"
-          >
-            Bale Relabeling
-          </button>
-        )}
-        <button
-          className="px-4 py-2 text-sm font-medium rounded-t-md border-b-2 border-primary text-primary"
-          data-testid="tab-wipers-re-entry"
-        >
-          Wipers Re-Entry by Date
-        </button>
+      <div className="erp-mobile-scroll-tabs px-3 pt-4 pb-1 sm:px-6">
+        <TabsList aria-label="Bale relabeling sections" className="w-max min-w-full sm:min-w-0 sm:w-fit">
+          {showRelabeling && (
+            <PillTabButton
+              selected={false}
+              onClick={() => navigate("/factory/bale-relabeling")}
+              data-testid="tab-relabeling"
+            >
+              Bale Relabeling
+            </PillTabButton>
+          )}
+          <PillTabButton selected data-testid="tab-wipers-re-entry">
+            Wipers Re-Entry by Date
+          </PillTabButton>
+        </TabsList>
       </div>
 
       <div className="p-6 space-y-6">
