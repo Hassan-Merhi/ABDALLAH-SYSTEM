@@ -54,7 +54,7 @@ function Tabs({
 const TabsList = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement> & { variant?: "pill" | "underline" }
->(({ className, variant = "pill", onKeyDown, ...props }, ref) => {
+>(({ className, variant = "pill", onKeyDown, onFocusCapture, ...props }, ref) => {
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     onKeyDown?.(event);
     if (event.defaultPrevented || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
@@ -62,7 +62,7 @@ const TabsList = React.forwardRef<
     // Skip those during keyboard navigation instead of focusing an invisible control.
     const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>(
       '[role="tab"]:not(:disabled)'
-    )).filter((tab) => tab.getClientRects().length > 0);
+    )).filter((tab) => tab.getClientRects().length > 0 && getComputedStyle(tab).visibility !== "hidden");
     if (!tabs.length) return;
     const currentIndex = tabs.indexOf(document.activeElement as HTMLButtonElement);
     if (currentIndex < 0) return;
@@ -82,9 +82,16 @@ const TabsList = React.forwardRef<
       role="tablist"
       data-responsive-tabs="true"
       data-variant={variant}
+      aria-orientation="horizontal"
       onKeyDown={handleKeyDown}
+      onFocusCapture={(event) => {
+        onFocusCapture?.(event);
+        if (event.defaultPrevented) return;
+        const focused = (event.target as HTMLElement).closest<HTMLElement>('[role="tab"]');
+        if (focused && event.currentTarget.contains(focused)) scrollSelectedTabIntoView(focused);
+      }}
       className={cn(
-        "inline-flex max-w-full items-center justify-start gap-1 overflow-x-auto overscroll-x-contain touch-pan-x",
+        "inline-flex min-w-0 max-w-full flex-nowrap items-center justify-start gap-1 overflow-x-auto overscroll-x-contain touch-pan-x",
         variant === "pill" && "rounded-full border border-border bg-muted/40 p-1 text-muted-foreground",
         variant === "underline" && "border-b border-border bg-transparent p-0 text-muted-foreground",
         className
@@ -96,22 +103,59 @@ const TabsList = React.forwardRef<
 TabsList.displayName = "TabsList";
 
 const pillTriggerClasses = [
-  "inline-flex min-h-11 shrink-0 touch-manipulation items-center justify-center gap-1.5 whitespace-nowrap text-sm font-medium transition-all sm:min-h-9",
-  "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+  "inline-flex min-h-11 shrink-0 touch-manipulation items-center justify-center gap-1.5 whitespace-nowrap text-sm font-medium transition-all motion-reduce:transition-none sm:min-h-9",
+  "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
   "disabled:pointer-events-none disabled:opacity-40",
   "rounded-full px-3 py-1.5 text-muted-foreground hover:text-foreground sm:px-4",
 ].join(" ");
 
-function scrollSelectedTabIntoView(node: HTMLButtonElement | null) {
+/** Scroll both levels when a strip lives inside the shared swipe container.
+ * A nested, width-constrained list may scroll internally as well as its parent.
+ * Use physical geometry so LTR and RTL browsers handle scrollLeft consistently.
+ */
+function scrollSelectedTabIntoView(node: HTMLElement | null) {
   const list = node?.closest<HTMLElement>('[role="tablist"]');
   if (!node || !list) return;
-  const scroller = list.scrollWidth > list.clientWidth + 1
-    ? list : list.closest<HTMLElement>(".erp-mobile-scroll-tabs") ?? list;
-  if (scroller.scrollWidth <= scroller.clientWidth) return;
-  const listBox = scroller.getBoundingClientRect();
-  const tabBox = node.getBoundingClientRect();
-  if (tabBox.left < listBox.left) scroller.scrollLeft -= listBox.left - tabBox.left + 8;
-  else if (tabBox.right > listBox.right) scroller.scrollLeft += tabBox.right - listBox.right + 8;
+
+  const outer = list.closest<HTMLElement>(".erp-mobile-scroll-tabs");
+  const scrollables = outer && outer !== list ? [list, outer] : [list];
+
+  for (const scroller of scrollables) {
+    if (scroller.scrollWidth <= scroller.clientWidth + 1) continue;
+    const view = scroller.getBoundingClientRect();
+    const tab = node.getBoundingClientRect();
+    const gap = 8;
+    if (tab.left < view.left + gap) {
+      scroller.scrollLeft -= view.left + gap - tab.left;
+    } else if (tab.right > view.right - gap) {
+      scroller.scrollLeft += tab.right - view.right + gap;
+    }
+  }
+}
+
+/** Reposition the active tab when zoom, container width, or its text changes.
+ * The existing shell observer still owns overflow fades; this tracks only the
+ * selected tab's visibility without creating another global scroll listener.
+ */
+function useActiveTabVisibility(ref: React.RefObject<HTMLButtonElement | null>, active: boolean) {
+  React.useEffect(() => {
+    const node = ref.current;
+    if (!active || !node) return;
+
+    const list = node.closest<HTMLElement>('[role="tablist"]');
+    const outer = list?.closest<HTMLElement>(".erp-mobile-scroll-tabs");
+    const update = () => scrollSelectedTabIntoView(node);
+    update();
+
+    const resize = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(update);
+    const observed = [node, list, outer].filter((item): item is HTMLElement => item != null);
+    observed.forEach((item) => resize?.observe(item));
+    window.addEventListener("resize", update, { passive: true });
+    return () => {
+      resize?.disconnect();
+      window.removeEventListener("resize", update);
+    };
+  }, [active, ref]);
 }
 
 const TabsTrigger = React.forwardRef<
@@ -130,9 +174,7 @@ const TabsTrigger = React.forwardRef<
     [ref]
   );
 
-  React.useEffect(() => {
-    if (active) scrollSelectedTabIntoView(localRef.current);
-  }, [active]);
+  useActiveTabVisibility(localRef, active);
 
   return (
     <button
@@ -174,9 +216,7 @@ const PillTabButton = React.forwardRef<
     else if (ref) ref.current = node;
   }, [ref]);
 
-  React.useEffect(() => {
-    if (selected) scrollSelectedTabIntoView(localRef.current);
-  }, [selected]);
+  useActiveTabVisibility(localRef, selected);
 
   return (
     <button
