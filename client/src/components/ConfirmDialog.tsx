@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,6 +24,8 @@ export interface ConfirmDialogProps {
   title: string;
   description?: React.ReactNode;
   confirmText?: string;
+  confirmButtonTestId?: string;
+  cancelButtonTestId?: string;
   cancelText?: string;
   tone?: ConfirmDialogTone;
   icon?: LucideIcon;
@@ -44,6 +46,8 @@ export function ConfirmDialog({
   title,
   description,
   confirmText = "Confirm",
+  confirmButtonTestId = "button-confirm-confirm",
+  cancelButtonTestId = "button-confirm-cancel",
   cancelText = "Cancel",
   tone = "default",
   icon: Icon,
@@ -66,31 +70,55 @@ export function ConfirmDialog({
 
   const [stage, setStage] = useState<1 | 2>(1);
   const [phrase, setPhrase] = useState("");
+  const phraseInputId = `confirm-phrase-${useId()}`;
   const [busy, setBusy] = useState(false);
+  const pendingRef = useRef(false);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
+  const titleRef = useRef<HTMLHeadingElement | null>(null);
+  const errorRef = useRef<HTMLParagraphElement | null>(null);
 
   useEffect(() => {
     if (!open) {
       setStage(1);
       setPhrase("");
       setBusy(false);
+      setConfirmError(null);
+      pendingRef.current = false;
     }
   }, [open]);
+
+  // Announce the second confirmation stage and refocus after an async failure.
+  // Neither transition closes the Radix focus trap.
+  useEffect(() => {
+    if (open && stage === 2) titleRef.current?.focus({ preventScroll: true });
+  }, [open, stage]);
+  useEffect(() => {
+    if (open && confirmError) errorRef.current?.focus({ preventScroll: true });
+  }, [open, confirmError]);
 
   const isLoading = busy || !!externalLoading;
   const phraseMatches = !requirePhrase || phrase.trim() === requirePhrase.trim();
 
   const handlePrimary = async (event: React.MouseEvent | React.SyntheticEvent) => {
     event.preventDefault();
-    if (!phraseMatches || isLoading || confirmDisabled) return;
+    if (!phraseMatches || isLoading || confirmDisabled || pendingRef.current) return;
     if (doubleConfirm && stage === 1) {
+      setConfirmError(null);
       setStage(2);
       return;
     }
+    // A ref locks immediately: state alone cannot stop two clicks before React rerenders.
+    pendingRef.current = true;
+    setConfirmError(null);
     setBusy(true);
     try {
       await onConfirm();
       setOpen(false);
+    } catch (error) {
+      // Keep the confirmation open on failure. Callers may also surface a toast.
+      setConfirmError(error instanceof Error ? error.message : "Action failed. Please try again.");
     } finally {
+      pendingRef.current = false;
       setBusy(false);
     }
   };
@@ -138,10 +166,16 @@ export function ConfirmDialog({
                 </div>
               )}
               <div className="min-w-0 flex-1 text-left">
-                <AlertDialogTitle className="wrap-break-word">{headerTitle}</AlertDialogTitle>
-                {headerDescription && (
+                <AlertDialogTitle ref={titleRef} tabIndex={-1} className="wrap-break-word focus-visible:outline-hidden">
+                  {headerTitle}
+                </AlertDialogTitle>
+                {headerDescription ? (
                   <AlertDialogDescription className="mt-1 whitespace-pre-line wrap-break-word leading-5">
                     {headerDescription}
+                  </AlertDialogDescription>
+                ) : (
+                  <AlertDialogDescription className="sr-only">
+                    Review the details and confirm or cancel this action.
                   </AlertDialogDescription>
                 )}
               </div>
@@ -149,14 +183,25 @@ export function ConfirmDialog({
           </AlertDialogHeader>
 
           {!showSecond && children && <div className="mt-4 min-w-0 space-y-3">{children}</div>}
+          {confirmError && (
+            <p
+              ref={errorRef}
+              tabIndex={-1}
+              role="alert"
+              className="mt-4 text-sm text-destructive focus-visible:outline-hidden"
+              data-testid="text-confirm-error"
+            >
+              {confirmError}
+            </p>
+          )}
 
           {!showSecond && requirePhrase && (
             <div className="mt-4 space-y-2">
-              <Label htmlFor="confirm-phrase" className="text-xs">
+              <Label htmlFor={phraseInputId} className="text-xs">
                 Type <span className="font-mono font-semibold">{requirePhrase}</span> to confirm
               </Label>
               <Input
-                id="confirm-phrase"
+                id={phraseInputId}
                 value={phrase}
                 onChange={(event) => setPhrase(event.target.value)}
                 autoComplete="off"
@@ -172,14 +217,14 @@ export function ConfirmDialog({
             onClick={handleCancel}
             disabled={isLoading}
             className="w-full sm:w-auto"
-            data-testid="button-confirm-cancel"
+            data-testid={cancelButtonTestId}
           >
             {cancelText}
           </AlertDialogCancel>
           <AlertDialogAction
             onClick={handlePrimary}
             disabled={isLoading || !phraseMatches || !!confirmDisabled}
-            data-testid="button-confirm-confirm"
+            data-testid={confirmButtonTestId}
             className={cn("w-full sm:w-auto", primaryClassName)}
           >
             {isLoading ? (

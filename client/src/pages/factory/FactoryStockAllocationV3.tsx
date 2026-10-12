@@ -167,14 +167,10 @@ export default function FactoryStockAllocationV3() {
             >
               {TAB_LABELS[tab]}
               {tab === "expected" && expectedLoads.length > 0 && (
-                <span className="ml-1.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-sm px-1">
-                  {expectedLoads.length}
-                </span>
+                <span className="ml-1.5 rounded-sm bg-info/10 px-1 text-xs text-info">{expectedLoads.length}</span>
               )}
               {tab === "loading" && loadingLoads.length > 0 && (
-                <span className="ml-1.5 text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-sm px-1">
-                  {loadingLoads.length}
-                </span>
+                <span className="ml-1.5 rounded-sm bg-warning/10 px-1 text-xs text-warning">{loadingLoads.length}</span>
               )}
             </PillTabButton>
           ))}

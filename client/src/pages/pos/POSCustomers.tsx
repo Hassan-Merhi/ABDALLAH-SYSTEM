@@ -2,6 +2,7 @@ import { searchIncludes } from "@shared/searchNormalization";
 import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { PageHeader } from "@/components/PageHeader";
+import { DataTableToolbar } from "@/components/DataTableToolbar";
 import { SafeStyle } from "@/components/SafeStyle";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -9,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Search, Users, Printer, FileDown, DollarSign } from "lucide-react";
+import { Plus, Users, Printer, FileDown, DollarSign } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { drCrClass } from "@/lib/formatNumber";
@@ -259,23 +260,19 @@ export default function POSCustomers() {
 
       {/* Search + customer table */}
       <div className="space-y-3">
-        <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
-          <div className="relative min-w-0 flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-            <Input
-              placeholder="Search customers..."
-              value={searchQuery}
-              onChange={(e) => setFilter("searchQuery", e.target.value)}
-              className="pl-10"
-              data-testid="input-search-customers"
-            />
-          </div>
-          {hasActiveFilters && (
-            <Button variant="outline" type="button" onClick={resetFilters} data-testid="button-reset-filters">
-              Reset filters
-            </Button>
-          )}
-        </div>
+        <DataTableToolbar
+          search={searchQuery}
+          onSearchChange={(value) => setFilter("searchQuery", value)}
+          searchPlaceholder="Search customers..."
+          searchTestId="input-search-customers"
+          actions={
+            hasActiveFilters ? (
+              <Button variant="outline" type="button" onClick={resetFilters} data-testid="button-reset-filters">
+                Reset filters
+              </Button>
+            ) : undefined
+          }
+        />
 
         {isLoading ? (
           <div className="space-y-2">
@@ -294,7 +291,7 @@ export default function POSCustomers() {
         ) : (
           <div className="border rounded-xl overflow-hidden">
             <div className="table-responsive">
-              <Table>
+              <Table mobileLayout="cards">
                 <TableHeader>
                   <TableRow className="bg-muted/40 hover:bg-muted/40">
                     <TableHead className="text-xs">Customer Name</TableHead>

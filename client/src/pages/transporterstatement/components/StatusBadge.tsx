@@ -3,9 +3,10 @@
  *
  * Extracted from TransporterStatement.tsx during the Phase 4 god-file split.
  */
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge as SharedStatusBadge } from "@/components/StatusBadge";
 import { fmtAmt } from "../utils";
 
+/** Amount calculation stays here; the shared status component owns presentation. */
 export function StatusBadge({
   status,
   paidAmount,
@@ -16,32 +17,18 @@ export function StatusBadge({
   total: string | null;
 }) {
   if (!status) return null;
-  if (status === "paid") {
-    return (
-      <Badge
-        className="text-[11px] bg-green-600/10 text-green-700 dark:text-green-400 border-green-600/20"
-        variant="outline"
-      >
-        Paid
-      </Badge>
-    );
-  }
   if (status === "partial") {
     const remaining = parseFloat(total || "0") - parseFloat(paidAmount || "0");
     return (
-      <Badge
-        className="text-[11px] bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20"
-        variant="outline"
-      >
-        Partial · {fmtAmt(remaining.toFixed(2))} left
-      </Badge>
+      <SharedStatusBadge
+        status="partial"
+        label={`Partial · ${fmtAmt(remaining.toFixed(2))} left`}
+        showIcon={false}
+        className="text-[11px]"
+      />
     );
   }
-  return (
-    <Badge className="text-[11px] bg-destructive/10 text-destructive border-destructive/20" variant="outline">
-      Unpaid
-    </Badge>
-  );
+  if (status === "paid") return <SharedStatusBadge status="paid" showIcon={false} className="text-[11px]" />;
+  // Unpaid statements stay in the destructive tone this screen always used.
+  return <SharedStatusBadge status="error" label="Unpaid" showIcon={false} className="text-[11px]" />;
 }
-
-// ─── Inline Due Date Editor ──────────────────────────────────────────────────

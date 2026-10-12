@@ -13,6 +13,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -157,9 +158,15 @@ export function AddUserDialog({ open, onOpenChange }: AddUserDialogProps) {
             <Button variant="outline" onClick={() => onOpenChange(false)} disabled={createMutation.isPending}>
               Cancel
             </Button>
-            <Button onClick={handleSubmit} disabled={createMutation.isPending} data-testid="button-create-user-submit">
-              {createMutation.isPending ? "Creating..." : "Create User"}
-            </Button>
+            <FormSubmitButton
+              type="button"
+              onClick={handleSubmit}
+              pending={createMutation.isPending}
+              pendingLabel="Creating…"
+              data-testid="button-create-user-submit"
+            >
+              Create User
+            </FormSubmitButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>

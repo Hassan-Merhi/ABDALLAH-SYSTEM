@@ -2,7 +2,8 @@ import type { ClientErrorLike } from "@/lib/clientError";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/StatusBadge";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
@@ -14,17 +15,7 @@ import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, keyStartsWith } from "@/lib/queryClient";
 import { PageHeader } from "@/components/PageHeader";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+import { ErrorState } from "@/components/ui/page-state";
 import { InvoiceSummaryBar } from "@/components/InvoiceSummaryBar";
 import type { FactoryMyAccess } from "@shared/apiTypes";
 
@@ -58,15 +49,30 @@ export default function FactoryPendingInvoices() {
   const { data: myAccess } = useQuery<FactoryMyAccess>({ queryKey: ["/api/factory/my-access"], staleTime: 5 * 60000 });
   const isAdmin = myAccess?.fullAccess === true;
 
-  const { data: pendingOrders = [], isLoading: pendingLoading } = useQuery<CustomerOrder[]>({
+  const {
+    data: pendingOrders = [],
+    isLoading: pendingLoading,
+    isError: pendingError,
+    refetch: refetchPending,
+  } = useQuery<CustomerOrder[]>({
     queryKey: ["/api/factory/customer-orders?status=PENDING_VERIFICATION&profile=summary&pageSize=250"],
   });
 
-  const { data: verifiedOrders = [], isLoading: verifiedLoading } = useQuery<CustomerOrder[]>({
+  const {
+    data: verifiedOrders = [],
+    isLoading: verifiedLoading,
+    isError: verifiedError,
+    refetch: refetchVerified,
+  } = useQuery<CustomerOrder[]>({
     queryKey: ["/api/factory/customer-orders?status=VERIFIED&profile=summary&pageSize=250"],
   });
 
-  const { data: finalizedOrders = [], isLoading: finalizedLoading } = useQuery<CustomerOrder[]>({
+  const {
+    data: finalizedOrders = [],
+    isLoading: finalizedLoading,
+    isError: finalizedError,
+    refetch: refetchFinalized,
+  } = useQuery<CustomerOrder[]>({
     queryKey: ["/api/factory/customer-orders?status=FINALIZED&profile=summary&pageSize=250"],
   });
 
@@ -91,6 +97,7 @@ export default function FactoryPendingInvoices() {
 
   const allOrders = [...pendingOrders, ...verifiedOrders, ...finalizedOrders];
   const isLoading = pendingLoading || verifiedLoading || finalizedLoading;
+  const hasLoadError = pendingError || verifiedError || finalizedError;
 
   const filteredOrders =
     statusFilter === "ALL"
@@ -99,39 +106,13 @@ export default function FactoryPendingInvoices() {
         ? allOrders.filter((o) => o.status === "PENDING_VERIFICATION" || o.status === "VERIFIED")
         : allOrders.filter((o) => o.status === statusFilter);
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "PENDING_VERIFICATION":
-        return (
-          <Badge
-            variant="outline"
-            className="bg-yellow-50 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800"
-          >
-            Pending
-          </Badge>
-        );
-      case "VERIFIED":
-        return (
-          <Badge
-            variant="outline"
-            className="bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800"
-          >
-            Verified
-          </Badge>
-        );
-      case "FINALIZED":
-        return (
-          <Badge
-            variant="outline"
-            className="bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800"
-          >
-            Finalized
-          </Badge>
-        );
-      default:
-        return <Badge variant="secondary">{status}</Badge>;
-    }
-  };
+  const getStatusBadge = (status: string) => (
+    <StatusBadge
+      status={status === "PENDING_VERIFICATION" ? "pending" : status}
+      label={status === "PENDING_VERIFICATION" ? "Pending" : undefined}
+      showIcon={false}
+    />
+  );
 
   const filters: { key: string; label: string; count: number }[] = [
     { key: "PENDING_VERIFIED", label: "Pending + Verified", count: pendingOrders.length + verifiedOrders.length },
@@ -140,7 +121,7 @@ export default function FactoryPendingInvoices() {
   ];
 
   return (
-    <div className="flex flex-col h-full p-6">
+    <div className="flex flex-col h-full p-3 sm:p-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
         <div>
           <PageHeader
@@ -149,12 +130,19 @@ export default function FactoryPendingInvoices() {
             icon={<ClipboardCheck className="h-5 w-5" />}
           />
         </div>
-        <div className="flex flex-wrap items-center gap-2" data-testid="filter-tabs">
+        <div
+          className="flex flex-wrap items-center gap-2"
+          role="group"
+          aria-label="Invoice status filters"
+          data-testid="filter-tabs"
+        >
           {filters.map((f) => (
             <Button
               key={f.key}
               variant={statusFilter === f.key ? "default" : "outline"}
               size="sm"
+              className="min-h-11 sm:min-h-8"
+              aria-pressed={statusFilter === f.key}
               onClick={() => setStatusFilter(f.key)}
               data-testid={`button-filter-${f.key.toLowerCase()}`}
             >
@@ -164,7 +152,7 @@ export default function FactoryPendingInvoices() {
         </div>
       </div>
 
-      {!isLoading && allOrders.length > 0 && <InvoiceSummaryBar orders={allOrders} />}
+      {!isLoading && !hasLoadError && allOrders.length > 0 && <InvoiceSummaryBar orders={allOrders} />}
 
       {isLoading ? (
         <div className="space-y-3">
@@ -172,6 +160,17 @@ export default function FactoryPendingInvoices() {
             <Skeleton key={i} className="h-14 w-full" />
           ))}
         </div>
+      ) : hasLoadError ? (
+        <ErrorState
+          title="Invoices could not be loaded"
+          description="Some invoice statuses could not be retrieved. Retry to see a complete list."
+          actionLabel="Try again"
+          onAction={() => {
+            void refetchPending();
+            void refetchVerified();
+            void refetchFinalized();
+          }}
+        />
       ) : (
         <Card className="table-responsive">
           <Table mobileLayout="cards">
@@ -207,8 +206,21 @@ export default function FactoryPendingInvoices() {
                 filteredOrders.map((order) => (
                   <TableRow
                     key={order.id}
-                    className="cursor-pointer"
-                    onClick={() => navigate(`/factory/sales/pending-invoices/${order.id}/verify`)}
+                    className="cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                    tabIndex={0}
+                    aria-label={`Open invoice ${order.invoiceNumber || order.id} for ${order.customerName}`}
+                    onClick={(event) => {
+                      // Do not hijack action buttons, including the confirm trigger.
+                      if ((event.target as HTMLElement).closest("button, a, [role=button]")) return;
+                      navigate(`/factory/sales/pending-invoices/${order.id}/verify`);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.target !== event.currentTarget) return;
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        navigate(`/factory/sales/pending-invoices/${order.id}/verify`);
+                      }
+                    }}
                     data-testid={`row-order-${order.id}`}
                   >
                     <TableCell className="font-mono" data-testid={`text-order-number-${order.id}`}>
@@ -250,6 +262,7 @@ export default function FactoryPendingInvoices() {
                           variant="ghost"
                           size="icon"
                           onClick={() => navigate(`/factory/sales/pending-invoices/${order.id}/verify`)}
+                          aria-label={`Review invoice ${order.invoiceNumber || order.id}`}
                           data-testid={`button-review-order-${order.id}`}
                         >
                           <Eye className="h-4 w-4" />
@@ -258,6 +271,7 @@ export default function FactoryPendingInvoices() {
                           variant="ghost"
                           size="icon"
                           title="Download Invoice PDF"
+                          aria-label={`Download PDF for invoice ${order.invoiceNumber || order.id}`}
                           onClick={() => window.open(`/api/factory/customer-orders/${order.id}/export-pdf`, "_blank")}
                           data-testid={`button-download-pdf-${order.id}`}
                         >
@@ -267,6 +281,7 @@ export default function FactoryPendingInvoices() {
                           variant="ghost"
                           size="icon"
                           title="Export to Excel"
+                          aria-label={`Export invoice ${order.invoiceNumber || order.id} to Excel`}
                           onClick={() => {
                             const a = document.createElement("a");
                             a.href = `/api/factory/customer-orders/${order.id}/export/excel`;
@@ -282,6 +297,7 @@ export default function FactoryPendingInvoices() {
                             variant="ghost"
                             size="icon"
                             title="Loading Status + Bale Refs (Excel)"
+                            aria-label={`Export loading status for invoice ${order.invoiceNumber || order.id}`}
                             onClick={() => {
                               const a = document.createElement("a");
                               a.href = `/api/factory/customer-orders/${order.id}/loading-status-export`;
@@ -293,34 +309,28 @@ export default function FactoryPendingInvoices() {
                             <Container className="h-4 w-4" />
                           </Button>
                         )}
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon" data-testid={`button-delete-order-${order.id}`}>
+                        <ConfirmDialog
+                          title="Delete Invoice"
+                          tone="destructive"
+                          description={`This will permanently delete invoice ${order.invoiceNumber || `#${order.id}`} for ${order.customerName}. Any bales assigned to this order will be returned to stock. This cannot be undone.`}
+                          confirmText="Delete"
+                          confirmButtonTestId={`button-confirm-delete-${order.id}`}
+                          cancelButtonTestId={`button-cancel-delete-${order.id}`}
+                          loading={deleteMutation.isPending}
+                          onConfirm={async () => {
+                            await deleteMutation.mutateAsync(order.id);
+                          }}
+                          trigger={
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              aria-label={`Delete invoice ${order.invoiceNumber || order.id}`}
+                              data-testid={`button-delete-order-${order.id}`}
+                            >
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Delete Invoice</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This will permanently delete invoice {order.invoiceNumber || `#${order.id}`} for{" "}
-                                {order.customerName}. Any bales assigned to this order will be returned to stock. This
-                                cannot be undone.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel data-testid={`button-cancel-delete-${order.id}`}>
-                                Cancel
-                              </AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => deleteMutation.mutate(order.id)}
-                                data-testid={`button-confirm-delete-${order.id}`}
-                              >
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                          }
+                        />
                       </div>
                     </TableCell>
                   </TableRow>

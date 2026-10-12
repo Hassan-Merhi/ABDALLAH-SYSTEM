@@ -5,30 +5,19 @@ import { useDebounce } from "@/hooks/use-debounce";
 import { useLocation } from "wouter";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import {
-  ArrowRight,
-  ExternalLink,
-  Pencil,
-  Save,
-  X,
-  ArrowLeftRight,
-  Search,
-  Package,
-  DollarSign,
-  Clock,
-} from "lucide-react";
+import { ArrowRight, ExternalLink, Pencil, Save, X, ArrowLeftRight, Package, DollarSign, Clock } from "lucide-react";
 import { parseISO } from "date-fns";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { PageHeader } from "@/components/PageHeader";
+import { DataTableToolbar } from "@/components/DataTableToolbar";
 import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
 import { useDateJump } from "@/hooks/use-date-jump";
 import { usePaginatedFilterState } from "@/hooks/use-paginated-filter-state";
@@ -200,26 +189,21 @@ export default function StockTransfers({ hideVoucherNotes = false }: StockTransf
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3">
-        <PeriodFilter value={period} onChange={(next) => setFilter("period", next)} />
-        <div className="relative flex-1 min-w-48 max-w-xs">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by voucher, location, notes…"
-            value={search}
-            onChange={(e) => setFilter("search", e.target.value)}
-            className="pl-8"
-            data-testid="input-search"
-          />
-        </div>
-        {hasActiveFilters && (
-          <Button variant="outline" size="sm" onClick={resetFilters} data-testid="button-reset-filters">
-            <X className="mr-2 h-4 w-4" />
-            Reset filters
-          </Button>
-        )}
-      </div>
+      <DataTableToolbar
+        search={search}
+        onSearchChange={(value) => setFilter("search", value)}
+        searchPlaceholder="Search by voucher, location, notes…"
+        searchTestId="input-search"
+        filters={<PeriodFilter value={period} onChange={(next) => setFilter("period", next)} />}
+        actions={
+          hasActiveFilters ? (
+            <Button variant="outline" size="sm" type="button" onClick={resetFilters} data-testid="button-reset-filters">
+              <X className="mr-2 h-4 w-4" />
+              Reset filters
+            </Button>
+          ) : undefined
+        }
+      />
 
       {/* Table */}
       {isLoading ? (

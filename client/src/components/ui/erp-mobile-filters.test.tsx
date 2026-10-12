@@ -78,7 +78,7 @@ describe("ErpMobileFilters", () => {
       </ErpMobileFilters>
     );
 
-    expect(screen.getByRole("search", { name: "Stock filters" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Stock filters" })).toBeInTheDocument();
     expect(screen.getByTestId("period")).toBeInTheDocument();
     expect(screen.getByTestId("quick")).toBeInTheDocument();
     expect(screen.getByTestId("stock-active-count")).toHaveTextContent("2");

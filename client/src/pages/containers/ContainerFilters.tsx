@@ -1,6 +1,6 @@
-import { Search, Filter, X, ChevronDown } from "lucide-react";
+import { Filter, X, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { SearchField } from "@/components/ui/search-field";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
@@ -37,16 +37,13 @@ export function ContainerFilters({
   return (
     /* Inline filter row */
     <div className="flex flex-wrap gap-2 items-center">
-      <div className="relative w-full min-w-0 sm:flex-1 sm:min-w-[200px]">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search by container number..."
-          value={searchTerm}
-          onChange={(e) => onSearchChange(e.target.value)}
-          className="pl-10"
-          data-testid="input-search-container"
-        />
-      </div>
+      <SearchField
+        value={searchTerm}
+        onValueChange={onSearchChange}
+        placeholder="Search by container number..."
+        wrapperClassName="w-full min-w-0 sm:flex-1 sm:min-w-[200px]"
+        data-testid="input-search-container"
+      />
       <div className="flex w-full gap-1 overflow-x-auto pb-1 sm:w-auto sm:flex-wrap sm:overflow-visible sm:pb-0">
         {(["ALL", "OTW", "OFFLOADED"] as const).map((s) => (
           <Button

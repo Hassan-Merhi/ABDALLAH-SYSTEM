@@ -113,17 +113,17 @@ export default function RawStockRecalculate() {
           <PillTabButton key={t.id} selected={activeTab === t.id} onClick={() => setActiveTab(t.id)}>
             {t.label}
             {t.id === "sources" && (sourceMismatches?.length ?? 0) > 0 && (
-              <span className="ml-1.5 rounded-full bg-red-500/15 text-red-600 text-[11px] px-1.5 py-0.5">
+              <span className="ml-1 rounded-full bg-destructive/10 px-1.5 py-0.5 text-[11px] text-destructive">
                 {sourceMismatches!.length}
               </span>
             )}
             {t.id === "audit" && (fullAudit?.summary.safeRepairsAvailable ?? 0) > 0 && (
-              <span className="ml-1.5 rounded-full bg-amber-500/15 text-amber-600 text-[11px] px-1.5 py-0.5">
+              <span className="ml-1 rounded-full bg-warning/10 px-1.5 py-0.5 text-[11px] text-warning">
                 {fullAudit!.summary.safeRepairsAvailable}
               </span>
             )}
             {t.id === "partialfix" && (partialOffloadScan?.affected.length ?? 0) > 0 && (
-              <span className="ml-1.5 rounded-full bg-blue-500/15 text-blue-600 text-[11px] px-1.5 py-0.5">
+              <span className="ml-1 rounded-full bg-info/10 px-1.5 py-0.5 text-[11px] text-info">
                 {partialOffloadScan!.affected.length}
               </span>
             )}

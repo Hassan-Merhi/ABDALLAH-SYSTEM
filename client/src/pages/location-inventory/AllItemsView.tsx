@@ -1,5 +1,4 @@
-import { Search } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { SearchField } from "@/components/ui/search-field";
 import { InventoryTable } from "./InventoryTable";
 import type { InventoryItem } from "./locationInventoryTypes";
 
@@ -42,10 +41,8 @@ export function AllItemsView({
       <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
         <span className="font-semibold text-foreground">{totalItems}</span> Items
         <span className="text-muted-foreground">·</span>
-        <span className="font-semibold text-foreground font-mono">
-          {Math.floor(totalQty).toLocaleString()}
-        </span>{" "}
-        BL total
+        <span className="font-semibold text-foreground font-mono">{Math.floor(totalQty).toLocaleString()}</span> BL
+        total
         {canViewCost && (
           <>
             <span className="text-muted-foreground">·</span>
@@ -55,16 +52,13 @@ export function AllItemsView({
       </div>
 
       {/* Search */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search items by name..."
-          value={itemSearchTerm}
-          onChange={(e) => setItemSearchTerm(e.target.value)}
-          className="pl-9"
-          data-testid="input-all-item-search"
-        />
-      </div>
+      <SearchField
+        value={itemSearchTerm}
+        onValueChange={setItemSearchTerm}
+        placeholder="Search items by name..."
+        wrapperClassName="max-w-sm"
+        data-testid="input-all-item-search"
+      />
 
       <InventoryTable
         filteredStockItems={allItemsFiltered}

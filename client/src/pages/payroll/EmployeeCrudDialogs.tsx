@@ -15,8 +15,10 @@ import {
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/decimal-input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 
@@ -137,13 +139,7 @@ export function EmployeeCrudDialogs({
                   <FormItem>
                     <FormLabel>Monthly Salary</FormLabel>
                     <FormControl>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        placeholder="0.00"
-                        {...field}
-                        data-testid="input-monthly-salary"
-                      />
+                      <MoneyInput step="0.01" placeholder="0.00" {...field} data-testid="input-monthly-salary" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -290,9 +286,14 @@ export function EmployeeCrudDialogs({
                 >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={createEmployeeMutation.isPending} data-testid="button-submit-create">
-                  {createEmployeeMutation.isPending ? "Creating..." : "Create Employee"}
-                </Button>
+                <FormSubmitButton
+                  type="submit"
+                  pending={createEmployeeMutation.isPending}
+                  pendingLabel="Creating…"
+                  data-testid="button-submit-create"
+                >
+                  Create Employee
+                </FormSubmitButton>
               </div>
             </form>
           </Form>

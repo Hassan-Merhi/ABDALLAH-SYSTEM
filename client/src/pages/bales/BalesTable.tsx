@@ -1,18 +1,13 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { SearchField } from "@/components/ui/search-field";
+import { PageState } from "@/components/ui/page-state";
+import { StatusBadge } from "@/components/StatusBadge";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Bale } from "@shared/schema";
-import { Package, Search, Trash2, Upload } from "lucide-react";
+import { Package, Trash2, Upload } from "lucide-react";
 
 interface BalesTableProps {
   bales: Bale[];
@@ -34,20 +29,17 @@ export function BalesTable({
   onNavigateImport,
 }: BalesTableProps) {
   return (
-    <Card className="p-6">
-      <div className="flex items-center justify-between mb-4">
+    <Card className="p-3 sm:p-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
         <h2 className="text-lg font-semibold">All Bales ({bales.length})</h2>
-        <div className="flex gap-2">
-          <div className="relative w-64">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search bales..."
-              value={searchTerm}
-              onChange={(e) => onSearchChange(e.target.value)}
-              className="pl-8"
-              data-testid="input-search-bales"
-            />
-          </div>
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
+          <SearchField
+            value={searchTerm}
+            onValueChange={onSearchChange}
+            placeholder="Search bales..."
+            wrapperClassName="w-full sm:w-64"
+            data-testid="input-search-bales"
+          />
           <Button variant="outline" onClick={onNavigateImport} data-testid="button-import">
             <Upload className="h-4 w-4 mr-2" />
             Import
@@ -56,20 +48,20 @@ export function BalesTable({
       </div>
 
       {isLoading ? (
-        <div className="space-y-3">
+        <div role="status" aria-live="polite" aria-busy="true" className="space-y-3">
+          <span className="sr-only">Loading bales…</span>
           {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-14 w-full" />
+            <Skeleton key={i} className="h-14 w-full" aria-hidden="true" />
           ))}
         </div>
       ) : bales.length === 0 ? (
-        <div className="text-center py-12">
-          <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-          <p className="text-muted-foreground">
-            {searchTerm ? "No bales match your search" : "No bales found. Scan or add a bale to get started."}
-          </p>
-        </div>
+        <PageState
+          title={searchTerm ? "No bales match your search" : "No bales found"}
+          description={searchTerm ? "Try another barcode or description." : "Scan or add a bale to get started."}
+          icon={Package}
+        />
       ) : (
-        <Table>
+        <Table mobileLayout="cards">
           <TableHeader className="sticky top-0 z-30 bg-background">
             <TableRow>
               <TableHead>Barcode</TableHead>
@@ -98,19 +90,17 @@ export function BalesTable({
                 <TableCell className="text-right font-mono">{parseFloat(bale.weight).toLocaleString()}</TableCell>
                 <TableCell>{formatDisplayDate(bale.datePressed)}</TableCell>
                 <TableCell>
-                  <Badge
-                    variant={
-                      bale.status === "AVAILABLE" ? "default" : bale.status === "SOLD" ? "secondary" : "outline"
-                    }
-                  >
-                    {bale.status}
-                  </Badge>
+                  <StatusBadge
+                    status={bale.status === "AVAILABLE" ? "available" : bale.status === "HOLD" ? "hold" : "sold"}
+                    showIcon={false}
+                  />
                 </TableCell>
                 <TableCell className="text-right">
                   <Button
                     variant="ghost"
                     size="icon"
                     onClick={() => onDeleteRequest(bale.id)}
+                    aria-label={`Delete bale ${bale.barcode}`}
                     data-testid={`button-delete-bale-${bale.id}`}
                   >
                     <Trash2 className="h-4 w-4" />

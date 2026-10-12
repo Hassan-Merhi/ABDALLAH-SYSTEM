@@ -6,7 +6,10 @@ import { WorkspaceActions } from "@/components/ui/workspace-layout";
 import { cn } from "@/lib/utils";
 
 type PageStateProps = React.HTMLAttributes<HTMLDivElement> & {
-  icon?: LucideIcon;
+  icon?: LucideIcon | null;
+  layout?: "panel" | "legacy";
+  /** Optional custom action slot used by compact legacy empty states. */
+  action?: React.ReactNode;
   title: string;
   description?: string;
   actionLabel?: string;
@@ -23,7 +26,9 @@ const PageState = React.forwardRef<HTMLDivElement, PageStateProps>(
   (
     {
       className,
-      icon: Icon = Inbox,
+      icon,
+      layout = "panel",
+      action,
       title,
       description,
       actionLabel,
@@ -36,8 +41,9 @@ const PageState = React.forwardRef<HTMLDivElement, PageStateProps>(
       iconClassName,
       ...props
     },
-    ref,
+    ref
   ) => {
+    const Icon = icon === undefined ? (layout === "legacy" ? null : Inbox) : icon;
     const hasPrimaryAction = Boolean(actionLabel && onAction);
     const hasSecondaryAction = Boolean(secondaryActionLabel && onSecondaryAction);
 
@@ -47,17 +53,38 @@ const PageState = React.forwardRef<HTMLDivElement, PageStateProps>(
         role="status"
         aria-atomic="true"
         className={cn(
-          "flex min-h-48 min-w-0 flex-col items-center justify-center rounded-lg border border-dashed bg-card px-4 py-8 text-center sm:px-6 sm:py-10",
-          className,
+          layout === "legacy"
+            ? "empty-state"
+            : "flex min-h-48 min-w-0 flex-col items-center justify-center rounded-lg border border-dashed bg-card px-4 py-8 text-center sm:px-6 sm:py-10",
+          className
         )}
         {...props}
       >
-        <div className="mb-4 rounded-full bg-muted p-3 text-muted-foreground">
-          <Icon className={cn("h-6 w-6", iconClassName)} aria-hidden="true" />
-        </div>
-        <h3 className="max-w-xl text-base font-semibold text-foreground">{title}</h3>
-        {description ? <p className="mt-1 max-w-xl text-sm leading-5 text-muted-foreground">{description}</p> : null}
-        {hasPrimaryAction || hasSecondaryAction ? (
+        {Icon ? (
+          <div
+            className={
+              layout === "legacy" ? "empty-state-icon" : "mb-4 rounded-full bg-muted p-3 text-muted-foreground"
+            }
+            aria-hidden="true"
+          >
+            <Icon className={cn(layout === "legacy" ? "h-5 w-5" : "h-6 w-6", iconClassName)} />
+          </div>
+        ) : null}
+        <h3 className={layout === "legacy" ? "empty-state-title" : "max-w-xl text-base font-semibold text-foreground"}>
+          {title}
+        </h3>
+        {description ? (
+          <p
+            className={
+              layout === "legacy" ? "empty-state-desc" : "mt-1 max-w-xl text-sm leading-5 text-muted-foreground"
+            }
+          >
+            {description}
+          </p>
+        ) : null}
+        {action ? (
+          <div className="mt-2">{action}</div>
+        ) : hasPrimaryAction || hasSecondaryAction ? (
           <WorkspaceActions className="mt-4 w-full justify-center sm:w-auto">
             {hasSecondaryAction ? (
               <Button type="button" variant="ghost" onClick={onSecondaryAction} disabled={actionPending}>
@@ -80,7 +107,7 @@ const PageState = React.forwardRef<HTMLDivElement, PageStateProps>(
         ) : null}
       </div>
     );
-  },
+  }
 );
 PageState.displayName = "PageState";
 
@@ -88,9 +115,11 @@ export function LoadingState({
   title = "Loading",
   description = "Please wait while the latest information is loaded.",
   className,
-}: Partial<Pick<PageStateProps, "title" | "description" | "className">>) {
+  ...props
+}: Omit<PageStateProps, "icon" | "title" | "description"> & { title?: string; description?: string }) {
   return (
     <PageState
+      {...props}
       className={className}
       icon={Loader2}
       iconClassName="animate-spin motion-reduce:animate-none"
@@ -128,15 +157,7 @@ export function SuccessState({
   description = "Your changes have been saved.",
   ...props
 }: Omit<PageStateProps, "icon" | "title"> & { title?: string }) {
-  return (
-    <PageState
-      icon={CheckCircle2}
-      title={title}
-      description={description}
-      aria-live="polite"
-      {...props}
-    />
-  );
+  return <PageState icon={CheckCircle2} title={title} description={description} aria-live="polite" {...props} />;
 }
 
 export { PageState };

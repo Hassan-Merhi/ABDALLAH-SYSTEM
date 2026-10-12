@@ -8,25 +8,14 @@ import { customersApi } from "@/api/customersApi";
 import { drCrClass } from "@/lib/formatNumber";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
-import {
-  Plus,
-  Search,
-  Building2,
-  Pencil,
-  Users,
-  Wallet,
-  TrendingUp,
-  TrendingDown,
-  EyeOff,
-  Eye,
-  Printer,
-} from "lucide-react";
+import { Plus, Building2, Pencil, Users, Wallet, TrendingUp, TrendingDown, EyeOff, Eye, Printer } from "lucide-react";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocation } from "wouter";
 import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/PageHeader";
+import { DataTableToolbar } from "@/components/DataTableToolbar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { insertCustomerSchema, type Customer } from "@shared/schema";
@@ -370,32 +359,35 @@ export default function Customers() {
         )}
       </div>
 
-      {/* Filter row */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-[220px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search customers..."
-            value={searchQuery}
-            onChange={(e) => setFilter("searchQuery", e.target.value)}
-            className="pl-9"
-            data-testid="input-search-customers"
-          />
-        </div>
-        <Button
-          variant="outline"
-          onClick={() => setFilter("hideZero", !hideZero)}
-          data-testid="button-toggle-hide-zero"
-        >
-          {hideZero ? <Eye className="mr-2 h-4 w-4" /> : <EyeOff className="mr-2 h-4 w-4" />}
-          {hideZero ? "Show Zero" : "Hide Zero"}
-        </Button>
-        {hasActiveFilters && (
-          <Button variant="outline" type="button" onClick={resetFilters} data-testid="button-reset-filters">
-            Reset filters
+      {/* Shared search and phone filter sheet; original persisted filters remain unchanged. */}
+      <DataTableToolbar
+        search={searchQuery}
+        onSearchChange={(value) => setFilter("searchQuery", value)}
+        searchPlaceholder="Search customers..."
+        searchTestId="input-search-customers"
+        mobileFilters
+        filterLabel="Customer filters"
+        activeFilterCount={hasActiveFilters ? 1 : 0}
+        onResetFilters={resetFilters}
+        filters={
+          <Button
+            variant="outline"
+            type="button"
+            onClick={() => setFilter("hideZero", !hideZero)}
+            data-testid="button-toggle-hide-zero"
+          >
+            {hideZero ? <Eye className="mr-2 h-4 w-4" /> : <EyeOff className="mr-2 h-4 w-4" />}
+            {hideZero ? "Show Zero" : "Hide Zero"}
           </Button>
-        )}
-      </div>
+        }
+        actions={
+          hasActiveFilters ? (
+            <Button variant="outline" type="button" onClick={resetFilters} data-testid="button-reset-filters">
+              Reset filters
+            </Button>
+          ) : undefined
+        }
+      />
 
       {/* Table */}
       <div className="border rounded-xl overflow-hidden">

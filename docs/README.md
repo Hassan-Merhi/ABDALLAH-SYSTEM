@@ -73,6 +73,15 @@ failure, so a correct document cannot quietly become undiscoverable.
 | [factory-mobile-audit.md](factory-mobile-audit.md) | Factory mode phone layouts and mobile audit status |
 | [universal-responsive-pill-tabs.md](universal-responsive-pill-tabs.md) | Shared pill tab component standard, migration map and verification status |
 | [ux-consistency-program.md](ux-consistency-program.md) | Shared responsive, translation, route-boundary, and filter-state contracts |
+| [shared-ui-continuation-roadmap.md](shared-ui-continuation-roadmap.md) | Shared UI standardization phase status, checkpoints and Phase 8 verification record |
+| [shared-ui-phase-1.md](shared-ui-phase-1.md) | Canonical page shells, page states, skeletons and status badges |
+| [shared-ui-phase-2.md](shared-ui-phase-2.md) | Shared responsive tabs: variants, keyboard contract and controlled route state |
+| [shared-ui-phase-3.md](shared-ui-phase-3.md) | Shared tables, toolbars, mobile filters, pagination and view preferences |
+| [shared-ui-phase-4.md](shared-ui-phase-4.md) | Canonical form inputs, explicit-currency display and protective async actions |
+| [shared-ui-phase-5.md](shared-ui-phase-5.md) | Cross-module adoption of the shared search, status and page-state primitives |
+| [shared-ui-phase-6.md](shared-ui-phase-6.md) | Accessibility, keyboard, RTL and interaction hardening conventions |
+| [shared-ui-phase-7.md](shared-ui-phase-7.md) | Fetch-interceptor, pagination-key, legacy list and debounce consolidation |
+| [shared-ui-phase-8-claude-handoff.md](shared-ui-phase-8-claude-handoff.md) | Phase 8 review scope and verification mandate |
 | [api-quickstart.md](api-quickstart.md) | Calling the API |
 | [compatibility.md](compatibility.md) | Supported browsers and platforms |
 

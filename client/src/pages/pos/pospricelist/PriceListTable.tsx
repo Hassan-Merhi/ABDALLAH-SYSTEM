@@ -12,6 +12,7 @@ import { useLocation } from "wouter";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PageState } from "@/components/ui/page-state";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -199,15 +200,14 @@ function EmptyState({ model }: { model: PosPriceListModel }) {
           ? "No items match your filters."
           : "No items found.";
   return (
-    <div className="flex flex-col items-center justify-center h-full text-center gap-2 text-muted-foreground py-16">
-      <Tag className="w-10 h-10 opacity-30" />
-      <p className="text-sm">{message}</p>
-      {(search || groupFilter !== "all" || showUnpriced) && (
-        <Button variant="ghost" size="sm" onClick={model.clearFilters}>
-          Clear filters
-        </Button>
-      )}
-    </div>
+    <PageState
+      title={message}
+      icon={Tag}
+      className="min-h-48"
+      actionLabel={search || groupFilter !== "all" || showUnpriced ? "Clear filters" : undefined}
+      onAction={model.clearFilters}
+      actionVariant="ghost"
+    />
   );
 }
 

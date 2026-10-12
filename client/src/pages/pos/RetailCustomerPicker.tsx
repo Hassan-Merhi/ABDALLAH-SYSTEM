@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Search, UserPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SearchField } from "@/components/ui/search-field";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { createRetailCustomer, searchRetailCustomers } from "./retailWave2Api";
@@ -22,6 +23,7 @@ export function RetailCustomerPicker({
   onSelect: (customer: Customer | null) => void;
 }) {
   const { toast } = useToast();
+  const customerPickerId = useId();
   const [open, setOpen] = useState(false);
   const [term, setTerm] = useState("");
   const [search, setSearch] = useState("");
@@ -71,7 +73,13 @@ export function RetailCustomerPicker({
             {customer.phone ? ` · ${customer.phone}` : ""}
           </div>
         </div>
-        <Button size="sm" variant="ghost" onClick={() => onSelect(null)} data-testid="retail-pos-customer-clear">
+        <Button
+          size="sm"
+          variant="ghost"
+          className="min-h-11 sm:min-h-8"
+          onClick={() => onSelect(null)}
+          data-testid="retail-pos-customer-clear"
+        >
           <X className="mr-1 h-3.5 w-3.5" /> Walk-in
         </Button>
       </div>
@@ -88,26 +96,38 @@ export function RetailCustomerPicker({
           size="sm"
           variant="outline"
           onClick={() => setOpen((value) => !value)}
+          aria-expanded={open}
+          aria-controls={customerPickerId}
           data-testid="retail-pos-customer-open"
         >
           <Search className="mr-1 h-3.5 w-3.5" /> Add customer
         </Button>
       </div>
       {open && (
-        <div className="space-y-2 rounded-lg border p-2">
-          <Input
+        <div
+          id={customerPickerId}
+          role="region"
+          aria-label="Select retail customer"
+          className="space-y-2 rounded-lg border p-2"
+        >
+          <SearchField
             autoFocus
             value={term}
-            onChange={(event) => setTerm(event.target.value)}
+            onValueChange={setTerm}
             placeholder="Search name, phone or code"
             data-testid="retail-pos-customer-search"
           />
-          <div className="max-h-40 space-y-1 overflow-y-auto">
+          <div
+            className="max-h-40 space-y-1 overflow-y-auto"
+            role="group"
+            aria-label="Customer search results"
+            aria-busy={customersQuery.isLoading}
+          >
             {(customersQuery.data ?? []).map((entry: Customer) => (
               <button
                 key={entry.id}
                 type="button"
-                className="flex w-full items-center justify-between rounded-sm border px-2 py-1.5 text-left text-sm hover:bg-muted/50"
+                className="flex min-h-11 w-full items-center justify-between rounded-sm border px-2 py-1.5 text-start text-sm hover:bg-muted/50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                 onClick={() => {
                   onSelect(entry);
                   setOpen(false);
@@ -124,9 +144,30 @@ export function RetailCustomerPicker({
                 </span>
               </button>
             ))}
-            {customersQuery.isLoading && <div className="p-2 text-xs text-muted-foreground">Searching…</div>}
-            {!customersQuery.isLoading && !(customersQuery.data ?? []).length && (
-              <div className="p-2 text-xs text-muted-foreground">No customer matches.</div>
+            {customersQuery.isLoading && (
+              <div role="status" className="p-2 text-xs text-muted-foreground">
+                Searching…
+              </div>
+            )}
+            {customersQuery.isError && (
+              <div role="alert" className="flex items-center justify-between gap-2 p-2 text-xs text-destructive">
+                Customer search failed.
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    void customersQuery.refetch();
+                  }}
+                >
+                  Retry
+                </Button>
+              </div>
+            )}
+            {!customersQuery.isLoading && !customersQuery.isError && !(customersQuery.data ?? []).length && (
+              <div role="status" className="p-2 text-xs text-muted-foreground">
+                No customer matches.
+              </div>
             )}
           </div>
           {creating ? (
@@ -150,7 +191,7 @@ export function RetailCustomerPicker({
                 />
               </div>
               <div className="flex justify-end gap-2">
-                <Button size="sm" variant="ghost" onClick={() => setCreating(false)}>
+                <Button size="sm" variant="ghost" className="min-h-11 sm:min-h-8" onClick={() => setCreating(false)}>
                   Cancel
                 </Button>
                 <Button

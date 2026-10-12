@@ -1,3 +1,9 @@
+import {
+  resolveFetchUrl as resolveUrl,
+  fetchRequestMethod as getMethod,
+  replaceFetchInputUrl as replaceInputUrl,
+  fetchQueryCacheKey,
+} from "./fetchRequestUtils";
 import { queryClient } from "./queryClient";
 
 const STOCK_ENTRY_ENDPOINT = "/api/factory/bales/stock-entry-history";
@@ -32,33 +38,8 @@ if (typeof window !== "undefined" && !window.__erpHeavyListPaginationClientInsta
   let selectedLimit: number = DEFAULT_LIMIT;
   let controlsRoot: HTMLDivElement | null = null;
 
-  function resolveUrl(input: RequestInfo | URL): URL | null {
-    try {
-      if (typeof input === "string") return new URL(input, window.location.origin);
-      if (input instanceof URL) return new URL(input.toString());
-      if (input instanceof Request) return new URL(input.url, window.location.origin);
-    } catch {
-      return null;
-    }
-    return null;
-  }
-
-  function getMethod(input: RequestInfo | URL, init?: RequestInit): string {
-    return String(init?.method || (input instanceof Request ? input.method : "GET")).toUpperCase();
-  }
-
   function buildBaseKey(url: URL): string {
-    const params = new URLSearchParams(url.searchParams);
-    for (const key of ["pagination", "page", "limit", "pageSize", "offset"]) params.delete(key);
-    params.sort();
-    return `${url.pathname}?${params.toString()}`;
-  }
-
-  function replaceInputUrl(input: RequestInfo | URL, url: URL): RequestInfo | URL {
-    if (input instanceof Request) return new Request(url.toString(), input);
-    if (input instanceof URL) return url;
-    if (url.origin === window.location.origin) return `${url.pathname}${url.search}${url.hash}`;
-    return url.toString();
+    return fetchQueryCacheKey(url, ["pagination", "page", "limit", "pageSize", "offset"]);
   }
 
   /**

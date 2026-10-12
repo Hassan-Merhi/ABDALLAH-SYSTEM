@@ -1,14 +1,10 @@
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
+import { PageShell } from "@/components/ui/page-shell";
 
 const CoreErpPage = React.forwardRef<HTMLElement, React.HTMLAttributes<HTMLElement>>(({ className, ...props }, ref) => (
-  <section
-    ref={ref}
-    data-core-erp-page="true"
-    className={cn("flex min-w-0 max-w-full flex-col gap-4 p-3 sm:gap-5 sm:p-4 lg:p-6", className)}
-    {...props}
-  />
+  <PageShell as="section" layout="core-erp" ref={ref} data-core-erp-page="true" className={className} {...props} />
 ));
 CoreErpPage.displayName = "CoreErpPage";
 

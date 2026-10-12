@@ -8,15 +8,24 @@ import { drCrClass } from "@/lib/formatNumber";
 import { factoryApiRequest } from "@/lib/factoryApi";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useLocation } from "wouter";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Search, User, Trash2, FileText, RotateCcw, History, Clock, Eye, EyeOff } from "lucide-react";
+import { Plus, Pencil, User, Trash2, FileText, RotateCcw, History, Clock, Eye, EyeOff } from "lucide-react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { FormSubmitButton } from "@/components/FormSubmitButton";
+import { useSingleFlightAction } from "@/hooks/use-single-flight-action";
+import { MoneyInput } from "@/components/ui/decimal-input";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { PageHeader } from "@/components/PageHeader";
+import { ErrorState } from "@/components/ui/page-state";
+import { DataTableToolbar } from "@/components/DataTableToolbar";
+import { PaginationBar } from "@/components/PaginationBar";
+import { useTablePrefs } from "@/hooks/use-table-prefs";
+import { useClientTablePagination } from "@/hooks/use-client-table-pagination";
+import { useCompany } from "@/contexts/CompanyContext";
 import { BalanceSplit, type LedgerSplitFields } from "./factorycustomerstatement/NotInLedgerParts";
 
 interface Customer extends LedgerSplitFields {
@@ -34,9 +43,16 @@ interface Customer extends LedgerSplitFields {
 }
 
 export default function FactoryCustomers() {
+  const createFormId = useId();
+  const editFormId = useId();
   const { toast } = useToast();
+  const { execute: executeSave, pending: saving } = useSingleFlightAction();
   const { formatCashAmount } = useCurrencyContext();
   const [, navigate] = useLocation();
+  const { selectedCompany } = useCompany();
+  const { prefs, setPrefs } = useTablePrefs("factory-customers", { companyId: selectedCompany?.id });
+
+  const pageSize = prefs.pageSize ?? 25;
   const [search, setSearch] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
@@ -56,6 +72,7 @@ export default function FactoryCustomers() {
     isLoading,
     isError,
     error,
+    refetch: refetchCustomers,
   } = useQuery<Customer[]>({
     queryKey: ["/api/factory/customers"],
   });
@@ -164,27 +181,35 @@ export default function FactoryCustomers() {
   };
 
   const handleCreate = () => {
-    if (!formData.legalName.trim()) return;
+    if (!formData.legalName.trim() || saving || createMutation.isPending) return;
     const days = formData.paymentTermsDays ? parseInt(formData.paymentTermsDays) : undefined;
-    createMutation.mutate({
-      legalName: formData.legalName.trim(),
-      phone: formData.phone.trim() || undefined,
-      openingBalance: formData.openingBalance || undefined,
-      openingBalanceSide: formData.openingBalanceSide || undefined,
-      paymentTermsDays: days || undefined,
+    void executeSave(() =>
+      createMutation.mutateAsync({
+        legalName: formData.legalName.trim(),
+        phone: formData.phone.trim() || undefined,
+        openingBalance: formData.openingBalance || undefined,
+        openingBalanceSide: formData.openingBalanceSide || undefined,
+        paymentTermsDays: days || undefined,
+      })
+    ).catch(() => {
+      // Existing mutation.onError provides feedback.
     });
   };
 
   const handleUpdate = () => {
-    if (!editingCustomer || !formData.legalName.trim()) return;
+    if (!editingCustomer || !formData.legalName.trim() || saving || updateMutation.isPending) return;
     const days = formData.paymentTermsDays ? parseInt(formData.paymentTermsDays) : null;
-    updateMutation.mutate({
-      id: editingCustomer.id,
-      data: {
-        legalName: formData.legalName.trim(),
-        phone: formData.phone.trim() || null,
-        paymentTermsDays: days,
-      },
+    void executeSave(() =>
+      updateMutation.mutateAsync({
+        id: editingCustomer.id,
+        data: {
+          legalName: formData.legalName.trim(),
+          phone: formData.phone.trim() || null,
+          paymentTermsDays: days,
+        },
+      })
+    ).catch(() => {
+      // Existing mutation.onError provides feedback.
     });
   };
 
@@ -196,6 +221,8 @@ export default function FactoryCustomers() {
   const visibleCustomers = showZeroBalance
     ? filtered
     : filtered.filter((customer) => Math.abs(customer.balance ?? 0) > 0.001);
+  const { page: safePage, setPage, totalPages, paginate } = useClientTablePagination(visibleCustomers.length, pageSize);
+  const pagedCustomers = paginate(visibleCustomers);
 
   if (isLoading) {
     return (
@@ -211,9 +238,14 @@ export default function FactoryCustomers() {
     return (
       <div className="flex flex-col h-full p-6 gap-4">
         <PageHeader title="Customers" />
-        <div className="rounded-md border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
-          Failed to load customers: {error?.message || "Unknown error"}
-        </div>
+        <ErrorState
+          title="Customers could not be loaded"
+          description={error?.message || "Please try again."}
+          actionLabel="Retry"
+          onAction={() => {
+            void refetchCustomers();
+          }}
+        />
       </div>
     );
   }
@@ -231,7 +263,10 @@ export default function FactoryCustomers() {
           {zeroBalanceCount > 0 && (
             <Button
               variant="outline"
-              onClick={() => setShowZeroBalance((visible) => !visible)}
+              onClick={() => {
+                setShowZeroBalance((visible) => !visible);
+                setPage(1);
+              }}
               aria-pressed={showZeroBalance}
               data-testid="button-toggle-zero-balance"
               size="sm"
@@ -253,20 +288,19 @@ export default function FactoryCustomers() {
         </div>
       </div>
 
-      <div className="relative mb-4">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search by name, code, or phone..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-9"
-          data-testid="input-search-customers"
-        />
-      </div>
+      <DataTableToolbar
+        search={search}
+        onSearchChange={(value) => {
+          setSearch(value);
+          setPage(1);
+        }}
+        searchPlaceholder="Search by name, code, or phone..."
+        searchTestId="input-search-customers"
+      />
 
       <div className="rounded-xl border overflow-hidden">
         <div className="table-responsive">
-          <Table mobileLayout="cards">
+          <Table mobileLayout="cards" density={prefs.density}>
             <TableHeader className="sticky top-0 z-30">
               <TableRow className="bg-muted border-b-2 border-border/60 hover:bg-muted">
                 <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
@@ -290,7 +324,7 @@ export default function FactoryCustomers() {
                   </TableCell>
                 </TableRow>
               ) : (
-                visibleCustomers.map((customer) => (
+                pagedCustomers.map((customer) => (
                   <TableRow key={customer.id} data-testid={`row-customer-${customer.id}`}>
                     <TableCell className="font-medium" data-testid={`text-customer-name-${customer.id}`}>
                       <button
@@ -359,6 +393,18 @@ export default function FactoryCustomers() {
           </Table>
         </div>
       </div>
+      <PaginationBar
+        page={safePage}
+        totalPages={totalPages}
+        total={visibleCustomers.length}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        noun="customers"
+        onPageSizeChange={(size) => {
+          setPrefs({ pageSize: size });
+          setPage(1);
+        }}
+      />
 
       {showDeleted && (
         <div className="rounded-xl border overflow-hidden mt-6">
@@ -412,13 +458,14 @@ export default function FactoryCustomers() {
       <Dialog
         open={isCreateOpen}
         onOpenChange={(open) => {
+          if (createMutation.isPending || saving) return;
           if (!open) {
             setIsCreateOpen(false);
             resetForm();
           }
         }}
       >
-        <DialogContent>
+        <DialogContent aria-busy={createMutation.isPending || saving}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <User className="h-5 w-5" />
@@ -428,42 +475,52 @@ export default function FactoryCustomers() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium mb-1 block">Name</label>
+              <label htmlFor={`${createFormId}-name`} className="text-sm font-medium mb-1 block">
+                Name
+              </label>
               <Input
                 value={formData.legalName}
                 onChange={(e) => setFormData({ ...formData, legalName: e.target.value })}
                 placeholder="Customer name"
+                id={`${createFormId}-name`}
                 data-testid="input-customer-name"
               />
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block">Phone</label>
+              <label htmlFor={`${createFormId}-phone`} className="text-sm font-medium mb-1 block">
+                Phone
+              </label>
               <Input
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 placeholder="Phone number"
+                id={`${createFormId}-phone`}
                 data-testid="input-customer-phone"
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-sm font-medium mb-1 block">Opening Balance</label>
-                <Input
-                  type="number"
+                <label htmlFor={`${createFormId}-balance`} className="text-sm font-medium mb-1 block">
+                  Opening Balance
+                </label>
+                <MoneyInput
                   step="0.01"
                   value={formData.openingBalance}
                   onChange={(e) => setFormData({ ...formData, openingBalance: e.target.value })}
                   placeholder="0.00"
+                  id={`${createFormId}-balance`}
                   data-testid="input-customer-opening-balance"
                 />
               </div>
               <div>
-                <label className="text-sm font-medium mb-1 block">Side</label>
+                <label htmlFor={`${createFormId}-side`} className="text-sm font-medium mb-1 block">
+                  Side
+                </label>
                 <Select
                   value={formData.openingBalanceSide}
                   onValueChange={(v) => setFormData({ ...formData, openingBalanceSide: v })}
                 >
-                  <SelectTrigger data-testid="select-balance-side">
+                  <SelectTrigger id={`${createFormId}-side`} data-testid="select-balance-side">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -474,7 +531,10 @@ export default function FactoryCustomers() {
               </div>
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block flex items-center gap-1">
+              <label
+                htmlFor={`${createFormId}-terms`}
+                className="text-sm font-medium mb-1 block flex items-center gap-1"
+              >
                 <Clock className="h-3.5 w-3.5" />
                 Payment Terms
               </label>
@@ -484,7 +544,7 @@ export default function FactoryCustomers() {
                   setFormData({ ...formData, paymentTermsDays: v === "none" ? "" : v === "custom" ? "" : v })
                 }
               >
-                <SelectTrigger data-testid="select-payment-terms">
+                <SelectTrigger id={`${createFormId}-terms`} data-testid="select-payment-terms">
                   <SelectValue placeholder="No payment terms" />
                 </SelectTrigger>
                 <SelectContent>
@@ -503,6 +563,7 @@ export default function FactoryCustomers() {
                   onChange={(e) => setFormData({ ...formData, paymentTermsDays: e.target.value })}
                   placeholder="Days"
                   className="mt-2"
+                  aria-label="Custom payment terms in days"
                   data-testid="input-custom-payment-terms"
                 />
               )}
@@ -521,13 +582,16 @@ export default function FactoryCustomers() {
               >
                 Cancel
               </Button>
-              <Button
+              <FormSubmitButton
+                type="button"
                 onClick={handleCreate}
-                disabled={createMutation.isPending || !formData.legalName.trim()}
+                pending={createMutation.isPending || saving}
+                pendingLabel="Creating…"
+                disabled={!formData.legalName.trim()}
                 data-testid="button-submit-customer"
               >
-                {createMutation.isPending ? "Creating..." : "Create Customer"}
-              </Button>
+                Create Customer
+              </FormSubmitButton>
             </div>
           </div>
         </DialogContent>
@@ -536,13 +600,14 @@ export default function FactoryCustomers() {
       <Dialog
         open={!!editingCustomer}
         onOpenChange={(open) => {
+          if (updateMutation.isPending || saving) return;
           if (!open) {
             setEditingCustomer(null);
             resetForm();
           }
         }}
       >
-        <DialogContent className="max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-h-[85vh] overflow-y-auto" aria-busy={updateMutation.isPending || saving}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Pencil className="h-5 w-5" />
@@ -552,25 +617,31 @@ export default function FactoryCustomers() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium mb-1 block">Name</label>
+              <label htmlFor={`${editFormId}-name`} className="text-sm font-medium mb-1 block">
+                Name
+              </label>
               <Input
                 value={formData.legalName}
                 onChange={(e) => setFormData({ ...formData, legalName: e.target.value })}
                 placeholder="Customer name"
+                id={`${editFormId}-name`}
                 data-testid="input-edit-customer-name"
               />
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block">Phone</label>
+              <label htmlFor={`${editFormId}-phone`} className="text-sm font-medium mb-1 block">
+                Phone
+              </label>
               <Input
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 placeholder="Phone number"
+                id={`${editFormId}-phone`}
                 data-testid="input-edit-customer-phone"
               />
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block flex items-center gap-1">
+              <label htmlFor={`${editFormId}-terms`} className="text-sm font-medium mb-1 block flex items-center gap-1">
                 <Clock className="h-3.5 w-3.5" />
                 Payment Terms
               </label>
@@ -588,7 +659,7 @@ export default function FactoryCustomers() {
                   else setFormData({ ...formData, paymentTermsDays: v });
                 }}
               >
-                <SelectTrigger data-testid="select-edit-payment-terms">
+                <SelectTrigger id={`${editFormId}-terms`} data-testid="select-edit-payment-terms">
                   <SelectValue placeholder="No payment terms" />
                 </SelectTrigger>
                 <SelectContent>
@@ -608,6 +679,7 @@ export default function FactoryCustomers() {
                   onChange={(e) => setFormData({ ...formData, paymentTermsDays: e.target.value })}
                   placeholder="Number of days"
                   className="mt-2"
+                  aria-label="Custom payment terms in days"
                   data-testid="input-edit-custom-payment-terms"
                 />
               )}
@@ -626,13 +698,16 @@ export default function FactoryCustomers() {
               >
                 Cancel
               </Button>
-              <Button
+              <FormSubmitButton
+                type="button"
                 onClick={handleUpdate}
-                disabled={updateMutation.isPending || !formData.legalName.trim()}
+                pending={updateMutation.isPending || saving}
+                pendingLabel="Saving…"
+                disabled={!formData.legalName.trim()}
                 data-testid="button-submit-edit-customer"
               >
-                {updateMutation.isPending ? "Saving..." : "Save Changes"}
-              </Button>
+                Save Changes
+              </FormSubmitButton>
             </div>
           </div>
         </DialogContent>
@@ -647,8 +722,8 @@ export default function FactoryCustomers() {
         tone="destructive"
         confirmText={deleteMutation.isPending ? "Deleting..." : "Delete"}
         loading={deleteMutation.isPending}
-        onConfirm={() => {
-          if (deletingCustomer) deleteMutation.mutate(deletingCustomer.id);
+        onConfirm={async () => {
+          if (deletingCustomer) await deleteMutation.mutateAsync(deletingCustomer.id);
         }}
         description={
           <span>

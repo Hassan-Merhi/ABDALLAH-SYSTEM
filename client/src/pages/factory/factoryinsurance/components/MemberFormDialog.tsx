@@ -4,12 +4,16 @@ import type { ClientErrorLike } from "@/lib/clientError";
  *
  * Extracted from FactoryInsurance.tsx during the Phase 4 god-file split.
  */
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
+import { FormSubmitButton } from "@/components/FormSubmitButton";
+import { MoneyInput } from "@/components/ui/decimal-input";
+import { FormGrid } from "@/components/ui/form";
+import { useSingleFlightAction } from "@/hooks/use-single-flight-action";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,6 +31,8 @@ function MemberFormDialog({
   existing?: InsuranceMember | null;
 }) {
   const { toast } = useToast();
+  const formId = useId();
+  const { execute: executeSave, pending: submitting } = useSingleFlightAction();
   const [name, setName] = useState(existing?.name ?? "");
   const [nationality, setNationality] = useState(existing?.nationality ?? "");
   const [positionWorking, setPositionWorking] = useState(existing?.positionWorking ?? "");
@@ -64,19 +70,24 @@ function MemberFormDialog({
   });
 
   const handleSubmit = () => {
+    if (submitting || saveMutation.isPending) return;
     if (!name.trim() || !startDate || !amount) {
       toast({ title: "Please fill in required fields", variant: "destructive" });
       return;
     }
-    saveMutation.mutate({
-      name: name.trim(),
-      nationality: nationality || null,
-      positionWorking: positionWorking || null,
-      insuranceNumber: insuranceNumber || null,
-      startDate,
-      amount,
-      dob: dob || null,
-      notes: notes || null,
+    void executeSave(() =>
+      saveMutation.mutateAsync({
+        name: name.trim(),
+        nationality: nationality || null,
+        positionWorking: positionWorking || null,
+        insuranceNumber: insuranceNumber || null,
+        startDate,
+        amount,
+        dob: dob || null,
+        notes: notes || null,
+      })
+    ).catch(() => {
+      // Existing mutation onError shows the error.
     });
   };
 
@@ -88,84 +99,96 @@ function MemberFormDialog({
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-1">
-            <Label>
+            <Label htmlFor={`${formId}-name`}>
               Name <span className="text-destructive">*</span>
             </Label>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Full name"
+              id={`${formId}-name`}
               data-testid="input-member-name"
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <FormGrid minColumnWidth="10rem" className="gap-3">
             <div className="space-y-1">
-              <Label>Nationality</Label>
+              <Label htmlFor={`${formId}-nationality`}>Nationality</Label>
               <Input
                 value={nationality}
                 onChange={(e) => setNationality(e.target.value)}
                 placeholder="e.g. Congolese"
+                id={`${formId}-nationality`}
                 data-testid="input-member-nationality"
               />
             </div>
             <div className="space-y-1">
-              <Label>Position / Working</Label>
+              <Label htmlFor={`${formId}-position`}>Position / Working</Label>
               <Input
                 value={positionWorking}
                 onChange={(e) => setPositionWorking(e.target.value)}
                 placeholder="e.g. Operator"
+                id={`${formId}-position`}
                 data-testid="input-member-position"
               />
             </div>
-          </div>
+          </FormGrid>
           <div className="space-y-1">
-            <Label>Insurance Number</Label>
+            <Label htmlFor={`${formId}-insurance`}>Insurance Number</Label>
             <Input
               value={insuranceNumber}
               onChange={(e) => setInsuranceNumber(e.target.value)}
               placeholder="e.g. INS-00123"
+              id={`${formId}-insurance`}
               data-testid="input-member-insurance-number"
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <FormGrid minColumnWidth="10rem" className="gap-3">
             <div className="space-y-1">
-              <Label>
+              <Label htmlFor={`${formId}-start`}>
                 Start Date <span className="text-destructive">*</span>
               </Label>
               <Input
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
+                id={`${formId}-start`}
                 data-testid="input-member-startdate"
               />
             </div>
             <div className="space-y-1">
-              <Label>Date of Birth</Label>
-              <Input type="date" value={dob} onChange={(e) => setDob(e.target.value)} data-testid="input-member-dob" />
+              <Label htmlFor={`${formId}-dob`}>Date of Birth</Label>
+              <Input
+                type="date"
+                value={dob}
+                onChange={(e) => setDob(e.target.value)}
+                id={`${formId}-dob`}
+                data-testid="input-member-dob"
+              />
             </div>
-          </div>
+          </FormGrid>
           <div className="space-y-1">
-            <Label>
+            <Label htmlFor={`${formId}-amount`}>
               Monthly Amount <span className="text-destructive">*</span>
             </Label>
-            <Input
-              type="number"
+            <MoneyInput
               min="0"
               step="0.01"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="0.00"
+              id={`${formId}-amount`}
               data-testid="input-member-amount"
             />
           </div>
           <div className="space-y-1">
-            <Label>Notes</Label>
+            <Label htmlFor={`${formId}-notes`}>Notes</Label>
             <Textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Optional notes"
               className="resize-none"
               rows={2}
+              id={`${formId}-notes`}
               data-testid="input-member-notes"
             />
           </div>
@@ -174,10 +197,15 @@ function MemberFormDialog({
           <Button variant="outline" onClick={onClose} data-testid="button-cancel-member">
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={saveMutation.isPending} data-testid="button-save-member">
-            {saveMutation.isPending && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+          <FormSubmitButton
+            type="button"
+            onClick={handleSubmit}
+            pending={submitting || saveMutation.isPending}
+            pendingLabel="Saving…"
+            data-testid="button-save-member"
+          >
             {existing ? "Save Changes" : "Add Member"}
-          </Button>
+          </FormSubmitButton>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -37,6 +37,11 @@ vi.mock("wouter", () => ({
 
 vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: vi.fn() }) }));
 
+vi.mock("@/contexts/CompanyContext", () => ({
+  useCompany: () => ({ selectedCompany: { id: 1, name: "Factory Co" }, companies: [], isLoading: false }),
+  CompanyProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
 const contacts = [
   {
     id: 7,

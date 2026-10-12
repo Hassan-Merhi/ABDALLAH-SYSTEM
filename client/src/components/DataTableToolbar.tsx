@@ -1,66 +1,91 @@
 import * as React from "react";
-import { Search, X } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+
+import { ErpMobileFilters } from "@/components/ui/erp-mobile-filters";
+import { SearchField } from "@/components/ui/search-field";
 import { cn } from "@/lib/utils";
 
 export interface DataTableToolbarProps {
   search?: string;
   onSearchChange?: (value: string) => void;
   searchPlaceholder?: string;
+  searchTestId?: string;
+  /** Controlled filters supplied by the owning page. */
   filters?: React.ReactNode;
   actions?: React.ReactNode;
+  /** Reuse the existing mobile filter sheet for complex filter controls. */
+  mobileFilters?: boolean;
+  filterLabel?: string;
+  activeFilterCount?: number;
+  onResetFilters?: () => void;
   className?: string;
   "data-testid"?: string;
 }
 
 /**
- * DataTableToolbar — consistent search + filter + action bar above tables.
- * Replaces ad-hoc flex rows scattered across list pages.
+ * Canonical list toolbar. Search stays visible on phones; advanced filters
+ * open in the existing ERP bottom sheet. All state/queries belong to callers.
  */
 export function DataTableToolbar({
   search,
   onSearchChange,
   searchPlaceholder = "Search...",
+  searchTestId = "input-search",
   filters,
   actions,
+  mobileFilters = false,
+  filterLabel = "Table filters",
+  activeFilterCount = 0,
+  onResetFilters,
   className,
   "data-testid": testId,
 }: DataTableToolbarProps) {
-  const hasSearch = onSearchChange !== undefined;
+  const searchControl = onSearchChange ? (
+    <SearchField
+      value={search ?? ""}
+      onValueChange={onSearchChange}
+      placeholder={searchPlaceholder}
+      data-testid={searchTestId}
+      wrapperClassName="sm:w-72 sm:max-w-full"
+    />
+  ) : null;
+
+  const filterControls = filters ? <div className="flex min-w-0 flex-wrap items-center gap-2">{filters}</div> : null;
+
+  const left =
+    mobileFilters && filters ? (
+      <ErpMobileFilters
+        label={filterLabel}
+        quick={searchControl}
+        activeCount={activeFilterCount}
+        canClear={activeFilterCount > 0 || Boolean(search)}
+        onClear={onResetFilters}
+        data-testid={testId ? `${testId}-filters` : "table-filters"}
+      >
+        {(layout) =>
+          layout === "inline" ? (
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+              {searchControl}
+              {filterControls}
+            </div>
+          ) : (
+            filterControls
+          )
+        }
+      </ErpMobileFilters>
+    ) : (
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+        {searchControl}
+        {filterControls}
+      </div>
+    );
+
   return (
     <div
-      className={cn("flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4", className)}
+      className={cn("mb-4 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between", className)}
       data-testid={testId ?? "toolbar-data-table"}
     >
-      <div className="flex flex-1 flex-wrap items-center gap-2 min-w-0">
-        {hasSearch && (
-          <div className="relative w-full sm:w-72 max-w-full">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-            <Input
-              value={search ?? ""}
-              onChange={(e) => onSearchChange?.(e.target.value)}
-              placeholder={searchPlaceholder}
-              className="pl-8 pr-8"
-              data-testid="input-search"
-            />
-            {search && (
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={() => onSearchChange?.("")}
-                className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
-                data-testid="button-clear-search"
-                aria-label="Clear search"
-              >
-                <X className="h-3.5 w-3.5" />
-              </Button>
-            )}
-          </div>
-        )}
-        {filters && <div className="flex items-center gap-2 flex-wrap">{filters}</div>}
-      </div>
-      {actions && <div className="flex items-center gap-2 flex-wrap shrink-0">{actions}</div>}
+      {left}
+      {actions ? <div className="flex min-w-0 flex-wrap items-center gap-2 sm:justify-end">{actions}</div> : null}
     </div>
   );
 }

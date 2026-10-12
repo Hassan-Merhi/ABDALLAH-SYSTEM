@@ -1,9 +1,18 @@
 import { searchAny } from "@shared/searchNormalization";
-import { useState, useMemo } from "react";
+import { useId, useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { PageHeader } from "@/components/PageHeader";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { FormSubmitButton } from "@/components/FormSubmitButton";
+import { useSingleFlightAction } from "@/hooks/use-single-flight-action";
+import { DataTableToolbar } from "@/components/DataTableToolbar";
+import { TableViewOptions, type TableColumnOption } from "@/components/TableViewOptions";
+import { PaginationBar } from "@/components/PaginationBar";
+import { useTablePrefs } from "@/hooks/use-table-prefs";
+import { useClientTablePagination } from "@/hooks/use-client-table-pagination";
+import { useCompany } from "@/contexts/CompanyContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,18 +20,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Search, Phone, Pencil, Trash2, Copy, BookMarked, X, Check } from "lucide-react";
+import { Plus, Phone, Pencil, Trash2, Copy, BookMarked, X, Check } from "lucide-react";
 
 interface PhoneEntry {
   label: string;
@@ -47,6 +46,14 @@ const EMPTY_FORM = {
   notes: "",
 };
 
+const CONTACT_COLUMNS: TableColumnOption[] = [
+  { key: "name", label: "Name", required: true },
+  { key: "role", label: "Role" },
+  { key: "phones", label: "Phone Numbers", required: true },
+  { key: "notes", label: "Notes" },
+  { key: "actions", label: "Actions", required: true },
+];
+
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   const handleCopy = () => {
@@ -58,7 +65,9 @@ function CopyButton({ text }: { text: string }) {
   return (
     <button
       onClick={handleCopy}
-      className="ml-1 text-muted-foreground hover:text-foreground transition-colors"
+      type="button"
+      aria-label={copied ? "Phone number copied" : "Copy phone number"}
+      className="ms-1 text-muted-foreground hover:text-foreground transition-colors"
       title="Copy"
     >
       {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
@@ -67,10 +76,18 @@ function CopyButton({ text }: { text: string }) {
 }
 
 export default function FactoryContacts() {
+  const formId = useId();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { execute: executeSave, pending: saving } = useSingleFlightAction();
+  const { selectedCompany } = useCompany();
+  const { prefs, setPrefs } = useTablePrefs("factory-contacts", { companyId: selectedCompany?.id });
+
+  const pageSize = prefs.pageSize ?? 25;
+  const visibility = prefs.columns ?? {};
+  const show = (key: string) => visibility[key] !== false;
 
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -92,6 +109,16 @@ export default function FactoryContacts() {
       (c) => searchAny(search, c.name, c.role, c.notes) || c.numbers.some((n) => searchAny(search, n.number, n.label))
     );
   }, [contacts, search]);
+  const orderedContacts = [...filtered].sort(
+    (a, b) => a.name.localeCompare(b.name) * (prefs.sortDir === "desc" ? -1 : 1)
+  );
+  const {
+    page: safePage,
+    setPage,
+    totalPages: pages,
+    paginate,
+  } = useClientTablePagination(orderedContacts.length, pageSize);
+  const visibleContacts = paginate(orderedContacts);
 
   const saveMutation = useMutation({
     mutationFn: async (data: typeof EMPTY_FORM) => {
@@ -130,12 +157,14 @@ export default function FactoryContacts() {
   });
 
   const openNew = () => {
+    saveMutation.reset();
     setEditingContact(null);
     setForm(EMPTY_FORM);
     setDialogOpen(true);
   };
 
   const openEdit = (c: Contact) => {
+    saveMutation.reset();
     setEditingContact(c);
     setForm({
       name: c.name,
@@ -159,13 +188,18 @@ export default function FactoryContacts() {
   const removeNumber = (idx: number) => setForm((f) => ({ ...f, numbers: f.numbers.filter((_, i) => i !== idx) }));
 
   const handleSubmit = () => {
+    if (saveMutation.isPending || saving) return;
     if (!form.name.trim()) {
       toast({ title: "Name is required", variant: "destructive" });
       return;
     }
-    saveMutation.mutate({
-      ...form,
-      numbers: form.numbers.filter((n) => n.number.trim()),
+    void executeSave(() =>
+      saveMutation.mutateAsync({
+        ...form,
+        numbers: form.numbers.filter((n) => n.number.trim()),
+      })
+    ).catch(() => {
+      // Existing mutation.onError provides feedback.
     });
   };
 
@@ -179,16 +213,23 @@ export default function FactoryContacts() {
       </PageHeader>
 
       <div className="flex-1 min-h-0 overflow-y-auto p-4">
-        {/* Search */}
-        <div className="relative mb-4 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search name, role, number…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
-        </div>
+        <DataTableToolbar
+          search={search}
+          onSearchChange={(value) => {
+            setSearch(value);
+            setPage(1);
+          }}
+          searchPlaceholder="Search name, role, number…"
+          actions={
+            <TableViewOptions
+              columns={CONTACT_COLUMNS}
+              visibility={visibility}
+              density={prefs.density}
+              onVisibilityChange={(key, value) => setPrefs({ columns: { ...visibility, [key]: value } })}
+              onDensityChange={(value) => setPrefs({ density: value })}
+            />
+          }
+        />
 
         {isLoading ? (
           <div className="space-y-2">
@@ -211,29 +252,31 @@ export default function FactoryContacts() {
           </div>
         ) : (
           <div className="sm:rounded-md sm:border">
-            <Table mobileLayout="cards" data-testid="factory-contacts-table">
+            <Table mobileLayout="cards" density={prefs.density} data-testid="factory-contacts-table">
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[180px]">Name</TableHead>
-                  <TableHead className="w-[140px]">Role</TableHead>
+                  {show("role") && <TableHead className="w-[140px]">Role</TableHead>}
                   <TableHead>Phone Numbers</TableHead>
-                  <TableHead>Notes</TableHead>
+                  {show("notes") && <TableHead>Notes</TableHead>}
                   <TableHead className="w-[80px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((c) => (
+                {visibleContacts.map((c) => (
                   <TableRow key={c.id} className="group">
                     <TableCell className="font-semibold align-top py-3">{c.name}</TableCell>
-                    <TableCell className="align-top py-3">
-                      {c.role ? (
-                        <Badge variant="secondary" className="text-xs font-normal">
-                          {c.role}
-                        </Badge>
-                      ) : (
-                        <span className="text-muted-foreground text-xs">—</span>
-                      )}
-                    </TableCell>
+                    {show("role") && (
+                      <TableCell className="align-top py-3">
+                        {c.role ? (
+                          <Badge variant="secondary" className="text-xs font-normal">
+                            {c.role}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
+                        )}
+                      </TableCell>
+                    )}
                     <TableCell className="align-top py-3">
                       {c.numbers.length > 0 ? (
                         <div className="space-y-1">
@@ -250,13 +293,15 @@ export default function FactoryContacts() {
                         <span className="text-muted-foreground text-xs">—</span>
                       )}
                     </TableCell>
-                    <TableCell className="align-top py-3 sm:max-w-[260px]">
-                      {c.notes ? (
-                        <p className="text-xs text-muted-foreground whitespace-pre-wrap line-clamp-3">{c.notes}</p>
-                      ) : (
-                        <span className="text-muted-foreground text-xs">—</span>
-                      )}
-                    </TableCell>
+                    {show("notes") && (
+                      <TableCell className="align-top py-3 sm:max-w-[260px]">
+                        {c.notes ? (
+                          <p className="text-xs text-muted-foreground whitespace-pre-wrap line-clamp-3">{c.notes}</p>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
+                        )}
+                      </TableCell>
+                    )}
                     <TableCell className="align-top py-3 text-right">
                       <div className="flex items-center justify-end gap-1 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 touch:opacity-100 sm:group-focus-within:opacity-100 touch:opacity-100">
                         <Button
@@ -287,19 +332,38 @@ export default function FactoryContacts() {
             </Table>
           </div>
         )}
+        <PaginationBar
+          page={safePage}
+          totalPages={pages}
+          total={filtered.length}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPrefs({ pageSize: size });
+            setPage(1);
+          }}
+          noun="contacts"
+        />
       </div>
 
       {/* Add / Edit Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-md">
+      <Dialog
+        open={dialogOpen}
+        onOpenChange={(nextOpen) => {
+          if (saveMutation.isPending || saving) return;
+          setDialogOpen(nextOpen);
+        }}
+      >
+        <DialogContent className="max-w-md" aria-busy={saveMutation.isPending || saving}>
           <DialogHeader>
             <DialogTitle>{editingContact ? "Edit Contact" : "Add Contact"}</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <Label>Name *</Label>
+              <Label htmlFor={`${formId}-name`}>Name *</Label>
               <Input
+                id={`${formId}-name`}
                 placeholder="e.g. Ahmed Karimi"
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
@@ -307,17 +371,18 @@ export default function FactoryContacts() {
             </div>
 
             <div className="space-y-1.5">
-              <Label>Role / Purpose</Label>
+              <Label htmlFor={`${formId}-role`}>Role / Purpose</Label>
               <Input
+                id={`${formId}-role`}
                 placeholder="e.g. Electrician, Plumber, Driver…"
                 value={form.role}
                 onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
               />
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2" role="group" aria-label="Phone Numbers">
               <div className="flex items-center justify-between">
-                <Label>Phone Numbers</Label>
+                <span className="text-sm font-medium">Phone Numbers</span>
                 <Button size="sm" variant="ghost" onClick={addNumber} type="button">
                   <Plus className="h-3.5 w-3.5 mr-1" />
                   Add
@@ -326,12 +391,14 @@ export default function FactoryContacts() {
               {form.numbers.map((n, i) => (
                 <div key={i} className="flex items-center gap-2">
                   <Input
+                    aria-label={`Phone ${i + 1} label`}
                     placeholder="Label (e.g. Mobile)"
                     value={n.label}
                     onChange={(e) => setNumber(i, "label", e.target.value)}
                     className="w-28 shrink-0 text-sm"
                   />
                   <Input
+                    aria-label={`Phone ${i + 1} number`}
                     placeholder="Number"
                     value={n.number}
                     onChange={(e) => setNumber(i, "number", e.target.value)}
@@ -343,6 +410,7 @@ export default function FactoryContacts() {
                       variant="ghost"
                       className="shrink-0 h-8 w-8 text-muted-foreground"
                       onClick={() => removeNumber(i)}
+                      aria-label={`Remove phone ${i + 1}`}
                       type="button"
                     >
                       <X className="h-4 w-4" />
@@ -353,8 +421,9 @@ export default function FactoryContacts() {
             </div>
 
             <div className="space-y-1.5">
-              <Label>Notes</Label>
+              <Label htmlFor={`${formId}-notes`}>Notes</Label>
               <Textarea
+                id={`${formId}-notes`}
                 placeholder="Anything extra — hours, location, rates…"
                 value={form.notes}
                 onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
@@ -363,38 +432,46 @@ export default function FactoryContacts() {
             </div>
           </div>
 
+          {saveMutation.isError && (
+            <p role="alert" className="text-sm text-destructive">
+              Contact could not be saved. Please review the fields and try again.
+            </p>
+          )}
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saveMutation.isPending || saving}>
               Cancel
             </Button>
-            <Button onClick={handleSubmit} disabled={saveMutation.isPending}>
-              {saveMutation.isPending ? "Saving…" : editingContact ? "Save Changes" : "Add Contact"}
-            </Button>
+            <FormSubmitButton
+              type="button"
+              onClick={handleSubmit}
+              pending={saveMutation.isPending || saving}
+              pendingLabel="Saving…"
+            >
+              {editingContact ? "Save Changes" : "Add Contact"}
+            </FormSubmitButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirm */}
-      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Contact</AlertDialogTitle>
-            <AlertDialogDescription>
-              Remove <strong>{deleteTarget?.name}</strong> from your contacts? This cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
-              disabled={deleteMutation.isPending}
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setDeleteTarget(null);
+        }}
+        title="Delete Contact"
+        tone="destructive"
+        description={
+          <>
+            Remove <strong>{deleteTarget?.name}</strong> from your contacts? This cannot be undone.
+          </>
+        }
+        confirmText="Delete"
+        loading={deleteMutation.isPending}
+        onConfirm={async () => {
+          if (deleteTarget) await deleteMutation.mutateAsync(deleteTarget.id);
+        }}
+      />
     </div>
   );
 }

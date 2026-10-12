@@ -1,3 +1,9 @@
+import {
+  resolveFetchUrl as resolveUrl,
+  fetchRequestMethod as methodOf,
+  replaceFetchInputUrl as replaceInputUrl,
+  fetchQueryCacheKey,
+} from "./fetchRequestUtils";
 import { queryClient } from "./queryClient";
 import {
   hasLoadedEveryRow,
@@ -108,37 +114,14 @@ if (typeof window !== "undefined" && !window.__erpDaybookPaginationInstalled) {
   let wasOnRoute = ROUTES.has(window.location.pathname);
   let progressRoot: HTMLDivElement | null = null;
 
-  function resolveUrl(input: RequestInfo | URL): URL | null {
-    try {
-      if (typeof input === "string") return new URL(input, window.location.origin);
-      if (input instanceof URL) return new URL(input.toString());
-      if (input instanceof Request) return new URL(input.url, window.location.origin);
-    } catch {
-      return null;
-    }
-    return null;
-  }
-
-  function methodOf(input: RequestInfo | URL, init?: RequestInit): string {
-    return String(init?.method || (input instanceof Request ? input.method : "GET")).toUpperCase();
-  }
-
-  function replaceInputUrl(input: RequestInfo | URL, url: URL): RequestInfo | URL {
-    if (input instanceof Request) return new Request(url.toString(), input);
-    if (input instanceof URL) return url;
-    if (url.origin === window.location.origin) return `${url.pathname}${url.search}${url.hash}`;
-    return url.toString();
-  }
-
   function baseKey(url: URL): string {
-    const params = new URLSearchParams(url.searchParams);
-    for (const key of ["pagination", "page", "limit", "pageSize", "offset", "fullAction"]) params.delete(key);
-    params.sort();
-    // The active company is carried by the session cookie, not the URL, so two
-    // companies produce identical daybook URLs. Scoping the cache key on the
-    // active company keeps a switch from merging one company's rows into
-    // another's list.
-    return `${readActiveCompanyScope()}|${url.pathname}?${params.toString()}`;
+    // The server identifies the company through a cookie, not the URL.
+    // Keep the active company in the key to avoid cross-company cache reuse.
+    return fetchQueryCacheKey(
+      url,
+      ["pagination", "page", "limit", "pageSize", "offset", "fullAction"],
+      readActiveCompanyScope()
+    );
   }
 
   function hasDeepLink(): boolean {
