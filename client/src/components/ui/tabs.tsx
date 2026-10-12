@@ -91,7 +91,7 @@ const TabsList = React.forwardRef<
         if (focused && event.currentTarget.contains(focused)) scrollSelectedTabIntoView(focused);
       }}
       className={cn(
-        "inline-flex min-w-0 max-w-full flex-nowrap items-center justify-start gap-1 overflow-x-auto overscroll-x-contain touch-pan-x",
+        "inline-flex min-w-0 max-w-full flex-nowrap items-center justify-start gap-1 overflow-x-auto overscroll-x-contain touch-auto",
         variant === "pill" && "rounded-full border border-border bg-muted/40 p-1 text-muted-foreground",
         variant === "underline" && "border-b border-border bg-transparent p-0 text-muted-foreground",
         className
