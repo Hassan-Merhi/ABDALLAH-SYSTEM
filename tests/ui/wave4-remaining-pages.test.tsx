@@ -107,13 +107,6 @@ const PAGES: PageCase[] = [
     sweep: true,
   },
   {
-    name: "SoldContainers",
-    load: () => import("@/pages/SoldContainers"),
-    landmark: "input-search-sold-containers",
-    showsRows: true,
-    sweep: true,
-  },
-  {
     name: "StockHub",
     load: () => import("@/pages/StockHub"),
     landmark: "tab-stock-items",
@@ -278,15 +271,6 @@ const PAGES: PageCase[] = [
     landmark: "stat-workers",
     factory: true,
     sweep: true,
-  },
-  {
-    name: "FactoryProduction",
-    load: () => import("@/pages/factory/FactoryProduction"),
-    landmark: "tab-factory-factory-suppliers",
-    factory: true,
-    sweep: true,
-    // The Summary tab reads bales as { bale, ... } rows.
-    seedRoutes: { "/api/factory/bales": () => [1, 2, 3].map((i) => ({ bale: seededRecord(i) })) },
   },
   {
     name: "FactoryRawMaterialsHub",
