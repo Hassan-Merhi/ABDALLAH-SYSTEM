@@ -124,7 +124,9 @@ function scrollSelectedTabIntoView(node: HTMLElement | null) {
     if (scroller.scrollWidth <= scroller.clientWidth + 1) continue;
     const view = scroller.getBoundingClientRect();
     const tab = node.getBoundingClientRect();
-    const gap = 8;
+    // Keep the selected label beyond the 2.5rem overflow fade when there are
+    // tabs on either side. At a hard scroll boundary, the scroll is clamped.
+    const gap = Math.min(40, scroller.clientWidth / 8);
     if (tab.left < view.left + gap) {
       scroller.scrollLeft -= view.left + gap - tab.left;
     } else if (tab.right > view.right - gap) {
