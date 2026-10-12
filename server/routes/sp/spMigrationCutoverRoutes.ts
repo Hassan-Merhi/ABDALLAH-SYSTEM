@@ -483,21 +483,9 @@ export function registerSpMigrationCutoverRoutes(app: Express): void {
   });
 
   const developer = [requireAuth, requireRole("Developer")] as const;
-  app.get("/api/sp/migration/cutover", ...developer, statusCutover);
-  app.get("/api/sp/migration/cutover/status", ...developer, statusCutover);
-  app.post("/api/sp/migration/cutover/prepare", ...developer, prepareCutover);
-  app.post("/api/sp/migration/cutover/finalize", ...developer, finalizeCutover);
-  app.post("/api/sp/migration/cutover/rollback", ...developer, rollbackCutover);
-  app.post("/api/sp/migration/cutover/cancel", ...developer, cancelPreparedCutover);
-
-  // Compatibility endpoint replacing the previous hard-disabled POST /cutover.
-  app.post("/api/sp/migration/cutover", ...developer, async (req: Request, res: Response) => {
-    if (req.body?.action === "prepare") return prepareCutover(req, res);
-    if (req.body?.action === "finalize") return finalizeCutover(req, res);
-    if (req.body?.action === "rollback") return rollbackCutover(req, res);
-    if (req.body?.action === "cancel") return cancelPreparedCutover(req, res);
-    return res.status(400).json({ message: "action must be prepare, finalize, rollback, or cancel" });
-  });
+  // Phase 4 registers and handles all /api/sp/migration/cutover endpoints earlier.
+  // Preserve this registrar's write guard, schema setup and unique review mapping
+  // endpoints, but do not re-register unreachable older cutover handlers.
 
   app.post("/api/sp/migration/gc-suspense-review/:targetEntryId/map", ...developer, mapSuspenseEntry);
   app.post("/api/sp/migration/gc-container-charge-review/:chargeId/map", ...developer, mapContainerCharge);
