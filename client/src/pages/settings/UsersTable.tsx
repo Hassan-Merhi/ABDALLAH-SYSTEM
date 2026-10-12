@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { DataTableToolbar } from "@/components/DataTableToolbar";
 import { PaginationBar } from "@/components/PaginationBar";
@@ -72,7 +73,7 @@ export function UsersTable({ users, onEdit, onDelete, onResetPassword }: UsersTa
                 <Badge variant="outline" className="capitalize">{user.role || "Normal User"}</Badge>
               </TableCell>}
               {show("status") && <TableCell>
-                <Badge variant={user.active ? "default" : "secondary"}>{user.active ? "Active" : "Inactive"}</Badge>
+                <StatusBadge status={user.active ? "active" : "inactive"} showIcon={false} />
               </TableCell>}
               <TableCell className="space-x-2 text-right">
                 <Button size="icon" variant="ghost" onClick={() => onResetPassword(user)} title="Reset Password" aria-label={`Reset ${user.username} password`}><Key className="h-4 w-4" /></Button>

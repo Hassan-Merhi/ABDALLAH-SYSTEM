@@ -2,6 +2,7 @@ import { searchAny } from "@shared/searchNormalization";
 import { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { DataTableToolbar } from "@/components/DataTableToolbar";
 import { TableViewOptions, type TableColumnOption } from "@/components/TableViewOptions";
@@ -93,7 +94,7 @@ export function CompaniesTable({ companies, onEdit, onDelete }: CompaniesTablePr
               {show("code") && <TableCell className="font-mono text-xs uppercase">{company.code}</TableCell>}
               {show("type") && <TableCell><Badge variant="outline" className="text-[11px] uppercase">{company.companyType}</Badge></TableCell>}
               {show("currency") && <TableCell className="text-xs font-medium">{company.baseCurrency} / {company.displayCurrency}</TableCell>}
-              {show("status") && <TableCell><Badge variant={company.active ? "default" : "secondary"}>{company.active ? "Active" : "Inactive"}</Badge></TableCell>}
+              {show("status") && <TableCell><StatusBadge status={company.active ? "active" : "inactive"} showIcon={false} /></TableCell>}
               <TableCell className="space-x-2 text-right">
                 <Button size="icon" variant="ghost" onClick={() => onEdit(company)} aria-label={`Edit ${company.name}`}><Edit className="h-4 w-4" /></Button>
                 <Button size="icon" variant="ghost" onClick={() => onDelete(company)} aria-label={`Delete ${company.name}`}><Trash2 className="h-4 w-4 text-destructive" /></Button>

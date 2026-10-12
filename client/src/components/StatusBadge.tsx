@@ -24,6 +24,9 @@ export type StatusKind =
   | "success"
   | "warning"
   | "error"
+  | "critical"
+  | "verified"
+  | "finalized"
   | "info"
   | "in_stock"
   | "loading"
@@ -73,6 +76,9 @@ const STATUS_MAP: Record<StatusKind, StatusMeta> = {
   success: { label: "Success", variant: "success", icon: CheckCircle2 },
   warning: { label: "Warning", variant: "warning", icon: AlertTriangle },
   error: { label: "Error", variant: "destructive", icon: XCircle },
+  critical: { label: "Critical", variant: "destructive", icon: AlertTriangle },
+  verified: { label: "Verified", variant: "success", icon: CheckCircle2 },
+  finalized: { label: "Finalized", variant: "info", icon: CheckCircle2 },
   info: { label: "Info", variant: "info", icon: CircleDot },
   // Cross-module statuses: one semantic palette, not one hard-coded color per screen.
   in_stock: { label: "In Stock", variant: "success", icon: CheckCircle2 },

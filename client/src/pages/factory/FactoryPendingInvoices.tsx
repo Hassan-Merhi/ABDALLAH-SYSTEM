@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/StatusBadge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
@@ -99,39 +100,13 @@ export default function FactoryPendingInvoices() {
         ? allOrders.filter((o) => o.status === "PENDING_VERIFICATION" || o.status === "VERIFIED")
         : allOrders.filter((o) => o.status === statusFilter);
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "PENDING_VERIFICATION":
-        return (
-          <Badge
-            variant="outline"
-            className="bg-yellow-50 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800"
-          >
-            Pending
-          </Badge>
-        );
-      case "VERIFIED":
-        return (
-          <Badge
-            variant="outline"
-            className="bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800"
-          >
-            Verified
-          </Badge>
-        );
-      case "FINALIZED":
-        return (
-          <Badge
-            variant="outline"
-            className="bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800"
-          >
-            Finalized
-          </Badge>
-        );
-      default:
-        return <Badge variant="secondary">{status}</Badge>;
-    }
-  };
+  const getStatusBadge = (status: string) => (
+    <StatusBadge
+      status={status === "PENDING_VERIFICATION" ? "pending" : status}
+      label={status === "PENDING_VERIFICATION" ? "Pending" : undefined}
+      showIcon={false}
+    />
+  );
 
   const filters: { key: string; label: string; count: number }[] = [
     { key: "PENDING_VERIFIED", label: "Pending + Verified", count: pendingOrders.length + verifiedOrders.length },
