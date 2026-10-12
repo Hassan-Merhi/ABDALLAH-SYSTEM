@@ -172,8 +172,21 @@ export default function FactoryPendingInvoices() {
                 filteredOrders.map((order) => (
                   <TableRow
                     key={order.id}
-                    className="cursor-pointer"
-                    onClick={() => navigate(`/factory/sales/pending-invoices/${order.id}/verify`)}
+                    className="cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                    tabIndex={0}
+                    aria-label={`Open invoice ${order.invoiceNumber || order.id} for ${order.customerName}`}
+                    onClick={(event) => {
+                      // Do not hijack action buttons, including the confirm trigger.
+                      if ((event.target as HTMLElement).closest("button, a, [role=button]")) return;
+                      navigate(`/factory/sales/pending-invoices/${order.id}/verify`);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.target !== event.currentTarget) return;
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        navigate(`/factory/sales/pending-invoices/${order.id}/verify`);
+                      }
+                    }}
                     data-testid={`row-order-${order.id}`}
                   >
                     <TableCell className="font-mono" data-testid={`text-order-number-${order.id}`}>
@@ -215,6 +228,7 @@ export default function FactoryPendingInvoices() {
                           variant="ghost"
                           size="icon"
                           onClick={() => navigate(`/factory/sales/pending-invoices/${order.id}/verify`)}
+                          aria-label={`Review invoice ${order.invoiceNumber || order.id}`}
                           data-testid={`button-review-order-${order.id}`}
                         >
                           <Eye className="h-4 w-4" />
@@ -223,6 +237,7 @@ export default function FactoryPendingInvoices() {
                           variant="ghost"
                           size="icon"
                           title="Download Invoice PDF"
+                          aria-label={`Download PDF for invoice ${order.invoiceNumber || order.id}`}
                           onClick={() => window.open(`/api/factory/customer-orders/${order.id}/export-pdf`, "_blank")}
                           data-testid={`button-download-pdf-${order.id}`}
                         >
@@ -232,6 +247,7 @@ export default function FactoryPendingInvoices() {
                           variant="ghost"
                           size="icon"
                           title="Export to Excel"
+                          aria-label={`Export invoice ${order.invoiceNumber || order.id} to Excel`}
                           onClick={() => {
                             const a = document.createElement("a");
                             a.href = `/api/factory/customer-orders/${order.id}/export/excel`;
@@ -247,6 +263,7 @@ export default function FactoryPendingInvoices() {
                             variant="ghost"
                             size="icon"
                             title="Loading Status + Bale Refs (Excel)"
+                            aria-label={`Export loading status for invoice ${order.invoiceNumber || order.id}`}
                             onClick={() => {
                               const a = document.createElement("a");
                               a.href = `/api/factory/customer-orders/${order.id}/loading-status-export`;

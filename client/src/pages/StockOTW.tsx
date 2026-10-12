@@ -680,7 +680,18 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
                         onClick={() => toggleItemExpanded(item.stockItemName)}
                       >
                         <TableCell className="pl-4">
-                          <Button variant="ghost" size="icon" data-testid={`button-expand-${index}`}>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            aria-expanded={isExpanded}
+                            aria-label={`${isExpanded ? "Collapse" : "Expand"} containers for ${item.stockItemName}`}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              toggleItemExpanded(item.stockItemName);
+                            }}
+                            data-testid={`button-expand-${index}`}
+                          >
                             {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                           </Button>
                         </TableCell>

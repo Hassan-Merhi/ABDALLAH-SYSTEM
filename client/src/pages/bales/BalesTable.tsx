@@ -103,6 +103,7 @@ export function BalesTable({
                     variant="ghost"
                     size="icon"
                     onClick={() => onDeleteRequest(bale.id)}
+                    aria-label={`Delete bale ${bale.barcode}`}
                     data-testid={`button-delete-bale-${bale.id}`}
                   >
                     <Trash2 className="h-4 w-4" />

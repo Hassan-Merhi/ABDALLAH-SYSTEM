@@ -74,6 +74,8 @@ export function ConfirmDialog({
   const [busy, setBusy] = useState(false);
   const pendingRef = useRef(false);
   const [confirmError, setConfirmError] = useState<string | null>(null);
+  const titleRef = useRef<HTMLHeadingElement | null>(null);
+  const errorRef = useRef<HTMLParagraphElement | null>(null);
 
   useEffect(() => {
     if (!open) {
@@ -84,6 +86,15 @@ export function ConfirmDialog({
       pendingRef.current = false;
     }
   }, [open]);
+
+  // Announce the second confirmation stage and refocus after an async failure.
+  // Neither transition closes the Radix focus trap.
+  useEffect(() => {
+    if (open && stage === 2) titleRef.current?.focus({ preventScroll: true });
+  }, [open, stage]);
+  useEffect(() => {
+    if (open && confirmError) errorRef.current?.focus({ preventScroll: true });
+  }, [open, confirmError]);
 
   const isLoading = busy || !!externalLoading;
   const phraseMatches = !requirePhrase || phrase.trim() === requirePhrase.trim();
@@ -155,7 +166,7 @@ export function ConfirmDialog({
                 </div>
               )}
               <div className="min-w-0 flex-1 text-left">
-                <AlertDialogTitle className="wrap-break-word">{headerTitle}</AlertDialogTitle>
+                <AlertDialogTitle ref={titleRef} tabIndex={-1} className="wrap-break-word focus-visible:outline-hidden">{headerTitle}</AlertDialogTitle>
                 {headerDescription && (
                   <AlertDialogDescription className="mt-1 whitespace-pre-line wrap-break-word leading-5">
                     {headerDescription}
@@ -167,7 +178,7 @@ export function ConfirmDialog({
 
           {!showSecond && children && <div className="mt-4 min-w-0 space-y-3">{children}</div>}
           {confirmError && (
-            <p role="alert" className="mt-4 text-sm text-destructive" data-testid="text-confirm-error">
+            <p ref={errorRef} tabIndex={-1} role="alert" className="mt-4 text-sm text-destructive focus-visible:outline-hidden" data-testid="text-confirm-error">
               {confirmError}
             </p>
           )}

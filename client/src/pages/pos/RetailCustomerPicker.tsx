@@ -103,12 +103,13 @@ export function RetailCustomerPicker({
             placeholder="Search name, phone or code"
             data-testid="retail-pos-customer-search"
           />
-          <div className="max-h-40 space-y-1 overflow-y-auto">
+          <div className="max-h-40 space-y-1 overflow-y-auto" role="group"
+            aria-label="Customer search results" aria-busy={customersQuery.isLoading}>
             {(customersQuery.data ?? []).map((entry: Customer) => (
               <button
                 key={entry.id}
                 type="button"
-                className="flex w-full items-center justify-between rounded-sm border px-2 py-1.5 text-left text-sm hover:bg-muted/50"
+                className="flex min-h-11 w-full items-center justify-between rounded-sm border px-2 py-1.5 text-start text-sm hover:bg-muted/50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                 onClick={() => {
                   onSelect(entry);
                   setOpen(false);
@@ -125,9 +126,9 @@ export function RetailCustomerPicker({
                 </span>
               </button>
             ))}
-            {customersQuery.isLoading && <div className="p-2 text-xs text-muted-foreground">Searching…</div>}
+            {customersQuery.isLoading && <div role="status" className="p-2 text-xs text-muted-foreground">Searching…</div>}
             {!customersQuery.isLoading && !(customersQuery.data ?? []).length && (
-              <div className="p-2 text-xs text-muted-foreground">No customer matches.</div>
+              <div role="status" className="p-2 text-xs text-muted-foreground">No customer matches.</div>
             )}
           </div>
           {creating ? (
