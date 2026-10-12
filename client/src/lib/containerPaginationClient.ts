@@ -1,3 +1,4 @@
+import { resolveFetchUrl as resolveUrl, replaceFetchInputUrl as replaceInputUrl, fetchRequestMethod } from "./fetchRequestUtils";
 import "./supplierPurchaseOrderPaginationClient";
 
 const ENDPOINTS = new Set([
@@ -28,37 +29,11 @@ if (
   window.__erpContainerPaginationInstalled = true;
   const previousFetch = window.fetch.bind(window);
 
-  const resolveUrl = (input: RequestInfo | URL): URL | null => {
-    try {
-      if (typeof input === "string")
-        return new URL(input, window.location.origin);
-      if (input instanceof URL) return new URL(input.toString());
-      if (input instanceof Request)
-        return new URL(input.url, window.location.origin);
-    } catch {
-      return null;
-    }
-    return null;
-  };
-
-  const replaceInputUrl = (
-    input: RequestInfo | URL,
-    url: URL,
-  ): RequestInfo | URL => {
-    if (input instanceof Request) return new Request(url.toString(), input);
-    if (input instanceof URL) return url;
-    return url.origin === window.location.origin
-      ? `${url.pathname}${url.search}${url.hash}`
-      : url.toString();
-  };
-
   window.fetch = async (
     input: RequestInfo | URL,
     init?: RequestInit,
   ): Promise<Response> => {
-    const method = String(
-      init?.method || (input instanceof Request ? input.method : "GET"),
-    ).toUpperCase();
+    const method = fetchRequestMethod(input, init);
     if (method !== "GET") return previousFetch(input, init);
     const url = resolveUrl(input);
     if (

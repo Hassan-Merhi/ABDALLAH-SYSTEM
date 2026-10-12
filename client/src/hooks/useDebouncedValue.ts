@@ -1,13 +1,7 @@
-import { useEffect, useState } from "react";
+import { useDebounce } from "./use-debounce";
 
-/** Returns the latest value after it has remained unchanged for the delay. */
+/** Compatibility name retained for existing imports; delegates to one timer
+ * and cleanup implementation in use-debounce.ts. */
 export function useDebouncedValue<T>(value: T, delayMs: number): T {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedValue(value), Math.max(0, delayMs));
-    return () => window.clearTimeout(timer);
-  }, [value, delayMs]);
-
-  return debouncedValue;
+  return useDebounce(value, delayMs);
 }
