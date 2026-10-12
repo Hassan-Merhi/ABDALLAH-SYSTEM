@@ -123,6 +123,16 @@ export function registerOrderLoadingRoutes(app: Express) {
       const createCarryoverProforma =
         req.body?.createCarryoverProforma === true || req.body?.createContinuation === true;
 
+      // The date selected in Validate & Finalize is the business-effective date.
+      // Keep a separate actual timestamp for audit/update bookkeeping.
+      const txDate = req.body?.txDate || getClientDate(req);
+      if (typeof txDate !== "string" || !/^\\d{4}-\\d{2}-\\d{2}$/.test(txDate) ||
+          Number.isNaN(Date.parse(txDate)) ||
+          new Date(`${txDate}T12:00:00.000Z`).toISOString().slice(0, 10) !== txDate) {
+        return res.status(400).json({ message: "Invalid finalization date (expected YYYY-MM-DD)" });
+      }
+      const effectiveFinalizedAt = new Date(`${txDate}T12:00:00.000Z`);
+
       const finalized = await db.transaction(async (tx) => {
         // Finalization consumes the proforma and may split a carried-over one,
         // so it serializes against scanners and imports on the same proforma.
@@ -282,8 +292,8 @@ export function registerOrderLoadingRoutes(app: Express) {
             // The later invoice-finalization step must preserve this value so a
             // revert returns here instead of incorrectly returning to VERIFIED.
             previousStatus: "LOADING",
-            loadingFinalizedAt: now,
-            verifiedAt: now,
+            loadingFinalizedAt: effectiveFinalizedAt,
+            verifiedAt: effectiveFinalizedAt,
             updatedAt: now,
           })
           .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)))
@@ -309,7 +319,6 @@ export function registerOrderLoadingRoutes(app: Express) {
           .select({ legalName: customers.legalName })
           .from(customers)
           .where(eq(customers.id, order.customerId));
-        const txDate = req.body?.txDate || getClientDate(req);
         const totalValue = bales.reduce((sum: number, b) => plusMoney(sum, b.priceUsed), 0);
 
         await writeDaybookEntry(tx, {
