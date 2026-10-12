@@ -131,10 +131,6 @@
       "reason": "Bulk stock operations validate the active company before loading item rows."
     },
     {
-      "path": "server/routes/stock/stockItemManageRoutes.ts",
-      "reason": "Stock-item management validates item ownership in the active company."
-    },
-    {
       "path": "server/routes/stock/transfer-adj/item-write.ts",
       "reason": "Transfer and adjustment writes run inside the active company inventory transaction."
     },

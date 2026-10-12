@@ -411,6 +411,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: AuthMe; edit
     handleDetailedExport,
     makeHandleKeyDown,
   } = usePosHandlers({
+    savedSale,
     rows,
     isCreditSale,
     paymentAccountType,

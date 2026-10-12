@@ -1459,7 +1459,7 @@
     },
     "/api/reports/item-market-analysis": {
       "status": 200,
-      "shape": "{companySummaries:[{companyCode:scalar,companyId:scalar,companyName:scalar,importedQty:scalar,itemCount:scalar,marginPct:scalar,profit:scalar,revenue:scalar,soldQty:scalar}],generatedAt:scalar,rows:[],stockGroups:[scalar],summary:{importedQty:scalar,itemCount:scalar,marginPct:scalar,profit:scalar,revenue:scalar,soldQty:scalar}}"
+      "shape": "{companySummaries:[{companyCode:scalar,companyId:scalar,companyName:scalar,importedQty:scalar,itemCount:scalar,marginPct:scalar,profit:scalar,revenue:scalar,soldQty:scalar}],generatedAt:scalar,rows:[],salesReportTotals:{profit:scalar,revenue:scalar,soldQty:scalar},stockGroups:[scalar],summary:{importedQty:scalar,itemCount:scalar,marginPct:scalar,profit:scalar,revenue:scalar,soldQty:scalar}}"
     },
     "/api/reports/item-market-analysis/sale-prices": {
       "status": 400,

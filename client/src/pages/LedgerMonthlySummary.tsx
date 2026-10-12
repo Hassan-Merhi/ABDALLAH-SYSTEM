@@ -278,7 +278,7 @@ export default function LedgerMonthlySummary() {
                         tickFormatter={(value) => formatSmartNumber(value)}
                       />
                       <Tooltip
-                        formatter={(value: number) => formatAmount(value)}
+                        formatter={(value) => formatAmount(Number(value))}
                         contentStyle={{
                           backgroundColor: "hsl(var(--background))",
                           border: "1px solid hsl(var(--border))",

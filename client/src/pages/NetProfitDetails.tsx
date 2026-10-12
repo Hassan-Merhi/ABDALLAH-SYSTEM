@@ -7,7 +7,8 @@ import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Calendar as CalendarPicker } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -37,7 +38,7 @@ import {
 } from "lucide-react";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useCompany } from "@/contexts/CompanyContext";
-import { NotInLedgerCard, type NotInLedgerSectionData } from "@/components/netposition/NotInLedgerCard";
+import type { NotInLedgerSectionData } from "@/components/netposition/NotInLedgerCard";
 
 interface AccountItem {
   id?: number;
@@ -317,33 +318,107 @@ export default function NetProfitDetails() {
   const { formatHistoricalBaseAmount: formatAmount } = useCurrencyContext();
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
-  const [fromInput, setFromInput] = useState<string>("");
-  const [toInput, setToInput] = useState<string>("");
   const [fromDate, setFromDate] = useState<string>("");
   const [toDate, setToDate] = useState<string>("");
 
-  const isValidDate = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v);
-  const commitFrom = (v: string) => {
-    if (v === "" || isValidDate(v)) setFromDate(v);
+  const toIsoDate = (date: Date) =>
+    [date.getFullYear(), String(date.getMonth() + 1).padStart(2, "0"), String(date.getDate()).padStart(2, "0")].join(
+      "-"
+    );
+  const parseLocalDate = (value: string) => {
+    if (!value) return undefined;
+    const [year, month, day] = value.split("-").map(Number);
+    return new Date(year, month - 1, day);
   };
-  const commitTo = (v: string) => {
-    if (v === "" || isValidDate(v)) setToDate(v);
+  const selectFrom = (date: Date | undefined) => {
+    if (!date) return;
+    const value = toIsoDate(date);
+    setFromDate(value);
+    if (toDate && value > toDate) setToDate(value);
+  };
+  const selectTo = (date: Date | undefined) => {
+    if (!date) return;
+    const value = toIsoDate(date);
+    setToDate(value);
+    if (fromDate && value < fromDate) setFromDate(value);
   };
   const clearDates = () => {
-    setFromInput("");
-    setToInput("");
     setFromDate("");
     setToDate("");
   };
-
-  const queryParam = toDate ? `?toDate=${toDate}` : "";
-
+  // A date range shows the CHANGE in balances over the selected period:
+  // closing snapshot at To minus opening snapshot immediately before From.
+  // A single To date remains an as-of balance sheet.
+  const previousDay = (iso: string) => {
+    const date = new Date(`${iso}T12:00:00Z`);
+    date.setUTCDate(date.getUTCDate() - 1);
+    return date.toISOString().slice(0, 10);
+  };
+  const differenceRows = (closing: AccountItem[], opening: AccountItem[]): AccountItem[] => {
+    const key = (a: AccountItem) => `${a.id ?? ""}|${a.code}|${a.name}|${a.category}`;
+    const old = new Map(opening.map((a) => [key(a), a.value]));
+    const seen = new Set<string>();
+    const rows = closing.map((a) => {
+      const k = key(a);
+      seen.add(k);
+      return { ...a, value: Math.round((a.value - (old.get(k) ?? 0)) * 100) / 100 };
+    });
+    for (const a of opening)
+      if (!seen.has(key(a))) {
+        rows.push({ ...a, value: -a.value });
+      }
+    return rows.filter((a) => Math.abs(a.value) >= 0.005);
+  };
+  // Equity has no breakdown, so diff it only where the section carries one.
+  const differenceSection = <T extends { total: number; breakdown?: BreakdownItem[]; accounts: AccountItem[] }>(
+    closing: T,
+    opening: T
+  ): T => ({
+    ...closing,
+    total: Math.round((closing.total - opening.total) * 100) / 100,
+    ...(closing.breakdown
+      ? {
+          breakdown: closing.breakdown.map((b) => ({
+            ...b,
+            value:
+              Math.round((b.value - (opening.breakdown?.find((old) => old.name === b.name)?.value ?? 0)) * 100) / 100,
+          })),
+        }
+      : {}),
+    accounts: differenceRows(closing.accounts, opening.accounts),
+  });
+  const periodEnd = toDate || (fromDate ? todayStr() : "");
   const { data, isLoading, error, refetch } = useQuery<NetProfitData>({
-    queryKey: ["/api/stats/net-profit", toDate],
+    queryKey: ["/api/stats/net-profit", selectedCompany?.id, fromDate, periodEnd],
     queryFn: async () => {
-      const res = await apiRequest("GET", `/api/stats/net-profit${queryParam}`);
-      if (!res.ok) throw new Error(await res.text());
-      return res.json();
+      const fetchSnapshot = async (date: string) => {
+        const query = date ? `?toDate=${encodeURIComponent(date)}` : "";
+        const response = await apiRequest("GET", `/api/stats/net-profit${query}`);
+        if (!response.ok) throw new Error(await response.text());
+        return response.json() as Promise<NetProfitData>;
+      };
+      const closing = await fetchSnapshot(periodEnd);
+      if (!fromDate) return closing;
+      const opening = await fetchSnapshot(previousDay(fromDate));
+      const diff = (a: number, b: number) => Math.round((a - b) * 100) / 100;
+      return {
+        ...closing,
+        forUs: differenceSection(closing.forUs, opening.forUs),
+        onUs: differenceSection(closing.onUs, opening.onUs),
+        equity: closing.equity && opening.equity ? differenceSection(closing.equity, opening.equity) : closing.equity,
+        income: differenceSection(closing.income, opening.income),
+        expenses: differenceSection(closing.expenses, opening.expenses),
+        forUsTotal: diff(closing.forUsTotal, opening.forUsTotal),
+        onUsTotal: diff(closing.onUsTotal, opening.onUsTotal),
+        netPosition: diff(closing.netPosition, opening.netPosition),
+        totalIncome: diff(closing.totalIncome, opening.totalIncome),
+        totalExpenses: diff(closing.totalExpenses, opening.totalExpenses),
+        incomeTotal: diff(closing.incomeTotal, opening.incomeTotal),
+        expensesTotal: diff(closing.expensesTotal, opening.expensesTotal),
+        netProfit: diff(closing.netProfit, opening.netProfit),
+        spPosProfit: diff(closing.spPosProfit ?? 0, opening.spPosProfit ?? 0),
+        netPositionLabel: "Net Position Change (selected period)",
+      };
     },
   });
 
@@ -354,13 +429,12 @@ export default function NetProfitDetails() {
       const today = new Date().toLocaleDateString("en-CA");
       const start =
         fromDate ||
-        fromInput ||
         (() => {
           const d = new Date();
           d.setFullYear(d.getFullYear() - 1);
           return d.toLocaleDateString("en-CA");
         })();
-      const end = toDate || toInput || today;
+      const end = toDate || today;
       return apiRequest("POST", "/api/whatsapp/send-net-position", { startDate: start, endDate: end });
     },
     onSuccess: async (res) => {
@@ -426,11 +500,11 @@ export default function NetProfitDetails() {
         meta={
           <span>
             {fromDate && toDate
-              ? `${fromDate} — ${toDate} (balances as of ${toDate})`
+              ? `${fromDate} — ${toDate} (change during period)`
               : toDate
                 ? `Balances as of ${toDate}`
                 : fromDate
-                  ? `From ${fromDate} — present`
+                  ? `From ${fromDate} — today (change during period)`
                   : "Current balances — all time"}
           </span>
         }
@@ -460,13 +534,12 @@ export default function NetProfitDetails() {
                 const today = new Date().toLocaleDateString("en-CA");
                 const start =
                   fromDate ||
-                  fromInput ||
                   (() => {
                     const d = new Date();
                     d.setFullYear(d.getFullYear() - 1);
                     return d.toLocaleDateString("en-CA");
                   })();
-                const end = toDate || toInput || today;
+                const end = toDate || today;
                 window.open(`/api/reports/net-position-monthly-excel?startDate=${start}&endDate=${end}`, "_blank");
               }}
             >
@@ -493,31 +566,42 @@ export default function NetProfitDetails() {
 
       <div className="flex items-center gap-2 flex-wrap">
         <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
-        <div className="flex items-center gap-1.5">
-          <Label className="text-sm text-muted-foreground whitespace-nowrap">From:</Label>
-          <Input
-            type="date"
-            value={fromInput}
-            max={toInput || todayStr()}
-            onChange={(e) => setFromInput(e.target.value)}
-            onBlur={(e) => commitFrom(e.target.value)}
-            className="w-36 text-sm"
-            data-testid="input-from-date"
-          />
-        </div>
-        <div className="flex items-center gap-1.5">
-          <Label className="text-sm text-muted-foreground whitespace-nowrap">To:</Label>
-          <Input
-            type="date"
-            value={toInput}
-            min={fromInput || undefined}
-            max={todayStr()}
-            onChange={(e) => setToInput(e.target.value)}
-            onBlur={(e) => commitTo(e.target.value)}
-            className="w-36 text-sm"
-            data-testid="input-to-date"
-          />
-        </div>
+        <Label className="text-sm text-muted-foreground">From:</Label>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" className="w-40 justify-between font-normal" data-testid="input-from-date">
+              {fromDate ? parseLocalDate(fromDate)!.toLocaleDateString("en-US") : "Select date"}
+              <Calendar className="h-4 w-4 opacity-70" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-auto p-0">
+            <CalendarPicker
+              mode="single"
+              selected={parseLocalDate(fromDate)}
+              onSelect={selectFrom}
+              disabled={(date) => date > new Date()}
+              initialFocus
+            />
+          </PopoverContent>
+        </Popover>
+        <Label className="text-sm text-muted-foreground">To:</Label>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" className="w-40 justify-between font-normal" data-testid="input-to-date">
+              {toDate ? parseLocalDate(toDate)!.toLocaleDateString("en-US") : "Select date"}
+              <Calendar className="h-4 w-4 opacity-70" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-auto p-0">
+            <CalendarPicker
+              mode="single"
+              selected={parseLocalDate(toDate)}
+              onSelect={selectTo}
+              disabled={(date) => date > new Date()}
+              initialFocus
+            />
+          </PopoverContent>
+        </Popover>
         {isFiltered && (
           <Button
             variant="ghost"
@@ -670,7 +754,6 @@ export default function NetProfitDetails() {
       </div>
 
       {/* ── Amounts not yet in the ledger (never in the totals) ── */}
-      <NotInLedgerCard section={data?.notInLedger} formatAmount={formatAmount} />
 
       {/* ── Partner capital / equity (Supplier Partner only) ── */}
       {showPartnerEquity && (

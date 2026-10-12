@@ -120,7 +120,7 @@ export function renderPriorityColorBox(
 ): string {
   const color = validatePriorityLabelColor(label as LabelData);
   return color
-    ? `<div class="${cssClass}" style="background-color: ${color} !important; -webkit-print-color-adjust: exact; print-color-adjust: exact;" data-priority-color="${color}" role="img" aria-label="Priority color ${color}"></div>`
+    ? `<div class="${cssClass}" style="background-color: ${color} !important; -webkit-print-color-adjust: exact; print-color-adjust: exact;" data-priority-color="${color}" role="img" aria-label="HMD priority color ${color}"><span class="priority-color-box-text">HMD</span></div>`
     : "";
 }
 
@@ -129,7 +129,7 @@ export function renderPriorityColorBox(
  * printed label; the box replaces the small logo without growing past its area.
  */
 export function priorityColorBoxCss(widthMm: number, heightMm: number): string {
-  return `.priority-color-box { width: ${widthMm}mm; height: ${heightMm}mm; border-radius: 2mm; display: block; flex-shrink: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }`;
+  return `.priority-color-box { width: ${widthMm}mm; height: ${heightMm}mm; border-radius: 2mm; display: flex !important; align-items: center; justify-content: center; flex-shrink: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; } .priority-color-box-text { color: #000000 !important; -webkit-text-fill-color: #000000 !important; font: 900 7pt/1 Arial, sans-serif; letter-spacing: 0.2mm; text-align: center; }`;
 }
 
 /** Used by legacy Pressing and Production labels to retain their ordinary HMD logo. */
