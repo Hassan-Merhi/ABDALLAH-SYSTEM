@@ -4,7 +4,7 @@ import type { ClientErrorLike } from "@/lib/clientError";
  *
  * Extracted from FactoryInsurance.tsx during the Phase 4 god-file split.
  */
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 
 import { useToast } from "@/hooks/use-toast";
@@ -31,6 +31,7 @@ function MemberFormDialog({
   existing?: InsuranceMember | null;
 }) {
   const { toast } = useToast();
+  const formId = useId();
   const { execute: executeSave, pending: submitting } = useSingleFlightAction();
   const [name, setName] = useState(existing?.name ?? "");
   const [nationality, setNationality] = useState(existing?.nationality ?? "");
@@ -96,83 +97,91 @@ function MemberFormDialog({
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-1">
-            <Label>
+            <Label htmlFor={`${formId}-name`}>
               Name <span className="text-destructive">*</span>
             </Label>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Full name"
+              id={`${formId}-name`}
               data-testid="input-member-name"
             />
           </div>
           <FormGrid minColumnWidth="10rem" className="gap-3">
             <div className="space-y-1">
-              <Label>Nationality</Label>
+              <Label htmlFor={`${formId}-nationality`}>Nationality</Label>
               <Input
                 value={nationality}
                 onChange={(e) => setNationality(e.target.value)}
                 placeholder="e.g. Congolese"
-                data-testid="input-member-nationality"
+                id={`${formId}-nationality`}
+              data-testid="input-member-nationality"
               />
             </div>
             <div className="space-y-1">
-              <Label>Position / Working</Label>
+              <Label htmlFor={`${formId}-position`}>Position / Working</Label>
               <Input
                 value={positionWorking}
                 onChange={(e) => setPositionWorking(e.target.value)}
                 placeholder="e.g. Operator"
-                data-testid="input-member-position"
+                id={`${formId}-position`}
+              data-testid="input-member-position"
               />
             </div>
           </FormGrid>
           <div className="space-y-1">
-            <Label>Insurance Number</Label>
+            <Label htmlFor={`${formId}-insurance`}>Insurance Number</Label>
             <Input
               value={insuranceNumber}
               onChange={(e) => setInsuranceNumber(e.target.value)}
               placeholder="e.g. INS-00123"
+              id={`${formId}-insurance`}
               data-testid="input-member-insurance-number"
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <FormGrid minColumnWidth="10rem" className="gap-3">
             <div className="space-y-1">
-              <Label>
+              <Label htmlFor={`${formId}-start`}>
                 Start Date <span className="text-destructive">*</span>
               </Label>
               <Input
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                data-testid="input-member-startdate"
+                id={`${formId}-start`}
+              data-testid="input-member-startdate"
               />
             </div>
             <div className="space-y-1">
-              <Label>Date of Birth</Label>
-              <Input type="date" value={dob} onChange={(e) => setDob(e.target.value)} data-testid="input-member-dob" />
+              <Label htmlFor={`${formId}-dob`}>Date of Birth</Label>
+              <Input type="date" value={dob} onChange={(e) => setDob(e.target.value)} id={`${formId}-dob`}
+              data-testid="input-member-dob" />
             </div>
-          </div>
+          </FormGrid>
           <div className="space-y-1">
-            <Label>
+            <Label htmlFor={`${formId}-amount`}>
               Monthly Amount <span className="text-destructive">*</span>
             </Label>
             <MoneyInput
-                            min="0"
+              min="0"
               step="0.01"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="0.00"
+              id={`${formId}-amount`}
               data-testid="input-member-amount"
             />
           </div>
           <div className="space-y-1">
-            <Label>Notes</Label>
+            <Label htmlFor={`${formId}-notes`}>Notes</Label>
             <Textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Optional notes"
               className="resize-none"
               rows={2}
+              id={`${formId}-notes`}
               data-testid="input-member-notes"
             />
           </div>

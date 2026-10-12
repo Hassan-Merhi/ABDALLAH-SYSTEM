@@ -4,6 +4,7 @@
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
  */
+import { useId } from "react";
 import type { useFactoryProformasModel } from "../../factoryproformas/useFactoryProformasModel";
 
 type FactoryProformasModel = ReturnType<typeof useFactoryProformasModel>;
@@ -29,6 +30,7 @@ export function EditPriceLineDialog({
   setEditLineValues: FactoryProformasModel["setEditLineValues"];
   setEditingLine: FactoryProformasModel["setEditingLine"];
 }) {
+  const formId = useId();
   return (
     <Dialog open={!!editingLine} onOpenChange={(open) => !open && setEditingLine(null)}>
       <DialogContent className="max-w-md">
@@ -41,8 +43,9 @@ export function EditPriceLineDialog({
             <p className="text-xs text-muted-foreground">{editingLine?.productName}</p>
           </div>
           <div>
-            <label className="text-sm font-medium mb-1 block">Product Name</label>
+            <label htmlFor={`${formId}-product-name`} className="text-sm font-medium mb-1 block">Product Name</label>
             <Input
+                id={`${formId}-product-name`}
               value={editLineValues.productName}
               onChange={(e) => setEditLineValues({ ...editLineValues, productName: e.target.value })}
               data-testid="input-edit-line-product-name"
@@ -50,39 +53,33 @@ export function EditPriceLineDialog({
           </div>
           <FormGrid minColumnWidth="8rem">
             <div>
-              <label className="text-sm font-medium mb-1 block">Quantity</label>
+              <label htmlFor={`${formId}-quantity`} className="text-sm font-medium mb-1 block">Quantity</label>
               <DecimalInput
+                id={`${formId}-quantity`}
                 step="1"
-                                value={editLineValues.quantity}
+                value={editLineValues.quantity}
                 onChange={(e) => setEditLineValues({ ...editLineValues, quantity: e.target.value })}
-                onKeyDown={(e) => {
-                  if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault();
-                }}
                 data-testid="input-edit-line-quantity"
               />
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block">Price per Bale</label>
+              <label htmlFor={`${formId}-price`} className="text-sm font-medium mb-1 block">Price per Bale</label>
               <MoneyInput
-                                step="0.01"
+                id={`${formId}-price`}
+                step="0.01"
                 value={editLineValues.pricePerBale}
                 onChange={(e) => setEditLineValues({ ...editLineValues, pricePerBale: e.target.value })}
-                onKeyDown={(e) => {
-                  if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault();
-                }}
                 data-testid="input-edit-line-price"
               />
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block">KG / Bale</label>
+              <label htmlFor={`${formId}-weight`} className="text-sm font-medium mb-1 block">KG / Bale</label>
               <DecimalInput
-                                step="0.01"
+                id={`${formId}-weight`}
+                step="0.01"
                 placeholder="e.g. 97"
                 value={editLineValues.weightPerBaleKg}
                 onChange={(e) => setEditLineValues({ ...editLineValues, weightPerBaleKg: e.target.value })}
-                onKeyDown={(e) => {
-                  if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault();
-                }}
                 data-testid="input-edit-line-weight"
               />
             </div>
