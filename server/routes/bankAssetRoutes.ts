@@ -72,8 +72,7 @@ export function registerBankAssetRoutes(app: Express) {
   // Bank account master routes first (their registration order is unchanged).
   registerBankAccountRoutes(app);
 
-  // This GET endpoint is owned by an earlier canonical route registrar.
-
+  // Cash/bank revaluation is handled earlier by accountCurrencyRoutes.
   // Fixed Assets
   app.get("/api/fixed-assets", requireAuth, async (req, res) => {
     try {
