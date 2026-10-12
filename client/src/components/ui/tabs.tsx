@@ -58,6 +58,8 @@ const TabsList = React.forwardRef<
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     onKeyDown?.(event);
     if (event.defaultPrevented || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    // Alt+Left/Right (browser Back/Forward) and Ctrl/Meta+Home/End belong to the browser.
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
     // A few report hubs keep legacy tabs mounted but visually hidden.
     // Skip those during keyboard navigation instead of focusing an invisible control.
     const tabs = Array.from(

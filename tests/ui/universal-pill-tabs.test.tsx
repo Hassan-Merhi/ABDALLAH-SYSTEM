@@ -117,6 +117,24 @@ describe("shared pill tabs", () => {
     expect(wide.scrollLeft).toBe(0);
   });
 
+  it("leaves modifier shortcuts such as Alt+Left (browser Back) to the browser", () => {
+    render(<ControlledTabs />);
+    const one = screen.getByRole("tab", { name: "One" });
+    one.focus();
+    for (const init of [
+      { key: "ArrowRight", altKey: true },
+      { key: "ArrowLeft", altKey: true },
+      { key: "End", ctrlKey: true },
+      { key: "Home", metaKey: true },
+    ]) {
+      const event = new KeyboardEvent("keydown", { ...init, bubbles: true, cancelable: true });
+      one.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(false);
+      expect(one).toHaveFocus();
+      expect(one).toHaveAttribute("aria-selected", "true");
+    }
+  });
+
   it("never lands on a tab that is not rendered", () => {
     render(<ControlledTabs hideTwo />);
     const one = screen.getByRole("tab", { name: "One" });
