@@ -12,9 +12,9 @@ vi.mock("@/lib/queryClient", () => ({ apiRequest: vi.fn() }));
 
 const approved = [
   "#7FFF00",
-  "#FFD700",
+  "#FFE066",
   "#808000",
-  "#B22222",
+  "#FF00FF",
   "#9400D3",
   "#DAA520",
   "#6A5ACD",
@@ -22,6 +22,7 @@ const approved = [
   "#F7E7CE",
   "#614051",
   "#B0E0E6",
+  "#000000",
 ];
 const clients: QueryClient[] = [];
 const configsUrl = "/api/factory/customer-orders/loading-list/priority-scan-configs";
@@ -51,15 +52,15 @@ afterEach(() => {
 });
 
 describe("Priority Scan fixed palette", () => {
-  it("exposes exactly the approved 11 colors in order", () => {
+  it("exposes exactly the approved 12 colors in order", () => {
     expect(PRIORITY_SCAN_COLORS).toEqual(approved);
-    expect(new Set(PRIORITY_SCAN_COLORS).size).toBe(11);
+    expect(new Set(PRIORITY_SCAN_COLORS).size).toBe(12);
   });
 
   it.each(approved)("lets a user select and save %s", async (color) => {
     mount();
     fireEvent.click(screen.getByTestId("button-set-priority-42"));
-    expect(screen.getAllByRole("button", { name: /Use color/ })).toHaveLength(11);
+    expect(screen.getAllByRole("button", { name: /Use color/ })).toHaveLength(12);
     fireEvent.click(screen.getByRole("button", { name: `Use color ${color}` }));
     fireEvent.click(screen.getByTestId("button-save-priority-42"));
     await waitFor(() =>
@@ -112,7 +113,7 @@ describe("Priority Scan fixed palette", () => {
   it("moves a legacy priority without submitting or mutating its saved color", async () => {
     const configs = [
       { id: 1, orderId: 42, color: "Navy", priority: 2, enabled: true },
-      { id: 2, orderId: 99, color: "#FFD700", priority: 1, enabled: true },
+      { id: 2, orderId: 99, color: "#FFE066", priority: 1, enabled: true },
     ];
     mount(configs);
     fireEvent.click(screen.getByTestId("button-priority-up-42"));
@@ -129,7 +130,7 @@ describe("Priority Scan fixed palette", () => {
   it("saves an untouched legacy priority from the editor without recoloring it", async () => {
     mount([
       { id: 1, orderId: 42, color: "Navy", priority: 2, enabled: true },
-      { id: 2, orderId: 99, color: "#FFD700", priority: 1, enabled: true },
+      { id: 2, orderId: 99, color: "#FFE066", priority: 1, enabled: true },
     ]);
     fireEvent.click(screen.getByTestId("button-priority-config-42"));
     // No approved swatch is preselected in place of the saved legacy color.
@@ -179,7 +180,7 @@ describe("Priority Scan fixed palette", () => {
   });
 
   it("restricts ordinary users to color edits without priority controls", async () => {
-    mount([{ id: 1, orderId: 42, color: "#FFD700", priority: 1, enabled: true }], "User");
+    mount([{ id: 1, orderId: 42, color: "#FFE066", priority: 1, enabled: true }], "User");
     expect(screen.queryByTestId("button-priority-up-42")).toBeNull();
     fireEvent.click(screen.getByTestId("button-priority-config-42"));
     expect(screen.queryByTestId("select-priority-42")).toBeNull();
@@ -194,6 +195,6 @@ describe("Priority Scan fixed palette", () => {
     const notice = translatePriorityScanText("legacyPriorityColorNotice", language, { color: "#123456" });
     expect(notice).toContain("#123456");
     expect(notice).not.toContain("{color}");
-    expect(notice).toContain(language === "ar" ? "الأحد عشر" : "11");
+    expect(notice).toContain(language === "ar" ? "الاثني عشر" : "12");
   });
 });
