@@ -126,9 +126,12 @@ export function registerOrderLoadingRoutes(app: Express) {
       // The date selected in Validate & Finalize is the business-effective date.
       // Keep a separate actual timestamp for audit/update bookkeeping.
       const txDate = req.body?.txDate || getClientDate(req);
-      if (typeof txDate !== "string" || !/^\\d{4}-\\d{2}-\\d{2}$/.test(txDate) ||
-          Number.isNaN(Date.parse(txDate)) ||
-          new Date(`${txDate}T12:00:00.000Z`).toISOString().slice(0, 10) !== txDate) {
+      if (
+        typeof txDate !== "string" ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(txDate) ||
+        Number.isNaN(Date.parse(txDate)) ||
+        new Date(`${txDate}T12:00:00.000Z`).toISOString().slice(0, 10) !== txDate
+      ) {
         return res.status(400).json({ message: "Invalid finalization date (expected YYYY-MM-DD)" });
       }
       const effectiveFinalizedAt = new Date(`${txDate}T12:00:00.000Z`);
