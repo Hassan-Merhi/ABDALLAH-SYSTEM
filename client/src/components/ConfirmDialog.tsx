@@ -25,6 +25,7 @@ export interface ConfirmDialogProps {
   description?: React.ReactNode;
   confirmText?: string;
   confirmButtonTestId?: string;
+  cancelButtonTestId?: string;
   cancelText?: string;
   tone?: ConfirmDialogTone;
   icon?: LucideIcon;
@@ -46,6 +47,7 @@ export function ConfirmDialog({
   description,
   confirmText = "Confirm",
   confirmButtonTestId = "button-confirm-confirm",
+  cancelButtonTestId = "button-confirm-cancel",
   cancelText = "Cancel",
   tone = "default",
   icon: Icon,
@@ -192,7 +194,7 @@ export function ConfirmDialog({
             onClick={handleCancel}
             disabled={isLoading}
             className="w-full sm:w-auto"
-            data-testid="button-confirm-cancel"
+            data-testid={cancelButtonTestId}
           >
             {cancelText}
           </AlertDialogCancel>

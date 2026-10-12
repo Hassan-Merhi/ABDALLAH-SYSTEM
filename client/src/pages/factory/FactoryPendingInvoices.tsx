@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/StatusBadge";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
@@ -15,17 +16,6 @@ import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, keyStartsWith } from "@/lib/queryClient";
 import { PageHeader } from "@/components/PageHeader";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 import { InvoiceSummaryBar } from "@/components/InvoiceSummaryBar";
 import type { FactoryMyAccess } from "@shared/apiTypes";
 
@@ -268,34 +258,22 @@ export default function FactoryPendingInvoices() {
                             <Container className="h-4 w-4" />
                           </Button>
                         )}
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon" data-testid={`button-delete-order-${order.id}`}>
+                        <ConfirmDialog
+                          title="Delete Invoice"
+                          tone="destructive"
+                          description={`This will permanently delete invoice ${order.invoiceNumber || `#${order.id}`} for ${order.customerName}. Any bales assigned to this order will be returned to stock. This cannot be undone.`}
+                          confirmText="Delete"
+                          confirmButtonTestId={`button-confirm-delete-${order.id}`}
+                          cancelButtonTestId={`button-cancel-delete-${order.id}`}
+                          loading={deleteMutation.isPending}
+                          onConfirm={async () => { await deleteMutation.mutateAsync(order.id); }}
+                          trigger={
+                            <Button variant="ghost" size="icon" aria-label={`Delete invoice ${order.invoiceNumber || order.id}`}
+                              data-testid={`button-delete-order-${order.id}`}>
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Delete Invoice</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This will permanently delete invoice {order.invoiceNumber || `#${order.id}`} for{" "}
-                                {order.customerName}. Any bales assigned to this order will be returned to stock. This
-                                cannot be undone.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel data-testid={`button-cancel-delete-${order.id}`}>
-                                Cancel
-                              </AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => deleteMutation.mutate(order.id)}
-                                data-testid={`button-confirm-delete-${order.id}`}
-                              >
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                          }
+                        />
                       </div>
                     </TableCell>
                   </TableRow>
