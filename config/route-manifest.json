@@ -1,7 +1,7 @@
 {
   "formatVersion": 1,
   "description": "Ordered snapshot of every registered Express route (method, path, guard chain) and middleware mount. Regenerate with UPDATE_ROUTE_MANIFEST=1 only when a route change is intended; during a file split the manifest must not change at all.",
-  "routeCount": 2115,
+  "routeCount": 2114,
   "middlewareMountCount": 130,
   "routes": [
     "GET /api/admin/operational-monitoring [requireAuth > <anonymous> > <anonymous>]",
@@ -162,7 +162,6 @@
     "DELETE /api/factory/raw-stock/receipts/:rawStockId [requireAuth > <anonymous>]",
     "PATCH /api/factory/raw-stock/receipts/:rawStockId [requireAuth > <anonymous>]",
     "GET /api/factory/raw-stock/by-container [requireAuth > <anonymous>]",
-    "GET /api/factory/raw-stock/available-containers [requireAuth > <anonymous>]",
     "POST /api/factory/raw-stock/offload [requireAuth > <anonymous>]",
     "POST /api/factory/containers/:id/reverse-offload [requireAuth > <anonymous>]",
     "POST /api/factory/containers/:id/post-offload-charges/preview [requireAuth > <anonymous>]",
