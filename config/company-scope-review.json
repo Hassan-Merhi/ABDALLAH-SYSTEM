@@ -87,10 +87,6 @@
       "reason": "Shipping-container rows are reached through the factory company boundary and parent ownership."
     },
     {
-      "path": "server/routes/fiscal-transfers/revisions-write.ts",
-      "reason": "Revision writes are protected by the migrated-voucher company guard."
-    },
-    {
       "path": "server/routes/git/gitAgentRoutes.ts",
       "reason": "Git reporting loads only resources selected by the active company context."
     },

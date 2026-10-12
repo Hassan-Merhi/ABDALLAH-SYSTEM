@@ -4,7 +4,7 @@ const files = {
   service: "server/services/rental/rentalPaymentPostingService.ts",
   deletionService: "server/services/rental/rentalPaymentDeletionService.ts",
   deletionRoute: "server/routes/rental/centralRentalPaymentDeletionRoute.ts",
-  registry: "server/routes/rental/index.ts",
+  registry: "server/routes/rentalRouteFactory.ts",
   routes: "server/routes/rental/rentalPaymentsAccrualRoutes.ts",
   deleteRoute: "server/routes/vouchers/centralPaymentReceiptDeleteRoute.ts",
   doc: "docs/archive/program-2-phase-8-rentals.md",

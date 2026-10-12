@@ -75,3 +75,80 @@ The JSON classifies all 70 retained signatures and their reasoning. **16 signatu
 - [x] No CI, tests, builds, typechecking, runtime checks or deployments.
 
 **Limit:** This is a completed *static source cleanup* phase, not a guarantee of zero dead backend routes or of runtime equivalence. Behavior requires the intentionally deferred final validation.
+
+---
+
+## Phase 3 continuation (second session) — full overlap and registrar audit
+
+**Status: COMPLETE.** Every repeated method + path signature in `config/route-manifest.json`
+was re-read at the handler level (`next` usage, registration order, guard chain), the lazy
+route modules were checked against their production prefixes, and every exported `register*`
+function under `server/routes` was traced to a live call site.
+
+### Additional registrations removed (8)
+
+| Signature | Removed copy | Why it could never run |
+|---|---|---|
+| `POST /api/stock-transfers/:transferId/revisions` | `vouchers/stockTransferRevisionLifecycleRoutes.ts`, `fiscal-transfers/revisions-write.ts` | `vouchers/immutableStockTransferRevisionRoutes.ts` registers first in `voucherRoutes.ts` and its handler has no `next` parameter. |
+| `POST /api/stock-transfer-revisions/:id/approve` | `vouchers/stockTransferRevisionLifecycleRoutes.ts` | Same: the immutable approve handler is terminal. |
+| `GET /api/stock-transfers/:transferId/revisions`, `GET /api/stock-transfers/by-voucher/:voucherId/revisions` | `fiscal-transfers/revisions-read.ts` (readers only) | Immutable readers register earlier (vouchers before fiscal transfers) and are terminal. The file's `PATCH /api/stock-transfers/:id` notes update is unique and retained. |
+| `PATCH /api/voucher-entries/:id` | `voucher-entries/write.ts` | `voucherEntryCurrencyEditRoutes.ts` is registered by `ledgerRoutes.ts` before `registerVoucherEntryRoutes` and is terminal. |
+| `POST /api/admin/account-migration/execute` | `admin/import-export/account-migration.ts` | `accountMigrationSafeRoutes.ts` registers first and is terminal. The undo chain is kept (both earlier undo handlers call `next()`). |
+| `GET /api/suppliers/:supplierId/purchase-orders` | `vouchers/voucherQueryRoutes.ts` | `supplierPurchaseOrderPaginationRoutes.ts` registers first and answers paged and unpaged requests. |
+
+Before: 2,076 registrations, 70 repeated signatures, 85 extra registrations.
+After: **2,068 registrations, 65 repeated signatures, 77 extra registrations.**
+The 16 previously "ambiguous" signatures were all resolved: 7 removals above, the rest
+reclassified with the concrete `next()` evidence (see the JSON `remaining[]`). **No ambiguous
+overlap remains.** `MAX_SHADOWED_REGISTRATIONS` in `tests/route-manifest.test.ts` was
+tightened from 143 to 77.
+
+### Unmounted duplicate registries and dead route files removed (14 files)
+
+| File | Evidence |
+|---|---|
+| `server/routes/stock/index.ts`, `server/routes/payroll/index.ts`, `server/routes/rental/index.ts`, `server/routes/factory/raw-stock/index.ts` | Second copies of the live registries (`stockRoutes.ts`, `factoryWorkerPayrollRoutes.ts`, `rentalRouteFactory.ts`, `factory/factoryRawStockRoutes.ts`). Nothing imports them; the raw-stock copy also lacked the company-context middleware of the live aggregator, so it was a hazard if ever re-imported. |
+| `server/routes/stats/index.ts`, `server/routes/vouchers/index.ts` | Compatibility re-exports with no importer (the comments in them already warned against second registration paths). |
+| `server/routes/admin/index.ts`, `server/routes/containers/index.ts`, `server/routes/factory/customer-orders/index.ts` | Re-export barrels with no importer. |
+| `server/routes/erp-payroll/_helpers.ts`, `server/routes/stock-summary-location/_helpers.ts`, `server/routes/vouchers/sales-update/_helpers.ts`, `server/routes/vouchers/transfer/_helpers.ts` | Comment-only / empty modules with no importer. |
+| `server/lib/routeRegistration.ts` | `registerRouteModules` helper with no importer. |
+
+Source-text tests and verify scripts that pinned the deleted copies were retargeted to the live
+registry (`tests/program-6c-stock-light-route.test.ts`, the three `factory-post-offload-*`
+tests, `scripts/verify-program2-phase8-rentals.mjs`) or now assert the dead barrel stays gone
+(`tests/sales-report-compact-routes.test.ts`, `scripts/verify-bandwidth-phase-3-sales-report.mjs`).
+`tests/stock-transfer-revision-write-route-behavior.test.ts` exercised only the unreachable
+`revisions-write.ts` handler in isolation and was removed with it. The stale
+`config/company-scope-review.json` entry for `revisions-write.ts` was removed (the audit fails on
+stale entries).
+
+### Lazy route modules
+
+All ten `registerLazyRouteModule` targets (chatbot, net-profit Excel, net-position Excel,
+export, git, container tracking, supplier profit check, AI import/validation/agent) register
+only paths under their declared prefixes, so no route is reachable in development but
+silently unreachable in production.
+
+### Findings retained for an owner decision (not dead-code removals)
+
+1. **`server/routes/accounts/ledger-balance.ts` is unmounted, but two tests certify it.**
+   `registerAccountLedgerBalanceRoutes` is not called by the application (the earlier
+   `accountCurrencyRoutes.ts` handler owns `GET /api/accounts/ledger/:id/balance`).
+   `tests/ledger-balance-exact.test.ts` and `tests/wave10-engine-consolidation.test.ts`
+   exercise the unmounted copy, whose logic (balance engine, wave 17 A) differs from the live
+   handler. Decide which implementation is canonical before deleting either.
+2. **`server/routes/factory/customer-orders/linkProformaAtomic.ts` is never wired.** It holds a
+   transactional, capacity-locked proforma link. The live
+   `PATCH /api/factory/customer-orders/:id/link-proforma` in `orderCrudRoutes.ts` runs without a
+   transaction or the capacity lock, while `tests/proforma-capacity-concurrency-wiring.test.ts`
+   only checks that the unused file contains the lock call. Wiring it changes behavior, so it
+   was left untouched.
+3. **`server/routes/stats/statsNetProfitResilience.ts` is never mounted** (tested only in
+   isolation). Either mount it intentionally or retire it with its test.
+4. **`server/routes/sp/spGoldenCoastPhase5PosSaleRoutes.ts`** is unmounted by design; its tests
+   explicitly require it to stay in source "for Phase 6 reuse". Retained per that policy.
+5. **`server/services/stockTransferRevisionLifecycle.ts`** lost its only production caller with
+   the removal of the shadowed revision routes; it is still imported by three tests. Assessed
+   in Phase 6.
+
+**No CI, tests, typecheck, builds or deployments were run.**

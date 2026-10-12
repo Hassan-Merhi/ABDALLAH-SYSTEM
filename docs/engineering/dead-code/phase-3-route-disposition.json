@@ -1,7 +1,7 @@
 {
   "version": 1,
   "phase": 3,
-  "status": "static_cleanup_complete_runtime_validation_deferred",
+  "status": "complete",
   "date": "2026-10-12",
   "repository": "Hassan-Merhi/ERP-FACTORY-SYSTEM",
   "branch": "refactor/erp-dead-code-cleanup",
@@ -27,7 +27,14 @@
       "server/routes/containers/offload/create.ts",
       "server/routes/stock/stockItemManageRoutes.ts",
       "server/routes/stock/stockPriceListImportRoutes.ts"
-    ]
+    ],
+    "continuation": {
+      "routeRegistrationsAfter": 2068,
+      "repeatedSignaturesAfter": 65,
+      "extraRegistrationsAfter": 77,
+      "additionalRegistrationsRemoved": 8,
+      "ambiguousRemaining": 0
+    }
   },
   "removals": [
     {
@@ -477,98 +484,84 @@
       "removedCount": 1,
       "category": "stock_import_canonical",
       "reason": "Earlier canonical route owns this path; later duplicate registrar removed."
-    }
-  ],
-  "remaining": [
-    {
-      "signature": "DELETE /api/vouchers/:id",
-      "registered": 6,
-      "category": "preserve_ambiguous_overlap",
-      "reason": "Overlap may be route-specific guard, shadowed legacy handler, specialized lifecycle, or fallback; no deletion without proving handler semantics.",
-      "removalAuthorized": false
-    },
-    {
-      "signature": "POST /api/factory/raw-stock/recalc/historical-replay/apply",
-      "registered": 4,
-      "category": "risk_sensitive_guard_or_fallback",
-      "reason": "Historical repair replay/readiness endpoints have layered safety; preserve without stronger reachability evidence.",
-      "removalAuthorized": false
-    },
-    {
-      "signature": "POST /api/sp/offload",
-      "registered": 4,
-      "category": "confirmed_guard_chain",
-      "reason": "Multiple request guards and canonical offload executor are intentionally registered in order.",
-      "removalAuthorized": false
     },
     {
       "signature": "POST /api/stock-transfers/:transferId/revisions",
-      "registered": 4,
-      "category": "preserve_ambiguous_overlap",
-      "reason": "Overlap may be route-specific guard, shadowed legacy handler, specialized lifecycle, or fallback; no deletion without proving handler semantics.",
-      "removalAuthorized": false
-    },
-    {
-      "signature": "GET /api/accounts/supplier/:id/transactions",
-      "registered": 3,
-      "category": "pagination_or_legacy_shape_fallback",
-      "reason": "Native paginated path and legacy/unpaginated compatibility route both retained.",
-      "removalAuthorized": false
-    },
-    {
-      "signature": "GET /api/sp/migration/cutover",
-      "registered": 2,
-      "category": "intentional_unsupported_method_catch_all",
-      "reason": "Earlier Phase 4 handles supported methods; later app.all route still rejects unsupported verbs.",
-      "removalAuthorized": false
-    },
-    {
-      "signature": "PATCH /api/vouchers/:id/transfer",
-      "registered": 3,
-      "category": "preserve_ambiguous_overlap",
-      "reason": "Overlap may be route-specific guard, shadowed legacy handler, specialized lifecycle, or fallback; no deletion without proving handler semantics.",
-      "removalAuthorized": false
-    },
-    {
-      "signature": "POST /api/admin/account-migration/undo",
-      "registered": 3,
-      "category": "preserve_ambiguous_overlap",
-      "reason": "Overlap may be route-specific guard, shadowed legacy handler, specialized lifecycle, or fallback; no deletion without proving handler semantics.",
-      "removalAuthorized": false
-    },
-    {
-      "signature": "POST /api/containers/:id/offload",
-      "registered": 2,
-      "category": "preserve_ambiguous_overlap",
-      "reason": "Overlap may be route-specific guard, shadowed legacy handler, specialized lifecycle, or fallback; no deletion without proving handler semantics.",
-      "removalAuthorized": false
-    },
-    {
-      "signature": "POST /api/sp/migration/cutover",
-      "registered": 2,
-      "category": "intentional_unsupported_method_catch_all",
-      "reason": "Earlier Phase 4 handles supported methods; later app.all route still rejects unsupported verbs.",
-      "removalAuthorized": false
+      "initialCount": 4,
+      "remainingCount": 2,
+      "removedCount": 2,
+      "category": "shadowed_by_terminal_immutable_revision_route",
+      "reason": "vouchers/immutableStockTransferRevisionRoutes.ts registers first and never calls next(); the later stockTransferRevisionLifecycleRoutes.ts and fiscal-transfers/revisions-write.ts copies were unreachable. adminPostUpdateStockTransferRevisionRoute.ts (next('route') pass-through) is retained ahead of it.",
+      "session": "phase-3-continuation"
     },
     {
       "signature": "POST /api/stock-transfer-revisions/:id/approve",
-      "registered": 3,
-      "category": "action_permission_gate_plus_implementation",
-      "reason": "Early action permission gate and later business handlers; any additional handler copies require separate per-route proof.",
-      "removalAuthorized": false
+      "initialCount": 3,
+      "remainingCount": 2,
+      "removedCount": 1,
+      "category": "shadowed_by_terminal_immutable_revision_route",
+      "reason": "The immutable approve handler is terminal; the later stockTransferRevisionLifecycleRoutes.ts approve was unreachable. The permissionBoundaryRoutes gate is retained.",
+      "session": "phase-3-continuation"
     },
     {
-      "signature": "POST /api/vouchers/bulk-delete",
-      "registered": 3,
-      "category": "action_permission_gate_plus_implementation",
-      "reason": "Early action permission gate and later business handlers; any additional handler copies require separate per-route proof.",
-      "removalAuthorized": false
+      "signature": "GET /api/stock-transfers/:transferId/revisions",
+      "initialCount": 2,
+      "remainingCount": 1,
+      "removedCount": 1,
+      "category": "shadowed_by_terminal_immutable_revision_route",
+      "reason": "Immutable reader is terminal; fiscal-transfers/revisions-read.ts reader removed (its PATCH /api/stock-transfers/:id notes update is retained).",
+      "session": "phase-3-continuation"
     },
+    {
+      "signature": "GET /api/stock-transfers/by-voucher/:voucherId/revisions",
+      "initialCount": 2,
+      "remainingCount": 1,
+      "removedCount": 1,
+      "category": "shadowed_by_terminal_immutable_revision_route",
+      "reason": "Immutable reader is terminal; fiscal-transfers/revisions-read.ts copy removed.",
+      "session": "phase-3-continuation"
+    },
+    {
+      "signature": "PATCH /api/voucher-entries/:id",
+      "initialCount": 2,
+      "remainingCount": 1,
+      "removedCount": 1,
+      "category": "shadowed_by_terminal_currency_edit_route",
+      "reason": "voucherEntryCurrencyEditRoutes.ts (registered by ledgerRoutes.ts before registerVoucherEntryRoutes) is terminal on every path; the voucher-entries/write.ts PATCH was unreachable. POST /api/voucher-entries in the same file is retained.",
+      "session": "phase-3-continuation"
+    },
+    {
+      "signature": "POST /api/admin/account-migration/execute",
+      "initialCount": 2,
+      "remainingCount": 1,
+      "removedCount": 1,
+      "category": "shadowed_by_terminal_safe_migration_route",
+      "reason": "accountMigrationSafeRoutes.ts execute is registered first (adminRoutes.ts) and never calls next(); the import-export/account-migration.ts execute was unreachable. The undo chain is retained because the round-trip and safe undo handlers call next() when no matching saved migration exists.",
+      "session": "phase-3-continuation"
+    },
+    {
+      "signature": "GET /api/suppliers/:supplierId/purchase-orders",
+      "initialCount": 2,
+      "remainingCount": 1,
+      "removedCount": 1,
+      "category": "shadowed_by_terminal_pagination_route",
+      "reason": "supplierPurchaseOrderPaginationRoutes.ts is registered first and answers both paged and unpaged requests; the cross-company copy in voucherQueryRoutes.ts was unreachable.",
+      "session": "phase-3-continuation"
+    }
+  ],
+  "remaining": [
     {
       "signature": "DELETE /api/deleted-items/:type/:id/permanent",
       "registered": 2,
       "category": "conditional_specialized_delete",
       "reason": "Specialized deleted-item route delegates some item types; retain fallback.",
+      "removalAuthorized": false
+    },
+    {
+      "signature": "DELETE /api/vouchers/:id",
+      "registered": 6,
+      "category": "conditional_lifecycle_dispatch",
+      "reason": "Five type-specific lifecycle handlers (stock adjustment, Golden Coast POS settlement, payment/receipt, journal, stock transfer) each call next() for vouchers they do not own; voucher-entries/delete.ts is the generic terminal handler.",
       "removalAuthorized": false
     },
     {
@@ -602,6 +595,13 @@
     {
       "signature": "GET /api/accounts/ledger/:id/transactions",
       "registered": 2,
+      "category": "pagination_or_legacy_shape_fallback",
+      "reason": "Native paginated path and legacy/unpaginated compatibility route both retained.",
+      "removalAuthorized": false
+    },
+    {
+      "signature": "GET /api/accounts/supplier/:id/transactions",
+      "registered": 3,
       "category": "pagination_or_legacy_shape_fallback",
       "reason": "Native paginated path and legacy/unpaginated compatibility route both retained.",
       "removalAuthorized": false
@@ -733,28 +733,14 @@
       "removalAuthorized": false
     },
     {
+      "signature": "GET /api/sp/migration/cutover",
+      "registered": 2,
+      "category": "intentional_unsupported_method_catch_all",
+      "reason": "Earlier Phase 4 handles supported methods; later app.all route still rejects unsupported verbs.",
+      "removalAuthorized": false
+    },
+    {
       "signature": "GET /api/stock-items",
-      "registered": 2,
-      "category": "pagination_or_legacy_shape_fallback",
-      "reason": "Native paginated path and legacy/unpaginated compatibility route both retained.",
-      "removalAuthorized": false
-    },
-    {
-      "signature": "GET /api/stock-transfers/:transferId/revisions",
-      "registered": 2,
-      "category": "preserve_ambiguous_overlap",
-      "reason": "Overlap may be route-specific guard, shadowed legacy handler, specialized lifecycle, or fallback; no deletion without proving handler semantics.",
-      "removalAuthorized": false
-    },
-    {
-      "signature": "GET /api/stock-transfers/by-voucher/:voucherId/revisions",
-      "registered": 2,
-      "category": "preserve_ambiguous_overlap",
-      "reason": "Overlap may be route-specific guard, shadowed legacy handler, specialized lifecycle, or fallback; no deletion without proving handler semantics.",
-      "removalAuthorized": false
-    },
-    {
-      "signature": "GET /api/suppliers/:supplierId/purchase-orders",
       "registered": 2,
       "category": "pagination_or_legacy_shape_fallback",
       "reason": "Native paginated path and legacy/unpaginated compatibility route both retained.",
@@ -770,15 +756,15 @@
     {
       "signature": "GET /api/vouchers/:id",
       "registered": 2,
-      "category": "preserve_ambiguous_overlap",
-      "reason": "Overlap may be route-specific guard, shadowed legacy handler, specialized lifecycle, or fallback; no deletion without proving handler semantics.",
+      "category": "confirmed_response_wrapper",
+      "reason": "registerVoucherDetailCompatibility wraps res.json to add `transfer` and calls next().",
       "removalAuthorized": false
     },
     {
       "signature": "PATCH /api/containers/:id/offload",
       "registered": 2,
-      "category": "preserve_ambiguous_overlap",
-      "reason": "Overlap may be route-specific guard, shadowed legacy handler, specialized lifecycle, or fallback; no deletion without proving handler semantics.",
+      "category": "confirmed_guard_chain",
+      "reason": "containerOffloadLifecycleGuard.ts calls next() into the central offload handler.",
       "removalAuthorized": false
     },
     {
@@ -791,43 +777,36 @@
     {
       "signature": "PATCH /api/locations/:locationId",
       "registered": 2,
-      "category": "preserve_ambiguous_overlap",
-      "reason": "Overlap may be route-specific guard, shadowed legacy handler, specialized lifecycle, or fallback; no deletion without proving handler semantics.",
-      "removalAuthorized": false
-    },
-    {
-      "signature": "PATCH /api/voucher-entries/:id",
-      "registered": 2,
-      "category": "preserve_ambiguous_overlap",
-      "reason": "Overlap may be route-specific guard, shadowed legacy handler, specialized lifecycle, or fallback; no deletion without proving handler semantics.",
+      "category": "confirmed_conditional_fallthrough",
+      "reason": "WhatsApp legacy compatibility handler calls next('route') for normal location edits.",
       "removalAuthorized": false
     },
     {
       "signature": "PATCH /api/vouchers/:id",
       "registered": 2,
-      "category": "preserve_ambiguous_overlap",
-      "reason": "Overlap may be route-specific guard, shadowed legacy handler, specialized lifecycle, or fallback; no deletion without proving handler semantics.",
+      "category": "conditional_lifecycle_dispatch",
+      "reason": "stockTransferLifecycleRoutes.ts calls next() unless the request changes a stock transfer's optional state.",
       "removalAuthorized": false
     },
     {
       "signature": "PATCH /api/vouchers/:id/adjustment",
       "registered": 2,
-      "category": "preserve_ambiguous_overlap",
-      "reason": "Overlap may be route-specific guard, shadowed legacy handler, specialized lifecycle, or fallback; no deletion without proving handler semantics.",
+      "category": "conditional_lifecycle_dispatch",
+      "reason": "exactStockAdjustmentLifecycleRoute.ts calls next() when the voucher or adjustment row is missing.",
       "removalAuthorized": false
     },
     {
       "signature": "PATCH /api/vouchers/:id/journal",
       "registered": 2,
-      "category": "preserve_ambiguous_overlap",
-      "reason": "Overlap may be route-specific guard, shadowed legacy handler, specialized lifecycle, or fallback; no deletion without proving handler semantics.",
+      "category": "conditional_lifecycle_dispatch",
+      "reason": "centralJournalLifecycleRoute.ts calls next() for vouchers it does not own.",
       "removalAuthorized": false
     },
     {
       "signature": "PATCH /api/vouchers/:id/payment-receipt",
       "registered": 2,
-      "category": "preserve_ambiguous_overlap",
-      "reason": "Overlap may be route-specific guard, shadowed legacy handler, specialized lifecycle, or fallback; no deletion without proving handler semantics.",
+      "category": "conditional_lifecycle_dispatch",
+      "reason": "centralPaymentReceiptLifecycleRoute.ts calls next() for vouchers it does not own.",
       "removalAuthorized": false
     },
     {
@@ -838,10 +817,17 @@
       "removalAuthorized": false
     },
     {
-      "signature": "POST /api/admin/account-migration/execute",
-      "registered": 2,
-      "category": "preserve_ambiguous_overlap",
-      "reason": "Overlap may be route-specific guard, shadowed legacy handler, specialized lifecycle, or fallback; no deletion without proving handler semantics.",
+      "signature": "PATCH /api/vouchers/:id/transfer",
+      "registered": 3,
+      "category": "conditional_lifecycle_dispatch",
+      "reason": "exactStockTransferEditRoute.ts and stockTransferLifecycleRoutes.ts call next() for drafts / non-transfer vouchers; transfer/transfer.ts is the terminal fallback.",
+      "removalAuthorized": false
+    },
+    {
+      "signature": "POST /api/admin/account-migration/undo",
+      "registered": 3,
+      "category": "conditional_lifecycle_dispatch",
+      "reason": "Round-trip and safe undo handlers call next() when no matching saved migration exists; the import-export undo is the terminal fallback.",
       "removalAuthorized": false
     },
     {
@@ -849,6 +835,13 @@
       "registered": 2,
       "category": "action_permission_gate_plus_implementation",
       "reason": "Early action permission gate and later business handlers; any additional handler copies require separate per-route proof.",
+      "removalAuthorized": false
+    },
+    {
+      "signature": "POST /api/containers/:id/offload",
+      "registered": 2,
+      "category": "confirmed_guard_chain",
+      "reason": "containerOffloadLifecycleGuard.ts calls next() into the central offload handler.",
       "removalAuthorized": false
     },
     {
@@ -863,6 +856,13 @@
       "registered": 2,
       "category": "confirmed_ledger_prerequisite",
       "reason": "Customer-ledger prerequisite middleware calls next() into the charge mutation endpoint.",
+      "removalAuthorized": false
+    },
+    {
+      "signature": "POST /api/factory/raw-stock/recalc/historical-replay/apply",
+      "registered": 4,
+      "category": "risk_sensitive_guard_or_fallback",
+      "reason": "Historical repair replay/readiness endpoints have layered safety; preserve without stronger reachability evidence.",
       "removalAuthorized": false
     },
     {
@@ -884,6 +884,20 @@
       "registered": 2,
       "category": "action_permission_gate_plus_implementation",
       "reason": "Early action permission gate and later business handlers; any additional handler copies require separate per-route proof.",
+      "removalAuthorized": false
+    },
+    {
+      "signature": "POST /api/sp/migration/cutover",
+      "registered": 2,
+      "category": "intentional_unsupported_method_catch_all",
+      "reason": "Earlier Phase 4 handles supported methods; later app.all route still rejects unsupported verbs.",
+      "removalAuthorized": false
+    },
+    {
+      "signature": "POST /api/sp/offload",
+      "registered": 4,
+      "category": "confirmed_guard_chain",
+      "reason": "Multiple request guards and canonical offload executor are intentionally registered in order.",
       "removalAuthorized": false
     },
     {
@@ -929,6 +943,20 @@
       "removalAuthorized": false
     },
     {
+      "signature": "POST /api/stock-transfer-revisions/:id/approve",
+      "registered": 2,
+      "category": "action_permission_gate_plus_implementation",
+      "reason": "Early action permission gate and later business handlers; any additional handler copies require separate per-route proof.",
+      "removalAuthorized": false
+    },
+    {
+      "signature": "POST /api/stock-transfers/:transferId/revisions",
+      "registered": 2,
+      "category": "confirmed_conditional_fallthrough",
+      "reason": "adminPostUpdateStockTransferRevisionRoute.ts calls next('route')/next() for optional or untouched revisions; the immutable handler is terminal.",
+      "removalAuthorized": false
+    },
+    {
       "signature": "POST /api/vouchers",
       "registered": 2,
       "category": "action_permission_gate_plus_implementation",
@@ -938,6 +966,13 @@
     {
       "signature": "POST /api/vouchers/:id/finalize",
       "registered": 2,
+      "category": "action_permission_gate_plus_implementation",
+      "reason": "Early action permission gate and later business handlers; any additional handler copies require separate per-route proof.",
+      "removalAuthorized": false
+    },
+    {
+      "signature": "POST /api/vouchers/bulk-delete",
+      "registered": 3,
       "category": "action_permission_gate_plus_implementation",
       "reason": "Early action permission gate and later business handlers; any additional handler copies require separate per-route proof.",
       "removalAuthorized": false
@@ -972,18 +1007,18 @@
     }
   ],
   "remainingCategories": {
-    "preserve_ambiguous_overlap": 16,
-    "risk_sensitive_guard_or_fallback": 3,
-    "confirmed_guard_chain": 1,
-    "pagination_or_legacy_shape_fallback": 17,
-    "intentional_unsupported_method_catch_all": 2,
-    "action_permission_gate_plus_implementation": 18,
     "conditional_specialized_delete": 1,
+    "conditional_lifecycle_dispatch": 7,
+    "pagination_or_legacy_shape_fallback": 16,
     "conditional_language_dispatch": 3,
     "conditional_export_dispatch": 4,
-    "confirmed_response_wrapper": 1,
-    "confirmed_conditional_fallthrough": 1,
+    "confirmed_response_wrapper": 2,
+    "risk_sensitive_guard_or_fallback": 3,
+    "confirmed_conditional_fallthrough": 3,
+    "intentional_unsupported_method_catch_all": 2,
+    "confirmed_guard_chain": 3,
     "confirmed_ledger_prerequisite": 2,
+    "action_permission_gate_plus_implementation": 18,
     "conditional_company_compatibility": 1
   },
   "guardrails": [
