@@ -16,6 +16,7 @@ export { StatCard, type StatCardProps, type StatTone } from "./StatCard";
 export { DashboardCard, type DashboardCardProps } from "./DashboardCard";
 export { SectionCard, type SectionCardProps } from "./SectionCard";
 export { DataTableToolbar, type DataTableToolbarProps } from "./DataTableToolbar";
+export { SearchField, type SearchFieldProps } from "./ui/search-field";
 export { TableViewOptions, type TableColumnOption, type TableViewOptionsProps } from "./TableViewOptions";
 export { PaginationBar, type PaginationBarProps } from "./PaginationBar";
 export { useTablePrefs, type TablePrefs, type TableDensity } from "@/hooks/use-table-prefs";

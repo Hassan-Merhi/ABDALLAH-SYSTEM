@@ -1,9 +1,7 @@
 import * as React from "react";
-import { Search, X } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
 import { ErpMobileFilters } from "@/components/ui/erp-mobile-filters";
-import { Input } from "@/components/ui/input";
+import { SearchField } from "@/components/ui/search-field";
 import { cn } from "@/lib/utils";
 
 export interface DataTableToolbarProps {
@@ -42,31 +40,13 @@ export function DataTableToolbar({
   "data-testid": testId,
 }: DataTableToolbarProps) {
   const searchControl = onSearchChange ? (
-    <div className="relative w-full min-w-0 sm:w-72 sm:max-w-full">
-      <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-      <Input
-        type="search"
-        value={search ?? ""}
-        onChange={(event) => onSearchChange(event.target.value)}
-        placeholder={searchPlaceholder}
-        aria-label={searchPlaceholder}
-        className="w-full pl-9 pr-9"
-        data-testid={searchTestId}
-      />
-      {search ? (
-        <Button
-          type="button"
-          size="icon"
-          variant="ghost"
-          onClick={() => onSearchChange("")}
-          className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2"
-          data-testid="button-clear-search"
-          aria-label="Clear search"
-        >
-          <X className="h-3.5 w-3.5" aria-hidden="true" />
-        </Button>
-      ) : null}
-    </div>
+    <SearchField
+      value={search ?? ""}
+      onValueChange={onSearchChange}
+      placeholder={searchPlaceholder}
+      data-testid={searchTestId}
+      wrapperClassName="sm:w-72 sm:max-w-full"
+    />
   ) : null;
 
   const filterControls = filters ? (
