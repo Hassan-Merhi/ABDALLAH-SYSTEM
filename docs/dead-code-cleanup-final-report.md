@@ -241,35 +241,40 @@ environment (`NODE_ENV=test`, `drizzle-kit push --force`, one app boot for start
 | `npm run lint` | 0 errors, 0 warnings (after fixing 11 warnings and 1 error left by the `_`-binding pass) |
 | `npm run build`, `node build.mjs` (Render's command, with the Phase 3 accounting gate) | pass, including server-bundle, artifact and runtime-dependency verification |
 | Startup migrations (`verify:startup-migrations`) | 0 failures |
-| Backend suite | 7,046 tests; 16 failed on the first run. 9 were this branch's (tests still pinned on removed dead code, the route manifest and the write-route sweep) and are fixed; the other 7 also fail on `origin/main` (below). |
-| Frontend suite | 2,147 tests; 3 failed. 1 was this branch's (Factory tab toggles read only by orphan pages) and is fixed; 2 also fail on `origin/main`. |
-| Audit and verify scripts in §14 | pass, except the three that also fail on `origin/main` (below) |
+| Backend suite | 7,045 tests: 7,033 pass, 0 fail, 12 skipped (the suite's own conditional skips) |
+| Frontend suite | 2,147 tests: all pass |
+| Audit and verify scripts in §14 (26 scripts) | all pass |
 
-Fixes the run required are in `fe6662055`, `1e6bb2ed9` and `0a5d708d2`. Where a test
-certified code that was removed as unreachable, the test now checks the code that serves the
-path (each change is listed in `0a5d708d2`); no assertion on live behaviour was weakened.
+The first run found 16 backend and 3 frontend failures. Ten were this branch's: tests still
+pinned on removed dead code, the route manifest, the write-route sweep, and Factory tab toggles
+read only by orphan pages. They are fixed in `fe6662055`, `1e6bb2ed9` and `0a5d708d2`. Where
+a test certified code that was removed as unreachable, it now checks the code that serves the
+path; no assertion on live behaviour was weakened.
 
-**Failing on `origin/main` too, not addressed here:**
-- `tests/backend-coverage-parameterized-route-matrix.test.ts` (`GET /api/screen-feed/trace/:event`)
-  and `tests/exchange-rate-daily-popup.test.ts`: supertest gets a `null` server address in this
-  container; may be environmental.
-- `tests/backend-coverage-phase27-external-integrations.test.ts`: the WhatsApp provider-timeout
-  case after main's Green API changes.
-- `tests/ui/phase4-split-pages.test.tsx`: the two AdvancesView dialog triggers have
-  `pointer-events: none`.
-- `scripts/verify-program2-phase8-rentals.mjs` (missing `normalizeVoucherEntryAmounts` marker),
-  `scripts/audit-i18n-phase14.mjs` (actionable-literal ratchet, same totals as main), and
-  `scripts/verify-remote-control-action-registry.mjs`. The last also lists `view` as unused here,
-  because the orphan `SoldContainers.tsx` was its only static user. `view` is kept: the
-  remote-support E2E and the registry unit test rely on it. Pruning the allowlist is an owner
-  call.
+The rest also failed on `origin/main` and are fixed in `e0366b058`:
+- Supertest 7.3 (main's dependency update) closes an agent's own server when its last request
+  settles. `exchange-rate-daily-popup` nested a request inside another's arguments, and the
+  route matrix raced the close after its SSE timeout. The first now reads today's date first;
+  the second listens on its own server.
+- The Phase 27 WhatsApp tests stubbed `fetch`, but Green API reads use `node:https` since #2204,
+  so they reached the real network. They now mock `node:https`.
+- A modal Radix dialog left open at Testing Library cleanup kept `pointer-events: none` on
+  `<body>`, breaking clicks in later tests (AdvancesView). The UI test setup clears it.
+- `verify-program2-phase8-rentals.mjs` checks the phase 22 posting-engine call instead of the
+  retired inline `normEntry` markers.
+- `audit-i18n-phase14.mjs`: 84 strings get Arabic and French entries in
+  `phase3RemainingTranslations.part28.ts`; six internal codes and errors join the reviewed
+  technical values. The audit now reports 0 actionable literals.
+- The remote-control allowlist drops `view`, `view-invoice` and `view-profitability`, which
+  have no annotated control left; the registry test and the remote-support E2E use
+  `view-details`.
 
 ## Follow-up commits
 
 - `af159468b` — `_`-binding backlog cleared and ESLint `varsIgnorePattern` removed (above).
 - `a1f08d895` — build-plugin transform targets restored (above).
 - The owner-decision commit that follows it applies the table above.
-- `fe6662055`, `8e2d90103` (merge of `origin/main@0599a9bab`), `1e6bb2ed9`, `0a5d708d2` — validation-run fixes (above).
+- `fe6662055`, `8e2d90103` (merge of `origin/main@0599a9bab`), `1e6bb2ed9`, `0a5d708d2`, `e0366b058` — validation-run fixes (above).
 - `7265326db` — merge of `origin/main`; stale `config/company-scope-review.json` entry for the
   stock registrar deleted in the first Phase 3 session removed (that audit fails on stale rows).
 
