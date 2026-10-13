@@ -26,6 +26,15 @@ import {
   type PriorityScanTransaction,
 } from "./priorityScanQueue";
 
+export async function isNonBalePriorityProductTx(tx: PriorityScanTransaction, companyId: number, productId: number | null | undefined): Promise<boolean> {
+  if (!productId) return false;
+  const result = firstRow(await tx.execute(sql`
+    SELECT 1 FROM factory_settings WHERE company_id = ${companyId}
+      AND COALESCE(extra_settings->'nonBalePriorityProductIds','[]'::jsonb) @> jsonb_build_array(${productId})
+    LIMIT 1`));
+  return Boolean(result);
+}
+
 export interface AutomaticPriorityAllocation {
   baleId: number;
   referenceNumber: string;
@@ -148,6 +157,8 @@ export async function allocateAutomaticPriorityBaleTx(
         }
       : null;
   }
+
+  if (await isNonBalePriorityProductTx(tx, companyId, bale.productId)) return null;
 
   // OFF prevents NEW automatic allocation, but must never erase the original
   // label destination/color for a bale that was assigned while ON.
