@@ -814,8 +814,18 @@ export function StockEntryTab({ showHistory = false, onOpenHistory }: StockEntry
             prefetchBannersForPrint();
             const paperFormat = getPaperFormat();
             const labelHtml = paperFormat === "A5" ? generateA5LabelsHtml(labels) : generateCombinedLabelsHtml(labels);
-            const win = window.open("", "_blank");
+            // Reuse the Stock Entry print tab rather than opening a third tab.
+            // "No Design" only prints the full-size label; no sticker/blank tab.
+            const preOpened = preOpenedWindowsRef.current;
+            preOpenedWindowsRef.current = null;
+            const win = preOpened?.a4 && !preOpened.a4.closed
+              ? preOpened.a4
+              : window.open("", "_blank");
+            if (preOpened?.sticker && !preOpened.sticker.closed) {
+              preOpened.sticker.close();
+            }
             if (win) {
+              win.document.open();
               win.document.write(labelHtml);
               win.document.close();
               win.focus();
