@@ -1,9 +1,10 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { CalendarDays, ChevronLeft, ChevronRight, RefreshCw, Search, X } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, RefreshCw, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SearchField } from "@/components/ui/search-field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -242,17 +243,15 @@ export function AuditLog({
         // shared filter sheet on ERP phones, where search stays visible beside the Filters button.
         const inline = !erpPhone;
         const searchControl = (
-          <div className={inline ? "relative flex-1 min-w-[180px]" : "relative"}>
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search user, module or action…"
-              value={filterSearch}
-              onChange={(event) => handleSearchChange(event.target.value)}
-              className={inline ? "pl-9 h-8 text-sm" : "pl-9 text-sm"}
-              disabled={activityLoading}
-              data-testid="input-activity-search"
-            />
-          </div>
+          <SearchField
+            value={filterSearch}
+            onValueChange={handleSearchChange}
+            placeholder="Search user, module or action…"
+            wrapperClassName={inline ? "flex-1 min-w-[180px]" : undefined}
+            className={inline ? "h-8 text-sm" : "text-sm"}
+            disabled={activityLoading}
+            data-testid="input-activity-search"
+          />
         );
         // The phone sheet labels the date fields; the inline toolbar keeps its compact inputs.
         const dateField = (label: string, input: React.ReactNode) =>

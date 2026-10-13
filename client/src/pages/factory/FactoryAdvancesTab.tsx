@@ -45,26 +45,28 @@ export default function FactoryAdvancesTab() {
 
   return (
     <Tabs value={activeTab} onValueChange={(value) => setSubTab(value as "advances" | "repayments" | "deductions")}>
-      <TabsList className="mb-4">
-        {showAdvances && (
-          <TabsTrigger value="advances" data-testid="subtab-advances">
-            <Banknote className="h-4 w-4 mr-2" />
-            Advances
-          </TabsTrigger>
-        )}
-        {showRepayments && (
-          <TabsTrigger value="repayments" data-testid="subtab-repayments">
-            <RotateCcw className="h-4 w-4 mr-2" />
-            Repayments
-          </TabsTrigger>
-        )}
-        {showDeductions && (
-          <TabsTrigger value="deductions" data-testid="subtab-deductions">
-            <Scissors className="h-4 w-4 mr-2" />
-            Deductions
-          </TabsTrigger>
-        )}
-      </TabsList>
+      <div className="erp-mobile-scroll-tabs mb-4 pb-1">
+        <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Factory advances and deductions">
+          {showAdvances && (
+            <TabsTrigger value="advances" data-testid="subtab-advances">
+              <Banknote className="h-4 w-4 mr-2" />
+              Advances
+            </TabsTrigger>
+          )}
+          {showRepayments && (
+            <TabsTrigger value="repayments" data-testid="subtab-repayments">
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Repayments
+            </TabsTrigger>
+          )}
+          {showDeductions && (
+            <TabsTrigger value="deductions" data-testid="subtab-deductions">
+              <Scissors className="h-4 w-4 mr-2" />
+              Deductions
+            </TabsTrigger>
+          )}
+        </TabsList>
+      </div>
 
       {showAdvances && (
         <TabsContent value="advances" className="mt-0">

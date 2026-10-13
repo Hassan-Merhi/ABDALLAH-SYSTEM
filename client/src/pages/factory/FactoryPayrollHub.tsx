@@ -4,6 +4,7 @@ import { HardHat, Shield, Users } from "lucide-react";
 import FactoryWorkersHub from "@/pages/factory/FactoryWorkersHub";
 import FactoryEmployeesHub from "@/pages/factory/FactoryEmployeesHub";
 import FactoryInsurance from "@/pages/factory/FactoryInsurance";
+import { TabsList, PillTabButton } from "@/components/ui/tabs";
 import { useHubQueryState } from "@/hooks/use-hub-query-state";
 import { useApplicationLanguage } from "@/contexts/ApplicationLanguageContext";
 import { translateFactoryStaffTrackingText } from "@/i18n/factoryStaffTrackingTranslations";
@@ -57,28 +58,23 @@ export default function FactoryPayrollHub() {
           />
         </div>
 
-        <div className="flex gap-0 px-4 overflow-x-auto" role="tablist">
-          {tabs.map(({ key, label, Icon }) => {
-            const active = activeSection === key;
-            return (
-              <button
-                key={key}
-                role="tab"
-                aria-selected={active}
-                data-testid={`tab-people-${key}`}
-                onClick={() => setActiveSection(key)}
-                className={[
-                  "flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
-                  active
-                    ? "border-primary text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-foreground",
-                ].join(" ")}
-              >
-                <Icon className="h-3.5 w-3.5" />
-                {label}
-              </button>
-            );
-          })}
+        <div className="erp-mobile-scroll-tabs px-4 pb-1">
+          <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Factory sections">
+            {tabs.map(({ key, label, Icon }) => {
+              const active = activeSection === key;
+              return (
+                <PillTabButton
+                  key={key}
+                  selected={active}
+                  data-testid={`tab-people-${key}`}
+                  onClick={() => setActiveSection(key)}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {label}
+                </PillTabButton>
+              );
+            })}
+          </TabsList>
         </div>
       </div>
 

@@ -1,3 +1,4 @@
+import { TabsList, PillTabButton } from "@/components/ui/tabs";
 import type { ClientErrorLike } from "@/lib/clientError";
 // LEGACY — Stock Allocation V3. Superseded by FactoryStockAllocationV5. Kept as fallback only. Route: /factory/stock-allocation-v3 (not in sidebar).
 import { useState } from "react";
@@ -156,32 +157,24 @@ export default function FactoryStockAllocationV3() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 flex-wrap">
+        <TabsList className="w-max max-w-full" aria-label="Stock allocation sections">
           {TABS.map((tab) => (
-            <button
+            <PillTabButton
               key={tab}
               onClick={() => setActiveTab(tab)}
               data-testid={`button-v3-tab-${tab}`}
-              className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                activeTab === tab
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                  : "text-muted-foreground hover:bg-sidebar-accent/40"
-              }`}
+              selected={activeTab === tab}
             >
               {TAB_LABELS[tab]}
               {tab === "expected" && expectedLoads.length > 0 && (
-                <span className="ml-1.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-sm px-1">
-                  {expectedLoads.length}
-                </span>
+                <span className="ml-1.5 rounded-sm bg-info/10 px-1 text-xs text-info">{expectedLoads.length}</span>
               )}
               {tab === "loading" && loadingLoads.length > 0 && (
-                <span className="ml-1.5 text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-sm px-1">
-                  {loadingLoads.length}
-                </span>
+                <span className="ml-1.5 rounded-sm bg-warning/10 px-1 text-xs text-warning">{loadingLoads.length}</span>
               )}
-            </button>
+            </PillTabButton>
           ))}
-        </div>
+        </TabsList>
       </div>
 
       {/* Tab body */}

@@ -1,6 +1,7 @@
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
+import type { TableDensity } from "@/hooks/use-table-prefs";
 
 import { useMobileCardTable } from "./mobile-card-table";
 import { usePhoneSheet } from "./phone-sheet";
@@ -29,6 +30,8 @@ type TableProps = React.TableHTMLAttributes<HTMLTableElement> & {
    * Only meaningful for tables that are wider than their container.
    */
   stickyFirstColumn?: boolean;
+  /** Presentation-only density; sorting and pagination stay outside the table. */
+  density?: TableDensity;
 };
 
 const Table = React.forwardRef<HTMLTableElement, TableProps>(
@@ -43,6 +46,7 @@ const Table = React.forwardRef<HTMLTableElement, TableProps>(
       maxHeight,
       mobileLayout,
       stickyFirstColumn,
+      density = "standard",
       style,
       ...props
     },
@@ -131,12 +135,13 @@ const Table = React.forwardRef<HTMLTableElement, TableProps>(
     return (
       <div
         ref={setWrapperRef}
-        role="region"
-        aria-label={scrollLabel}
-        aria-describedby={descriptionId}
-        tabIndex={0}
+        role={cards ? undefined : "region"}
+        aria-label={cards ? undefined : scrollLabel}
+        aria-describedby={cards ? undefined : descriptionId}
+        tabIndex={cards ? undefined : 0}
         data-horizontal-scroll="true"
         data-table-scroll-region="true"
+        data-table-density={density}
         data-mobile-cards={cards ? "true" : undefined}
         data-scroll-mode={scrollMode}
         className={cn(
@@ -155,7 +160,10 @@ const Table = React.forwardRef<HTMLTableElement, TableProps>(
           scrollMode === "page" && "print:overflow-visible",
           stickyFirstColumn &&
             !cards &&
-            "[&_tr>*:first-child]:sticky [&_tr>*:first-child]:left-0 [&_tr>*:first-child]:z-20 [&_thead_tr>*:first-child]:bg-muted [&_tbody_tr>*:first-child]:bg-background [&_tr>*:first-child]:shadow-[1px_0_0_hsl(var(--border))]",
+            "[&_tr>*:first-child]:sticky [&_tr>*:first-child]:start-0 [&_tr>*:first-child]:z-20 [&_thead_tr>*:first-child]:bg-muted [&_tbody_tr>*:first-child]:bg-background [&_tr>*:first-child]:shadow-[1px_0_0_hsl(var(--border))] rtl:[&_tr>*:first-child]:shadow-[-1px_0_0_hsl(var(--border))]",
+          // Cells default to py-2 (sm:py-1) and heads to h-10 (sm:h-8); densities must differ at every width.
+          density === "compact" && "[&_thead_th]:h-8 sm:[&_thead_th]:h-7 [&_tbody_td]:py-1 sm:[&_tbody_td]:py-0.5",
+          density === "comfortable" && "[&_thead_th]:h-11 sm:[&_thead_th]:h-10 [&_tbody_td]:py-3 sm:[&_tbody_td]:py-2",
           wrapperClassName,
           // A card stack is part of the page: no scroll cap, no frame.
           cards && "max-h-none overflow-visible rounded-none border-0"

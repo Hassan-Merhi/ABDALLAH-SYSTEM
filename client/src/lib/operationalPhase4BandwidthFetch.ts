@@ -1,4 +1,4 @@
-import { resolveRequestUrl, requestMethod } from "./fetchRequestInfo";
+import { resolveFetchUrl as resolveRequestUrl, fetchRequestMethod as requestMethod } from "./fetchRequestUtils";
 
 const REQUEST_HEADER = "x-erp-compact-response";
 const RESPONSE_HEADER = "x-erp-compact-response";

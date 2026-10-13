@@ -5,6 +5,8 @@ import { cn } from "@/lib/utils";
 export interface LoadingSkeletonProps {
   variant?: "page" | "card" | "table" | "list" | "kpi-grid" | "form";
   rows?: number;
+  /** Accessible loading description for assistive technology. */
+  label?: string;
   className?: string;
   "data-testid"?: string;
 }
@@ -17,6 +19,7 @@ export interface LoadingSkeletonProps {
 export function LoadingSkeleton({
   variant = "card",
   rows = 5,
+  label = "Loading content",
   className,
   "data-testid": testId,
 }: LoadingSkeletonProps) {
@@ -24,7 +27,7 @@ export function LoadingSkeleton({
 
   if (variant === "page") {
     return (
-      <div className={cn("space-y-6", className)} data-testid={tid}>
+      <div className={cn("space-y-6", className)} role="status" aria-label={label} aria-busy="true" data-testid={tid}>
         <div className="space-y-2">
           <Skeleton className="h-8 w-1/3" />
           <Skeleton className="h-4 w-1/2" />
@@ -45,7 +48,13 @@ export function LoadingSkeleton({
 
   if (variant === "kpi-grid") {
     return (
-      <div className={cn("grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3", className)} data-testid={tid}>
+      <div
+        className={cn("grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3", className)}
+        role="status"
+        aria-label={label}
+        aria-busy="true"
+        data-testid={tid}
+      >
         {Array.from({ length: rows }).map((_, i) => (
           <Card key={i} className="p-5">
             <Skeleton className="h-16 w-full" />
@@ -57,7 +66,7 @@ export function LoadingSkeleton({
 
   if (variant === "table") {
     return (
-      <Card className={cn("p-4", className)} data-testid={tid}>
+      <Card className={cn("p-4", className)} role="status" aria-label={label} aria-busy="true" data-testid={tid}>
         <div className="space-y-3">
           <Skeleton className="h-9 w-full" />
           {Array.from({ length: rows }).map((_, i) => (
@@ -70,7 +79,7 @@ export function LoadingSkeleton({
 
   if (variant === "list") {
     return (
-      <div className={cn("space-y-2", className)} data-testid={tid}>
+      <div className={cn("space-y-2", className)} role="status" aria-label={label} aria-busy="true" data-testid={tid}>
         {Array.from({ length: rows }).map((_, i) => (
           <Card key={i} className="p-3 flex items-center gap-3">
             <Skeleton className="h-10 w-10 rounded-md shrink-0" />
@@ -86,7 +95,7 @@ export function LoadingSkeleton({
 
   if (variant === "form") {
     return (
-      <div className={cn("space-y-4", className)} data-testid={tid}>
+      <div className={cn("space-y-4", className)} role="status" aria-label={label} aria-busy="true" data-testid={tid}>
         {Array.from({ length: rows }).map((_, i) => (
           <div key={i} className="space-y-2">
             <Skeleton className="h-4 w-24" />
@@ -98,7 +107,13 @@ export function LoadingSkeleton({
   }
 
   return (
-    <Card className={cn("p-5 space-y-3", className)} data-testid={tid}>
+    <Card
+      className={cn("p-5 space-y-3", className)}
+      role="status"
+      aria-label={label}
+      aria-busy="true"
+      data-testid={tid}
+    >
       <Skeleton className="h-5 w-1/3" />
       {Array.from({ length: rows }).map((_, i) => (
         <Skeleton key={i} className="h-4 w-full" />

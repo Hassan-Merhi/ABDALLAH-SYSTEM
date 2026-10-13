@@ -328,7 +328,8 @@ const PAGES: PageCase[] = [
   {
     name: "ContainerListView",
     load: () => import("@/pages/factory/factory-containers/ContainerListView"),
-    landmark: "input-search-containers",
+    // The search box needs the parent's setter; the status filter is always rendered.
+    landmark: "select-filter-status",
     factory: true,
   },
   {

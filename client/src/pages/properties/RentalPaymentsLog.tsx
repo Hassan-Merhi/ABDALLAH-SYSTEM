@@ -6,49 +6,19 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/PageHeader";
+import { DataTableToolbar } from "@/components/DataTableToolbar";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { MoneyAmount } from "@/components/MoneyAmount";
+import { formatMoneyNumber } from "@/lib/moneyDisplay";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { useMobileCardTable } from "@/components/ui/mobile-card-table";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { AlertTriangle, ClipboardList, Search, Trash2 } from "lucide-react";
+import { AlertTriangle, ClipboardList, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 
 const MONTH_NAMES = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const fmtMoney = (v: string | number | null | undefined) => {
-  if (v === null || v === undefined || v === "") return "—";
-  const n = Number(v);
-  return n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-};
-
-function currencySymbol(currency: string): string {
-  if (currency === "EUR") return "€";
-  if (currency === "CFA" || currency === "XAF" || currency === "XOF") return "FC ";
-  return "$";
-}
-
-function fmtMoneyWithCurrency(v: string | number | null | undefined, currency = "USD"): string {
-  if (v === null || v === undefined || v === "") return "—";
-  const n = Number(v);
-  const isCFA = currency === "CFA" || currency === "XAF" || currency === "XOF";
-  const formatted = n.toLocaleString("en-US", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: isCFA ? 0 : 2,
-  });
-  return `${currencySymbol(currency)}${formatted}`;
-}
-
 type PaymentRow = {
   id: number;
   paymentDate: string;
@@ -133,16 +103,13 @@ export default function RentalPaymentsLog({
             subtitle="All payment receipts recorded across all units, sorted by date."
             icon={pageIcon ?? <ClipboardList className="h-5 w-5" />}
           />
-          <div className="relative w-full sm:w-64">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              className="pl-8"
-              placeholder="Search tenant, unit, notes…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              data-testid={`input-${testIdPrefix}-payments-search`}
-            />
-          </div>
+          <DataTableToolbar
+            search={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search tenant, unit, notes…"
+            searchTestId={`input-${testIdPrefix}-payments-search`}
+            className="mb-0"
+          />
         </>
       ) : (
         <div className="flex items-center gap-3 flex-wrap justify-between">
@@ -155,16 +122,13 @@ export default function RentalPaymentsLog({
               />
             </div>
           </div>
-          <div className="relative w-full sm:w-64">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              className="pl-8"
-              placeholder="Search tenant, unit, notes…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              data-testid={`input-${testIdPrefix}-payments-search`}
-            />
-          </div>
+          <DataTableToolbar
+            search={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search tenant, unit, notes…"
+            searchTestId={`input-${testIdPrefix}-payments-search`}
+            className="mb-0"
+          />
         </div>
       )}
 
@@ -189,7 +153,7 @@ export default function RentalPaymentsLog({
               className="text-2xl font-bold text-green-600 dark:text-green-400"
               data-testid={`stat-${testIdPrefix}-total-amount`}
             >
-              {fmtMoney(total)}
+              {formatMoneyNumber(total)}
             </div>
           </CardContent>
         </Card>
@@ -247,7 +211,7 @@ export default function RentalPaymentsLog({
                         )}
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums font-semibold text-green-700 dark:text-green-400">
-                        {fmtMoneyWithCurrency(p.amount, p.currency)}
+                        <MoneyAmount amount={p.amount} currency={p.currency ?? "USD"} />
                       </td>
                       <td className="px-3 py-2 text-xs text-muted-foreground">
                         {MONTH_NAMES[p.forMonth]} {p.forYear}
@@ -286,7 +250,7 @@ export default function RentalPaymentsLog({
                       TOTAL
                     </td>
                     <td className="px-3 py-2 text-right tabular-nums font-bold text-green-700 dark:text-green-400">
-                      {fmtMoney(total)}
+                      {formatMoneyNumber(total)}
                     </td>
                     <td colSpan={4}></td>
                   </tr>
@@ -297,41 +261,33 @@ export default function RentalPaymentsLog({
         </CardContent>
       </Card>
 
-      {/* Delete confirmation */}
-      <AlertDialog
+      <ConfirmDialog
         open={!!deleteTarget}
-        onOpenChange={(open) => {
-          if (!open) setDeleteTarget(null);
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setDeleteTarget(null);
         }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete this payment?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {deleteTarget && (
-                <>
-                  This will permanently remove the{" "}
-                  <strong>{fmtMoneyWithCurrency(deleteTarget.amount, deleteTarget.currency)}</strong> payment from{" "}
-                  <strong>{deleteTarget.tenantName ?? "—"}</strong> ({MONTH_NAMES[deleteTarget.forMonth]}{" "}
-                  {deleteTarget.forYear}). The accounting entry will be reversed, and any inter-company transfer that
-                  was automatically created for this payment will also be fully reversed in both companies. This cannot
-                  be undone.
-                </>
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground"
-              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
-              data-testid="button-confirm-delete-payment"
-            >
-              {deleteMutation.isPending ? "Deleting…" : "Yes, Delete Payment"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        title="Delete this payment?"
+        tone="destructive"
+        confirmText="Yes, Delete Payment"
+        confirmButtonTestId="button-confirm-delete-payment"
+        loading={deleteMutation.isPending}
+        description={
+          deleteTarget ? (
+            <>
+              This will permanently remove the{" "}
+              <strong>
+                <MoneyAmount amount={deleteTarget.amount} currency={deleteTarget.currency ?? "USD"} />
+              </strong>{" "}
+              payment from <strong>{deleteTarget.tenantName ?? "—"}</strong> ({MONTH_NAMES[deleteTarget.forMonth]}{" "}
+              {deleteTarget.forYear}). The accounting entry will be reversed, and any inter-company transfer
+              automatically created for this payment will be fully reversed in both companies. This cannot be undone.
+            </>
+          ) : undefined
+        }
+        onConfirm={async () => {
+          if (deleteTarget) await deleteMutation.mutateAsync(deleteTarget.id);
+        }}
+      />
     </div>
   );
 }

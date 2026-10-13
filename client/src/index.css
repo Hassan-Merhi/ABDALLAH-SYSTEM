@@ -1063,7 +1063,10 @@
     /* hide the scrollbar visually but keep it functional */
     scrollbar-width: none;
     -ms-overflow-style: none;
-    /* padding-bottom so the scrollbar doesn't clip tab content */
+  }
+  /* The pill component supplies balanced p-1 on all sides. Only legacy
+     tablists need the small clearance reserved for hidden scrollbars. */
+  [role="tablist"]:not([data-responsive-tabs="true"]) {
     padding-bottom: 2px;
   }
   [role="tablist"]::-webkit-scrollbar {

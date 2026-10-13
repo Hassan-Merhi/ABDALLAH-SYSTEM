@@ -4,6 +4,9 @@ type PayrollModel = ReturnType<typeof usePayrollModel>;
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/decimal-input";
+import { FormSubmitButton } from "@/components/FormSubmitButton";
+import { useSingleFlightAction } from "@/hooks/use-single-flight-action";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 
@@ -16,6 +19,7 @@ interface DepositDialogProps {
 }
 
 export function DepositDialog({ open, onOpenChange, selectedEmployee, form, mutation }: DepositDialogProps) {
+  const { execute: executeDeposit, pending: submitting } = useSingleFlightAction();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent data-testid="dialog-deposit">
@@ -27,7 +31,16 @@ export function DepositDialog({ open, onOpenChange, selectedEmployee, form, muta
         </DialogHeader>
 
         <Form {...form}>
-          <form noValidate onSubmit={form.handleSubmit((data) => mutation.mutate(data))} className="space-y-4">
+          <form
+            noValidate
+            onSubmit={form.handleSubmit((data) => {
+              if (mutation.isPending || submitting) return;
+              void executeDeposit(() => mutation.mutateAsync(data)).catch(() => {
+                // The mutation's existing onError handler owns error reporting.
+              });
+            })}
+            className="space-y-4"
+          >
             <FormField
               control={form.control}
               name="amount"
@@ -35,7 +48,7 @@ export function DepositDialog({ open, onOpenChange, selectedEmployee, form, muta
                 <FormItem>
                   <FormLabel>Amount</FormLabel>
                   <FormControl>
-                    <Input type="number" step="0.01" placeholder="0.00" {...field} data-testid="input-deposit-amount" />
+                    <MoneyInput step="0.01" placeholder="0.00" {...field} data-testid="input-deposit-amount" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -79,9 +92,14 @@ export function DepositDialog({ open, onOpenChange, selectedEmployee, form, muta
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={mutation.isPending} data-testid="button-submit-deposit">
-                {mutation.isPending ? "Processing..." : "Deposit"}
-              </Button>
+              <FormSubmitButton
+                type="submit"
+                pending={mutation.isPending || submitting}
+                pendingLabel="Processing…"
+                data-testid="button-submit-deposit"
+              >
+                Deposit
+              </FormSubmitButton>
             </div>
           </form>
         </Form>

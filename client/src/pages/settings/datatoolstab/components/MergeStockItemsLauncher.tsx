@@ -57,17 +57,19 @@ export function MergeStockItemsLauncher() {
           </DialogHeader>
 
           <Tabs value={tab} onValueChange={setTab} className="mt-2">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="single" data-testid="tab-merge-single">
-                Single Item
-              </TabsTrigger>
-              <TabsTrigger value="bulk" data-testid="tab-merge-bulk">
-                Bulk via Excel
-              </TabsTrigger>
-              <TabsTrigger value="history" data-testid="tab-merge-history">
-                History
-              </TabsTrigger>
-            </TabsList>
+            <div className="erp-mobile-scroll-tabs pb-1">
+              <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Dialog sections">
+                <TabsTrigger value="single" data-testid="tab-merge-single">
+                  Single Item
+                </TabsTrigger>
+                <TabsTrigger value="bulk" data-testid="tab-merge-bulk">
+                  Bulk via Excel
+                </TabsTrigger>
+                <TabsTrigger value="history" data-testid="tab-merge-history">
+                  History
+                </TabsTrigger>
+              </TabsList>
+            </div>
             <TabsContent value="single" className="mt-4">
               <MergeStockItemsCard embedded />
             </TabsContent>

@@ -1,6 +1,8 @@
+import { useId } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/decimal-input";
 import { Label } from "@/components/ui/label";
 import { money, type RetailPaymentDraft, type RetailPaymentMethod } from "./retailPosTypes";
 
@@ -21,6 +23,7 @@ export function RetailPaymentPanel({
   value: RetailPaymentDraft[];
   onChange: (payments: RetailPaymentDraft[]) => void;
 }) {
+  const formId = useId();
   const paid = value.reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
   const remaining = Math.max(0, total - paid);
   const over = Math.max(0, paid - total);
@@ -63,8 +66,11 @@ export function RetailPaymentPanel({
         return (
           <div key={index} className="grid gap-2 rounded-md border bg-background p-2 md:grid-cols-[140px_1fr_1fr_auto]">
             <div>
-              <Label className="text-xs">Method</Label>
+              <Label htmlFor={`${formId}-method-${index}`} className="text-xs">
+                Method
+              </Label>
               <select
+                id={`${formId}-method-${index}`}
                 className="mt-1 h-9 w-full rounded-md border bg-background px-2 text-sm"
                 value={payment.method}
                 onChange={(event) => {
@@ -83,10 +89,12 @@ export function RetailPaymentPanel({
               </select>
             </div>
             <div>
-              <Label className="text-xs">Amount</Label>
-              <Input
+              <Label htmlFor={`${formId}-amount-${index}`} className="text-xs">
+                Amount
+              </Label>
+              <MoneyInput
+                id={`${formId}-amount-${index}`}
                 className="mt-1 h-9"
-                type="number"
                 min="0"
                 step="0.01"
                 value={payment.amount}
@@ -95,10 +103,12 @@ export function RetailPaymentPanel({
             </div>
             {payment.method === "cash" ? (
               <div>
-                <Label className="text-xs">Tendered</Label>
-                <Input
+                <Label htmlFor={`${formId}-tendered-${index}`} className="text-xs">
+                  Tendered
+                </Label>
+                <MoneyInput
+                  id={`${formId}-tendered-${index}`}
                   className="mt-1 h-9"
-                  type="number"
                   min="0"
                   step="0.01"
                   value={payment.tenderedAmount ?? payment.amount}
@@ -108,8 +118,11 @@ export function RetailPaymentPanel({
               </div>
             ) : (
               <div>
-                <Label className="text-xs">Reference</Label>
+                <Label htmlFor={`${formId}-reference-${index}`} className="text-xs">
+                  Reference
+                </Label>
                 <Input
+                  id={`${formId}-reference-${index}`}
                   className="mt-1 h-9"
                   value={payment.reference ?? ""}
                   placeholder="Optional"
@@ -122,7 +135,7 @@ export function RetailPaymentPanel({
                 type="button"
                 size="icon"
                 variant="ghost"
-                aria-label="Remove payment"
+                aria-label={`Remove payment ${index + 1}`}
                 disabled={value.length === 1}
                 onClick={() => onChange(value.filter((_, paymentIndex) => paymentIndex !== index))}
               >
@@ -133,7 +146,7 @@ export function RetailPaymentPanel({
         );
       })}
 
-      <div className="grid grid-cols-3 gap-2 border-t pt-2 text-sm">
+      <div className="grid grid-cols-3 gap-2 border-t pt-2 text-sm" aria-label="Payment totals">
         <div>
           <div className="text-xs text-muted-foreground">Due</div>
           <div className="font-semibold">{money(total)}</div>

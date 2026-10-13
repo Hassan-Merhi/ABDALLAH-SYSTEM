@@ -9,7 +9,7 @@ import {
   type BandwidthInvalidationMessage,
   type BandwidthInvalidationScope,
 } from "./bandwidthInvalidationPolicy";
-import { resolveRequestUrl, requestMethod } from "./fetchRequestInfo";
+import { resolveFetchUrl as resolveRequestUrl, fetchRequestMethod as requestMethod } from "./fetchRequestUtils";
 
 type HotspotCacheRule = {
   pattern: RegExp;

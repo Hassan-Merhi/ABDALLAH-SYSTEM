@@ -48,7 +48,7 @@ or import that only it needed.
 
 - Before writing a helper, look for it: `shared/typeGuards.ts` (`isRecord`, …),
   `server/lib/listPagination.ts` (`parsePositiveInt`, list pagination),
-  `client/src/lib/fetchRequestInfo.ts` (fetch-guard request shape), `server/lib/money.ts`.
+  `client/src/lib/fetchRequestUtils.ts` (fetch-interceptor request shape), `server/lib/money.ts`.
 - Copying a helper into a second module is acceptable only when the copies are expected to
   diverge (for example separately audited posting services). Say so in a comment.
 - Export only what another module imports. An export that exists "for later" is dead code that

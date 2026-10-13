@@ -1,18 +1,25 @@
 import type { ClientErrorLike } from "@/lib/clientError";
-import { useState, useEffect } from "react";
+import { useId, useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { DecimalInput, MoneyInput } from "@/components/ui/decimal-input";
+import { FormGrid } from "@/components/ui/form";
+import { FormActionBar } from "@/components/ui/workspace-layout";
+import { FormSubmitButton } from "@/components/FormSubmitButton";
+import { formatMoneyDisplay } from "@/lib/moneyDisplay";
+import { useSingleFlightAction } from "@/hooks/use-single-flight-action";
 import { Loader2, ArrowRight } from "lucide-react";
 
 function fmt(v: number | string | undefined, dec = 2) {
   const n = parseFloat(String(v ?? "0"));
-  return isNaN(n)
-    ? `$0.${"0".repeat(dec)}`
-    : `$${n.toLocaleString("en-US", { minimumFractionDigits: dec, maximumFractionDigits: dec })}`;
+  return formatMoneyDisplay(Number.isFinite(n) ? n : 0, {
+    currency: "USD",
+    minimumFractionDigits: dec,
+    maximumFractionDigits: dec,
+  });
 }
 function num(v: string) {
   return parseFloat(v || "0") || 0;
@@ -34,8 +41,10 @@ interface OpeningStockRow {
 }
 
 export default function SpOpeningStock() {
+  const formId = useId();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { execute: executePost, pending: submitting } = useSingleFlightAction();
 
   const [articleCode, setArticleCode] = useState("");
   const [qty, setQty] = useState("");
@@ -88,17 +97,22 @@ export default function SpOpeningStock() {
   const canSubmit = articleCode.trim() && qtyN > 0 && finalN > 0;
 
   const handleSubmit = () => {
+    if (mutation.isPending || submitting) return;
     if (!canSubmit) {
       toast({ title: "Fill in article code, qty and final unit cost", variant: "destructive" });
       return;
     }
-    mutation.mutate({
-      articleCode: articleCode.trim(),
-      qty,
-      baseUnitCostUsd: baseUC || "0",
-      landedUnitCostUsd: landedUC || "0",
-      finalUnitCostUsd: finalUC,
-      notes,
+    void executePost(() =>
+      mutation.mutateAsync({
+        articleCode: articleCode.trim(),
+        qty,
+        baseUnitCostUsd: baseUC || "0",
+        landedUnitCostUsd: landedUC || "0",
+        finalUnitCostUsd: finalUC,
+        notes,
+      })
+    ).catch(() => {
+      // The mutation's onError handler already shows the posting failure.
     });
   };
 
@@ -121,76 +135,90 @@ export default function SpOpeningStock() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="col-span-2">
-              <label className="text-xs text-muted-foreground">Article Code *</label>
+          <FormGrid minColumnWidth="10rem" className="gap-3">
+            <div className="col-span-full">
+              <label htmlFor={`${formId}-article`} className="text-xs text-muted-foreground">
+                Article Code *
+              </label>
               <Input
                 value={articleCode}
                 onChange={(e) => setArticleCode(e.target.value)}
                 className="mt-1"
                 placeholder="e.g. RICE-25KG"
+                id={`${formId}-article`}
                 data-testid="input-sp-opn-article"
               />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Qty *</label>
-              <Input
-                type="number"
+              <label htmlFor={`${formId}-quantity`} className="text-xs text-muted-foreground">
+                Qty *
+              </label>
+              <DecimalInput
                 step="0.01"
                 value={qty}
                 onChange={(e) => setQty(e.target.value)}
                 className="mt-1"
                 placeholder="0"
+                id={`${formId}-quantity`}
                 data-testid="input-sp-opn-qty"
               />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Base Unit Cost $ (supplier cost)</label>
-              <Input
-                type="number"
+              <label htmlFor={`${formId}-base`} className="text-xs text-muted-foreground">
+                Base Unit Cost $ (supplier cost)
+              </label>
+              <MoneyInput
                 step="0.0001"
                 value={baseUC}
                 onChange={(e) => setBaseUC(e.target.value)}
                 className="mt-1"
                 placeholder="0.0000"
+                id={`${formId}-base`}
                 data-testid="input-sp-opn-base"
               />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Landed Unit Cost $ (freight/duty etc.)</label>
-              <Input
-                type="number"
+              <label htmlFor={`${formId}-landed`} className="text-xs text-muted-foreground">
+                Landed Unit Cost $ (freight/duty etc.)
+              </label>
+              <MoneyInput
                 step="0.0001"
                 value={landedUC}
                 onChange={(e) => setLandedUC(e.target.value)}
                 className="mt-1"
                 placeholder="0.0000"
+                id={`${formId}-landed`}
                 data-testid="input-sp-opn-landed"
               />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Final Unit Cost $ (auto = base + landed) *</label>
-              <Input
-                type="number"
+              <label htmlFor={`${formId}-final`} className="text-xs text-muted-foreground">
+                Final Unit Cost $ (auto = base + landed) *
+              </label>
+              <MoneyInput
                 step="0.0001"
                 value={finalUC}
                 onChange={(e) => setFinalUC(e.target.value)}
                 className="mt-1"
                 placeholder="0.0000"
+                id={`${formId}-final`}
                 data-testid="input-sp-opn-final"
               />
             </div>
-            <div className="col-span-2">
-              <label className="text-xs text-muted-foreground">Notes / Description</label>
+            <div className="col-span-full">
+              <label htmlFor={`${formId}-notes`} className="text-xs text-muted-foreground">
+                Notes / Description
+              </label>
               <Input
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 className="mt-1"
                 placeholder="Optional"
+                id={`${formId}-notes`}
                 data-testid="input-sp-opn-notes"
               />
             </div>
-          </div>
+          </FormGrid>
 
           {/* Voucher preview */}
           {qtyN > 0 && finalN > 0 && (
@@ -220,16 +248,18 @@ export default function SpOpeningStock() {
             </div>
           )}
 
-          <div className="flex justify-end">
-            <Button
+          <FormActionBar>
+            <FormSubmitButton
+              type="button"
               onClick={handleSubmit}
-              disabled={mutation.isPending || !canSubmit}
+              disabled={!canSubmit}
+              pending={mutation.isPending || submitting}
+              pendingLabel="Posting…"
               data-testid="button-sp-post-opening"
             >
-              {mutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Post Opening Stock
-            </Button>
-          </div>
+            </FormSubmitButton>
+          </FormActionBar>
         </CardContent>
       </Card>
 

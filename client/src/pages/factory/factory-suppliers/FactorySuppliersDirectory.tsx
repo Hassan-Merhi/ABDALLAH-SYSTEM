@@ -14,6 +14,7 @@ import {
   Weight,
 } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
+import { PageState } from "@/components/ui/page-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -344,7 +345,7 @@ export function FactorySuppliersDirectory({ model }: { model: SuppliersModel }) 
           );
         })}
         {model.filteredTopLevel.length === 0 && !model.isLoading && (
-          <div className="p-8 text-center text-muted-foreground text-sm">No suppliers found.</div>
+          <PageState title="No suppliers found" icon={Package} className="border-0" />
         )}
       </div>
 

@@ -90,20 +90,22 @@ export function StockItemDetailsDialogView({ dialog }: { dialog: StockItemDetail
           </DialogHeader>
 
           <Tabs defaultValue="details" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="details" data-testid="tab-details">
-                Item Details
-              </TabsTrigger>
-              <TabsTrigger value="prices" data-testid="tab-location-prices">
-                Location Prices
-              </TabsTrigger>
-              <TabsTrigger value="aliases" data-testid="tab-aliases">
-                Code Aliases
-              </TabsTrigger>
-              <TabsTrigger value="transactions" data-testid="tab-transactions">
-                Voucher History
-              </TabsTrigger>
-            </TabsList>
+            <div className="erp-mobile-scroll-tabs pb-1">
+              <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Dialog sections">
+                <TabsTrigger value="details" data-testid="tab-details">
+                  Item Details
+                </TabsTrigger>
+                <TabsTrigger value="prices" data-testid="tab-location-prices">
+                  Location Prices
+                </TabsTrigger>
+                <TabsTrigger value="aliases" data-testid="tab-aliases">
+                  Code Aliases
+                </TabsTrigger>
+                <TabsTrigger value="transactions" data-testid="tab-transactions">
+                  Voucher History
+                </TabsTrigger>
+              </TabsList>
+            </div>
 
             <TabsContent value="details" className="space-y-4 mt-4">
               <div className="border-b pb-6">

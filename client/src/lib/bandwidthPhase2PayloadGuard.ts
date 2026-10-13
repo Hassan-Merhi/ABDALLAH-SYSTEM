@@ -1,6 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { queryClient } from "./queryClient";
-import { resolveRequestUrl, requestMethod } from "./fetchRequestInfo";
+import { resolveFetchUrl as resolveRequestUrl, fetchRequestMethod as requestMethod } from "./fetchRequestUtils";
 
 const resolvedQueryClient: QueryClient = queryClient;
 

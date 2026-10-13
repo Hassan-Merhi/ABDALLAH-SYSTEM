@@ -25,28 +25,30 @@ export function PosSetupHub({ userRole }: { userRole?: string }) {
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="flex flex-wrap gap-1">
-          <TabsTrigger value="pos-settings" className="flex items-center gap-1">
-            <ShoppingCart className="h-3.5 w-3.5" />
-            POS Settings
-          </TabsTrigger>
-          <TabsTrigger value="exchange-rates" className="flex items-center gap-1">
-            <TrendingUp className="h-3.5 w-3.5" />
-            Exchange Rates
-          </TabsTrigger>
-          <TabsTrigger value="fiscal" className="flex items-center gap-1">
-            <CalendarRange className="h-3.5 w-3.5" />
-            Fiscal Period
-          </TabsTrigger>
-          <TabsTrigger value="price-groups" className="flex items-center gap-1">
-            <Layers className="h-3.5 w-3.5" />
-            Price Groups
-          </TabsTrigger>
-          <TabsTrigger value="intercompany" className="flex items-center gap-1">
-            <ArrowLeftRight className="h-3.5 w-3.5" />
-            Auto-Transfer
-          </TabsTrigger>
-        </TabsList>
+        <div className="erp-mobile-scroll-tabs pb-1">
+          <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="POS settings sections">
+            <TabsTrigger value="pos-settings" className="flex items-center gap-1">
+              <ShoppingCart className="h-3.5 w-3.5" />
+              POS Settings
+            </TabsTrigger>
+            <TabsTrigger value="exchange-rates" className="flex items-center gap-1">
+              <TrendingUp className="h-3.5 w-3.5" />
+              Exchange Rates
+            </TabsTrigger>
+            <TabsTrigger value="fiscal" className="flex items-center gap-1">
+              <CalendarRange className="h-3.5 w-3.5" />
+              Fiscal Period
+            </TabsTrigger>
+            <TabsTrigger value="price-groups" className="flex items-center gap-1">
+              <Layers className="h-3.5 w-3.5" />
+              Price Groups
+            </TabsTrigger>
+            <TabsTrigger value="intercompany" className="flex items-center gap-1">
+              <ArrowLeftRight className="h-3.5 w-3.5" />
+              Auto-Transfer
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="pos-settings" className="mt-4">
           <PosSettingsTab />

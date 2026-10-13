@@ -37,6 +37,11 @@ vi.mock("wouter", () => ({
 
 vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: vi.fn() }) }));
 
+vi.mock("@/contexts/CompanyContext", () => ({
+  useCompany: () => ({ selectedCompany: { id: 1, name: "Factory Co" }, companies: [], isLoading: false }),
+  CompanyProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
 const contacts = [
   {
     id: 7,
@@ -156,7 +161,8 @@ describe("Factory phone interactions", () => {
           </TabsList>
         </Tabs>
       );
-      expect(screen.getByRole("tablist").scrollLeft).toBe(228);
+      // Past the far edge by the overflow-fade clearance: min(40px, clientWidth / 8).
+      expect(screen.getByRole("tablist").scrollLeft).toBe(520 - 300 + 300 / 8);
     } finally {
       spy.mockRestore();
       delete (HTMLElement.prototype as unknown as Record<string, unknown>).scrollWidth;

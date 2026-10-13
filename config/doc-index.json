@@ -349,6 +349,7 @@
     "docs/inventory-cost-memory-policy.md": "reference",
     "docs/inventory-flow.md": "reference",
     "docs/mobile-tablet-web-regression.md": "reference",
+    "docs/universal-responsive-pill-tabs.md": "reference",
     "docs/monitoring/health-metrics.md": "reference",
     "docs/multi-currency-phase8-account-api.md": "reference",
     "docs/onboarding.md": "reference",
@@ -400,6 +401,15 @@
     "docs/archive/security/codeql-phase1-inventory.md": "record",
     "docs/archive/engineering/dead-code/phase-11-report.md": "record",
     "docs/dead-code-prevention.md": "reference",
-    "docs/dead-code-cleanup-final-report.md": "reference"
+    "docs/dead-code-cleanup-final-report.md": "reference",
+    "docs/shared-ui-continuation-roadmap.md": "reference",
+    "docs/shared-ui-phase-1.md": "reference",
+    "docs/shared-ui-phase-2.md": "reference",
+    "docs/shared-ui-phase-3.md": "reference",
+    "docs/shared-ui-phase-4.md": "reference",
+    "docs/shared-ui-phase-5.md": "reference",
+    "docs/shared-ui-phase-6.md": "reference",
+    "docs/shared-ui-phase-7.md": "reference",
+    "docs/shared-ui-phase-8-claude-handoff.md": "reference"
   }
 }

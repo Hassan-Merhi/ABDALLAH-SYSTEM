@@ -189,10 +189,12 @@ export default function Accounts() {
           onValueChange={(value) => setRequestedAccountTab(value as "view" | "find")}
           className="space-y-6"
         >
-          <TabsList className={phoneStatementOpen ? "hidden" : undefined}>
-            {showViewAccounts && <TabsTrigger value="view">View Accounts</TabsTrigger>}
-            {showFindVoucher && <TabsTrigger value="find">Find Voucher</TabsTrigger>}
-          </TabsList>
+          <div className={phoneStatementOpen ? "hidden" : "erp-mobile-scroll-tabs pb-1"}>
+            <TabsList className="w-max min-w-full sm:min-w-0 sm:w-fit" aria-label="Accounts sections">
+              {showViewAccounts && <TabsTrigger value="view">View Accounts</TabsTrigger>}
+              {showFindVoucher && <TabsTrigger value="find">Find Voucher</TabsTrigger>}
+            </TabsList>
+          </div>
 
           {showViewAccounts && (
             <TabsContent value="view" className="space-y-4">

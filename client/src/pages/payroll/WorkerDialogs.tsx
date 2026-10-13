@@ -18,8 +18,10 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/decimal-input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
+import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -171,7 +173,7 @@ export function WorkerDialogs({
                   <FormItem>
                     <FormLabel>Monthly Salary</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" {...field} data-testid="input-new-worker-salary" />
+                      <MoneyInput step="0.01" {...field} data-testid="input-new-worker-salary" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -219,9 +221,14 @@ export function WorkerDialogs({
                 >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={createWorkerMutation.isPending} data-testid="button-submit-new-worker">
-                  {createWorkerMutation.isPending ? "Creating..." : "Create Worker"}
-                </Button>
+                <FormSubmitButton
+                  type="submit"
+                  pending={createWorkerMutation.isPending}
+                  pendingLabel="Creating…"
+                  data-testid="button-submit-new-worker"
+                >
+                  Create Worker
+                </FormSubmitButton>
               </div>
             </form>
           </Form>

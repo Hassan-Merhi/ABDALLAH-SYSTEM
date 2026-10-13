@@ -107,17 +107,10 @@
   }
 
   /*
- * Settings sections carry up to six sub-tabs; in a sideways scroller most of them sit off-screen
- * with nothing hinting they exist. On phones (and phone landscape) they wrap so every sub-tab
- * is visible.
- */
-  @media (max-width: 639px), (hover: none) and (pointer: coarse) and (max-height: 500px) {
-    html[data-app-shell="erp"] [data-erp-route="/settings"] [data-responsive-tabs="true"] {
-      flex-wrap: wrap;
-      overflow: visible;
-      border-radius: 1rem;
-    }
-  }
+   * Settings follows the same one-row pill design as every other module.
+   * Long labels stay intact; the existing horizontal scroll strip and its
+   * overflow fade indicate additional tabs on small or landscape phones.
+   */
 
   /* Page forms: the closing button-only row with a submit action spans the width on phones. */
   @media (max-width: 639px), (hover: none) and (pointer: coarse) and (max-height: 500px) {

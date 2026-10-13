@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Input } from "@/components/ui/input";
+import { SearchField } from "@/components/ui/search-field";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Search, Package, Container, Loader2 } from "lucide-react";
@@ -63,17 +63,14 @@ export default function OffloadItemSearch() {
         subtitle="Search any item name to see every offloaded container it arrived in"
       />
       <div className="flex w-full gap-2 sm:max-w-xl">
-        <div className="relative min-w-0 flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            className="pl-9"
-            placeholder="e.g. MJS MIX CH WINTER BOOTS"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            data-testid="input-item-search"
-          />
-        </div>
+        <SearchField
+          value={input}
+          onValueChange={setInput}
+          onKeyDown={handleKeyDown}
+          placeholder="e.g. MJS MIX CH WINTER BOOTS"
+          wrapperClassName="flex-1"
+          data-testid="input-item-search"
+        />
         <Button onClick={handleSearch} disabled={!input.trim() || isLoading} data-testid="button-search">
           {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
           <span className="ml-1.5">Search</span>

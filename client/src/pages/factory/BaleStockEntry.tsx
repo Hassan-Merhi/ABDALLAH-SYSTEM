@@ -125,32 +125,34 @@ export default function BaleStockEntry() {
         }}
         className="min-w-0"
       >
-        <TabsList aria-label="Bale stock entry sections" className="w-full max-w-full">
-          {showEntry && (
-            <TabsTrigger value="entry" data-testid="tab-stock-entry">
-              <ScanLine className="mr-1 h-4 w-4" />
-              Stock Entry
-            </TabsTrigger>
-          )}
-          {showGroundScan && (
-            <TabsTrigger value="ground-scan" data-testid="tab-ground-scan">
-              <ScanLine className="mr-1 h-4 w-4" />
-              Ground Scan
-            </TabsTrigger>
-          )}
-          {showDailyScan && (
-            <TabsTrigger value="daily-scan" data-testid="tab-daily-scan">
-              <CalendarDays className="mr-1 h-4 w-4" />
-              Daily Scan
-            </TabsTrigger>
-          )}
-          {showProductionTargets && (
-            <TabsTrigger value="production-targets" data-testid="tab-production-targets">
-              <Target className="mr-1 h-4 w-4" />
-              {tr("productionTargets")}
-            </TabsTrigger>
-          )}
-        </TabsList>
+        <div className="erp-mobile-scroll-tabs pb-1">
+          <TabsList aria-label="Bale stock entry sections" className="w-max min-w-full sm:min-w-0 sm:w-fit">
+            {showEntry && (
+              <TabsTrigger value="entry" data-testid="tab-stock-entry">
+                <ScanLine className="mr-1 h-4 w-4" />
+                Stock Entry
+              </TabsTrigger>
+            )}
+            {showGroundScan && (
+              <TabsTrigger value="ground-scan" data-testid="tab-ground-scan">
+                <ScanLine className="mr-1 h-4 w-4" />
+                Ground Scan
+              </TabsTrigger>
+            )}
+            {showDailyScan && (
+              <TabsTrigger value="daily-scan" data-testid="tab-daily-scan">
+                <CalendarDays className="mr-1 h-4 w-4" />
+                Daily Scan
+              </TabsTrigger>
+            )}
+            {showProductionTargets && (
+              <TabsTrigger value="production-targets" data-testid="tab-production-targets">
+                <Target className="mr-1 h-4 w-4" />
+                {tr("productionTargets")}
+              </TabsTrigger>
+            )}
+          </TabsList>
+        </div>
         {showEntry && (
           <TabsContent value="entry" className="mt-4 min-w-0">
             <StockEntryTab

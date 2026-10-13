@@ -1,3 +1,4 @@
+import { TabsList, PillTabButton } from "@/components/ui/tabs";
 import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -200,34 +201,20 @@ export default function FactorySheetsAndSacks() {
 
       {/* Tab switcher */}
       {effectiveTab ? (
-        <div className="flex items-center gap-1 border-b">
+        <TabsList aria-label="Sheets and sacks sections" className="w-max max-w-full">
           {showStock && (
-            <button
-              onClick={() => setActiveTab("stock")}
-              className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                effectiveTab === "stock"
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
+            <PillTabButton onClick={() => setActiveTab("stock")} selected={effectiveTab === "stock"}>
               <Layers className="h-4 w-4" />
               Current Stock
-            </button>
+            </PillTabButton>
           )}
           {showMovements && (
-            <button
-              onClick={() => setActiveTab("movements")}
-              className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                effectiveTab === "movements"
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
+            <PillTabButton onClick={() => setActiveTab("movements")} selected={effectiveTab === "movements"}>
               <History className="h-4 w-4" />
               Movement Log
-            </button>
+            </PillTabButton>
           )}
-        </div>
+        </TabsList>
       ) : (
         <div className="rounded-md border p-6 text-sm text-muted-foreground">
           No Sheets & Sacks tabs are available for this user.

@@ -1,5 +1,8 @@
-import { resolveRequestUrl, requestMethod } from "./fetchRequestInfo";
-
+import {
+  resolveFetchUrl as resolveUrl,
+  fetchRequestMethod as requestMethod,
+  fetchQueryCacheKey,
+} from "./fetchRequestUtils";
 const BYPASS_HEADER = "x-phase4-bandwidth-bypass";
 const DAILY_PAGE_SIZE = 250;
 const DAILY_RECONCILE_MS = 10 * 60_000;
@@ -60,10 +63,7 @@ function jsonResponseFrom(source: Response, payload: unknown): Response {
 }
 
 function dailyKey(url: URL): string {
-  const params = new URLSearchParams(url.searchParams);
-  for (const name of ["page", "pageSize", "limit", "offset", "afterId"]) params.delete(name);
-  params.sort();
-  return `${url.pathname}?${params.toString()}`;
+  return fetchQueryCacheKey(url, ["page", "pageSize", "limit", "offset", "afterId"]);
 }
 
 function mergeRows(current: DailyScanRow[], incoming: DailyScanRow[]): DailyScanRow[] {
@@ -191,7 +191,7 @@ export function installPhase4BandwidthFetch(): void {
   const originalFetch = window.fetch.bind(window);
 
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-    const url = resolveRequestUrl(input);
+    const url = resolveUrl(input);
     if (!url || !url.pathname.startsWith("/api/")) return originalFetch(input, init);
 
     const headers = requestHeaders(input, init);

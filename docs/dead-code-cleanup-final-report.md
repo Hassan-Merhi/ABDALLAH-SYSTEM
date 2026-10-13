@@ -73,7 +73,7 @@ retired SP cut-over handlers, AIS live-tracking and automated container-tracking
 ## 6. Duplicate implementations consolidated
 
 `isRecord` ×7 → `shared/typeGuards.ts`; `parsePositiveInt` ×10 → `server/lib/listPagination.ts`;
-fetch-guard `resolveRequestUrl`/`requestMethod` ×5 each → `client/src/lib/fetchRequestInfo.ts`;
+fetch-guard `resolveRequestUrl`/`requestMethod` ×5 each → `client/src/lib/fetchRequestInfo.ts` (folded into main's `fetchRequestUtils.ts` at the second main merge);
 three unused payroll copies of `findOrCreateLedger`/`computeMonthlyPay*`/`workerUpload` and the
 unused `classifyBalesByFinalization` copy removed. Financial helpers that are identical but
 separately audited (Golden Coast `money()`, payroll `computeMonthlyPay`) were deliberately left.

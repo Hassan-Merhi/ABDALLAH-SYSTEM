@@ -223,3 +223,88 @@
 - Empty states (simple illustrations, max-w-xs)
 - User avatars (w-10 h-10 rounded-full)
 - Company logos (h-8 in selectors)
+## Shared UI component contract (Phase 1, October 2026)
+
+The source of truth for shared component behavior and recommended imports is
+[`docs/shared-ui-phase-1.md`](docs/shared-ui-phase-1.md).
+
+- Use the canonical `PageShell` with `layout="workspace"` for new pages.
+  Keep `PageShell layout="padded"` and `CoreErpPage` for older page
+  contracts; they delegate to the same underlying renderer.
+- Prefer `PageState`'s `EmptyState`, `LoadingState`, `ErrorState` and
+  `SuccessState` for feedback. Use `LoadingSkeleton` when a structural
+  loading placeholder provides more context. The old compact
+  `ui/empty-state` is an adapter, not an alternative implementation.
+- Use `components/StatusBadge` for statuses instead of local ad-hoc
+  color mappings. Domain adapters may add context-specific labels and values.
+- Import directly from canonical module paths for feature-level code.
+  The `@/components/shared` barrel is also supported for grouped imports.
+- Reuse the existing page header, table, form, and dialog primitives.
+  Never duplicate data fetching, business rules, permission checks, or
+  currency calculations inside presentation components.
+
+This phase intentionally does **not** change tab UX, table filters, business
+forms, calculations, or CI enforcement. Those are covered by later phases.
+
+## Shared responsive tabs (Phase 2, October 2026)
+
+New tabbed content must use `Tabs`, `TabsList`, `TabsTrigger`, and
+`TabsContent` from `client/src/components/ui/tabs.tsx`.
+Use the `pill` or `underline` variant based on content hierarchy. Both
+variants display consistently on phone and desktop, have scrollable strips on
+small screens, and support keyboard navigation and accessible tab panels.
+Do not reimplement tab button colors, selected states or keyboard behavior.
+See [`docs/shared-ui-phase-2.md`](docs/shared-ui-phase-2.md) for the contract.
+
+## Shared list components (Phase 3, October 2026)
+
+The canonical `Table` renderer, `DataTableToolbar`, `TableViewOptions`,
+`PaginationBar`, and `useTablePrefs` are required for new ordinary
+operational list designs where those features are relevant. Keep calculations,
+authorization, and authoritative filters in their owning modules. Standard
+phone record lists use `mobileLayout="cards"`; financial ledgers and
+column-dependent matrices remain scrollable tables. For detailed usage, see
+[`docs/shared-ui-phase-3.md`](docs/shared-ui-phase-3.md).
+
+## Canonical Forms and Financial Display (Phase 4)
+
+Use the existing `FormField` / `FormControl` validation contract,
+`FormGrid`, `FormActionBar`, `DecimalInput`, `MoneyInput`,
+`FormSubmitButton`, and `ConfirmDialog` instead of bespoke controls.
+Explicit-currency amounts use `MoneyAmount` or
+`formatMoneyDisplay`, *never* implicit FX conversion. Await async
+confirmations and guard posting actions against repeat submissions.
+The full reference is [`docs/shared-ui-phase-4.md`](docs/shared-ui-phase-4.md).
+
+## Phase 5 reusable presentation contracts
+
+For all controlled standalone searches, prefer
+`@/components/ui/search-field` (including sidebars, lookup forms, and list
+filters). Table toolbars already use it. Keep bespoke scanner search handling
+only where replacing the native input would alter barcode focus or cashier
+keyboard selection behavior. Use `StatusBadge` for known semantic statuses,
+`PageState` for common loading/error/empty UX, and `ConfirmDialog` with
+an awaited promise for consequential deletion. See
+[`docs/shared-ui-phase-5.md`](docs/shared-ui-phase-5.md).
+
+## Phase 6 focus, keyboard and accessibility guidelines
+
+Prefer logical start/end spacing, screen-reader labels for icon controls,
+explicit field `htmlFor` associations, keyboard-operable disclosure
+actions and a single selected-state radio group for mutually exclusive
+options. Do not collapse failed fetches into empty states or close a pending
+mutation dialog before the action resolves. Mobile card tables should not
+add redundant scroll-region tab stops, while wider data grids retain their
+keyboard scroll affordance. The implementation and exceptions are described
+in [`docs/shared-ui-phase-6.md`](docs/shared-ui-phase-6.md).
+
+## Phase 7 architecture consolidation
+
+Use `fetchRequestUtils.ts` for browser fetch URL, request method,
+rewrite mechanics and stable pagination query keys. Interceptors must retain
+their original endpoint routing, company scoping, captured previous fetch
+function and request-init forwarding. Use `legacyPaginatedListFetch.ts`
+only for endpoints whose public legacy contract is a flattened JSON array,
+and `use-debounce.ts` for new hooks (keep the `useDebouncedValue` name as
+a compatibility import). No untraced dynamic or side-effect file removals.
+See `docs/shared-ui-phase-7.md`.
