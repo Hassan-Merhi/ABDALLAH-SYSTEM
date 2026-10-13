@@ -143,10 +143,16 @@ const html = fs.readFileSync("client/index.html", "utf8");
 const productionRoots = [...html.matchAll(/<script[^>]+src="\/([^"]+)"/g)].map((m) => `client/${m[1]}`);
 productionRoots.push("server/index.ts", "server/startupPreload.mjs", "server/runtimeMemoryGuard.mjs");
 productionRoots.push(...codeFiles.filter((f) => f.startsWith("client/public/") || f.startsWith("desktop/")));
+// Imports written into source by the build plugins. A relative one is resolved
+// from client/src (main.tsx) and from the folder of each file the plugin targets.
 for (const f of codeFiles.filter((f) => f.startsWith("build/"))) {
-  for (const m of fs.readFileSync(f, "utf8").matchAll(/(?:from\s+\\?["']|import\(\\?["'])(@\/[^"'\\]+)/g)) {
-    const target = resolveSpecifier("client/src/x.ts", m[1]);
-    if (target) productionRoots.push(target);
+  const text = fs.readFileSync(f, "utf8");
+  const targetDirs = [...text.matchAll(/["'`]\/(client\/src\/[^"'`]+)["'`]/g)].map((m) => path.posix.dirname(m[1]));
+  for (const m of text.matchAll(/(?:from\s+|import\s*\(?\s*)\\?["'`]((?:@\/|\.{1,2}\/)[^"'`\\]+)/g)) {
+    for (const dir of ["client/src", ...targetDirs]) {
+      const target = resolveSpecifier(`${dir}/x.ts`, m[1]);
+      if (target && !target.startsWith("build/")) productionRoots.push(target);
+    }
   }
 }
 const toolingRoots = codeFiles.filter((f) => !f.includes("/") || f.startsWith("build/") || f.startsWith("scripts/"));

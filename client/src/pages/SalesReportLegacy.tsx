@@ -10,6 +10,7 @@ import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/compon
 import { ErpMobileFilters } from "@/components/ui/erp-mobile-filters";
 import { useDateJump } from "@/hooks/use-date-jump";
 
+import { useToast } from "@/hooks/use-toast";
 import { PageHeader } from "@/components/PageHeader";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
@@ -59,6 +60,9 @@ export default function SalesReport() {
   const [isMultiCompanyMode, setIsMultiCompanyMode] = useState(false);
   const [selectedCompanies, setSelectedCompanies] = useState<string[]>([]);
   const [selectedRowDate, setSelectedRowDate] = useState<string | null>(null);
+  // build/viteSalesReportBandwidthPlugin.ts rewrites this exact line to `const { toast } = useToast();`
+  // eslint-disable-next-line unused-imports/no-unused-vars -- used after the build transform
+  const { toast: _toast } = useToast();
   const { formatDisplayDate } = useDateFormat();
   const { formatAmount } = useCurrencyContext();
 
