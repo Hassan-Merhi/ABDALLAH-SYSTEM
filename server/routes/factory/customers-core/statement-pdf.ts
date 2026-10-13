@@ -92,7 +92,6 @@ export function registerFactoryCustomerStatementPdfRoutes(app: Express) {
         } else {
           particulars = row.description || "";
         }
-        if (row.notInLedger) particulars = `${particulars} (not yet in the ledger)`.trim();
         return { ...row, debit, credit, container, particulars };
       });
 
@@ -504,23 +503,8 @@ export function registerFactoryCustomerStatementPdfRoutes(app: Express) {
       } else {
         doc.text(closingStr, colX[5] + CP, y + 4, { width: colW[5] - CP * 2, align: "right", lineBreak: false });
       }
-      y += 20;
-
-      // ── Closing split: in the ledger / not yet in the ledger ──
-      for (const [label, value] of [
-        ["of which in the ledger", closingLedger],
-        ["of which not yet in the ledger", closingNotInLedger],
-      ] as const) {
-        ensureSpace(14);
-        doc.fillColor("#333333").font("Helvetica-Oblique").fontSize(FS);
-        doc.text(label, colX[2] + CP, y + 2, { width: colW[2] - CP * 2, lineBreak: false });
-        const splitStr = fmtBalance(value.abs().toNumber(), value.lessThan(0) ? "Cr" : "Dr");
-        const col = value.lessThan(0) ? 5 : 4;
-        doc.text(splitStr, colX[col] + CP, y + 2, { width: colW[col] - CP * 2, align: "right", lineBreak: false });
-        doc.fillColor("#000000");
-        y += 14;
-      }
-      y += 4;
+      y += 20; 
+      
 
       // ── Statement note ──
       if (customer.statementNote) {
