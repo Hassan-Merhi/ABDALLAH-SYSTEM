@@ -19,8 +19,9 @@
  *   - the reviewed re-cost: preview, Owner-only apply of the reviewed hash,
  *     audited; it posts FACTORY-RECOST to Factory Stock Revaluation after the
  *     cut-over and nothing before; SOLD bales are never re-costed;
- *   - the factory net position values bales at cost, counts the bales reserved
- *     for unfinalized orders once, and lists those orders for information only.
+ *   - the factory net position (since #2214 / #2216) values available bales like
+ *     the Location Inventory page, lists unfinalized orders for information only,
+ *     and refuses to value stock in a currency with no confirmed USD rate.
  */
 import bcrypt from "bcryptjs";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -295,6 +296,7 @@ async function cleanup(companyId: number, supervisorId?: string) {
     await q(`DELETE FROM factory_raw_stock WHERE company_id = $1`);
     await q(`DELETE FROM factory_containers WHERE company_id = $1`);
     await q(`DELETE FROM factory_suppliers WHERE company_id = $1`);
+    await q(`DELETE FROM factory_fx_rates WHERE company_id = $1`);
     await q(`DELETE FROM financial_operation_requests WHERE company_id = $1`);
     await q(`DELETE FROM factory_bale_sequences WHERE company_id = $1`);
     await q(`DELETE FROM factory_bale_products WHERE company_id = $1`);
@@ -706,8 +708,30 @@ describe("the reviewed bale re-cost", () => {
 });
 
 describe("factory net position", () => {
-  it("values bales at cost, counts bales reserved for unfinalized orders once, and lists the orders for information", async () => {
-    const reserved = await bale({ status: "RESERVED_FOR_ORDER", weight: "25", costPerKg: "3.08", totalCost: "77" });
+  it("refuses to value stock in a currency with no confirmed USD rate", async () => {
+    // #2216: the AUD containers need a manual AUD rate; none is configured yet.
+    await pool.query(`DELETE FROM factory_fx_rates WHERE company_id = $1`, [companyId]);
+    const { statusCode, body } = await call("GET /api/factory/net-position", { query: { asOf: today } });
+    expect({ statusCode, message: body?.message }).toEqual({
+      statusCode: 500,
+      message: "Missing confirmed USD exchange rate for AUD",
+    });
+  });
+
+  it("values available bales like Location Inventory and lists unfinalized orders for information only", async () => {
+    await pool.query(
+      `INSERT INTO factory_fx_rates (company_id, currency_code, rate_to_usd, effective_date, source)
+       VALUES ($1, 'AUD', '0.65', $2, 'manual')`,
+      [companyId, today]
+    );
+    await bale({ status: "IN_STOCK", weight: "30", costPerKg: "2", totalCost: "60", product: true });
+    const reserved = await bale({
+      status: "RESERVED_FOR_ORDER",
+      weight: "25",
+      costPerKg: "3.08",
+      totalCost: "77",
+      product: true,
+    });
     const orderId = (
       await one(
         `INSERT INTO customer_orders (company_id, customer_id, order_date, status, grand_total)
@@ -721,23 +745,28 @@ describe("factory net position", () => {
       [orderId, reserved, locationId]
     );
 
-    const expected = await one<{ cost: string }>(
-      `SELECT COALESCE(SUM(total_cost), 0)::text AS cost FROM factory_bales
-        WHERE company_id = $1 AND status IN ('IN_STOCK', 'RESERVED_FOR_ORDER', 'RESERVED_FOR_DISPATCH')`,
+    // #2214: Stock In Hand matches the Location Inventory page - available IN_STOCK
+    // bales not on any order, at their product's catalogue production price.
+    const expected = await one<{ value: string }>(
+      `SELECT COALESCE(SUM(p.production_price), 0)::text AS value
+         FROM factory_bales b
+         LEFT JOIN factory_bale_products p ON p.id = b.product_id
+        WHERE b.company_id = $1 AND b.status = 'IN_STOCK' AND b.deleted_at IS NULL
+          AND NOT EXISTS (SELECT 1 FROM customer_order_bales cob WHERE cob.bale_id = b.id)`,
       [companyId]
     );
     const { statusCode, body } = await call("GET /api/factory/net-position", { query: { asOf: today } });
     expect({ statusCode, message: body?.message }).toEqual({ statusCode: 200, message: undefined });
-    expect(body.inventoryValue).toBeCloseTo(Number(expected.cost), 2);
-    expect(body.reservedBales).toEqual({ count: 1, cost: 77 });
-    expect(body.inventoryValueBasis).toBe("bale-cost");
+    expect(Number(expected.value)).toBeGreaterThan(0);
+    expect(body.inventoryValue).toBeCloseTo(Number(expected.value), 2);
+    expect(body.forUs.accounts).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: "INVENTORY", value: body.inventoryValue })])
+    );
 
-    const orderLine = body.notInLedger.lines.find((line: { code: string }) => line.code === "PENDING_ORDERS");
-    expect(orderLine).toMatchObject({ value: 500, informational: true, count: 1 });
-    const counted = body.notInLedger.lines
-      .filter((line: { informational?: boolean }) => !line.informational)
-      .reduce((sum: number, line: { value: number }) => sum + line.value, 0);
-    expect(body.notInLedger.total).toBeCloseTo(counted, 2);
+    // #2216: the unfinalized order is not a collectible receivable - listed, never counted.
+    expect(body.pendingTotal).toBe(500);
+    expect(body.pendingOrders).toEqual([expect.objectContaining({ id: orderId, grandTotal: 500 })]);
+    expect(body.forUs.accounts.some((a: { code: string }) => a.code === "PENDING_ORDERS")).toBe(false);
     const accountsTotal = body.forUs.accounts.reduce((sum: number, a: { value: number }) => sum + a.value, 0);
     expect(body.forUsTotal).toBeCloseTo(accountsTotal, 2);
   });
