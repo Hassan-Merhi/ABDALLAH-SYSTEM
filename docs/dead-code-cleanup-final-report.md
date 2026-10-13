@@ -3,9 +3,9 @@
 Branch `refactor/erp-dead-code-cleanup` (mirrored to `claude/blissful-bell-w6imct`).
 Baseline: `main@3a210f315ddba5aaf0bbe6dee21b5d5e3417b97f`. Not merged into `main`.
 
-> **Nothing in this program was executed as a test, build, CI run, migration or deployment.**
-> All verification below is static. The branch must pass the validation in §14 before it is
-> merged.
+> Phases 3–13 were verified statically only. The §14 validation was then run with the owner's
+> approval on 2026-10-13, after merging `origin/main@0599a9bab`; results are in
+> "Validation run" below. No deployment or live-database migration was run.
 
 Per-phase evidence: [`archive/engineering/dead-code/`](archive/engineering/dead-code/).
 Standards going forward: [dead-code-prevention.md](dead-code-prevention.md).
@@ -154,7 +154,7 @@ deleted files were updated.
 8. `eslint.config.js` no longer ignores `_`-prefixed local variables (see Phase 13 follow-up
    below). The static scan found none left, but ESLint itself has not been run.
 
-## 13. Verification skipped (as instructed)
+## 13. Verification skipped during the phases (as instructed)
 
 Not run: CI, unit/integration/browser/E2E tests, `npm ci`/`npm install`, `npm run check`,
 `npm run lint`, production build, route-manifest regeneration, audit/verify scripts,
@@ -229,11 +229,47 @@ diagnostic that `origin/main` lacks. `report-dead-code.mjs` now counts relative 
 written by the build plugins as production roots; it had seen only `@/` ones, which is how
 both deletions slipped through.
 
+## Validation run (2026-10-13)
+
+Run in the session container against a local, disposable PostgreSQL 16 database, using CI's
+environment (`NODE_ENV=test`, `drizzle-kit push --force`, one app boot for startup migrations).
+
+| Check | Result |
+|---|---|
+| `npm ci` | passes (edited lockfile installs) |
+| `npm run check` | 0 errors (after fixing 2 type errors from the revision-panel change) |
+| `npm run lint` | 0 errors, 0 warnings (after fixing 11 warnings and 1 error left by the `_`-binding pass) |
+| `npm run build`, `node build.mjs` (Render's command, with the Phase 3 accounting gate) | pass, including server-bundle, artifact and runtime-dependency verification |
+| Startup migrations (`verify:startup-migrations`) | 0 failures |
+| Backend suite | 7,046 tests; 16 failed on the first run. 9 were this branch's (tests still pinned on removed dead code, the route manifest and the write-route sweep) and are fixed; the other 7 also fail on `origin/main` (below). |
+| Frontend suite | 2,147 tests; 3 failed. 1 was this branch's (Factory tab toggles read only by orphan pages) and is fixed; 2 also fail on `origin/main`. |
+| Audit and verify scripts in §14 | pass, except the three that also fail on `origin/main` (below) |
+
+Fixes the run required are in `fe6662055`, `1e6bb2ed9` and `0a5d708d2`. Where a test
+certified code that was removed as unreachable, the test now checks the code that serves the
+path (each change is listed in `0a5d708d2`); no assertion on live behaviour was weakened.
+
+**Failing on `origin/main` too, not addressed here:**
+- `tests/backend-coverage-parameterized-route-matrix.test.ts` (`GET /api/screen-feed/trace/:event`)
+  and `tests/exchange-rate-daily-popup.test.ts`: supertest gets a `null` server address in this
+  container; may be environmental.
+- `tests/backend-coverage-phase27-external-integrations.test.ts`: the WhatsApp provider-timeout
+  case after main's Green API changes.
+- `tests/ui/phase4-split-pages.test.tsx`: the two AdvancesView dialog triggers have
+  `pointer-events: none`.
+- `scripts/verify-program2-phase8-rentals.mjs` (missing `normalizeVoucherEntryAmounts` marker),
+  `scripts/audit-i18n-phase14.mjs` (actionable-literal ratchet, same totals as main), and
+  `scripts/verify-remote-control-action-registry.mjs`. The last also lists `view` as unused here,
+  because the orphan `SoldContainers.tsx` was its only static user. `view` is kept: the
+  remote-support E2E and the registry unit test rely on it. Pruning the allowlist is an owner
+  call.
+
 ## Follow-up commits
 
 - `af159468b` — `_`-binding backlog cleared and ESLint `varsIgnorePattern` removed (above).
 - `a1f08d895` — build-plugin transform targets restored (above).
 - The owner-decision commit that follows it applies the table above.
+- `fe6662055`, `8e2d90103` (merge of `origin/main@0599a9bab`), `1e6bb2ed9`, `0a5d708d2` — validation-run fixes (above).
 - `7265326db` — merge of `origin/main`; stale `config/company-scope-review.json` entry for the
   stock registrar deleted in the first Phase 3 session removed (that audit fails on stale rows).
 
