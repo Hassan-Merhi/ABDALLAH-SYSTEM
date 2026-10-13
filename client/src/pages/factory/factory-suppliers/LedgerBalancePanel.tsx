@@ -15,10 +15,8 @@ const amountText = (value: number, prefix: string, formatNum: (val: string) => s
  * ledger balance first, the native balance per currency beside it, then the
  * amounts not yet in the ledger and the operational figure as labelled memos.
  */
-export function LedgerBalancePanel({ view, operationalTotal, formatNum }: LedgerBalancePanelProps) {
+export function LedgerBalancePanel({ view, formatNum }: LedgerBalancePanelProps) {
   const ledger = Number(view.ledgerBalanceUsd);
-  const notInLedger = Number(view.notInLedger.total);
-  const operational = operationalTotal === undefined ? null : Number(operationalTotal);
   const natives = view.nativeBalances.filter((bucket) => Math.abs(Number(bucket.balance)) > 0.005);
   return (
     <div className="rounded-xl border p-4 space-y-3" data-testid="panel-supplier-ledger-balance">

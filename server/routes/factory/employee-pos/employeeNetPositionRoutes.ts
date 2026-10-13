@@ -14,7 +14,6 @@ import {
 
 import {
   customerOrders,
-  customerBalances,
   customers,
   ledgerAccounts,
   voucherEntries,
@@ -91,7 +90,13 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         configFxRates[row.currency_code as string] = toMoney(row.rate_to_usd as string).toNumber();
       }
       // Only use manually configured rates — no hardcoded fallbacks
-      const getConfigFx = (cc: string): number => { if (cc.toUpperCase() === 'USD') return 1; const rate = configFxRates[cc]; if (!rate || !Number.isFinite(rate) || rate <= 0) throw new Error(`Missing confirmed USD exchange rate for ${cc}`); return rate; };
+      const getConfigFx = (cc: string): number => {
+        if (cc.toUpperCase() === "USD") return 1;
+        const rate = configFxRates[cc];
+        if (!rate || !Number.isFinite(rate) || rate <= 0)
+          throw new Error(`Missing confirmed USD exchange rate for ${cc}`);
+        return rate;
+      };
 
       // ── 1. Factory supplier balances (What We Owe) ──────────────────────
       // Computed in ./netPositionSupplierBalances. suppliersList,
@@ -225,15 +230,20 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
 
       if (allCustomersForNP.length > 0) {
         // Match the Parties page's combined ledger + operational balance exactly.
-        const figures = await getCustomerLedgerAndMemo(companyId, allCustomersForNP.map(c => c.id), asOf);
+        const figures = await getCustomerLedgerAndMemo(
+          companyId,
+          allCustomersForNP.map((c) => c.id),
+          asOf
+        );
         for (const c of allCustomersForNP) {
           const f = figures.get(c.id);
           const balance = (f?.ledger ?? new MoneyDecimal(0)).plus(f?.memoTotal ?? 0);
-          if (balance.abs().gte(0.01)) customerItems.push({
-            name: c.legalName || `Customer #${c.id}`,
-            balanceUsd: round2(balance.toNumber()),
-            ledgerAccountId: c.ledgerAccountId || undefined,
-          });
+          if (balance.abs().gte(0.01))
+            customerItems.push({
+              name: c.legalName || `Customer #${c.id}`,
+              balanceUsd: round2(balance.toNumber()),
+              ledgerAccountId: c.ledgerAccountId || undefined,
+            });
         }
       }
 
@@ -325,9 +335,9 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       // KPI) is the authoritative source; we recompute it fresh below instead.
       const cleanLedgerForUs = ledgerForUs.filter(
         (a) =>
-          (!PERPETUAL_STOCK_ACCOUNT_CODES.has((a.code || "").trim().toUpperCase()) &&
-            !inventoryCategoryRx.test(a.category) &&
-            !inventoryCategoryRx.test(a.name)) &&
+          !PERPETUAL_STOCK_ACCOUNT_CODES.has((a.code || "").trim().toUpperCase()) &&
+          !inventoryCategoryRx.test(a.category) &&
+          !inventoryCategoryRx.test(a.name) &&
           (a.name || "").toLowerCase().trim().replace(/\s+/g, " ") !== "factory worker advances" &&
           // Exclude per-worker insurance liability accounts (e.g. "Insurance - أحمد علي رمضان")
           // — these are tracked separately via the Insurance section, not Net Position assets
