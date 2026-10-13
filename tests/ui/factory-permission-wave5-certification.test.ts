@@ -81,8 +81,14 @@ describe("Wave 5 Factory permission registry certification", () => {
     );
     const settingsKeys = new Set<string>(FACTORY_TAB_REGISTRY.map((tab) => tab.key));
 
+    // Tab keys that only the backend boundary enforces; the next test checks
+    // that they are still owned there.
+    const backendOnly = new Set(["hide_tab_payroll_records"]);
+    const backendSource = readFileSync("server/middleware/factoryBackendAccessBoundary.ts", "utf8");
+    for (const key of backendOnly) expect(backendSource).toContain(`"${key}"`);
+
     const missingFromSettings = [...usedKeys].filter((key) => !settingsKeys.has(key));
-    const unusedInUi = [...settingsKeys].filter((key) => !usedKeys.has(key));
+    const unusedInUi = [...settingsKeys].filter((key) => !usedKeys.has(key) && !backendOnly.has(key));
 
     expect(missingFromSettings).toEqual([]);
     expect(unusedInUi).toEqual([]);
