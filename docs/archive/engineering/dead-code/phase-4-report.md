@@ -105,7 +105,7 @@ The complete list is in the appendix.
 | `pages/sp/golden-coast/HadiCashRoutingPanel.tsx`, `pages/pos/hooks/goldenCoastPhase6Pos.ts` | Golden Coast financial UI/contract code with behavior tests; removed from the hub when HADI payout became canonical. Retire only with the GC owner. |
 | `pages/settings/PageVisibilityTree.tsx` | Dedicated permission-tree test; never mounted. |
 | `components/ui/chart.tsx`, `pagination.tsx`, `workflow-dialog.tsx` | UI kit primitives covered by the mobile-responsive suites; unused by pages. |
-| `lib/containerPaginationClient.ts`, `lib/supplierPurchaseOrderPaginationClient.ts` | **Possible regression**: `tests/ui/fetch-guards-behavior.test.ts` tests these fetch interceptors, but nothing installs them in the app. |
+| `lib/containerPaginationClient.ts`, `lib/supplierPurchaseOrderPaginationClient.ts` | **Possible regression**: `tests/ui/fetch-guards-behavior.test.ts` tests these fetch interceptors, but nothing installs them in the app. *Corrected later: `build/vitePhase1PaginationPlugin.ts` installs them at build time. The same plugin imports `accountStatementPaginationClient`, whose deletion below was reverted in `a1f08d895`.* |
 
 These were not deleted because doing so would remove a hidden feature, delete a behavior-tested
 financial component, or silently drop a check that suggests the code was meant to be live.

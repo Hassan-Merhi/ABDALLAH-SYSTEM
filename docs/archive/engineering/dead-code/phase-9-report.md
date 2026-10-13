@@ -40,3 +40,4 @@ and `components.json` (Replit/shadcn tooling).
 (`node build.mjs`), while `render.yaml` uses `npm run build` (→ `scripts/build-server.mjs`).
 The Render dashboard can override the blueprint, and checking it requires choosing a Render
 workspace, so the file was kept. Delete it only after confirming the live build command.
+*Confirmed 2026-10-13: the Render service `system` builds with `npm ci && node build.mjs`; `build.mjs` stays.*

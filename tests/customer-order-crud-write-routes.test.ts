@@ -12,11 +12,12 @@
  *     goes back to `IN_STOCK` so it can be re-sold. A finalized invoice is
  *     refused outright, because releasing bales that have already been billed
  *     would put sold stock back on the shelf.
- *   - **`link-proforma` re-prices the order.** Linking wipes the expected lines
- *     and backfills them from the new proforma, so a stale line surviving a
- *     re-link would compare scans against a proforma that no longer applies.
- *     It refuses a customer mismatch, an inactive proforma, and any order that
- *     is not LOADING.
+ *   - **`link-proforma` re-prices the order.** A link made during loading is
+ *     reference-only (linkProformaAtomic.ts, #1411): linking a different
+ *     proforma wipes the expected lines and does not backfill them, so a stale
+ *     line surviving a re-link would compare scans against a proforma that no
+ *     longer applies. It refuses a customer mismatch, an inactive proforma,
+ *     and any order that is not LOADING.
  *
  * The status guards are the point of the rest: only a DRAFT order may have its
  * date changed, because the date drives which accounting period the invoice
@@ -211,19 +212,19 @@ describe("PATCH /api/factory/customer-orders/:id/date", () => {
 });
 
 describe("PATCH /api/factory/customer-orders/:id/link-proforma", () => {
-  it("links a proforma and backfills the expected lines", async () => {
+  it("links a proforma as a reference without backfilling expected lines", async () => {
     const orderId = await createOrder("LOADING");
     const proformaId = await createProforma();
 
     const response = await agent.patch(`/api/factory/customer-orders/${orderId}/link-proforma`).send({ proformaId });
 
     expect(response.status).toBe(200);
-    expect(response.body.linked.linesBackfilled).toBe(1);
+    expect(response.body.linked.linesBackfilled).toBe(0);
     expect((await orderRow(orderId))?.proforma_id_used).toBe(proformaId);
-    expect(await expectedLineCount(orderId)).toBe(1);
+    expect(await expectedLineCount(orderId)).toBe(0);
   });
 
-  it("replaces the expected lines when a different proforma is linked", async () => {
+  it("clears the expected lines when a different proforma is linked", async () => {
     const orderId = await createOrder("LOADING");
     const first = await createProforma();
     const second = await createProforma();
@@ -234,7 +235,7 @@ describe("PATCH /api/factory/customer-orders/:id/link-proforma", () => {
     // A line surviving from the old proforma would have scans compared against
     // quantities that no longer apply.
     expect((await orderRow(orderId))?.proforma_id_used).toBe(second);
-    expect(await expectedLineCount(orderId)).toBe(1);
+    expect(await expectedLineCount(orderId)).toBe(0);
   });
 
   it("unlinks on a null proforma, clearing the expected lines", async () => {

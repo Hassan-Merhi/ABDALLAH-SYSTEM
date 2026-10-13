@@ -16,6 +16,7 @@ export const ContainersPage = lazy(() => import("@/pages/ContainersPage"));
 export const InventoryHub = lazy(() => import("@/pages/InventoryHub"));
 export const StockHub = lazy(() => import("@/pages/StockHub"));
 export const Accounts = lazy(() => import("@/pages/Accounts"));
+export const HistoricalOpenings = lazy(() => import("@/pages/accounts/HistoricalOpenings"));
 export const Agents = lazy(() => import("@/pages/Agents"));
 export const Suppliers = lazy(() => import("@/pages/Suppliers"));
 export const Vouchers = lazy(() => import("@/pages/Vouchers"));
@@ -152,6 +153,7 @@ export const ProductionComparison = lazy(() => import("@/pages/factory/Productio
 export const FactoryImport = lazy(() => import("@/pages/factory/FactoryImport"));
 export const FactoryBaleRelabeling = lazy(() => import("@/pages/factory/FactoryBaleRelabeling"));
 export const MergeBaleProducts = lazy(() => import("@/pages/factory/MergeBaleProducts"));
+export const FactoryCatalogTranslations = lazy(() => import("@/pages/factory/FactoryCatalogTranslations"));
 export const BaleProductImages = lazy(() => import("@/pages/factory/BaleProductImages"));
 export const CustomerLogosSettings = lazy(() => import("@/pages/factory/CustomerLogosSettings"));
 export const LabelBannersSettings = lazy(() => import("@/pages/factory/LabelBannersSettings"));

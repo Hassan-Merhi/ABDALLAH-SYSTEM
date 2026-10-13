@@ -103,6 +103,7 @@ export const FACTORY_ACCESS_REGISTRY: readonly FactoryPageDefinition[] = [
     route: "/factory/bales-hub",
     aliases: [
       "/factory/bale-products",
+      "/factory/catalog-translations",
       "/factory/bale-product-history",
       "/factory/reprint-labels",
       "/factory/bales-history",

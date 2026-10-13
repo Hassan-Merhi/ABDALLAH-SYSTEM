@@ -73,6 +73,12 @@ type check, no build — and is not a CI gate. Treat every line as a lead:
 1. Search tests and `scripts/verify-*`/`audit-*` for the file path or bare name; many checks
    read source text by path.
 2. Check the history of the last importer for "hide", "disable" or "temporarily".
-3. Never remove `shared/schema/**` table definitions, migrations, or startup-schema modules
+3. Search `build/*.ts` for the file name and for the exact line you are about to change. The
+   Vite plugins inject imports into `main.tsx` and rewrite exact source lines at build time,
+   and they throw when a target is gone, so `vite build` fails although the type check and
+   the tests pass. (The cleanup removed one injected module and one rewritten line this way;
+   both were restored.)
+4. Never remove `shared/schema/**` table definitions, migrations, or startup-schema modules
    because they look unused; drizzle-kit and live tables depend on them.
-4. Re-run the route manifest, type check and the affected tests before merging.
+5. Re-run the route manifest, type check, the affected tests and `npm run build` before
+   merging.

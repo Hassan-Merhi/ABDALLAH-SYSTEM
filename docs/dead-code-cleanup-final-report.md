@@ -129,26 +129,15 @@ deleted files were updated.
 
 ## 12. Known risks and items needing a decision
 
-1. **Unmounted code certified by tests** — production does not run these, but tests pass on
-   them, so the tests give false assurance:
-   - `server/routes/accounts/ledger-balance.ts` (balance-engine `GET /api/accounts/ledger/:id/balance`)
-     vs the live `accountCurrencyRoutes.ts` handler; `tests/ledger-balance-exact.test.ts` and
-     `tests/wave10-engine-consolidation.test.ts` exercise the unmounted copy. Decide which
-     implementation is canonical.
-   - `customer-orders/linkProformaAtomic.ts`: a transactional, capacity-locked proforma link that
-     was never wired. The live `PATCH /api/factory/customer-orders/:id/link-proforma` runs without
-     a transaction or the capacity lock. **Possible concurrency defect.**
-   - `client/.../HistoricalOpeningResolver.tsx`, `FactoryCatalogTranslationEditor.tsx`,
-     `StockTransferRevisionHistory.tsx`: UIs certified by tests/verify scripts but not routed.
-   - `client/src/lib/containerPaginationClient.ts`, `supplierPurchaseOrderPaginationClient.ts`:
-     tested fetch interceptors that nothing installs.
-   - `stats/statsNetProfitResilience.ts`, `ApprovalsPage`/`BusinessAlertsPage` backends (UI
-     removed 2026-06-25, routes still live).
-2. **`build.mjs`**: says Render runs it directly; `render.yaml` uses `npm run build`. Confirm the
-   Render dashboard build command before deleting it (checking requires choosing a Render
-   workspace).
-3. **`@typescript/native`** (`npm:typescript@7.0.2`) ships a second `tsc` binary; kept, but
-   which `tsc` `npm run check` resolves is a toolchain decision.
+1. **Unmounted code certified by tests** — resolved by the owner decisions below, except
+   `stats/statsNetProfitResilience.ts` and the `ApprovalsPage`/`BusinessAlertsPage` backends (UI
+   removed 2026-06-25, routes still live), which remain open.
+2. **`build.mjs`** is live: the Render service `system` builds with `npm ci && node build.mjs`
+   (read from the Render dashboard, not changed). `render.yaml` still says `npm run build`, so
+   the blueprint and the dashboard disagree; `build.mjs` also runs
+   `tests/phase3-accounting-audit.test.ts` as a deploy gate.
+3. **`@typescript/native`** (`npm:typescript@7.0.2`) ships a second `tsc` binary; kept by owner
+   decision. Which `tsc` `npm run check` resolves is still a toolchain question.
 4. The manifest edits, the lockfile edits and the test-suite case removals are unverified until
    §14 runs. Order-sensitive DB mocks were checked for the files where unused reads were
    removed; others could exist.
@@ -159,11 +148,9 @@ deleted files were updated.
    merged lockfile is as unverified as the rest until `npm ci` runs.
 6. 1,590 exports used only inside their own module remain (cosmetic backlog; un-exporting them
    would touch hundreds of files and collide with concurrent work).
-7. Three audit-trail item diffs are computed and never written: `_itemDiff`/`_adjItemDiff` in
-   `vouchers/voucherPurchaseUpdateRoutes.ts` and `_xfrItemDiff` in `vouchers/transfer/transfer.ts`
-   call `buildItemLevelChanges(...)` but the result is not attached to the audit entry. Either
-   the audit is missing item-level detail or the calls are waste — an owner decision, so they
-   were left in place.
+7. The "unwritten audit item diffs" reported here earlier were a misreading: `_itemDiff`,
+   `_adjItemDiff` and `_xfrItemDiff` are all spread into the audit entry (`extra` / `changes`),
+   on `main` as well. Nothing to change.
 8. `eslint.config.js` no longer ignores `_`-prefixed local variables (see Phase 13 follow-up
    below). The static scan found none left, but ESLint itself has not been run.
 
@@ -185,10 +172,14 @@ npm run check                           # full type check
 npm run lint                            # zero-warning ratchet
 npm run test:backend -- route-manifest  # manifest must match without UPDATE_ROUTE_MANIFEST
 npm test                                # backend + frontend suites
+#   in particular: customer-order-crud-write-routes, wave10-engine-consolidation,
+#   ui/stock-transfer-form-revision-behavior, ui/factory-mobile-route-registry,
+#   ui/fetch-guards-behavior, multi-currency-integration, factory-bilingual-completion
 npm run audit:doc-index && npm run audit:scripts && npm run audit:write-routes
 npm run audit:company-scope && npm run audit:source-text-assertions && npm run audit:god-files
 node scripts/audit-write-evidence.mjs
 node scripts/verify-stock-transfer-revision-lifecycle.mjs
+node scripts/verify-group-a-phase-3.mjs
 node scripts/verify-program2-phase4-pos-stock-transfers.mjs
 node scripts/verify-program2-phase8-rentals.mjs
 node scripts/verify-bandwidth-phase-3-sales-report.mjs
@@ -212,9 +203,37 @@ against the previous commit, 0 broken source-text pins. `varsIgnorePattern` was 
 from the ESLint unused-vars rule. Remaining `_` names are rest-omit keys (23), parameters and
 caught errors, which the rule still allows.
 
+## Owner decisions applied (2026-10-13)
+
+| Item | Decision | Outcome |
+|---|---|---|
+| Ledger balance: `accounts/ledger-balance.ts` vs live `accountCurrencyRoutes.ts` | implementer's choice | The live handler stays canonical. The unmounted copy differs on figures (a customer-owned ledger rolls into the customer; a linked bank is not folded in), so switching would change reported balances, which a cleanup must not do. The unmounted copy, `tests/ledger-balance-exact.test.ts` and the one assertion in `tests/wave10-engine-consolidation.test.ts` that called it are deleted. `tests/wave17-reporting.test.ts` tests the live route and is unchanged. |
+| `linkProformaAtomic.ts` | link it | `PATCH /api/factory/customer-orders/:id/link-proforma` now calls `linkOrderProformaAtomically`: one transaction with the proforma capacity lock and `FOR UPDATE` on the order. **Behaviour change:** as designed in #1411, a link made during loading is reference-only. It no longer backfills `customer_order_expected_lines` from the proforma (`linesBackfilled` is 0), and re-linking the same proforma is a no-op that keeps a customised plan. `tests/customer-order-crud-write-routes.test.ts` is updated to that contract. The response shape and error statuses are unchanged. |
+| Unrouted UIs | give each a route | `/accounts/historical-openings` (Admin, Owner, Developer with Accounts access, the roles the save endpoint accepts) renders `HistoricalOpeningResolver`. `/factory/catalog-translations` (an alias of the Bale Explorer access, hidden with the Bale Products tab) renders `FactoryCatalogTranslationEditor`. `StockTransferRevisionHistory` is a panel, not a page: the stock-transfer form now renders it in place of its inline copy. The inline copy still had the "Reference only" switch, whose endpoint answers 409 since revisions became immutable, and it showed no lifecycle status. `scripts/verify-group-a-phase-3.mjs` already treated the component as the admin history. |
+| Pagination interceptors | delete if not usable | Kept. They are usable and are installed: `build/vitePhase1PaginationPlugin.ts` injects `containerPaginationClient` into `main.tsx` at build time, and that module imports the supplier one. Without the supplier interceptor, a supplier's purchase-order dialog would show only the first 100 rows. The Phase 4 note calling them "never installed" was wrong (see the regression below). |
+| Audit item diffs | save or remove | Already saved (item 7 above). |
+| `build.mjs` | look it up | Live (item 2 above); kept. |
+| Container planner, remove-from-stock tab | stay | Kept hidden. |
+| Test-only accounting, costing and audit services | keep | Kept. |
+| `@typescript/native` | keep | Kept. |
+
+**Regression found and fixed (`a1f08d895`).** The Vite build plugins rewrite source at build
+time and throw when an exact target is missing. Phase 4 deleted
+`client/src/lib/accountStatementPaginationClient.ts`, which the Phase 1 pagination plugin
+imports into `main.tsx`. The `_`-binding cleanup deleted
+`const { toast: _toast } = useToast();` from `SalesReportLegacy.tsx`, which the always-on sales
+report invalidation plugin rewrites. Either one would have failed `vite build`. Both are
+restored. Running every always-on plugin transform over `client/src` (string transforms
+only) now matches `origin/main` file for file. Type-checking the transformed output finds no
+diagnostic that `origin/main` lacks. `report-dead-code.mjs` now counts relative imports
+written by the build plugins as production roots; it had seen only `@/` ones, which is how
+both deletions slipped through.
+
 ## Follow-up commits
 
 - `af159468b` — `_`-binding backlog cleared and ESLint `varsIgnorePattern` removed (above).
+- `a1f08d895` — build-plugin transform targets restored (above).
+- The owner-decision commit that follows it applies the table above.
 - `7265326db` — merge of `origin/main`; stale `config/company-scope-review.json` entry for the
   stock registrar deleted in the first Phase 3 session removed (that audit fails on stale rows).
 
