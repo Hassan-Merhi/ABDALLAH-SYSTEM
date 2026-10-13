@@ -147,7 +147,23 @@ async function closeLanguageOnboarding(page) {
   );
 }
 
+/**
+ * Signs in, retrying once when the shell wait times out without the server rejecting the sign-in.
+ * A rejection (e.g. 429 from the login flood guard) is never retried: another attempt would only
+ * spend more of the same budget. A plain timeout has hit one random viewport per CI run while the
+ * re-run passed, so one fresh attempt separates a slow first render from a real failure.
+ */
 async function login(page) {
+  try {
+    await loginOnce(page);
+  } catch (error) {
+    if (!(error instanceof Error) || error.name !== "TimeoutError") throw error;
+    console.warn(`Sign-in timed out (${error.message}); retrying once from a fresh /login.`);
+    await loginOnce(page);
+  }
+}
+
+async function loginOnce(page) {
   await page.goto(`${BASE_URL}/login`, { waitUntil: "domcontentloaded", timeout: TIMEOUT_MS });
   // Viewport pages share one cookie jar; later /login visits may already be authenticated.
   await page.waitForFunction(
