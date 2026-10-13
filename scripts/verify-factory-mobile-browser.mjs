@@ -34,7 +34,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import puppeteer from "puppeteer";
 
-import { awaitAuthenticatedShell, watchSignInResponses } from "./lib/browser-smoke-signin.mjs";
+import { awaitAuthenticatedShell, signInWithOneRetry, watchSignInResponses } from "./lib/browser-smoke-signin.mjs";
 import { resolveFactoryMobileSeeds } from "./lib/factory-mobile-fixture.mjs";
 import { DIALOG_TRIGGERS, SEED_KEYS, SEEDED_ROUTES, STATIC_ROUTES } from "./lib/factory-mobile-routes.mjs";
 
@@ -147,20 +147,9 @@ async function closeLanguageOnboarding(page) {
   );
 }
 
-/**
- * Signs in, retrying once when the shell wait times out without the server rejecting the sign-in.
- * A rejection (e.g. 429 from the login flood guard) is never retried: another attempt would only
- * spend more of the same budget. A plain timeout has hit one random viewport per CI run while the
- * re-run passed, so one fresh attempt separates a slow first render from a real failure.
- */
+/** Signs in, retrying once on a plain timeout (see signInWithOneRetry). */
 async function login(page) {
-  try {
-    await loginOnce(page);
-  } catch (error) {
-    if (!(error instanceof Error) || error.name !== "TimeoutError") throw error;
-    console.warn(`Sign-in timed out (${error.message}); retrying once from a fresh /login.`);
-    await loginOnce(page);
-  }
+  await signInWithOneRetry(() => loginOnce(page));
 }
 
 async function loginOnce(page) {

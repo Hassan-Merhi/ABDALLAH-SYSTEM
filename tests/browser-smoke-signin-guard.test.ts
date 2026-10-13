@@ -9,7 +9,11 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import { awaitAuthenticatedShell, watchSignInResponses } from "../scripts/lib/browser-smoke-signin.mjs";
+import {
+  awaitAuthenticatedShell,
+  signInWithOneRetry,
+  watchSignInResponses,
+} from "../scripts/lib/browser-smoke-signin.mjs";
 
 type Listener = (response: unknown) => void;
 
@@ -143,5 +147,38 @@ describe("browser smoke sign-in guard", () => {
 
     expect(signIn.rejection).toBeNull();
     signIn.stop();
+  });
+});
+
+describe("browser smoke sign-in retry", () => {
+  const timeoutError = () => Object.assign(new Error("Waiting failed: 45000ms exceeded"), { name: "TimeoutError" });
+
+  it("retries once when the first sign-in times out", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const attempt = vi.fn().mockRejectedValueOnce(timeoutError()).mockResolvedValueOnce("signed-in");
+    await expect(signInWithOneRetry(attempt)).resolves.toBe("signed-in");
+    expect(attempt).toHaveBeenCalledTimes(2);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("retrying once"));
+    warn.mockRestore();
+  });
+
+  it("gives up after the one retry also times out", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const attempt = vi.fn().mockRejectedValue(timeoutError());
+    await expect(signInWithOneRetry(attempt)).rejects.toThrow("45000ms exceeded");
+    expect(attempt).toHaveBeenCalledTimes(2);
+    warn.mockRestore();
+  });
+
+  it("never retries a rejected sign-in", async () => {
+    const attempt = vi.fn().mockRejectedValue(new Error("sign-in rejected by the server (429 Too Many Requests)"));
+    await expect(signInWithOneRetry(attempt)).rejects.toThrow("sign-in rejected");
+    expect(attempt).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry a successful sign-in", async () => {
+    const attempt = vi.fn().mockResolvedValue(undefined);
+    await signInWithOneRetry(attempt);
+    expect(attempt).toHaveBeenCalledTimes(1);
   });
 });
