@@ -5,6 +5,7 @@
  * explicit provider errors, timeouts, and retry rules cannot turn into false
  * success or uncontrolled retry storms. No real external service is contacted.
  */
+import { EventEmitter } from "node:events";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const VALID_CONTAINER = "MSKU1234567";
@@ -27,6 +28,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.doUnmock("node:https");
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 
@@ -278,9 +280,43 @@ describe("Phase 27 WhatsApp provider boundary", () => {
     );
   });
 
+  // Green API reads (getStateInstance, getChats) go through node:https over IPv4, not the
+  // global fetch, so the transport is mocked at that boundary.
+  function mockGreenHttps(reply: { timeout: true } | { status: number; body: string }) {
+    const requestMock = vi.fn((_url: URL, _options: unknown, onResponse: (res: EventEmitter) => void) => {
+      const req = Object.assign(new EventEmitter(), {
+        end() {
+          setImmediate(() => {
+            if ("timeout" in reply) {
+              req.emit("timeout");
+              return;
+            }
+            const res = Object.assign(new EventEmitter(), { statusCode: reply.status });
+            onResponse(res);
+            res.emit("data", Buffer.from(reply.body));
+            res.emit("end");
+            req.emit("close");
+          });
+        },
+        destroy(error?: Error) {
+          setImmediate(() => {
+            if (error) req.emit("error", error);
+            req.emit("close");
+          });
+        },
+      });
+      return req;
+    });
+    vi.doMock("node:https", async (importOriginal) => ({
+      ...(await importOriginal<typeof import("node:https")>()),
+      request: requestMock,
+    }));
+    return requestMock;
+  }
+
   it("returns unknown instead of throwing on provider timeout", async () => {
-    const timeout = Object.assign(new Error("timeout"), { name: "TimeoutError" });
-    const fetchMock = vi.fn().mockRejectedValue(timeout);
+    const requestMock = mockGreenHttps({ timeout: true });
+    const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
 
     const { getGreenInstanceState } = await import(
@@ -289,17 +325,13 @@ describe("Phase 27 WhatsApp provider boundary", () => {
     await expect(
       getGreenInstanceState("instance", "token")
     ).resolves.toBe("unknown");
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    // A read is retried once, then reported as unknown; nothing falls through to fetch.
+    expect(requestMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("treats malformed provider JSON as an unknown connection state", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response("not-json", {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      })
-    );
-    vi.stubGlobal("fetch", fetchMock);
+    const requestMock = mockGreenHttps({ status: 200, body: "not-json" });
 
     const { getGreenInstanceState } = await import(
       "../server/services/whatsappService"
@@ -307,5 +339,6 @@ describe("Phase 27 WhatsApp provider boundary", () => {
     await expect(
       getGreenInstanceState("instance", "token")
     ).resolves.toBe("unknown");
+    expect(requestMock).toHaveBeenCalledTimes(1);
   });
 });
