@@ -95,15 +95,13 @@ export function registerFactoryCustomerStatementPdfRoutes(app: Express) {
         return { ...row, debit, credit, container, particulars };
       });
 
-      // "Brought forward" balances at the start of the filter period: combined and ledger
+      // "Brought forward" balance at the start of the filter period
       let bfCombined = openingExact;
-      let bfLedger = openingExact;
       if (dateFromParam) {
         for (const r of allEnrichedPdf) {
           const rDate = (r.transactionDate || "").toString().slice(0, 10);
           if (rDate >= dateFromParam) break;
           bfCombined = bfCombined.plus(r.combinedEffect);
-          bfLedger = bfLedger.plus(r.ledgerEffect);
         }
       }
       const bfRunning = bfCombined.toNumber();
@@ -133,8 +131,6 @@ export function registerFactoryCustomerStatementPdfRoutes(app: Express) {
       const totalDr = totalDrExact.toNumber();
       const totalCr = totalCrExact.toNumber();
       const closingCombined = bfCombined.plus(totalDrExact).minus(totalCrExact);
-      const closingLedger = rows.reduce((sum, r) => sum.plus(r.ledgerEffect), bfLedger);
-      const closingNotInLedger = closingCombined.minus(closingLedger);
       const closingBalance = closingCombined.abs().toNumber();
       const closingBalanceSide = closingCombined.lessThan(0) ? "Cr" : "Dr";
 
@@ -503,8 +499,7 @@ export function registerFactoryCustomerStatementPdfRoutes(app: Express) {
       } else {
         doc.text(closingStr, colX[5] + CP, y + 4, { width: colW[5] - CP * 2, align: "right", lineBreak: false });
       }
-      y += 20; 
-      
+      y += 20;
 
       // ── Statement note ──
       if (customer.statementNote) {
