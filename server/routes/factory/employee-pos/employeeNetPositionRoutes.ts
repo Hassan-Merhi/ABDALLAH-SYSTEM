@@ -91,7 +91,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         configFxRates[row.currency_code as string] = toMoney(row.rate_to_usd as string).toNumber();
       }
       // Only use manually configured rates — no hardcoded fallbacks
-      const getConfigFx = (cc: string): number => configFxRates[cc] ?? 1;
+      const getConfigFx = (cc: string): number => { if (cc.toUpperCase() === 'USD') return 1; const rate = configFxRates[cc]; if (!rate || !Number.isFinite(rate) || rate <= 0) throw new Error(`Missing confirmed USD exchange rate for ${cc}`); return rate; };
 
       // ── 1. Factory supplier balances (What We Owe) ──────────────────────
       // Computed in ./netPositionSupplierBalances. suppliersList,
@@ -197,6 +197,8 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       // Any ledger account named/coded as "Payroll Payable" duplicates that and
       // must be excluded here — the single correct figure is injected below.
       const ledgerOnUs = ledgerOnUsRaw.filter((a) => {
+        // Stock credit balances are inventory contra-assets, not separate supplier debts.
+        if (PERPETUAL_STOCK_ACCOUNT_CODES.has((a.code || "").trim().toUpperCase())) return false;
         const nameLower = (a.name || "").toLowerCase();
         const code = (a.code || "").toUpperCase();
         const isPayrollPayable =
@@ -258,10 +260,9 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       // From the cut-over the ledger's factory stock accounts replace the computed
       // values (the selling-price view keeps its bale value, in place of the
       // ledger's finished goods at cost).
-      const sellingView = valuationMode === "selling";
-      const inventorySellValue = ledgerStock ? 0 : computedInventorySellValue;
-      const rawMaterialStockValue = ledgerStock ? 0 : computedRawMaterialStockValue;
-      const balanceOnTableValue = ledgerStock ? 0 : computedBalanceOnTableValue;
+      const inventorySellValue = computedInventorySellValue;
+      const rawMaterialStockValue = computedRawMaterialStockValue;
+      const balanceOnTableValue = computedBalanceOnTableValue;
 
       // ── 4. Pending, Verified & Loading orders (upcoming receivables) ──────────
       // Fetched here (before forUsTotal) so PENDING/VERIFIED totals can be
@@ -322,17 +323,11 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       // reality because advance repayments/deductions aren't always posted back to it.
       // factory_worker_advances.remaining_balance (used by the Payroll & Benefits "Advances"
       // KPI) is the authoritative source; we recompute it fresh below instead.
-      const keepsLedgerStock = (a: { code?: string | null }) => {
-        const code = (a.code || "").trim().toUpperCase();
-        if (!ledgerStock || !PERPETUAL_STOCK_ACCOUNT_CODES.has(code)) return false;
-        return !(sellingView && code === "FACTORY_FINISHED_GOODS");
-      };
       const cleanLedgerForUs = ledgerForUs.filter(
         (a) =>
-          (keepsLedgerStock(a) ||
-            (!inventoryCategoryRx.test(a.category) &&
-              !inventoryCategoryRx.test(a.name) &&
-              !(ledgerStock && (a.code || "").trim().toUpperCase() === "FACTORY_FINISHED_GOODS"))) &&
+          (!PERPETUAL_STOCK_ACCOUNT_CODES.has((a.code || "").trim().toUpperCase()) &&
+            !inventoryCategoryRx.test(a.category) &&
+            !inventoryCategoryRx.test(a.name)) &&
           (a.name || "").toLowerCase().trim().replace(/\s+/g, " ") !== "factory worker advances" &&
           // Exclude per-worker insurance liability accounts (e.g. "Insurance - أحمد علي رمضان")
           // — these are tracked separately via the Insurance section, not Net Position assets
@@ -509,7 +504,8 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
           stockOtwValue +
           totalCustomerDr +
           // At cost from the cut-over, the orders' bales are in the ledger's finished goods.
-          (ledgerStock && !sellingView ? 0 : pendingTotal + verifiedTotal + loadingTotal) +
+          // Unfinalized orders are not collectible receivables. Keep them as informational rows only.
+          0 +
           totalSupplierOverpaymentsRounded +
           prepaidRent +
           employeeReceivablesTotal +
@@ -575,15 +571,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
             category: "Supplier Overpayments",
             breakdown: s.breakdown,
           })),
-        ...(pendingTotal > 0
-          ? [{ name: "Pending Orders", code: "PENDING_ORDERS", value: pendingTotal, category: "Pending Orders" }]
-          : []),
-        ...(verifiedTotal > 0
-          ? [{ name: "Verified Orders", code: "VERIFIED_ORDERS", value: verifiedTotal, category: "Verified Orders" }]
-          : []),
-        ...(loadingTotal > 0
-          ? [{ name: "Loading Orders", code: "LOADING_ORDERS", value: loadingTotal, category: "Loading Orders" }]
-          : []),
+
         ...(prepaidRent > 0
           ? [{ name: "Prepaid Rent", code: "PREPAID_RENT", value: prepaidRent, category: "Prepaid Rent" }]
           : []),
