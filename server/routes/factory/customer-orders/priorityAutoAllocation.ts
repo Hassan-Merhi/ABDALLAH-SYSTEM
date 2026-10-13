@@ -72,10 +72,6 @@ export async function allocateAutomaticPriorityBaleTx(
     .where(and(eq(factoryBales.id, baleId), eq(factoryBales.companyId, companyId), isNull(factoryBales.deletedAt)))
     .limit(1);
   if (!bale) return null;
-  // Print-only non-bale catalog items never receive priority color or a loading link,
-  // including on reprints. Keep existing allocation/history records untouched.
-  if (await isNonBalePriorityProductTx(tx, companyId, bale.productId)) return null;
-
   // An active snapshot has a company/bale uniqueness boundary. Reprinting an existing
   // allocation uses its original priority/color even after the queue changes.
   const existing = firstRow(
@@ -148,20 +144,36 @@ export async function allocateAutomaticPriorityBaleTx(
        ORDER BY id ASC LIMIT 1
     `)
     ) as { priority: number; color: string } | undefined;
-    return prior
-      ? {
-          baleId,
-          referenceNumber: bale.referenceNumber,
-          orderId: Number(linked.orderId),
-          priority: Number(prior.priority),
-          color: prior.color,
-          source: "manual",
-          existing: true,
-        }
-      : null;
+    if (!prior) {
+      // Ordinary container-linked bales may have no priority history. Only
+      // block a colorless print when this loading is configured for Priority Scan.
+      const priorityConfigured = firstRow(await tx.execute(sql`
+        SELECT 1 FROM customer_order_priority_scan_configs
+         WHERE company_id = ${companyId} AND order_id = ${linked.orderId}
+         LIMIT 1
+      `));
+      if (priorityConfigured) {
+        // The live queue color is not a historical source of truth.
+        throw new Error(`Bale ${bale.referenceNumber} is on priority loading ${linked.orderId} but has no saved priority scan color. Reconcile its original color before printing.`);
+      }
+      return null;
+    }
+    return {
+      baleId,
+      referenceNumber: bale.referenceNumber,
+      orderId: Number(linked.orderId),
+      priority: Number(prior.priority),
+      color: prior.color,
+      source: "manual",
+      existing: true,
+    };
   }
 
 
+
+  // Exclusions apply only to future allocation; never strip a color from a
+  // bale that is already physically linked to a loading with saved priority history.
+  if (await isNonBalePriorityProductTx(tx, companyId, bale.productId)) return null;
 
   // OFF prevents NEW automatic allocation, but must never erase the original
   // label destination/color for a bale that was assigned while ON.
