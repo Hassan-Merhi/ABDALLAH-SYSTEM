@@ -32,7 +32,7 @@ import {
 } from "./intent";
 import { toMoney } from "../lib/money";
 
-function buildSystemPrompt(context: ERPContext, userPreferences?: UserPreferences): string {
+function buildSystemPrompt(context: ERPContext, _userPreferences?: UserPreferences): string {
   const profitMargin =
     toMoney(context.profitAnalysis.totalSales).toNumber() > 0
       ? (

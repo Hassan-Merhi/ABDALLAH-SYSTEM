@@ -174,10 +174,8 @@ async function runPhase5Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         WHERE pli.po_id = ${po5.id}
         ORDER BY pli.id
       `);
-      let _lineTotal = 0;
       const tableRows5 = lineRows.rows.map((r) => {
         const lt = toMoney(r.line_total).toNumber();
-        _lineTotal += lt;
         return [
           r.item_name,
           r.code,

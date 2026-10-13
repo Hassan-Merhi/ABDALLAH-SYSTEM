@@ -12,7 +12,7 @@ export type BulkTrackingProgress = {
   completedAt: number | null;
 };
 
-let _bulkProgress: BulkTrackingProgress = {
+const _bulkProgress: BulkTrackingProgress = {
   running: false,
   total: 0,
   processed: 0,
