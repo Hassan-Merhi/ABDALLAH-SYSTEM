@@ -5,6 +5,7 @@
  * explicit provider errors, timeouts, and retry rules cannot turn into false
  * success or uncontrolled retry storms. No real external service is contacted.
  */
+import { EventEmitter } from "node:events";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const VALID_CONTAINER = "MSKU1234567";
@@ -13,6 +14,43 @@ const originalEnv = {
   MAERSK_CONSUMER_KEY: process.env.MAERSK_CONSUMER_KEY,
   MAERSK_CONSUMER_SECRET: process.env.MAERSK_CONSUMER_SECRET,
 };
+
+type GreenApiHttpsReply = { error: Error } | { status: number; body: string };
+
+/**
+ * Green API read-only calls (getStateInstance, getChats) go through node:https
+ * over IPv4 rather than fetch. Stub that boundary so no real request is sent.
+ */
+function mockGreenApiHttps(reply: GreenApiHttpsReply) {
+  const request = vi.fn(
+    (_url: URL, _options: unknown, onResponse: (res: EventEmitter & { statusCode: number }) => void) => {
+      const req = Object.assign(new EventEmitter(), {
+        end() {
+          queueMicrotask(() => {
+            if ("error" in reply) {
+              req.emit("error", reply.error);
+              return;
+            }
+            const res = Object.assign(new EventEmitter(), { statusCode: reply.status });
+            onResponse(res);
+            res.emit("data", Buffer.from(reply.body));
+            res.emit("end");
+          });
+        },
+        destroy(error?: Error) {
+          if (error) req.emit("error", error);
+          req.emit("close");
+        },
+      });
+      return req;
+    }
+  );
+  vi.doMock("node:https", async (importOriginal) => ({
+    ...(await importOriginal<typeof import("node:https")>()),
+    request,
+  }));
+  return request;
+}
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -26,6 +64,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.doUnmock("node:https");
   vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
@@ -58,9 +97,7 @@ describe("Phase 27 JSONCargo provider", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    const { track } = await import(
-      "../server/lib/trackingProviders/jsonCargoProvider"
-    );
+    const { track } = await import("../server/lib/trackingProviders/jsonCargoProvider");
     const result = await track(VALID_CONTAINER, "MAERSK");
 
     expect(result).toMatchObject({
@@ -76,9 +113,7 @@ describe("Phase 27 JSONCargo provider", () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ ok: true }));
     vi.stubGlobal("fetch", fetchMock);
 
-    const { track } = await import(
-      "../server/lib/trackingProviders/jsonCargoProvider"
-    );
+    const { track } = await import("../server/lib/trackingProviders/jsonCargoProvider");
     const result = await track(VALID_CONTAINER, "MAERSK");
 
     expect(result.success).toBe(false);
@@ -99,9 +134,7 @@ describe("Phase 27 JSONCargo provider", () => {
       );
     vi.stubGlobal("fetch", fetchMock);
 
-    const { track } = await import(
-      "../server/lib/trackingProviders/jsonCargoProvider"
-    );
+    const { track } = await import("../server/lib/trackingProviders/jsonCargoProvider");
     const pending = track(VALID_CONTAINER, "MAERSK");
     await vi.runAllTimersAsync();
     const result = await pending;
@@ -117,14 +150,10 @@ describe("Phase 27 JSONCargo provider", () => {
 
   it("does not retry deterministic 400/404 provider responses", async () => {
     process.env.JSONCARGO_API_KEY = "phase27-key";
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(jsonResponse({ error: "missing" }, 404));
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ error: "missing" }, 404));
     vi.stubGlobal("fetch", fetchMock);
 
-    const { track } = await import(
-      "../server/lib/trackingProviders/jsonCargoProvider"
-    );
+    const { track } = await import("../server/lib/trackingProviders/jsonCargoProvider");
     const result = await track(VALID_CONTAINER, "MAERSK");
 
     expect(result.errorCategory).toBe("not_found");
@@ -140,9 +169,7 @@ describe("Phase 27 JSONCargo provider", () => {
     const fetchMock = vi.fn().mockRejectedValue(timeout);
     vi.stubGlobal("fetch", fetchMock);
 
-    const { track } = await import(
-      "../server/lib/trackingProviders/jsonCargoProvider"
-    );
+    const { track } = await import("../server/lib/trackingProviders/jsonCargoProvider");
     const pending = track(VALID_CONTAINER, "MAERSK");
     await vi.runAllTimersAsync();
     const result = await pending;
@@ -160,9 +187,7 @@ describe("Phase 27 JSONCargo provider", () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
 
-    const { track, normalizeJsonCargoCarrier } = await import(
-      "../server/lib/trackingProviders/jsonCargoProvider"
-    );
+    const { track, normalizeJsonCargoCarrier } = await import("../server/lib/trackingProviders/jsonCargoProvider");
     expect(normalizeJsonCargoCarrier("CMA-CGM (France)")).toBe("CMA_CGM");
     expect(normalizeJsonCargoCarrier("unknown carrier")).toBeNull();
 
@@ -179,9 +204,7 @@ describe("Phase 27 Maersk provider", () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
 
-    const { track } = await import(
-      "../server/lib/trackingProviders/maerskProvider"
-    );
+    const { track } = await import("../server/lib/trackingProviders/maerskProvider");
     const result = await track(VALID_CONTAINER);
 
     expect(result).toMatchObject({
@@ -197,9 +220,7 @@ describe("Phase 27 Maersk provider", () => {
     process.env.MAERSK_CONSUMER_SECRET = "phase27-secret";
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce(
-        jsonResponse({ access_token: "token-a", expires_in: 3600 })
-      )
+      .mockResolvedValueOnce(jsonResponse({ access_token: "token-a", expires_in: 3600 }))
       .mockResolvedValueOnce(
         new Response("broken-json", {
           status: 200,
@@ -208,9 +229,7 @@ describe("Phase 27 Maersk provider", () => {
       );
     vi.stubGlobal("fetch", fetchMock);
 
-    const { track } = await import(
-      "../server/lib/trackingProviders/maerskProvider"
-    );
+    const { track } = await import("../server/lib/trackingProviders/maerskProvider");
     const result = await track(VALID_CONTAINER);
 
     expect(result.success).toBe(false);
@@ -223,13 +242,9 @@ describe("Phase 27 Maersk provider", () => {
     process.env.MAERSK_CONSUMER_SECRET = "phase27-secret";
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce(
-        jsonResponse({ access_token: "token-a", expires_in: 3600 })
-      )
+      .mockResolvedValueOnce(jsonResponse({ access_token: "token-a", expires_in: 3600 }))
       .mockResolvedValueOnce(jsonResponse({ error: "unauthorized" }, 401))
-      .mockResolvedValueOnce(
-        jsonResponse({ access_token: "token-b", expires_in: 3600 })
-      )
+      .mockResolvedValueOnce(jsonResponse({ access_token: "token-b", expires_in: 3600 }))
       .mockResolvedValueOnce(
         jsonResponse({
           status: "IN_TRANSIT",
@@ -250,9 +265,7 @@ describe("Phase 27 Maersk provider", () => {
       );
     vi.stubGlobal("fetch", fetchMock);
 
-    const { track } = await import(
-      "../server/lib/trackingProviders/maerskProvider"
-    );
+    const { track } = await import("../server/lib/trackingProviders/maerskProvider");
     const first = await track(VALID_CONTAINER);
     const second = await track(VALID_CONTAINER);
 
@@ -269,43 +282,29 @@ describe("Phase 27 Maersk provider", () => {
 
 describe("Phase 27 WhatsApp provider boundary", () => {
   it("normalizes recipient ids without changing existing group ids", async () => {
-    const { normaliseChatId } = await import(
-      "../server/services/whatsappService"
-    );
+    const { normaliseChatId } = await import("../server/services/whatsappService");
     expect(normaliseChatId("+243 999 123 456")).toBe("243999123456@c.us");
-    expect(normaliseChatId("120363000000@g.us")).toBe(
-      "120363000000@g.us"
-    );
+    expect(normaliseChatId("120363000000@g.us")).toBe("120363000000@g.us");
   });
 
   it("returns unknown instead of throwing on provider timeout", async () => {
-    const timeout = Object.assign(new Error("timeout"), { name: "TimeoutError" });
-    const fetchMock = vi.fn().mockRejectedValue(timeout);
+    const timeout = Object.assign(new Error("Connection timed out"), { code: "ETIMEDOUT" });
+    const request = mockGreenApiHttps({ error: timeout });
+    const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
 
-    const { getGreenInstanceState } = await import(
-      "../server/services/whatsappService"
-    );
-    await expect(
-      getGreenInstanceState("instance", "token")
-    ).resolves.toBe("unknown");
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const { getGreenInstanceState } = await import("../server/services/whatsappService");
+    await expect(getGreenInstanceState("instance", "token")).resolves.toBe("unknown");
+    // Read-only calls are retried once; nothing goes through fetch.
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("treats malformed provider JSON as an unknown connection state", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response("not-json", {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      })
-    );
-    vi.stubGlobal("fetch", fetchMock);
+    const request = mockGreenApiHttps({ status: 200, body: "not-json" });
 
-    const { getGreenInstanceState } = await import(
-      "../server/services/whatsappService"
-    );
-    await expect(
-      getGreenInstanceState("instance", "token")
-    ).resolves.toBe("unknown");
+    const { getGreenInstanceState } = await import("../server/services/whatsappService");
+    await expect(getGreenInstanceState("instance", "token")).resolves.toBe("unknown");
+    expect(request).toHaveBeenCalledTimes(1);
   });
 });

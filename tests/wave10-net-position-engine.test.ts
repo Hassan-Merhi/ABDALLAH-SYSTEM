@@ -7,9 +7,10 @@
  *   - a new customer's opening is owned by the customer record: the CUST
  *     ledger created with it starts at zero, and the opening appears exactly
  *     once in net position and in the trial balance;
- *   - amounts not yet in the ledger (unposted factory invoices, factory POS
- *     credit sales, unjournalled container goods, unfinalized orders) are a
- *     separate `notInLedger` section, never in What We Have / What We Owe;
+ *   - the factory net position is the exception since #2212: its customers are
+ *     back on their pre-Wave-10 operational balance (unposted factory invoices
+ *     and POS credit sales count), and unfinalized orders are listed for
+ *     information only, never in What We Have / What We Owe;
  *   - supplier-partner companies still exclude customers.
  */
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -365,36 +366,33 @@ describe("net position party lines equal the engine", () => {
 });
 
 describe("the factory net position", () => {
-  it("takes customers and factory suppliers from the engine and lists what is not in the ledger apart", async () => {
+  it("takes customers at their operational balance and factory suppliers from the engine, orders apart", async () => {
     const { statusCode, body } = await call("GET /api/factory/net-position", {
       session: { factoryCompanyId: factory, currentCompanyId: factory },
       query: { asOf: AS_OF },
     });
     expect(statusCode).toBe(200);
     const customer = await getPartyBalance(db, { companyId: factory, kind: "customer", id: fCustomer, asOf: AS_OF });
+    // The ledger holds only the 100 receipt, so the engine sees the customer in credit.
     expect(customer?.historicalBaseClosing).toBe("-100.00");
-    // The ledger holds only the 100 receipt: the customer is in credit (What We Owe).
-    expect(body.onUs.accounts).toEqual(
+    // #2212 restored the pre-Wave-10 customer balance: the 500 invoice and the 200 POS
+    // credit sale count even before they are journalled, less the 100 receipt.
+    expect(body.forUs.accounts).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ code: "CUSTOMER_CR", name: `${PREFIX} factory customer`, value: 100 }),
+        expect.objectContaining({ code: "CUSTOMER_DR", name: `${PREFIX} factory customer`, value: 600 }),
       ])
     );
+    expect(body.onUs.accounts.some((account: { code: string }) => account.code === "CUSTOMER_CR")).toBe(false);
     // The factory supplier was paid 60 in the ledger: an overpayment until the container is journalled.
     expect(body.forUs.accounts).toEqual(
       expect.arrayContaining([expect.objectContaining({ code: "SUPPLIER_OVERPAID", value: 60 })])
     );
-    const memo = Object.fromEntries(
-      body.notInLedger.lines.map((line: { code: string; value: number }) => [line.code, line.value])
-    );
-    expect(memo).toMatchObject({
-      NOT_IN_LEDGER_FACTORY_INVOICE: 500,
-      NOT_IN_LEDGER_FACTORY_POS_CREDIT_SALE: 200,
-      NOT_IN_LEDGER_FACTORY_CONTAINER_GOODS: -500,
-      PENDING_ORDERS: 75,
-    });
-    // None of it is in the totals.
-    expect(body.forUs.accounts.some((account: { code: string }) => account.code === "PENDING_ORDERS")).toBe(false);
+    // The unfinalized order is listed for information only, never in the totals.
     expect(body.pendingTotal).toBe(75);
+    expect(body.pendingOrders).toEqual([expect.objectContaining({ grandTotal: 75 })]);
+    expect(body.forUs.accounts.some((account: { code: string }) => account.code === "PENDING_ORDERS")).toBe(false);
+    const accountsTotal = body.forUs.accounts.reduce((sum: number, a: { value: number }) => sum + a.value, 0);
+    expect(body.forUsTotal).toBeCloseTo(accountsTotal, 2);
     expect(body.netPosition).toBeCloseTo(body.forUsTotal - body.onUsTotal, 2);
   });
 });

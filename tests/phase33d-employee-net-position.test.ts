@@ -29,39 +29,17 @@ const harness = vi.hoisted(() => {
     classifyNetPositionAccounts: vi.fn(),
     computeNetPositionInventory: vi.fn(),
     computeNetPositionSupplierBalances: vi.fn(),
-    loadNetPositionParties: vi.fn(),
+    getCustomerLedgerAndMemo: vi.fn(),
     loggerError: vi.fn(),
   };
 });
 
-// Wave 10: factory suppliers, customers and employees come from the balance
-// engine; the factory-specific "not yet in the ledger" helpers stay real.
-vi.mock("../server/services/accounting/balances/netPositionParties", async () => {
-  const notInLedgerSection = (lines: Array<{ value: number; count: number }>) => ({
-    label: "Not yet in the ledger",
-    total: Math.round(lines.reduce((sum, line) => sum + line.value, 0) * 100) / 100,
-    lines,
-  });
-  return { loadNetPositionParties: harness.loadNetPositionParties, notInLedgerSection };
-});
-
-const payrollLine = (value: number) => ({
-  name: "Payroll Payable",
-  code: "EMPLOYEE_PAYROLL_PAYABLE",
-  value,
-  category: "Liability",
-  partyKind: "employee",
-  partyId: null,
-});
-const emptyParties = () => ({
-  forUs: [],
-  onUs: [payrollLine(0)],
-  forUsTotal: 0,
-  onUsTotal: 0,
-  customerLedgerIds: new Set<number>(),
-  payrollSigned: 0,
-  notInLedger: { label: "Not yet in the ledger", total: 0, lines: [] },
-});
+// Since #2212 the factory net position takes each customer at the Parties
+// page's combined ledger + operational balance, and employees straight from
+// employees.currentBalance.
+vi.mock("../server/routes/factory/customers-core/customerLedgerSplit", () => ({
+  getCustomerLedgerAndMemo: harness.getCustomerLedgerAndMemo,
+}));
 
 vi.mock("../server/db", () => ({
   db: harness.db,
@@ -91,6 +69,7 @@ vi.mock("../server/routes/factory/employee-pos/netPositionSupplierBalances", () 
 }));
 vi.mock("../server/lib/queryResult", () => ({ resultRows: (value: any) => value?.rows ?? [] }));
 
+import { MoneyDecimal } from "../server/lib/money";
 import { registerEmployeeNetPositionRoutes } from "../server/routes/factory/employee-pos/employeeNetPositionRoutes";
 
 type Handler = (req: any, res: any) => unknown;
@@ -150,7 +129,7 @@ describe("Phase 33D employee/factory net position", () => {
       stockOtwValue: 0,
       balanceOnTableValue: 0,
     });
-    harness.loadNetPositionParties.mockResolvedValue(emptyParties());
+    harness.getCustomerLedgerAndMemo.mockResolvedValue(new Map());
   });
 
   it("returns 400 when neither the session nor an active factory company can resolve a company", async () => {
@@ -207,7 +186,7 @@ describe("Phase 33D employee/factory net position", () => {
     expect(res.body.onUs.accounts).toEqual([expect.objectContaining({ code: "EMPLOYEE_PAYROLL_PAYABLE", value: 0 })]);
   });
 
-  it("takes parties from the balance engine, keeps ledger balances, and lists unfinalized orders apart", async () => {
+  it("takes customers at their Parties balance, keeps ledger balances, and lists unfinalized orders apart", async () => {
     harness.classifyNetPositionAccounts.mockReturnValue({
       forUsAccounts: [
         { id: 1, name: "Operating Cash", code: "CASH", category: "Asset", value: 100 },
@@ -225,63 +204,15 @@ describe("Phase 33D employee/factory net position", () => {
         { name: "Other Payable", code: "OTHER", category: "Liability", value: 30 },
       ],
     });
-    harness.loadNetPositionParties.mockResolvedValue({
-      forUs: [
-        {
-          name: "Supplier Overpaid",
-          code: "SUPPLIER_OVERPAID",
-          value: 10,
-          category: "Supplier Overpayments",
-          partyKind: "factorySupplier",
-          partyId: 2,
-        },
-        {
-          name: "Bob Owes",
-          code: "EMPLOYEE_RECEIVABLE",
-          value: 12,
-          category: "Employee Receivable",
-          partyKind: "employee",
-          partyId: 9,
-        },
-        {
-          id: 6,
-          name: "Customer Dr",
-          code: "CUSTOMER_DR",
-          value: 70,
-          category: "Customer",
-          partyKind: "customer",
-          partyId: 5,
-        },
+    harness.computeNetPositionSupplierBalances.mockResolvedValue({
+      supplierLockedRateMapNp: new Map(),
+      allContainersF: [],
+      supplierItems: [
+        { name: "Supplier Due", balanceUsd: 40, breakdown: [] },
+        { name: "Supplier Overpaid", balanceUsd: -10, breakdown: [] },
       ],
-      onUs: [
-        {
-          name: "Supplier Due",
-          code: "SUPPLIER",
-          value: 40,
-          category: "Supplier",
-          partyKind: "factorySupplier",
-          partyId: 1,
-        },
-        payrollLine(20),
-      ],
-      forUsTotal: 92,
-      onUsTotal: 60,
-      // The customer's linked ledger is rolled into the customer line.
-      customerLedgerIds: new Set<number>([6]),
-      payrollSigned: 20,
-      notInLedger: {
-        label: "Not yet in the ledger",
-        total: 300,
-        lines: [
-          {
-            label: "Factory invoices not yet in the ledger",
-            code: "NOT_IN_LEDGER_FACTORY_INVOICE",
-            value: 300,
-            category: "Not yet in the ledger",
-            count: 2,
-          },
-        ],
-      },
+      totalSupplierLiabilities: 40,
+      totalSupplierOverpayments: 10,
     });
     harness.computeNetPositionInventory.mockResolvedValue({
       inventorySellValue: 200,
@@ -289,14 +220,29 @@ describe("Phase 33D employee/factory net position", () => {
       stockOtwValue: 50,
       balanceOnTableValue: 25,
     });
+    // Customer 5 owes 50 in the ledger plus 20 not yet in it; customer 6 (whose
+    // linked ledger is the classifier's CUST-6) is 30 in credit.
+    harness.getCustomerLedgerAndMemo.mockResolvedValue(
+      new Map([
+        [5, { ledger: new MoneyDecimal(50), memoTotal: new MoneyDecimal(20) }],
+        [6, { ledger: new MoneyDecimal(-30), memoTotal: new MoneyDecimal(0) }],
+      ])
+    );
 
     harness.executeResults.push(
       { rows: [{ currency_code: "CDF", rate_to_usd: "0.00035" }] },
       { rows: [{ total: "15" }] }
     );
     harness.selectResults.push(
+      // ledger accounts, vouchers
       [],
       [],
+      // customers
+      [
+        { id: 5, legalName: "Customer Dr", ledgerAccountId: null },
+        { id: 6, legalName: "Customer Cr", ledgerAccountId: 6 },
+      ],
+      // unfinalized orders
       [
         {
           id: 1,
@@ -326,21 +272,27 @@ describe("Phase 33D employee/factory net position", () => {
           customerName: "Loading Customer",
         },
       ],
-      []
+      // factory rental units
+      [],
+      // employees
+      [
+        { firstName: "Bob", lastName: "Owes", currentBalance: "-12" },
+        { firstName: "Pat", lastName: "Due", currentBalance: "20" },
+      ]
     );
 
     const res = resHarness();
     await routes.get("GET /api/factory/net-position")!(req({ query: { asOf: "2026-09-15" } }), res);
 
     expect(res.statusCode).toBe(200);
-    // What We Have: ledger 100 + 88 (worker-advance ledger kept) + inventory 200
-    // + raw 100 + table 25 + OTW 50 + customer 70 + supplier overpaid 10 + employee 12 = 655.
-    // What We Owe: ledger 50 + 30 + supplier 40 + payroll 20 = 140.
+    // What We Have: ledger cash 100 + inventory 200 + raw 100 + table 25 + OTW 50
+    // + customer 70 + supplier overpaid 10 + employee 12 + worker advances 15 = 582.
+    // What We Owe: ledger 30 + supplier 40 + customer credit 30 + payroll 20 = 120.
     expect(res.body).toMatchObject({
       asOf: "2026-09-15",
-      forUsTotal: 655,
-      onUsTotal: 140,
-      netPosition: 515,
+      forUsTotal: 582,
+      onUsTotal: 120,
+      netPosition: 462,
       supplierLiabilities: 40,
       supplierOverpayments: 10,
       inventoryValue: 200,
@@ -349,52 +301,52 @@ describe("Phase 33D employee/factory net position", () => {
       pendingTotal: 60,
       verifiedTotal: 70,
       loadingTotal: 80,
-      ledgerAssets: 188,
-      ledgerLiabilities: 80,
+      ledgerAssets: 100,
+      ledgerLiabilities: 30,
       payrollPayable: 20,
     });
-    // Unfinalized orders and the worker-advance table's excess over the ledger
-    // (15 − (88 − 50) = −23) are listed apart, never in the totals.
-    expect(res.body.notInLedger.lines.map((line: any) => [line.code, line.value])).toEqual([
-      ["NOT_IN_LEDGER_FACTORY_INVOICE", 300],
-      ["PENDING_ORDERS", 60],
-      ["VERIFIED_ORDERS", 70],
-      ["LOADING_ORDERS", 80],
-      ["WORKER_ADVANCES", -23],
-    ]);
 
-    const forUsCodes = res.body.forUs.accounts.map((account: any) => account.code);
-    expect(forUsCodes).toEqual(
-      expect.arrayContaining([
-        "INVENTORY",
-        "RAW_MATERIAL",
-        "BALANCE_ON_TABLE",
-        "STOCK_OTW",
-        "CASH",
-        "ADV",
-        "CUSTOMER_DR",
-        "SUPPLIER_OVERPAID",
-        "EMPLOYEE_RECEIVABLE",
-      ])
-    );
-    expect(forUsCodes).not.toEqual(
-      expect.arrayContaining(["LEGACY_INV", "RENT", "INS", "CUST-6", "PENDING_ORDERS", "WORKER_ADVANCES"])
-    );
+    const forUs = Object.fromEntries(res.body.forUs.accounts.map((account: any) => [account.code, account.value]));
+    expect(forUs).toMatchObject({
+      INVENTORY: 200,
+      RAW_MATERIAL: 100,
+      BALANCE_ON_TABLE: 25,
+      STOCK_OTW: 50,
+      CASH: 100,
+      CUSTOMER_DR: 70,
+      SUPPLIER_OVERPAID: 10,
+      EMPLOYEE_RECEIVABLE: 12,
+      WORKER_ADVANCES: 15,
+    });
+    // Legacy inventory, the worker-advance and prepaid-rent ledgers, insurance
+    // members, the customer's own ledger and the unfinalized orders stay out.
+    const forUsCodes = Object.keys(forUs);
+    for (const code of ["LEGACY_INV", "ADV", "RENT", "INS", "CUST-6", "PENDING_ORDERS"]) {
+      expect(forUsCodes).not.toContain(code);
+    }
 
-    const onUsCodes = res.body.onUs.accounts.map((account: any) => account.code);
-    expect(onUsCodes).toEqual(expect.arrayContaining(["SUPPLIER", "OTHER", "ADV", "EMPLOYEE_PAYROLL_PAYABLE"]));
-    expect(onUsCodes).not.toEqual(expect.arrayContaining(["PAYROLL_PAYABLE", "ACCR-RENT-PAY", "INS"]));
+    const onUs = Object.fromEntries(res.body.onUs.accounts.map((account: any) => [account.code, account.value]));
+    expect(onUs).toMatchObject({ SUPPLIER: 40, OTHER: 30, EMPLOYEE_PAYROLL_PAYABLE: 20, CUSTOMER_CR: 30 });
+    for (const code of ["PAYROLL_PAYABLE", "ACCR-RENT-PAY", "ADV", "INS"]) {
+      expect(Object.keys(onUs)).not.toContain(code);
+    }
+    expect(res.body.forUsTotal).toBeCloseTo(
+      res.body.forUs.accounts.reduce((sum: number, account: any) => sum + account.value, 0),
+      2
+    );
+    expect(res.body.onUsTotal).toBeCloseTo(
+      res.body.onUs.accounts.reduce((sum: number, account: any) => sum + account.value, 0),
+      2
+    );
 
     const supplierArgs = harness.computeNetPositionSupplierBalances.mock.calls[0][0];
     expect(supplierArgs.companyId).toBe(7);
     expect(supplierArgs.asOf).toBe("2026-09-15");
-    expect(supplierArgs.contextOnly).toBe(true);
     expect(supplierArgs.getConfigFx("CDF")).toBe(0.00035);
     expect(supplierArgs.getConfigFx("USD")).toBe(1);
-    expect(harness.loadNetPositionParties).toHaveBeenCalledWith(
-      7,
-      expect.objectContaining({ asOf: "2026-09-15", customers: true, factorySuppliers: true, employees: "factory" })
-    );
+    // A currency with no confirmed manual rate is refused, never guessed (#2216).
+    expect(() => supplierArgs.getConfigFx("EUR")).toThrow("Missing confirmed USD exchange rate for EUR");
+    expect(harness.getCustomerLedgerAndMemo).toHaveBeenCalledWith(7, [5, 6], "2026-09-15");
   });
 
   it("sums ledger movements exactly", async () => {

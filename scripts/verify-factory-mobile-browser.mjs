@@ -34,7 +34,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import puppeteer from "puppeteer";
 
-import { awaitAuthenticatedShell, watchSignInResponses } from "./lib/browser-smoke-signin.mjs";
+import { awaitAuthenticatedShell, signInWithOneRetry, watchSignInResponses } from "./lib/browser-smoke-signin.mjs";
 import { resolveFactoryMobileSeeds } from "./lib/factory-mobile-fixture.mjs";
 import { DIALOG_TRIGGERS, SEED_KEYS, SEEDED_ROUTES, STATIC_ROUTES } from "./lib/factory-mobile-routes.mjs";
 
@@ -147,7 +147,12 @@ async function closeLanguageOnboarding(page) {
   );
 }
 
+/** Signs in, retrying once on a plain timeout (see signInWithOneRetry). */
 async function login(page) {
+  await signInWithOneRetry(() => loginOnce(page));
+}
+
+async function loginOnce(page) {
   await page.goto(`${BASE_URL}/login`, { waitUntil: "domcontentloaded", timeout: TIMEOUT_MS });
   // Viewport pages share one cookie jar; later /login visits may already be authenticated.
   await page.waitForFunction(
