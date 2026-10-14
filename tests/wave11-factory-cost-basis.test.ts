@@ -675,6 +675,61 @@ describe("the reviewed bale re-cost", () => {
     expect(audit).toHaveLength(1);
   });
 
+  it("reviews SOLD bales on genuinely uninvoiced VERIFIED orders, but refuses invoiced or finalized orders", async () => {
+    const unbilled = await bale({ status: "SOLD", weight: "25", costPerKg: "40", totalCost: "1000" });
+    const invoiceMarked = await bale({ status: "SOLD", weight: "25", costPerKg: "40", totalCost: "1000" });
+    const finalized = await bale({ status: "SOLD", weight: "25", costPerKg: "40", totalCost: "1000" });
+
+    const link = async (baleId: number, status: string, invoiced: boolean) => {
+      const rec = await one<{ reference_number: string }>(
+        "SELECT reference_number FROM factory_bales WHERE id = $1", [baleId]
+      );
+      const order = await one<{ id: number }>(
+        `INSERT INTO customer_orders
+          (company_id, customer_id, order_date, status, invoice_number, finalized_at)
+         VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
+        [companyId, customerId, today, status, invoiced ? `INV-${baleId}` : null, invoiced ? new Date() : null]
+      );
+      await pool.query(
+        `INSERT INTO customer_order_bales
+          (order_id, bale_id, bale_reference, location_id, weight, price_used)
+         VALUES ($1,$2,$3,$4,25,60)`,
+        [order.id, baleId, rec.reference_number, locationId]
+      );
+      return order.id;
+    };
+
+    const unbilledOrder = await link(unbilled, "VERIFIED", false);
+    await link(invoiceMarked, "VERIFIED", true);
+    await link(finalized, "FINALIZED", true);
+
+    const preview = await call("GET /api/factory/bale-cost/recost-preview", { user: { role: "Owner" } });
+    expect(preview.statusCode).toBe(200);
+    expect(preview.body.bales.find((r: { id: number }) => r.id === unbilled)).toMatchObject({
+      status: "SOLD",
+      eligibility: "sold-on-uninvoiced-verified-order",
+      oldTotalCost: "1000.0000000",
+      newTotalCost: "40.0000000",
+    });
+    expect(preview.body.bales.some((r: { id: number }) => r.id === invoiceMarked)).toBe(false);
+    expect(preview.body.bales.some((r: { id: number }) => r.id === finalized)).toBe(false);
+
+    // Even without changing the stored SOLD status, an invoice issued between
+    // preview and apply must invalidate the previously reviewed plan hash.
+    await pool.query(
+      "UPDATE customer_orders SET invoice_number=$1, finalized_at=NOW() WHERE id=$2",
+      [`INV-${unbilledOrder}`, unbilledOrder]
+    );
+    const refused = await call("POST /api/factory/bale-cost/recost-apply", {
+      user: { role: "Owner" },
+      body: { confirm: true, planHash: preview.body.planHash },
+    });
+    expect(refused).toMatchObject({ statusCode: 409, body: { code: "PLAN_CHANGED" } });
+    expect((await baleCost(unbilled)).total_cost).toBe("1000.0000000");
+    expect((await baleCost(invoiceMarked)).total_cost).toBe("1000.0000000");
+    expect((await baleCost(finalized)).total_cost).toBe("1000.0000000");
+  });
+
   it("posts the value change to Factory Stock Revaluation after the cut-over", async () => {
     const stale = await bale({ status: "IN_STOCK", weight: "25", costPerKg: "4", totalCost: "100" });
     await setCutover(true);
