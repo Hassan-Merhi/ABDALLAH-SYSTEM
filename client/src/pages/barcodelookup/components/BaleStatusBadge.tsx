@@ -12,6 +12,8 @@ export function BaleStatusBadge({ status }: { status: string }) {
     { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: LucideIcon }
   > = {
     IN_STOCK: { label: "In Stock", variant: "default", icon: CheckCircle2 },
+    LOADING: { label: "Loading", variant: "outline", icon: AlertCircle },
+    RESERVED_FOR_ORDER: { label: "Reserved for Order", variant: "outline", icon: AlertCircle },
     SOLD: { label: "Sold", variant: "secondary", icon: ArchiveX },
     FINALIZED: { label: "Finalized", variant: "secondary", icon: CheckCircle2 },
     DISPATCHED: { label: "Dispatched", variant: "secondary", icon: XCircle },
