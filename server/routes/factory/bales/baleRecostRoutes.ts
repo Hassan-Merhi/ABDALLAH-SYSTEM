@@ -35,12 +35,15 @@ export function registerBaleRecostRoutes(app: Express) {
         }
         const limit = typeof req.query.limit === "string" ? Number(req.query.limit) : 100;
         const offset = typeof req.query.offset === "string" ? Number(req.query.offset) : 0;
-        if (!Number.isSafeInteger(limit) || !Number.isSafeInteger(offset) || limit < 1 || limit > 250 || offset < 0) {
-          return res.status(400).json({ message: "limit must be 1–250 and offset must be nonnegative" });
+        const orderId = req.query.orderId == null ? undefined
+          : typeof req.query.orderId === "string" ? Number(req.query.orderId) : NaN;
+        if (!Number.isSafeInteger(limit) || !Number.isSafeInteger(offset) || limit < 1 || limit > 250 || offset < 0 ||
+            (orderId != null && (!Number.isSafeInteger(orderId) || orderId < 1))) {
+          return res.status(400).json({ message: "limit must be 1–250; offset nonnegative; orderId a positive integer" });
         }
         res.json(await historicalBaleCostAuditPreview(companyId, {
           group: rawGroup as HistoricalBaleAuditGroup | undefined,
-          limit, offset,
+          orderId, limit, offset,
         }));
       } catch (error: unknown) {
         logger.error("Historical factory bale costing audit failed:", { error });
