@@ -123,7 +123,7 @@ export interface BaleRecostPlan {
 
 export class BaleRecostRefusal extends Error {
   constructor(
-    readonly code: "PLAN_CHANGED" | "NOTHING_TO_APPLY",
+    readonly code: "PLAN_CHANGED" | "NOTHING_TO_APPLY" | "VERIFIED_SOLD_CONFIRM_REQUIRED",
     message: string
   ) {
     super(message);
@@ -443,7 +443,11 @@ export interface BaleRecostResult {
  */
 export async function applyBaleRecost(
   companyId: number,
-  params: { planHash: string; actor: { userId: string; username: string } }
+  params: {
+    planHash: string;
+    confirmVerifiedSoldBales?: boolean;
+    actor: { userId: string; username: string };
+  }
 ): Promise<BaleRecostResult> {
   return db.transaction(async (tx) => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('factory_bale_recost'), ${companyId})`);
@@ -464,6 +468,13 @@ export async function applyBaleRecost(
     }
     if (plan.mixes.length === 0 && plan.bales.length === 0) {
       throw new BaleRecostRefusal("NOTHING_TO_APPLY", FACTORY_BALE_RECOST_NOTHING_MESSAGE);
+    }
+    if (plan.bales.some((b) => b.eligibility === "sold-on-uninvoiced-verified-order") &&
+        params.confirmVerifiedSoldBales !== true) {
+      throw new BaleRecostRefusal(
+        "VERIFIED_SOLD_CONFIRM_REQUIRED",
+        "The plan contains bales marked SOLD on uninvoiced VERIFIED orders. Review their current-catalogue cost basis and explicitly confirm these bales before applying."
+      );
     }
 
     const now = new Date();
