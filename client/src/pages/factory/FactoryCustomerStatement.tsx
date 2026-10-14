@@ -20,8 +20,6 @@ import { PageHeader } from "@/components/PageHeader";
 import * as XLSX from "xlsx-js-style";
 import type { FactoryMyAccess } from "@shared/apiTypes";
 import {
-  BalanceSplit,
-  NotInLedgerBadge,
   type LedgerSplitFields,
   type NotInLedgerRowFields,
 } from "./factorycustomerstatement/NotInLedgerParts";
@@ -397,7 +395,6 @@ export default function FactoryCustomerStatement() {
             <Badge variant="outline" className="mt-1 text-xs" data-testid="badge-balance-side">
               {currentBalanceSide}
             </Badge>
-            <BalanceSplit split={statement} format={fmtMoney} testId="text-balance-split" />
           </div>
           {hasOpeningBalance && (
             <div className="rounded-xl border p-4">
@@ -601,12 +598,7 @@ export default function FactoryCustomerStatement() {
                                   {entry.transactionType}
                                 </Badge>
                                 {isInvoice && <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0" />}
-                                {entry.notInLedger && (
-                                  <NotInLedgerBadge
-                                    label={entry.notInLedgerLabel}
-                                    testId={`badge-not-in-ledger-${entry.id}`}
-                                  />
-                                )}
+
                               </div>
                             </TableCell>
                             <TableCell

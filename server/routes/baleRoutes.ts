@@ -301,7 +301,7 @@ export function registerBaleRoutes(app: Express) {
     const [baleSeq] = await tx.select().from(factoryBaleSequences).where(eq(factoryBaleSequences.companyId, companyId));
 
     const seqMax = Math.max(refSeq?.nextNumber ?? 0, baleSeq?.nextNumber ?? 0);
-    const safeNext = Math.max(dbMax + 1, seqMax);
+    const safeNext = Math.max(dbMax + 1, seqMax, 300000);
     const referenceNumber = `REF${String(safeNext).padStart(6, "0")}`;
 
     // Update (or insert) referenceSequences so next call gets safeNext+1
@@ -471,6 +471,22 @@ export function registerBaleRoutes(app: Express) {
         return { labelPrints: results, priorityAllocations: allocations };
       });
 
+      // Diagnose missing priority colors without exposing customer/order details.
+      // HTTP 200 alone does not mean the priority-color assignment succeeded.
+      const allocatedIds = new Set(priorityAllocations.map((row) => Number(row.baleId)));
+      const uncolored = labelPrints.filter((row) =>
+        row.productionBaleId && !allocatedIds.has(Number(row.productionBaleId))
+      );
+      if (uncolored.length > 0) {
+        logger.warn("Priority print returned uncolored physical bales", {
+          event: "bale-label-prints.missing-priority-color",
+          companyId,
+          referenceNumbers: uncolored.map((row) => row.referenceNumber),
+          baleIds: uncolored.map((row) => row.productionBaleId),
+          printedCount: labelPrints.length,
+          assignedCount: priorityAllocations.length,
+        });
+      }
       res.json({ labelPrints, priorityAllocations });
     } catch (error: unknown) {
       if (error instanceof LabelPrintRequestError) {

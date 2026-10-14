@@ -72,10 +72,6 @@ export async function allocateAutomaticPriorityBaleTx(
     .where(and(eq(factoryBales.id, baleId), eq(factoryBales.companyId, companyId), isNull(factoryBales.deletedAt)))
     .limit(1);
   if (!bale) return null;
-  // Print-only non-bale catalog items never receive priority color or a loading link,
-  // including on reprints. Keep existing allocation/history records untouched.
-  if (await isNonBalePriorityProductTx(tx, companyId, bale.productId)) return null;
-
   // An active snapshot has a company/bale uniqueness boundary. Reprinting an existing
   // allocation uses its original priority/color even after the queue changes.
   const existing = firstRow(
@@ -99,7 +95,7 @@ export async function allocateAutomaticPriorityBaleTx(
       await tx.execute(sql`
       SELECT cob.id FROM customer_order_bales cob
         JOIN customer_orders co ON co.id = cob.order_id
-       WHERE cob.bale_id = ${baleId} AND cob.order_id = ${existing.orderId}
+       WHERE (cob.bale_id = ${baleId} OR (cob.bale_reference = ${bale.referenceNumber} AND cob.bale_id IS NULL)) AND cob.order_id = ${existing.orderId}
          AND co.company_id = ${companyId} AND co.status <> 'CANCELLED' AND co.deleted_at IS NULL
        LIMIT 1
     `)
@@ -134,7 +130,7 @@ export async function allocateAutomaticPriorityBaleTx(
     await tx.execute(sql`
     SELECT cob.order_id AS "orderId", co.status
       FROM customer_order_bales cob JOIN customer_orders co ON co.id = cob.order_id
-     WHERE cob.bale_id = ${baleId} AND co.company_id = ${companyId}
+     WHERE (cob.bale_id = ${baleId} OR (cob.bale_reference = ${bale.referenceNumber} AND cob.bale_id IS NULL)) AND co.company_id = ${companyId}
        AND co.status <> 'CANCELLED' AND co.deleted_at IS NULL
      LIMIT 1
   `)
@@ -148,20 +144,46 @@ export async function allocateAutomaticPriorityBaleTx(
        ORDER BY id ASC LIMIT 1
     `)
     ) as { priority: number; color: string } | undefined;
-    return prior
-      ? {
-          baleId,
-          referenceNumber: bale.referenceNumber,
-          orderId: Number(linked.orderId),
-          priority: Number(prior.priority),
-          color: prior.color,
-          source: "manual",
-          existing: true,
-        }
-      : null;
+    if (!prior) {
+      // A bale can already be attached to a configured priority loading
+      // without a scan history record (for example, an older/manual loading).
+      // Use ONLY this exact container's configured color, never a different
+      // currently active priority queue target. Do not create or rewrite history.
+      const configured = firstRow(await tx.execute(sql`
+        SELECT priority, color FROM customer_order_priority_scan_configs
+         WHERE company_id = ${companyId} AND order_id = ${linked.orderId}
+         ORDER BY id DESC LIMIT 1
+      `)) as { priority: number; color: string } | undefined;
+      if (!configured) return null; // Ordinary non-priority container.
+      if (!configured.color || !/^#[0-9a-fA-F]{6}$/.test(configured.color.trim())) {
+        throw new Error(`Bale ${bale.referenceNumber} is on priority loading ${linked.orderId} but its configured color is invalid.`);
+      }
+      return {
+        baleId,
+        referenceNumber: bale.referenceNumber,
+        orderId: Number(linked.orderId),
+        priority: Number(configured.priority),
+        color: configured.color,
+        source: "manual",
+        existing: true,
+      };
+    }
+    return {
+      baleId,
+      referenceNumber: bale.referenceNumber,
+      orderId: Number(linked.orderId),
+      priority: Number(prior.priority),
+      color: prior.color,
+      source: "manual",
+      existing: true,
+    };
   }
 
 
+
+  // Exclusions apply only to future allocation; never strip a color from a
+  // bale that is already physically linked to a loading with saved priority history.
+  if (await isNonBalePriorityProductTx(tx, companyId, bale.productId)) return null;
 
   // OFF prevents NEW automatic allocation, but must never erase the original
   // label destination/color for a bale that was assigned while ON.
@@ -216,7 +238,7 @@ export async function allocateAutomaticPriorityBaleTx(
     await tx.execute(sql`
     SELECT cob.id FROM customer_order_bales cob
       JOIN customer_orders co ON co.id = cob.order_id
-     WHERE cob.bale_id = ${baleId} AND co.company_id = ${companyId}
+     WHERE (cob.bale_id = ${baleId} OR (cob.bale_reference = ${bale.referenceNumber} AND cob.bale_id IS NULL)) AND co.company_id = ${companyId}
        AND co.status <> 'CANCELLED' AND co.deleted_at IS NULL LIMIT 1
   `)
   );

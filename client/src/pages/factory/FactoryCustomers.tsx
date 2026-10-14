@@ -26,7 +26,7 @@ import { PaginationBar } from "@/components/PaginationBar";
 import { useTablePrefs } from "@/hooks/use-table-prefs";
 import { useClientTablePagination } from "@/hooks/use-client-table-pagination";
 import { useCompany } from "@/contexts/CompanyContext";
-import { BalanceSplit, type LedgerSplitFields } from "./factorycustomerstatement/NotInLedgerParts";
+import type { LedgerSplitFields } from "./factorycustomerstatement/NotInLedgerParts";
 
 interface Customer extends LedgerSplitFields {
   id: number;
@@ -343,11 +343,6 @@ export default function FactoryCustomers() {
                           <span className={`text-xs font-semibold ${drCrClass(customer.balanceSide)}`}>
                             {customer.balanceSide}
                           </span>
-                          <BalanceSplit
-                            split={customer}
-                            format={formatCashAmount}
-                            testId={`text-customer-balance-split-${customer.id}`}
-                          />
                         </span>
                       ) : (
                         "-"

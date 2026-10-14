@@ -269,9 +269,17 @@ export async function applyPurchaseOrderItemsUpdate(
       b1FreightPaidBy === "own" && freight.greaterThan(0) ? itemsTotal.plus(nonFreightCharges) : poGrandTotalExact
     );
 
+    // A reversed offload may have retired the purchase voucher while keeping its
+    // historical PO link. Never modify or resurrect that deleted accounting row.
+    const [linkedVoucher] = existingPO.voucherId
+      ? await tx.select({ deletedAt: vouchers.deletedAt }).from(vouchers)
+          .where(and(eq(vouchers.id, existingPO.voucherId), eq(vouchers.companyId, existingPO.companyId))).limit(1)
+      : [];
+    const hasRetiredPurchaseVoucher = !!existingPO.voucherId && (!linkedVoucher || !!linkedVoucher.deletedAt);
+
     // Update the associated voucher — use supplier share (intercoTotal) so freight excluded
     // when it's paid via own-account or parent-company voucher.
-    if (existingPO.voucherId) {
+    if (existingPO.voucherId && !hasRetiredPurchaseVoucher) {
       const poVoucherId = existingPO.voucherId;
       // Phase 22 (C), G4: an audited open-period edit of the posted PO voucher
       // (409 in a closed period: reverse and re-post); every amount column.
@@ -310,7 +318,7 @@ export async function applyPurchaseOrderItemsUpdate(
     // Freight for same-company POs is embedded directly in the PO voucher above.
     {
       const _b1ParentId = await storage.getParentCompanyId();
-      if (_b1ParentId && existingPO.companyId !== _b1ParentId) {
+      if (!hasRetiredPurchaseVoucher && _b1ParentId && existingPO.companyId !== _b1ParentId) {
         const _b1FreightParentAccountId: number | null =
           req.body.freightParentAccountId !== undefined
             ? req.body.freightParentAccountId === null
@@ -396,7 +404,11 @@ export async function applyPurchaseOrderItemsUpdate(
       }
     }
     // Perpetual inventory (wave 8.2): goods in transit follows the edited PO voucher.
-    await syncPurchaseOrderGitTx(tx, existingPO.companyId, existingPO.id);
+    // Do not regenerate GIT from a retired voucher during the reversed-offload
+    // editing window; the next offload must post a fresh live accounting source.
+    if (!hasRetiredPurchaseVoucher) {
+      await syncPurchaseOrderGitTx(tx, existingPO.companyId, existingPO.id);
+    }
 
     // Wave 7: the audit row commits with the edit (it used to be written after
     // the commit, and its failure was swallowed). The in-transaction

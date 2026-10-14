@@ -4,7 +4,7 @@
  *   - a bank_accounts master row (its opening with its side, and the lines
  *     that name it and no ledger account) is a cash/bank line of every net
  *     position — live with a date, the Excel export, the dated snapshot
- *     (monthly Excel, schedulers, WhatsApp) and the factory — at the balance
+ *     (monthly Excel, schedulers, WhatsApp) — at the balance
  *     engine's historical-base figure, labelled by the bank's name; an
  *     overdrawn bank is a liability;
  *   - a bank linked to a ledger account (bank_accounts.linked_ledger_id) is
@@ -15,6 +15,8 @@
  *     translation middleware) replaces each bank's row by its translation
  *     instead of adding a second one;
  *   - group net position includes each bank once per company.
+ *   - the factory net position is the exception since #2212: it lists ledger
+ *     accounts only, so a bank master row is not one of its lines.
  */
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -327,12 +329,13 @@ describe("banks in every dated net position", () => {
       query: { asOf: AS_OF },
     });
     expect({ statusCode, message: body?.message }).toEqual({ statusCode: 200, message: undefined });
-    expect(byName(body.forUs.accounts, `${PREFIX} bank FBANK`)).toEqual([
-      expect.objectContaining({ value: 460, category: "Bank", bankAccountId: factoryBank }),
-    ]);
-    expect(body.bankAssets).toBe(460);
-    expect(body.bankOverdrafts).toBe(0);
-    expect(body.forUs.breakdown).toEqual(expect.arrayContaining([{ name: "Bank", value: 460 }]));
+    // #2212 put the factory net position back on its pre-Wave-10 sources: ledger
+    // accounts only. A bank_accounts master row with no linked ledger account is
+    // not a line of it, and the bankAssets / bankOverdrafts fields are gone.
+    expect(byName(body.forUs.accounts, `${PREFIX} bank FBANK`)).toEqual([]);
+    expect(byName(body.onUs.accounts, `${PREFIX} bank FBANK`)).toEqual([]);
+    expect(body).not.toHaveProperty("bankAssets");
+    expect(body).not.toHaveProperty("bankOverdrafts");
     const accountsTotal = body.forUs.accounts.reduce((sum: number, a: { value: number }) => sum + a.value, 0);
     expect(body.forUsTotal).toBeCloseTo(accountsTotal, 2);
   });

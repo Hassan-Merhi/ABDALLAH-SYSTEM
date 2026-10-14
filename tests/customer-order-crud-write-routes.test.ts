@@ -297,6 +297,69 @@ describe("PATCH /api/factory/customer-orders/:id/link-proforma", () => {
   });
 });
 
+describe("PATCH /api/factory/customer-orders/:id/change-customer", () => {
+  async function orderCustomer(id: number): Promise<number | null> {
+    const result = await pool.query<{ customer_id: number | null }>(
+      `SELECT customer_id FROM customer_orders WHERE id = $1`,
+      [id]
+    );
+    return result.rows[0]?.customer_id ?? null;
+  }
+
+  it("moves a LOADING order to another customer, dropping the old proforma link and plan, audited", async () => {
+    const orderId = await createOrder("LOADING");
+    const proformaId = await createProforma();
+    await pool.query(`UPDATE customer_orders SET proforma_id_used = $1 WHERE id = $2`, [proformaId, orderId]);
+    await pool.query(
+      `INSERT INTO customer_order_expected_lines
+         (company_id, order_id, proforma_id, proforma_line_id, article_code, product_name, expected_qty)
+       SELECT $1, $2, cpl.proforma_id, cpl.id, cpl.article_code, cpl.product_name, cpl.quantity
+       FROM customer_proforma_lines cpl WHERE cpl.proforma_id = $3`,
+      [ctx.companyId, orderId, proformaId]
+    );
+
+    const response = await agent
+      .patch(`/api/factory/customer-orders/${orderId}/change-customer`)
+      .send({ customerId: otherCustomerId });
+
+    expect(response.status).toBe(200);
+    expect(await orderCustomer(orderId)).toBe(otherCustomerId);
+    // The old customer's proforma and its per-container plan do not carry over.
+    expect((await orderRow(orderId))?.proforma_id_used).toBeNull();
+    expect(await expectedLineCount(orderId)).toBe(0);
+    const audit = await pool.query(
+      `SELECT changes FROM audit_logs WHERE table_name = 'factory_customer_orders' AND record_id = $1::text AND action = 'update'`,
+      [orderId]
+    );
+    expect(audit.rowCount).toBeGreaterThan(0);
+  });
+
+  it("refuses an order that is not LOADING", async () => {
+    const orderId = await createOrder("DRAFT");
+    const response = await agent
+      .patch(`/api/factory/customer-orders/${orderId}/change-customer`)
+      .send({ customerId: otherCustomerId });
+
+    expect(response.status).toBe(409);
+    expect(await orderCustomer(orderId)).toBe(customerId);
+  });
+
+  it("refuses an unknown customer and invalid ids", async () => {
+    const orderId = await createOrder("LOADING");
+    expect(
+      (await agent.patch(`/api/factory/customer-orders/${orderId}/change-customer`).send({ customerId: 999999 })).status
+    ).toBe(404);
+    expect(
+      (await agent.patch(`/api/factory/customer-orders/${orderId}/change-customer`).send({ customerId: "x" })).status
+    ).toBe(400);
+    expect(
+      (await agent.patch("/api/factory/customer-orders/999999/change-customer").send({ customerId: otherCustomerId }))
+        .status
+    ).toBe(404);
+    expect(await orderCustomer(orderId)).toBe(customerId);
+  });
+});
+
 describe("PATCH /api/factory/customer-orders/:id/loading-note", () => {
   it("stores the note", async () => {
     const orderId = await createOrder("LOADING");

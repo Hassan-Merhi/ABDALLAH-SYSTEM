@@ -92,19 +92,16 @@ export function registerFactoryCustomerStatementPdfRoutes(app: Express) {
         } else {
           particulars = row.description || "";
         }
-        if (row.notInLedger) particulars = `${particulars} (not yet in the ledger)`.trim();
         return { ...row, debit, credit, container, particulars };
       });
 
-      // "Brought forward" balances at the start of the filter period: combined and ledger
+      // "Brought forward" balance at the start of the filter period
       let bfCombined = openingExact;
-      let bfLedger = openingExact;
       if (dateFromParam) {
         for (const r of allEnrichedPdf) {
           const rDate = (r.transactionDate || "").toString().slice(0, 10);
           if (rDate >= dateFromParam) break;
           bfCombined = bfCombined.plus(r.combinedEffect);
-          bfLedger = bfLedger.plus(r.ledgerEffect);
         }
       }
       const bfRunning = bfCombined.toNumber();
@@ -134,8 +131,6 @@ export function registerFactoryCustomerStatementPdfRoutes(app: Express) {
       const totalDr = totalDrExact.toNumber();
       const totalCr = totalCrExact.toNumber();
       const closingCombined = bfCombined.plus(totalDrExact).minus(totalCrExact);
-      const closingLedger = rows.reduce((sum, r) => sum.plus(r.ledgerEffect), bfLedger);
-      const closingNotInLedger = closingCombined.minus(closingLedger);
       const closingBalance = closingCombined.abs().toNumber();
       const closingBalanceSide = closingCombined.lessThan(0) ? "Cr" : "Dr";
 
@@ -505,22 +500,6 @@ export function registerFactoryCustomerStatementPdfRoutes(app: Express) {
         doc.text(closingStr, colX[5] + CP, y + 4, { width: colW[5] - CP * 2, align: "right", lineBreak: false });
       }
       y += 20;
-
-      // ── Closing split: in the ledger / not yet in the ledger ──
-      for (const [label, value] of [
-        ["of which in the ledger", closingLedger],
-        ["of which not yet in the ledger", closingNotInLedger],
-      ] as const) {
-        ensureSpace(14);
-        doc.fillColor("#333333").font("Helvetica-Oblique").fontSize(FS);
-        doc.text(label, colX[2] + CP, y + 2, { width: colW[2] - CP * 2, lineBreak: false });
-        const splitStr = fmtBalance(value.abs().toNumber(), value.lessThan(0) ? "Cr" : "Dr");
-        const col = value.lessThan(0) ? 5 : 4;
-        doc.text(splitStr, colX[col] + CP, y + 2, { width: colW[col] - CP * 2, align: "right", lineBreak: false });
-        doc.fillColor("#000000");
-        y += 14;
-      }
-      y += 4;
 
       // ── Statement note ──
       if (customer.statementNote) {

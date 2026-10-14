@@ -427,4 +427,54 @@ export const phase3RemainingTranslationsPart28: readonly Phase3SharedUiEntry[] =
     ar: "رابط صورة التجزئة غير صالح",
     fr: "URL d'image de vente au détail invalide",
   },
+  {
+    en: "Choose new customer",
+    ar: "اختر العميل الجديد",
+    fr: "Choisir le nouveau client",
+  },
+  {
+    en: "Change loading customer",
+    ar: "تغيير عميل التحميل",
+    fr: "Changer le client du chargement",
+  },
+  {
+    en: "Save customer",
+    ar: "حفظ العميل",
+    fr: "Enregistrer le client",
+  },
+  {
+    en: "Customer changed",
+    ar: "تم تغيير العميل",
+    fr: "Client modifié",
+  },
+  {
+    en: "Loading and bales preserved. Old customer proforma unlinked.",
+    ar: "تم الاحتفاظ بالتحميل والبالات. تم فك ربط الفاتورة الأولية للعميل السابق.",
+    fr: "Chargement et balles conservés. La proforma de l'ancien client a été dissociée.",
+  },
+  {
+    en: "Cannot change customer",
+    ar: "لا يمكن تغيير العميل",
+    fr: "Impossible de changer le client",
+  },
+  {
+    en: "Only Admin, Owner or Developer can reassign loadings",
+    ar: "يمكن للمسؤول أو المالك أو المطوّر فقط إعادة تعيين عمليات التحميل",
+    fr: "Seuls l'administrateur, le propriétaire ou le développeur peuvent réaffecter les chargements",
+  },
+  {
+    en: "Valid order and customer IDs required",
+    ar: "يلزم إدخال معرّفات صالحة للطلب والعميل",
+    fr: "Des identifiants de commande et de client valides sont requis",
+  },
+  {
+    en: "Bale ${bale.referenceNumber} is on priority loading ${linked.orderId} but its configured color is invalid.",
+    ar: "البالة {{0}} مدرجة في تحميل الأولوية {{1}} لكن لونها المُعدّ غير صالح.",
+    fr: "La balle {{0}} est sur le chargement prioritaire {{1}} mais sa couleur configurée est invalide.",
+  },
+  {
+    en: "Missing confirmed USD exchange rate for ${cc}",
+    ar: "سعر الصرف المؤكد بالدولار الأمريكي مفقود لـ {{0}}",
+    fr: "Taux de change USD confirmé manquant pour {{0}}",
+  },
 ];

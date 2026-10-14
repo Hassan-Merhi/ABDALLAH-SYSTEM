@@ -76,3 +76,21 @@ export async function awaitAuthenticatedShell(watcher, shellPromise) {
   }
   if (!outcome.ok) throw outcome.error;
 }
+
+/**
+ * Runs a suite's sign-in, and once more from a fresh /login when the first
+ * attempt fails on a plain timeout. A plain timeout (the login form or the
+ * authenticated shell not rendering in time) hit one random viewport per CI
+ * run while the re-run passed. A rejected sign-in is never retried: that error
+ * is not a TimeoutError, and another attempt would only spend more of the
+ * login flood guard's budget.
+ */
+export async function signInWithOneRetry(signInOnce, label = "Sign-in") {
+  try {
+    return await signInOnce();
+  } catch (error) {
+    if (!(error instanceof Error) || error.name !== "TimeoutError") throw error;
+    console.warn(`${label} timed out (${error.message}); retrying once from a fresh /login.`);
+    return signInOnce();
+  }
+}

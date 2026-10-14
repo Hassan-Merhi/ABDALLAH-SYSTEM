@@ -141,6 +141,7 @@ const SENSITIVE_WRITE_ROUTES = [
   "PATCH /api/factory/bales/bulk-date",
   "PATCH /api/factory/bales/bulk-status",
   "PATCH /api/factory/containers/:id",
+  "PATCH /api/factory/customer-orders/:id/change-customer",
   "PATCH /api/factory/customer-orders/:id/charges/:chargeId",
   "PATCH /api/factory/customer-orders/:id/date",
   "PATCH /api/factory/customer-orders/:id/hidden",

@@ -33,7 +33,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import puppeteer from "puppeteer";
 
-import { awaitAuthenticatedShell, watchSignInResponses } from "./lib/browser-smoke-signin.mjs";
+import { awaitAuthenticatedShell, signInWithOneRetry, watchSignInResponses } from "./lib/browser-smoke-signin.mjs";
 import { runErpMobileWorkflows } from "./lib/erp-mobile-workflows.mjs";
 
 const args = Object.fromEntries(
@@ -169,7 +169,12 @@ async function markLanguageOnboardingComplete(page) {
   });
 }
 
+/** Signs in, retrying once on a plain timeout (see signInWithOneRetry). */
 async function login(page) {
+  await signInWithOneRetry(() => loginOnce(page));
+}
+
+async function loginOnce(page) {
   await page.goto(`${BASE_URL}/login`, { waitUntil: "domcontentloaded", timeout: TIMEOUT_MS });
   await page.waitForSelector('[data-testid="input-username"]', { visible: true, timeout: TIMEOUT_MS });
   await page.type('[data-testid="input-username"]', USERNAME);
