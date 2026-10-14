@@ -178,12 +178,7 @@ export function registerRawStockOffloadRoutes(app: Express) {
           message: "Select the freight supplier or paying account before offloading.",
         });
       }
-      if (
-        !isSubsequentReceipt &&
-        otherChargesVal > 0 &&
-        !reqOtherChargesAccountId &&
-        !reqOtherChargesSupplierId
-      ) {
+      if (!isSubsequentReceipt && otherChargesVal > 0 && !reqOtherChargesAccountId && !reqOtherChargesSupplierId) {
         return res.status(400).json({
           message: "Select the other-charges supplier or paying account before offloading.",
         });

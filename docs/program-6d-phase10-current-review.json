@@ -1,18 +1,16 @@
 {
   "program": "6D",
-  "baselineHead": "7aad495802fd67598278178372a9f05f4c24ab94",
-  "reviewedAt": "2026-09-21",
+  "baselineHead": "301b35d737a36c46e7f604936a8832af09025eb1",
+  "reviewedAt": "2026-10-14",
   "groups": {
     "intentional-full-read": [
       "P6D-a4ef6930012d",
       "P6D-3608d5680047",
       "P6D-d61f04590b78",
-      "P6D-858f7cf1b26f",
       "P6D-ff2c401f19e9",
       "P6D-5709d5880a70",
       "P6D-234522823ed5",
       "P6D-b78bd2dd186c",
-      "P6D-fb3a65cd6fd3",
       "P6D-093546127783",
       "P6D-0df74091fc55",
       "P6D-b7b78a8533f1",
@@ -29,15 +27,17 @@
       "P6D-8317f979c568",
       "P6D-94b68aadd1d9",
       "P6D-e59fa1721518",
-      "P6D-aac1e4fd95b0"
+      "P6D-aac1e4fd95b0",
+      "P6D-58c4e5ee98a9",
+      "P6D-130ff6e585b8",
+      "P6D-f886378d22f6",
+      "P6D-9348f4309ab1"
     ],
     "transaction-order-dependency": [
       "P6D-97f84dd925c0",
       "P6D-c6b04e6a3e9e",
       "P6D-55aca13936ea",
       "P6D-a91e65a92662",
-      "P6D-4ba31100ea9e",
-      "P6D-c78056da27db",
       "P6D-0b8ba7822a7a",
       "P6D-18b8984a910e",
       "P6D-407a23c2b481",
@@ -45,19 +45,20 @@
       "P6D-1b41ae4a5f57",
       "P6D-0762ab1bfde1",
       "P6D-13db3a7b07fb",
-      "P6D-ecf9ec830537",
       "P6D-79d5aefa4d7f",
-      "P6D-58f2586f4b77",
       "P6D-0a13880847dd",
       "P6D-341fd9b92b19",
       "P6D-5c6743a7d2c4",
       "P6D-46b55c0f12dd",
       "P6D-4aba5a09b1db",
-      "P6D-8a054d2c91c3",
-      "P6D-4a0914c1b308",
-      "P6D-012ea6f14681",
       "P6D-f6027b563329",
-      "P6D-fd6978675a9e"
+      "P6D-fd6978675a9e",
+      "P6D-9bf0b42139ee",
+      "P6D-cc3d35901092",
+      "P6D-f1dd8fd116f9",
+      "P6D-3e5dce751a13",
+      "P6D-0dd322de7a50",
+      "P6D-75d764d27469"
     ],
     "false-positive": [
       "P6D-94dd2f11ecdd",
@@ -65,7 +66,6 @@
       "P6D-b2b29fe6b15e",
       "P6D-6aa109d58497",
       "P6D-23b86646da36",
-      "P6D-3f960b54973b",
       "P6D-ed18a60f4aef",
       "P6D-1192f1439892",
       "P6D-0bc7c45e1399",
@@ -74,7 +74,9 @@
       "P6D-5872c012152b",
       "P6D-82a18c3edca2",
       "P6D-d7060a4cb698",
-      "P6D-3173cb3bbf98"
+      "P6D-3173cb3bbf98",
+      "P6D-754d67fc3254",
+      "P6D-1dfb7aa12353"
     ]
   }
 }
