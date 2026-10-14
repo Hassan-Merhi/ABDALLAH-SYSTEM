@@ -137,22 +137,41 @@ export function registerFactoryStockQueryRoutes(app: Express) {
           asc(factoryBales.referenceNumber)
         );
 
-      // Filter out bales currently locked in an active LOADING order
+      // Use the same order-link availability policy as the authoritative
+      // Inventory snapshot. Do not treat a stale IN_STOCK row attached to a
+      // verified/finalized customer order as available inventory.
       const baleIds = bales.map((b) => b.id).filter((id): id is number => id != null);
-      let loadingBaleIds = new Set<number>();
+      const orderStatuses = new Map<number, Set<string>>();
       if (baleIds.length > 0) {
-        const loadingRows = await db
-          .select({ baleId: customerOrderBales.baleId })
+        const linkedOrders = await db
+          .select({ baleId: customerOrderBales.baleId, status: customerOrders.status })
           .from(customerOrderBales)
           .innerJoin(customerOrders, eq(customerOrderBales.orderId, customerOrders.id))
-          .where(and(eq(customerOrders.status, "LOADING"), inArray(customerOrderBales.baleId, baleIds)));
-        loadingBaleIds = new Set(loadingRows.map((r) => r.baleId));
+          .where(and(
+            eq(customerOrders.companyId, companyId),
+            isNull(customerOrders.deletedAt),
+            inArray(customerOrders.status, [
+              "LOADING", "PENDING_VERIFICATION", "VERIFIED", "FINALIZED", "DISPATCHED", "SOLD",
+            ]),
+            inArray(customerOrderBales.baleId, baleIds),
+          ));
+        for (const { baleId, status } of linkedOrders) {
+          if (!orderStatuses.has(baleId)) orderStatuses.set(baleId, new Set());
+          orderStatuses.get(baleId)!.add(status);
+        }
       }
 
-      const result = bales.map((b) => ({
-        ...b,
-        lockedInLoading: b.id ? loadingBaleIds.has(b.id) : false,
-      }));
+      const completedStatuses = ["FINALIZED", "DISPATCHED", "SOLD"];
+      const result = bales
+        .filter((bale) => !completedStatuses.some((status) => orderStatuses.get(bale.id)?.has(status)))
+        .map((bale) => {
+          const linkedStatuses = orderStatuses.get(bale.id);
+          return {
+            ...bale,
+            lockedInLoading: linkedStatuses?.has("LOADING") ?? false,
+            blockedByOrder: Boolean(linkedStatuses?.size),
+          };
+        });
 
       res.json(result);
     } catch (error: unknown) {
