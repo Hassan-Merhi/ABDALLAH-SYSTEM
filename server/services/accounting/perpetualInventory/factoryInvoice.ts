@@ -145,8 +145,11 @@ export async function syncFactoryInvoiceTx(
     `
   );
   if (!order || order.status !== "FINALIZED" || order.deleted_at !== null || !order.invoice_number) return null;
-  if (!order.invoice_date || !(await isPerpetualInventoryActive(tx, companyId, order.invoice_date))) return null;
+  if (!order.invoice_date) return null;
   if (await isSupplierPartnerCompany(tx, companyId)) return null;
+  // Customer receivables and sales revenue must always reach the ledger.
+  // The inventory cut-over gates COGS/finished-goods only, not the invoice itself.
+  const postInventoryCost = await isPerpetualInventoryActive(tx, companyId, order.invoice_date);
 
   // Charges with their own CHARGE- voucher already debit the customer.
   const [vouchered] = await rows<{ amount: string }>(
@@ -154,31 +157,51 @@ export async function syncFactoryInvoiceTx(
     sql`
       SELECT COALESCE(SUM(c.amount), 0)::text AS amount
         FROM customer_order_charges c
-        JOIN vouchers v ON v.id = c.voucher_id AND v.company_id = ${companyId} AND v.deleted_at IS NULL
+        JOIN vouchers v ON v.company_id = ${companyId} AND v.deleted_at IS NULL
                        AND COALESCE(v.optional, false) = false
+                       AND (
+                         v.id = c.voucher_id
+                         OR (
+                           c.voucher_id IS NULL
+                           AND (
+                             v.voucher_number = 'CHARGE-PRE-' || ${orderId}::text || '-' || c.id::text
+                             OR v.voucher_number LIKE 'CHARGE-' || ${order.invoice_number} || '-' || c.id::text || '-%'
+                           )
+                           AND EXISTS (
+                             SELECT 1 FROM voucher_entries ve
+                              WHERE ve.voucher_id = v.id
+                                AND ve.customer_id = ${order.customer_id}
+                                AND ABS(COALESCE(ve.debit_amount, 0) - COALESCE(ve.credit_amount, 0) - c.amount) < 0.005
+                           )
+                         )
+                       )
        WHERE c.order_id = ${orderId}
     `
   );
   const receivable = toMoney(order.grand_total ?? 0)
     .minus(toMoney(vouchered?.amount ?? 0))
     .toDecimalPlaces(2);
-  const [cost] = await rows<{ cost: string }>(
-    tx,
-    sql`
+  const [cost] = postInventoryCost
+    ? await rows<{ cost: string }>(
+        tx,
+        sql`
       SELECT COALESCE(SUM(b.total_cost), 0)::text AS cost
         FROM customer_order_bales cob
         JOIN factory_bales b ON b.id = cob.bale_id AND b.company_id = ${companyId}
        WHERE cob.order_id = ${orderId}
     `
-  );
-  const cogs = toMoney(cost?.cost ?? 0).toDecimalPlaces(2);
+      )
+    : [{ cost: "0" }];
+  const cogs = postInventoryCost ? toMoney(cost?.cost ?? 0).toDecimalPlaces(2) : new MoneyDecimal(0);
   if (receivable.isZero() && cogs.isZero()) return null;
   const currency = normalizeFactoryCurrency(order.currency);
   const rate = await findFactoryFxRateOnOrBefore(tx, companyId, currency, order.invoice_date);
   if (!rate) throw new FactoryInvoiceRateRefusalError(currency, order.invoice_date);
 
   const zero = new MoneyDecimal(0);
-  const accounts = await systemAccountIdsTx(tx, companyId, ["COGS", "FACTORY_FINISHED_GOODS"]);
+  const accounts = postInventoryCost
+    ? await systemAccountIdsTx(tx, companyId, ["COGS", "FACTORY_FINISHED_GOODS"])
+    : new Map<string, number>();
   const revenueAccountId = await ledgerAccountByCodeTx(
     tx,
     companyId,
@@ -206,20 +229,22 @@ export async function syncFactoryInvoiceTx(
       narration: ["Factory bale sales", invoice].join(" - "),
     },
   ];
-  const costLines: LinkedJournalLine[] = [
-    {
-      ledgerAccountId: accounts.get("COGS")!,
-      debit: cogs,
-      credit: zero,
-      narration: ["Cost of bales sold", invoice].join(" - "),
-    },
-    {
-      ledgerAccountId: accounts.get("FACTORY_FINISHED_GOODS")!,
-      debit: zero,
-      credit: cogs,
-      narration: ["Bales invoiced", invoice].join(" - "),
-    },
-  ];
+  const costLines: LinkedJournalLine[] = postInventoryCost
+    ? [
+        {
+          ledgerAccountId: accounts.get("COGS")!,
+          debit: cogs,
+          credit: zero,
+          narration: ["Cost of bales sold", invoice].join(" - "),
+        },
+        {
+          ledgerAccountId: accounts.get("FACTORY_FINISHED_GOODS")!,
+          debit: zero,
+          credit: cogs,
+          narration: ["Bales invoiced", invoice].join(" - "),
+        },
+      ]
+    : [];
   const description = ["Factory invoice", invoice].join(" - ");
   const identity = { sourceType: FACTORY_INVOICE_SOURCE, sourceId: orderId };
   if (currency === "USD") {
