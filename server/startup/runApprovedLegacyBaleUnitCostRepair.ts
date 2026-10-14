@@ -54,7 +54,7 @@ export async function runApprovedLegacyBaleUnitCostRepair(pool: Pool): Promise<v
       throw new Error("Legacy unit-cost repair refused: inventory GL cutover exists; use reviewed journal-posted recost");
     }
 
-    await client.query(\`
+    await client.query(`
       CREATE TEMP TABLE legacy_bale_cost_candidates ON COMMIT DROP AS
       SELECT b.id AS bale_id, b.company_id, b.article_code, b.reference_number,
              b.product_id, b.status AS old_status, b.weight_kg,
@@ -82,12 +82,12 @@ export async function runApprovedLegacyBaleUnitCostRepair(pool: Pool): Promise<v
               AND co.deleted_at IS NULL
               AND co.status IN ('FINALIZED', 'DISPATCHED', 'SOLD', 'INVOICED', 'COMPLETED')
          )
-    \`);
-    const [totals] = (await client.query<Totals>(\`
+    `);
+    const [totals] = (await client.query<Totals>(`
       SELECT COUNT(*)::text AS total,
              COALESCE(SUM(old_total_cost - new_total_cost),0)::text AS difference
         FROM legacy_bale_cost_candidates
-    \`)).rows;
+    `)).rows;
     const count = Number(totals.total);
     const delta = Number(totals.difference);
     if (count === 0) {
@@ -96,13 +96,13 @@ export async function runApprovedLegacyBaleUnitCostRepair(pool: Pool): Promise<v
       return;
     }
     if (count > MAX_ROWS || delta <= 0 || delta > MAX_VALUE_CHANGE + 0.01) {
-      throw new Error(\`Legacy unit-cost repair refused: scope grew unexpectedly (\${count} bales, USD \${delta})\`);
+      throw new Error(`Legacy unit-cost repair refused: scope grew unexpectedly (${count} bales, USD ${delta})`);
     }
 
     // Lock the candidates and re-check all their old monetary values before
     // making any change. A concurrent sale, weight edit, or product movement
     // causes an all-or-nothing rollback, never a partial repair.
-    const locked = await client.query<ChangedRow>(\`
+    const locked = await client.query<ChangedRow>(`
       SELECT b.id
         FROM factory_bales b
         JOIN legacy_bale_cost_candidates c ON c.bale_id=b.id
@@ -111,23 +111,23 @@ export async function runApprovedLegacyBaleUnitCostRepair(pool: Pool): Promise<v
          AND b.total_cost = c.old_total_cost
          AND b.weight_kg = c.weight_kg
        ORDER BY b.id FOR UPDATE OF b
-    \`);
+    `);
     if (locked.rowCount !== count) {
       throw new Error("Legacy unit-cost repair refused: a bale changed during review");
     }
-    const ordersNow = await client.query(\`
+    const ordersNow = await client.query(`
       SELECT 1 FROM legacy_bale_cost_candidates c
       JOIN customer_order_bales cob ON cob.bale_id=c.bale_id
       JOIN customer_orders o ON o.id=cob.order_id
        WHERE o.company_id=12 AND o.deleted_at IS NULL
          AND o.status IN ('FINALIZED','DISPATCHED','SOLD','INVOICED','COMPLETED')
       LIMIT 1
-    \`);
+    `);
     if (ordersNow.rowCount) {
       throw new Error("Legacy unit-cost repair refused: candidate was assigned to a completed order");
     }
 
-    await client.query(\`
+    await client.query(`
       CREATE TABLE IF NOT EXISTS factory_legacy_bale_cost_repairs (
         bale_id INTEGER PRIMARY KEY,
         company_id INTEGER NOT NULL,
@@ -142,16 +142,16 @@ export async function runApprovedLegacyBaleUnitCostRepair(pool: Pool): Promise<v
         repair_run_id INTEGER,
         repaired_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
-    \`);
-    const duplicates = await client.query(\`
+    `);
+    const duplicates = await client.query(`
       SELECT 1 FROM factory_legacy_bale_cost_repairs r
       JOIN legacy_bale_cost_candidates c ON c.bale_id=r.bale_id LIMIT 1
-    \`);
+    `);
     if (duplicates.rowCount) {
       throw new Error("Legacy unit-cost repair refused: previously repaired bale was selected again");
     }
 
-    const beforeAfter = await client.query(\`
+    const beforeAfter = await client.query(`
       INSERT INTO factory_legacy_bale_cost_repairs (
         bale_id,company_id,article_code,reference_number,old_status,weight_kg,
         old_cost_per_kg,new_cost_per_kg,old_total_cost,new_total_cost
@@ -160,11 +160,11 @@ export async function runApprovedLegacyBaleUnitCostRepair(pool: Pool): Promise<v
              old_cost_per_kg,new_cost_per_kg,old_total_cost,new_total_cost
         FROM legacy_bale_cost_candidates
       RETURNING bale_id
-    \`);
+    `);
     if (beforeAfter.rowCount !== count) {
       throw new Error("Legacy unit-cost repair refused: audit row count does not match plan");
     }
-    const updated = await client.query(\`
+    const updated = await client.query(`
       UPDATE factory_bales b
          SET cost_per_kg = c.new_cost_per_kg,
              total_cost = c.new_total_cost,
@@ -176,15 +176,15 @@ export async function runApprovedLegacyBaleUnitCostRepair(pool: Pool): Promise<v
          AND b.cost_per_kg = c.old_cost_per_kg
          AND b.total_cost = c.old_total_cost
       RETURNING b.id
-    \`);
+    `);
     if (updated.rowCount !== count) {
       throw new Error("Legacy unit-cost repair refused: applied row count does not match plan");
     }
 
     const fingerprint = createHash("sha256")
-      .update(\`\${RUN_TYPE}:\${count}:\${delta.toFixed(2)}\`)
+      .update(`${RUN_TYPE}:${count}:${delta.toFixed(2)}`)
       .digest("hex");
-    const [run] = (await client.query<{ id: number }>(\`
+    const [run] = (await client.query<{ id: number }>(`
       INSERT INTO factory_bale_recost_runs (company_id,plan_hash,plan,applied_by)
       SELECT 12, $1,
         jsonb_build_object(
@@ -202,14 +202,14 @@ export async function runApprovedLegacyBaleUnitCostRepair(pool: Pool): Promise<v
         ),
         'owner-requested-2026-10-14'
       RETURNING id
-    \`, [fingerprint,RUN_TYPE,count,delta])).rows;
+    `, [fingerprint,RUN_TYPE,count,delta])).rows;
     await client.query(
       "UPDATE factory_legacy_bale_cost_repairs SET repair_run_id=$1 WHERE company_id=12 AND repair_run_id IS NULL AND bale_id IN (SELECT bale_id FROM legacy_bale_cost_candidates)",
       [run.id]
     );
 
     await client.query("COMMIT");
-    logger.info(\`[LegacyBaleUnitCost] Applied audit run \${run.id}: \${count} unsold no-mix bales; stock cost corrected downward USD \${delta.toFixed(2)}; sold bales and posted invoices untouched\`);
+    logger.info(`[LegacyBaleUnitCost] Applied audit run ${run.id}: ${count} unsold no-mix bales; stock cost corrected downward USD ${delta.toFixed(2)}; sold bales and posted invoices untouched`);
   } catch (error) {
     await client.query("ROLLBACK").catch(() => undefined);
     throw error; // Do not replace production with an unreviewed partial accounting repair.
