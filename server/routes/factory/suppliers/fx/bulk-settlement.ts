@@ -9,6 +9,7 @@ import { parseId } from "../../../../lib/parseId";
 import { getErrorMessage } from "../../../../lib/httpHandlers";
 import { logger } from "../../../../lib/logger";
 import { getClientDate } from "../../../../lib/dateUtils";
+import { writeDaybookEntry } from "../../_helpers";
 import { db } from "../../../../db";
 import { requireAuth } from "../../../../auth";
 import {
@@ -22,6 +23,7 @@ import { eq, and, desc, inArray } from "drizzle-orm";
 import { isPayableContainer } from "./_helpers";
 import type Decimal from "decimal.js";
 import { MoneyDecimal, parseMoneyInput, toMoney } from "../../../../lib/money";
+import { postSupplierFxTransferJournalTx } from "../../../../services/factory/supplierFxTransferJournal";
 
 const ZERO = new MoneyDecimal(0);
 const TOLERANCE = new MoneyDecimal("0.001");
@@ -302,6 +304,20 @@ export function registerSupplierBulkFxSettlementRoutes(app: Express) {
               sourceType: "supplier",
             })
             .returning();
+          // Bulk settlement uses the same atomic source→voucher path as a
+          // single transfer: partial failure rolls back ALL created transfers.
+          await postSupplierFxTransferJournalTx(tx, fxTransfer);
+          await writeDaybookEntry(tx, {
+            companyId,
+            txDate: settlementDate,
+            txType: "SUPPLIER_FX_TRANSFER",
+            referenceId: fxTransfer.id,
+            referenceTable: "factory_supplier_fx_transfers",
+            description: `FX Transfer: ${alloc.name} ${fromCurrencyCode} ${alloc.allocated.toFixed(2)} → ${broker.name} USD ${alloc.toAmountUsd.toFixed(2)}`,
+            amountCurrency: alloc.allocated.toNumber(),
+            amountUsd: alloc.toAmountUsd.toNumber(),
+            currencyCode: fromCurrencyCode,
+          });
 
           // Container-level allocations (oldest-first within each supplier)
           const sortedCont = [...alloc.containers].sort((a, b) =>
