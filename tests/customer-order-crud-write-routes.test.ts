@@ -328,7 +328,7 @@ describe("PATCH /api/factory/customer-orders/:id/change-customer", () => {
     expect((await orderRow(orderId))?.proforma_id_used).toBeNull();
     expect(await expectedLineCount(orderId)).toBe(0);
     const audit = await pool.query(
-      `SELECT changes FROM audit_logs WHERE table_name = 'factory_customer_orders' AND record_id = $1::text AND action = 'update'`,
+      `SELECT changes FROM audit_log WHERE table_name = 'factory_customer_orders' AND record_id = $1 AND action = 'update'`,
       [orderId]
     );
     expect(audit.rowCount).toBeGreaterThan(0);
