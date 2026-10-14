@@ -53,6 +53,7 @@ import { runStartupMigrations, warmupDb } from "./startup/runServerStartupMigrat
 import { ensureFactoryStaffTrackingSchema } from "./startup/factoryStaffTrackingSchema";
 import { ensureFactoryContainerPlannerSchemaOnBoot } from "./startup/factoryContainerPlannerSchema";
 import { ensurePriorityScanSchema } from "./startup/priorityScanSchema";
+import { ensureFactoryBaleOrderIntegrity } from "./startup/ensureFactoryBaleOrderIntegrity";
 import { ensureFactorySheetsSacksSchema } from "./startup/factorySheetsSacksSchema";
 import { ensureRecurringJournalSchema } from "./services/accounting/ensureRecurringJournalSchema";
 import { bootstrapRecurringJournalFromEnvironment } from "./services/accounting/recurringJournalBootstrap";
@@ -317,6 +318,9 @@ let migrationsDone = false;
       // than a new one reporting healthy with the planner broken.
       await ensureFactoryContainerPlannerSchemaOnBoot(pool);
       logger.info("[startup] ✓ Factory container planner schema ensured");
+      // Before accepting requests, repair old completed-order bales and install
+      // the DB guard even when bulk migrations are disabled.
+      await ensureFactoryBaleOrderIntegrity(pool);
       if (migrationsEnabled) {
         try {
           await runMigrations();

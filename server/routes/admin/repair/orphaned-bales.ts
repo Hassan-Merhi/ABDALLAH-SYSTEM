@@ -16,18 +16,24 @@ import { resultRows } from "../../../lib/queryResult";
 export function registerAdminOrphanedBaleRoutes(app: Express) {
   app.post("/api/admin/fix-orphaned-bales", requireAuth, requireRole("Admin", "Owner"), async (_req, res) => {
     try {
+      const companyId = _req.session.factoryCompanyId || _req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
       const result = await db.execute(sql`
-        UPDATE factory_bales
-        SET status = 'IN_STOCK', updated_at = NOW()
-        WHERE status = 'RESERVED_FOR_ORDER'
-          AND deleted_at IS NULL
-          AND id NOT IN (
-            SELECT cob.bale_id
-            FROM customer_order_bales cob
-            INNER JOIN customer_orders co ON co.id = cob.order_id
-            WHERE co.deleted_at IS NULL
-              AND co.status IN ('LOADING', 'PENDING_VERIFICATION', 'VERIFIED')
-          )
+        UPDATE factory_bales AS fb
+           SET status = 'IN_STOCK', updated_at = NOW()
+         WHERE fb.company_id = ${companyId}
+           AND fb.status = 'RESERVED_FOR_ORDER'
+           AND fb.deleted_at IS NULL
+           AND NOT EXISTS (
+             SELECT 1
+               FROM customer_order_bales cob
+               JOIN customer_orders co ON co.id = cob.order_id
+              WHERE cob.bale_id = fb.id
+                AND co.company_id = fb.company_id
+                AND co.deleted_at IS NULL
+                AND co.status IN ('DRAFT', 'LOADING', 'PENDING_VERIFICATION',
+                                  'VERIFIED', 'FINALIZED', 'DISPATCHED', 'SOLD')
+           )
         RETURNING id
       `);
       const fixed = resultRows(result)?.length ?? 0;

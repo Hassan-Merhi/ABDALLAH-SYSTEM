@@ -233,6 +233,11 @@ export function registerBaleLookupRoutes(app: Express) {
               isNull(customerOrders.deletedAt)
             )
           )
+          .orderBy(sql`CASE ${customerOrders.status}
+            WHEN 'FINALIZED' THEN 0 WHEN 'SOLD' THEN 1
+            WHEN 'DISPATCHED' THEN 2 WHEN 'VERIFIED' THEN 3
+            WHEN 'PENDING_VERIFICATION' THEN 4 WHEN 'LOADING' THEN 5
+            ELSE 9 END`)
           .limit(1);
         let directLoadedOnOrder = null;
         let directIsInLoadingOrder = false;
@@ -243,13 +248,17 @@ export function registerBaleLookupRoutes(app: Express) {
 
         // If the bale's stored status is IN_STOCK but it's already on a finalized order,
         // derive the correct effective status so the Bale Explorer shows it accurately.
-        const _finalizedStatuses = ["FINALIZED", "DISPATCHED", "SOLD"];
+        const directOrderStatus = directLoadedOnOrder?.status;
         const directEffectiveStatus =
-          directBale.status === "IN_STOCK" &&
-          directLoadedOnOrder?.status &&
-          _finalizedStatuses.includes(directLoadedOnOrder.status)
-            ? "SOLD"
-            : directBale.status;
+          directBale.status !== "IN_STOCK" || !directOrderStatus
+            ? directBale.status
+            : ["FINALIZED", "DISPATCHED", "SOLD"].includes(directOrderStatus)
+              ? "SOLD"
+              : directOrderStatus === "LOADING"
+                ? "LOADING"
+                : ["PENDING_VERIFICATION", "VERIFIED"].includes(directOrderStatus)
+                  ? "RESERVED_FOR_ORDER"
+                  : directBale.status;
 
         // Fetch audit history for this bale
         const directAuditHistory = await db
@@ -555,13 +564,14 @@ export function registerBaleLookupRoutes(app: Express) {
 
       // If the bale's stored status is IN_STOCK but it's already on a finalized order,
       // derive the correct effective status so the Bale Explorer shows it accurately.
-      if (
-        baleInfo &&
-        baleInfo.status === "IN_STOCK" &&
-        loadedOnOrder?.status &&
-        ["FINALIZED", "DISPATCHED", "SOLD"].includes(loadedOnOrder.status)
-      ) {
-        baleInfo.status = "SOLD";
+      if (baleInfo && baleInfo.status === "IN_STOCK" && loadedOnOrder?.status) {
+        if (["FINALIZED", "DISPATCHED", "SOLD"].includes(loadedOnOrder.status)) {
+          baleInfo.status = "SOLD";
+        } else if (loadedOnOrder.status === "LOADING") {
+          baleInfo.status = "LOADING";
+        } else if (["PENDING_VERIFICATION", "VERIFIED"].includes(loadedOnOrder.status)) {
+          baleInfo.status = "RESERVED_FOR_ORDER";
+        }
       }
 
       // Fetch audit history for this bale

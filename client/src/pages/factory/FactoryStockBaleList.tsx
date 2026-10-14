@@ -20,6 +20,7 @@ interface StockBale {
   productionDate: string | null;
   workerName: string | null;
   lockedInLoading: boolean;
+  blockedByOrder: boolean;
 }
 
 function fmtDate(val: string | null | undefined): string {
@@ -61,8 +62,9 @@ export default function FactoryStockBaleList() {
     enabled: !!articleCode,
   });
 
-  const available = bales.filter((b) => !b.lockedInLoading);
+  const available = bales.filter((b) => !b.blockedByOrder);
   const locked = bales.filter((b) => b.lockedInLoading);
+  const reserved = bales.filter((b) => b.blockedByOrder && !b.lockedInLoading);
 
   return (
     <PageShell className="max-w-4xl">
@@ -77,6 +79,11 @@ export default function FactoryStockBaleList() {
             <Badge variant="outline" className="text-amber-600 dark:text-amber-400 border-amber-500/40">
               <AlertTriangle className="h-3 w-3 mr-1" />
               {locked.length} locked in loading
+            </Badge>
+          )}
+          {reserved.length > 0 && (
+            <Badge variant="outline" className="text-amber-600 dark:text-amber-400 border-amber-500/40">
+              {reserved.length} reserved for order
             </Badge>
           )}
         </PageActions>
@@ -110,7 +117,7 @@ export default function FactoryStockBaleList() {
                   className={cn(
                     "border-b last:border-0 transition-colors",
                     idx % 2 === 0 ? "bg-background" : "bg-muted/20",
-                    bale.lockedInLoading && "opacity-60"
+                    bale.blockedByOrder && "opacity-60"
                   )}
                   data-testid={`row-bale-${bale.referenceNumber}`}
                 >
@@ -144,6 +151,10 @@ export default function FactoryStockBaleList() {
                         className="text-[11px] px-1.5 h-5 text-amber-600 dark:text-amber-400 border-amber-500/40"
                       >
                         Loading
+                      </Badge>
+                    ) : bale.blockedByOrder ? (
+                      <Badge variant="outline" className="text-[11px] px-1.5 h-5 text-amber-600 dark:text-amber-400 border-amber-500/40">
+                        Reserved
                       </Badge>
                     ) : (
                       <Badge
