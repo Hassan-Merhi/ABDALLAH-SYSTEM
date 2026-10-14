@@ -9,6 +9,12 @@ import { describe, expect, it, vi } from "vitest";
 const writes: unknown[] = [];
 vi.mock("../server/auth", () => ({ requireAuth: () => undefined }));
 vi.mock("../server/routes/factory/_helpers", () => ({ writeDaybookEntry: async () => undefined }));
+// The balanced settlement journal (#2232) posts through the real engine; this
+// test covers only the container allocation arithmetic.
+vi.mock("../server/services/factory/supplierFxTransferJournal", () => ({
+  postSupplierFxTransferJournalTx: async () => ({ voucherId: 1, replayed: false }),
+  assertCommissionAllocationCoveredTx: async () => undefined,
+}));
 vi.mock("../server/db", async () => {
   const { getTableName } = await import("drizzle-orm");
   const rows: Record<string, unknown[]> = {
