@@ -741,6 +741,48 @@ describe("the reviewed bale re-cost", () => {
     expect((await baleCost(finalized)).total_cost).toBe("1000.0000000");
   });
 
+  it("includes uninvoiced VERIFIED-order SOLD bales in book stock and changes their value only after both approvals", async () => {
+    const preinvoiceSold = await bale({ status: "SOLD", weight: "25", costPerKg: "40", totalCost: "1000" });
+    const rec = await one<{ reference_number: string }>("SELECT reference_number FROM factory_bales WHERE id=$1", [preinvoiceSold]);
+    const order = await one<{ id: number }>(
+      "INSERT INTO customer_orders (company_id, customer_id, order_date, status) VALUES ($1,$2,$3,'VERIFIED') RETURNING id",
+      [companyId, customerId, today]
+    );
+    await pool.query(
+      "INSERT INTO customer_order_bales (order_id,bale_id,bale_reference,location_id,weight,price_used) VALUES ($1,$2,$3,$4,25,60)",
+      [order.id, preinvoiceSold, rec.reference_number, locationId]
+    );
+    const before = await factoryStockValuation(db, companyId);
+    const preview = await call("GET /api/factory/bale-cost/recost-preview", { user: { role: "Owner" } });
+    expect(preview.statusCode).toBe(200);
+    expect(preview.body.bales.some((r: { id: number }) => r.id === preinvoiceSold)).toBe(true);
+
+    const applied = await call("POST /api/factory/bale-cost/recost-apply", {
+      user: { role: "Owner" },
+      body: { confirm: true, confirmVerifiedSoldBales: true, planHash: preview.body.planHash },
+    });
+    expect(applied.statusCode).toBe(200);
+    expect(applied.body.voucherId).toBeNull(); // No perpetual-inventory cutover in test.
+    expect((await baleCost(preinvoiceSold))).toMatchObject({
+      status: "SOLD",
+      total_cost: "40.0000000",
+      cost_per_kg: "1.6000000",
+    });
+    const after = await factoryStockValuation(db, companyId);
+    // The per-bale cost change reduces finished goods; it does not restore
+    // or duplicate a physical bale, and the order stays VERIFIED.
+    expect(Number(before.finished.minus(after.finished))).toBeCloseTo(960, 2);
+    expect((await one<{ status: string }>("SELECT status FROM customer_orders WHERE id=$1", [order.id])).status).toBe("VERIFIED");
+
+    const audit = await call("GET /api/factory/bale-cost/historical-sold-audit", {
+      query: { group: "OPEN_VERIFIED_UNINVOICED", limit: "10", offset: "0" },
+      user: { role: "Owner" },
+    });
+    expect(audit.statusCode).toBe(200);
+    expect(audit.body.readOnly).toBe(true);
+    expect(audit.body.valuationBasis).toBe("current-catalogue-only-NOT-historical-price-at-sale");
+  });
+
   it("posts the value change to Factory Stock Revaluation after the cut-over", async () => {
     const stale = await bale({ status: "IN_STOCK", weight: "25", costPerKg: "4", totalCost: "100" });
     await setCutover(true);
