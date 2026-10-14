@@ -714,6 +714,17 @@ describe("the reviewed bale re-cost", () => {
     expect(preview.body.bales.some((r: { id: number }) => r.id === invoiceMarked)).toBe(false);
     expect(preview.body.bales.some((r: { id: number }) => r.id === finalized)).toBe(false);
 
+    // A separate explicit Owner approval is required when SOLD bales remain
+    // part of stock because their orders have not yet been invoiced.
+    const noSecondConfirmation = await call("POST /api/factory/bale-cost/recost-apply", {
+      user: { role: "Owner" },
+      body: { confirm: true, planHash: preview.body.planHash },
+    });
+    expect(noSecondConfirmation).toMatchObject({
+      statusCode: 409,
+      body: { code: "VERIFIED_SOLD_CONFIRM_REQUIRED" },
+    });
+
     // Even without changing the stored SOLD status, an invoice issued between
     // preview and apply must invalidate the previously reviewed plan hash.
     await pool.query(
@@ -722,7 +733,7 @@ describe("the reviewed bale re-cost", () => {
     );
     const refused = await call("POST /api/factory/bale-cost/recost-apply", {
       user: { role: "Owner" },
-      body: { confirm: true, planHash: preview.body.planHash },
+      body: { confirm: true, confirmVerifiedSoldBales: true, planHash: preview.body.planHash },
     });
     expect(refused).toMatchObject({ statusCode: 409, body: { code: "PLAN_CHANGED" } });
     expect((await baleCost(unbilled)).total_cost).toBe("1000.0000000");
