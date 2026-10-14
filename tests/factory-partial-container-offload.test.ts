@@ -54,6 +54,9 @@ async function makeContainer(opts: {
       companyId: ctx.companyId,
       containerNumber: opts.containerNumber,
       supplierId,
+      // Offloads with positive freight must name who is owed it (fail-closed
+      // posting); the material supplier also carries the freight here.
+      freightSupplierId: supplierId,
       totalKg,
       declaredKg: opts.declaredKg ?? totalKg,
       actualReceivedKg: opts.actualReceivedKg ?? null,
@@ -87,11 +90,11 @@ async function cleanupFactoryTables(companyId: number) {
   await pool.query(`DELETE FROM factory_offload_additional_charges WHERE company_id = $1`, [companyId]);
   await pool.query(`DELETE FROM factory_container_commissions WHERE company_id = $1`, [companyId]);
   await pool.query(`DELETE FROM factory_containers WHERE company_id = $1`, [companyId]);
-  await pool.query(`DELETE FROM factory_suppliers WHERE company_id = $1`, [companyId]);
   await pool.query(`DELETE FROM voucher_entries WHERE voucher_id IN (SELECT id FROM vouchers WHERE company_id = $1)`, [
     companyId,
   ]);
   await pool.query(`DELETE FROM vouchers WHERE company_id = $1`, [companyId]);
+  await pool.query(`DELETE FROM factory_suppliers WHERE company_id = $1`, [companyId]);
 }
 
 // ─── Setup ────────────────────────────────────────────────────────────────────
