@@ -5,6 +5,8 @@ import { resultRows } from "../../../lib/queryResult";
 import { factoryContainers } from "@shared/schema";
 import type Decimal from "decimal.js";
 import { MoneyDecimal, toMoney } from "../../../lib/money";
+import { getFactoryBalanceOnTableSnapshot } from "../../../services/factory/productionBalanceOnTable";
+import { getLockedSupplierRatesReadOnlyBulk } from "../../../services/factory/rawStockLockedRateBulk";
 
 const ZERO = new MoneyDecimal(0);
 /** A numeric column from a raw query row, exactly (missing or unparsable is zero). */
@@ -114,6 +116,9 @@ export async function computeNetPositionInventory(ctx: NetPositionInventoryConte
   const rawResult = await db.execute(sql`
   SELECT
     fc.supplier_id,
+    -- Unassigned receipt rows appear separately per container in Raw Materials.
+    -- Preserve that row boundary so their cent rounding also matches.
+    CASE WHEN fc.supplier_id IS NULL THEN fc.id ELSE NULL END AS unattached_container_id,
     SUM(frs.received_kg::numeric)                                            AS total_recv,
     SUM(frs.used_kg::numeric)                                                AS total_used,
     -- Local cost per kg (the currency on the container, e.g. AUD, EUR) — a
@@ -138,7 +143,7 @@ export async function computeNetPositionInventory(ctx: NetPositionInventoryConte
     AND  fc.status     != 'DELETED'
     AND  frs.deleted_at IS NULL
     AND  fc.deleted_at IS NULL
-  GROUP  BY fc.supplier_id
+  GROUP  BY fc.supplier_id, CASE WHEN fc.supplier_id IS NULL THEN fc.id ELSE NULL END
 `);
   const rawRows = resultRows(rawResult);
 
@@ -167,7 +172,7 @@ export async function computeNetPositionInventory(ctx: NetPositionInventoryConte
   };
   const supMap = new Map<string, SupMap>();
   for (const r of rawRows) {
-    const key = r.supplier_id ? `s${r.supplier_id}` : `u`;
+    const key = r.supplier_id ? `s${r.supplier_id}` : `u-${r.unattached_container_id}`;
     const recv = col(r.total_recv);
     const used = col(r.total_used);
     const cpkLocal = col(r.avg_cpk_local);
@@ -270,26 +275,32 @@ export async function computeNetPositionInventory(ctx: NetPositionInventoryConte
     if (r.supplier_id) reservedBySupKey.set(`s${r.supplier_id}`, col(r.reserved_kg));
   }
 
-  // Sum each supplier's stock value the SAME way rawStockReceiptRoutes.ts computes
-  // "Stock Value" on the Raw Materials page: for a real supplier with a locked rate,
-  // value = remainingKg × lockedRateUsd (the spec-mandated formula — the locked rate
-  // supersedes whatever blended/tracked cost basis this supplier's receipts drifted to
-  // over time). Only MANUAL/standalone materials (no supplierId, key "u") have no
-  // locked rate — those keep the tracked remaining-value basis (remValUsd), since that
-  // page-side formula only applies to real suppliers too.
-  // (Reserved kg still have physical value in the warehouse; they are subtracted from the
-  // displayed kg count but not from the dollar value, matching the raw-materials KPI.)
+  // /api/factory/raw-stock serializes each supplier/material row to cents
+  // AFTER rounding freeKg to three decimals. The Raw Materials page sums those
+  // displayed row values; rounding one grand total can differ by $0.01+.
+  // Mirror the source row boundaries instead of re-rounding the sum.
+  const missingSupplierRateIds = [...supMap.keys()]
+    .filter((key) => key.startsWith("s"))
+    .map((key) => Number(key.slice(1)))
+    .filter((id) => Number.isInteger(id) && !ctx.supplierLockedRateMapNp.has(id));
+  // The Raw Materials page also resolves legacy NULL locked rates instead of
+  // falling back to a different receipt-derived net-position valuation.
+  const legacyRates = missingSupplierRateIds.length
+    ? await getLockedSupplierRatesReadOnlyBulk(db, ctx.companyId, missingSupplierRateIds)
+    : new Map<number, number>();
+
   let rawTotal: Decimal = ZERO;
-  for (const [key, s] of supMap.entries()) {
-    const supplierId = key.startsWith("s") ? parseInt(key.slice(1)) : null;
-    const lockedRate = supplierId !== null ? ctx.supplierLockedRateMapNp.get(supplierId) : undefined;
-    if (lockedRate !== undefined) {
-      rawTotal = rawTotal.plus(s.recv.minus(s.used).times(lockedRate));
-    } else {
-      rawTotal = rawTotal.plus(s.remValUsd);
-    }
+  for (const [key, stock] of supMap.entries()) {
+    const supplierId = key.startsWith("s") ? Number(key.slice(1)) : null;
+    const lockedRate = supplierId !== null
+      ? toMoney(ctx.supplierLockedRateMapNp.get(supplierId) ?? legacyRates.get(supplierId) ?? 0)
+      : null;
+    const rowValue = lockedRate !== null
+      ? toMoney(stock.recv.minus(stock.used).toFixed(3)).times(lockedRate)
+      : stock.remValUsd;
+    rawTotal = rawTotal.plus(rowValue.toDecimalPlaces(2, MoneyDecimal.ROUND_HALF_UP));
   }
-  const rawMaterialStockValue = cents(rawTotal);
+  const rawMaterialStockValue = rawTotal.toNumber();
 
   // ── 3b. Factory Stock OTW — containers in transit (PENDING / IN_TRANSIT / ARRIVED) ──
   // Per-currency goods+freight+commission+other charges, converted to USD using the
@@ -321,53 +332,26 @@ export async function computeNetPositionInventory(ctx: NetPositionInventoryConte
     )
   );
 
-  // ── 3c. Balance on Table — material in process (mix batch input minus bale output) ──
-  // Mirrors the production-value-report formula: all-time totals, no date filter.
-  // Must exclude soft-deleted batches and carry-forward rows exactly like
-  // factoryBaleExportRoutes.ts does, or a deleted batch keeps inflating this figure
-  // (its total_weight_kg/total_cost still get summed even though the batch no longer
-  // exists from the user's point of view) and Net Position stops matching the
-  // Production report's Balance on Table card.
-  const mixSumResult = await db.execute(sql`
-  SELECT
-    COALESCE(SUM(total_weight_kg::numeric), 0) AS total_mix_kg,
-    COALESCE(SUM(total_cost::numeric),      0) AS total_mix_cost
-  FROM factory_mix_batches
-  WHERE company_id = ${ctx.companyId}
-    AND carry_forward_from_id IS NULL
-    AND deleted_at IS NULL
-`);
-  const mixSumRow = resultRows(mixSumResult)[0] ?? {};
-  const totalMixKg = col(mixSumRow.total_mix_kg);
-  const totalMixCost = col(mixSumRow.total_mix_cost);
-  const blendedCpk = totalMixKg.gt(0) ? totalMixCost.div(totalMixKg) : ZERO;
+  // Authoritative Production Overview → Balance on Table (historical as-of,
+  // excludes REPACKED bales, uses the cumulative 10dp batch rate).
+  const balanceSnapshot = await getFactoryBalanceOnTableSnapshot(ctx.companyId, ctx.asOf);
+  const balanceOnTableValue = balanceSnapshot.value;
 
-  // Split bales: wipers/garbage (by category name) vs regular
-  const baleSumResult = await db.execute(sql`
-  SELECT
-    COALESCE(SUM(b.weight_kg::numeric), 0)                                          AS total_kg,
-    COALESCE(SUM(p.selling_price::numeric), 0)                                      AS total_selling_value,
-    COALESCE(SUM(CASE WHEN lower(c.name) ~ '(wiper|garbage|rag)'
-                      THEN b.weight_kg::numeric ELSE 0 END), 0)                     AS wg_kg
-  FROM   factory_bales        b
-  LEFT   JOIN factory_bale_products  p ON p.id = b.product_id
-  LEFT   JOIN factory_categories     c ON c.id = p.category_id
-  WHERE  b.company_id = ${ctx.companyId}
-    AND  b.status NOT IN ('DELETED', 'REMOVED')
-`);
-  const baleSumRow = resultRows(baleSumResult)[0] ?? {};
-  const totalBaleKg = col(baleSumRow.total_kg);
-  const totalSellingValue = col(baleSumRow.total_selling_value);
-
-  const botWeightKg = MoneyDecimal.max(totalMixKg.minus(totalBaleKg), 0);
-  const balanceOnTableValue = cents(botWeightKg.times(blendedCpk));
-  // Selling valuation uses the realized configured selling value per kg of produced
-  // bales as the best like-for-like valuation for material still on the table.
-  // If no produced-bale selling basis exists yet, fall back to cost rather than
-  // inventing a markup.
-  const blendedSellingPerKg = totalBaleKg.gt(0) ? totalSellingValue.div(totalBaleKg) : ZERO;
+  // Legacy selling-price valuation field, retained for existing consumers.
+  // Factory Net Position itself always shows the COST Balance on Table.
+  const baleSellingResult = await db.execute(sql`
+    SELECT COALESCE(SUM(p.selling_price::numeric), 0) AS total_selling_value
+    FROM factory_bales b
+    LEFT JOIN factory_bale_products p ON p.id = b.product_id
+    WHERE b.company_id = ${ctx.companyId}
+      AND b.status NOT IN ('DELETED', 'REMOVED', 'REPACKED')
+      AND COALESCE(DATE(b.stock_entry_date), DATE(b.created_at)) <= ${ctx.asOf}
+  `);
+  const totalSellingValue = col((resultRows(baleSellingResult)[0] ?? {}).total_selling_value);
+  const baleWeightKg = toMoney(balanceSnapshot.baleWeightKg);
+  const blendedSellingPerKg = baleWeightKg.gt(0) ? totalSellingValue.div(baleWeightKg) : ZERO;
   const balanceOnTableSellingValue = blendedSellingPerKg.gt(0)
-    ? cents(botWeightKg.times(blendedSellingPerKg))
+    ? cents(toMoney(balanceSnapshot.weightKg).times(blendedSellingPerKg))
     : balanceOnTableValue;
 
   return {
