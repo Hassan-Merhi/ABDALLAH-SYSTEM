@@ -120,13 +120,14 @@ type DetailRow = {
 
 export async function historicalBaleCostAuditPreview(
   companyId: number,
-  options: { group?: HistoricalBaleAuditGroup; limit?: number; offset?: number } = {}
+  options: { group?: HistoricalBaleAuditGroup; orderId?: number; limit?: number; offset?: number } = {}
 ) {
   const limit = Math.min(250, Math.max(1, Math.trunc(options.limit ?? 100)));
   const offset = Math.min(100000, Math.max(0, Math.trunc(options.offset ?? 0)));
   const group = options.group ?? null;
+  const orderId = options.orderId ?? null;
 
-  const [summaryRows, detailRows] = await Promise.all([
+  const [summaryRows, detailRows, ordersRows] = await Promise.all([
     db.execute(sql`
       ${candidateSet(companyId)}
       SELECT review_group,
@@ -150,8 +151,20 @@ export async function historicalBaleCostAuditPreview(
              container_number, document_frozen, sale_balance_exists, review_group
         FROM classified
        WHERE (${group}::text IS NULL OR review_group = ${group}::text)
+         AND (${orderId}::int IS NULL OR order_id = ${orderId}::int)
        ORDER BY order_id NULLS LAST, id
        LIMIT ${limit} OFFSET ${offset}
+    `),
+    db.execute(sql`
+      ${candidateSet(companyId)}
+      SELECT order_id, order_status, invoice_number, container_number,
+             review_group, COUNT(*)::int AS bale_count,
+             SUM(nominal_difference)::text AS nominal_difference
+        FROM classified
+       WHERE order_id IS NOT NULL
+       GROUP BY order_id, order_status, invoice_number, container_number, review_group
+       ORDER BY nominal_difference::numeric DESC
+       LIMIT 300
     `),
   ]);
 
@@ -161,9 +174,19 @@ export async function historicalBaleCostAuditPreview(
     valuationBasis: "current-catalogue-only-NOT-historical-price-at-sale",
     warning: "Nominal differences are screening estimates, not approved historical cost or journal adjustments.",
     summary: summaryRows.rows as unknown as SummaryRow[],
+    orders: ordersRows.rows as unknown as Array<{
+      order_id: number;
+      order_status: string;
+      invoice_number: string | null;
+      container_number: string | null;
+      review_group: HistoricalBaleAuditGroup;
+      bale_count: number;
+      nominal_difference: string;
+    }>,
     details: detailRows.rows as unknown as DetailRow[],
     limit,
     offset,
     group,
+    orderId,
   };
 }
