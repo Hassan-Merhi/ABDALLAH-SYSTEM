@@ -21,6 +21,9 @@ import {
 } from "../server/services/security/databaseScopeRuntimeContext";
 
 const COMPANY = 12;
+// These India, Patli invoices have already been fully journaled by CHARGE vouchers.
+// Their correct residual is zero: no INV-GL voucher needs to be created.
+const FULLY_CHARGED_ORDER_IDS = new Set([69, 71, 89, 110, 132, 152, 155, 164, 179]);
 const AUDITED_ORDER_IDS = new Set([14,31,32,35,45,46,51,61,63,65,69,71,74,81,83,89,92,96,97,99,100,102,105,106,110,111,112,116,118,120,122,124,126,127,129,130,132,135,137,139,140,143,144,145,147,148,149,150,152,153,155,164,165,166,168,169,171,177,179,181,185,186,188]);
 
 interface Candidate {
@@ -112,6 +115,7 @@ async function run(APPLY: boolean) {
 
   const blocked: Candidate[] = [];
   const ready: Candidate[] = [];
+  const fullyCharged: Candidate[] = [];
   for (const invoice of pending) {
     const reasons: string[] = [];
     if (invoice.currency_code !== "USD") reasons.push("non-USD: verify historical FX");
@@ -126,12 +130,20 @@ async function run(APPLY: boolean) {
       reasons.push(`unposted charge(s) #${invoice.unlinked_charge_ids}`);
     if (toMoney(invoice.already_posted_charges).greaterThan(toMoney(invoice.gross)))
       reasons.push("posted charges exceed invoice");
+    const residual = toMoney(invoice.gross).minus(toMoney(invoice.already_posted_charges));
+    if (residual.isZero() && FULLY_CHARGED_ORDER_IDS.has(invoice.id) &&
+        toMoney(invoice.unlinked_positive_charges).isZero() && reasons.length === 0) {
+      fullyCharged.push(invoice);
+      console.log(`ALREADY COVERED ${invoice.invoice_number}: full invoice posted through linked charges`);
+      continue;
+    }
+    if (residual.isZero()) reasons.push("zero receivable without a verified charge-only exception");
     if (reasons.length) {
       blocked.push(invoice);
       console.warn(`BLOCKED ${invoice.invoice_number} ${invoice.customer_name}: ${reasons.join("; ")}`);
     } else ready.push(invoice);
   }
-  console.log(`Eligible=${ready.length}; blocked=${blocked.length}`);
+  console.log(`Eligible=${ready.length}; fully accounted by charges=${fullyCharged.length}; blocked=${blocked.length}`);
 
   if (!APPLY) {
     for (const invoice of ready) {
@@ -217,12 +229,17 @@ async function run(APPLY: boolean) {
     });
   }
   const remaining = await candidates();
-  if (remaining.some((row) => AUDITED_ORDER_IDS.has(row.id))) {
-    throw new Error(`Reconciliation incomplete: ${remaining.length} audited invoices still missing GL`);
+  const missingFinancialPostings = remaining.filter((row) =>
+    !FULLY_CHARGED_ORDER_IDS.has(row.id) ||
+    !toMoney(row.gross).eq(toMoney(row.already_posted_charges)) ||
+    toMoney(row.unlinked_positive_charges).greaterThan(0)
+  );
+  if (missingFinancialPostings.length) {
+    throw new Error(`Reconciliation incomplete: ${missingFinancialPostings.length} invoice(s) still have amounts outside the ledger`);
   }
   const additionalCharge = postedCount > 0 && pending.some((invoice) => invoice.id === 99)
     ? new MoneyDecimal("533.50") : new MoneyDecimal(0);
-  console.log(`DONE: ${postedCount} invoice journals, sales income ${postedAmount.toFixed(2)}, separately journaled Gate Pass ${additionalCharge.toFixed(2)}; ${remaining.length} still missing.`);
+  console.log(`DONE: ${postedCount} invoice journals, sales income ${postedAmount.toFixed(2)}, separately journaled Gate Pass ${additionalCharge.toFixed(2)}; ${remaining.length} zero-balance invoices already covered by charges.`);
 }
 /** Called only from the explicitly enabled one-time startup path or the CLI. */
 export function reconcileFactoryInvoices20261014(apply: boolean): Promise<void> {
