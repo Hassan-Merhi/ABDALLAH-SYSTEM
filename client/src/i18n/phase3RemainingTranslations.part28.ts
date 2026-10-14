@@ -477,4 +477,10 @@ export const phase3RemainingTranslationsPart28: readonly Phase3SharedUiEntry[] =
     ar: "سعر الصرف المؤكد بالدولار الأمريكي مفقود لـ {{0}}",
     fr: "Taux de change USD confirmé manquant pour {{0}}",
   },
+  { en: "Freight Supplier (required)", ar: "مورد الشحن (مطلوب)", fr: "Fournisseur du fret (obligatoire)" },
+  {
+    en: "Freight can be payable to a different supplier than the goods purchase.",
+    ar: "يمكن أن يكون الشحن مستحقًا لمورد مختلف عن مورد شراء البضائع.",
+    fr: "Le fret peut être dû à un fournisseur différent de celui de l'achat des marchandises.",
+  },
 ];

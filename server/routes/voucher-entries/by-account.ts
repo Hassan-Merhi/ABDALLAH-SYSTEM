@@ -180,8 +180,16 @@ export function registerVoucherEntryByAccountRoutes(app: Express) {
         // Closed period: each line's voucher, on both of its dates (the same
         // check the voucher_entries trigger makes; raised here first so the
         // whole move is refused before any line changes).
-        for (const voucherId of new Set(entriesWithVouchers.map((e) => e.voucherId))) {
-          await tx.execute(sql`SELECT erp_assert_voucher_open(${voucherId}::integer)`);
+        // One statement for every distinct voucher, so a large move is not a
+        // round trip per voucher.
+        const voucherIds = [...new Set(entriesWithVouchers.map((e) => e.voucherId))];
+        if (voucherIds.length > 0) {
+          await tx.execute(
+            sql`SELECT erp_assert_voucher_open(v) FROM unnest(ARRAY[${sql.join(
+              voucherIds.map((id) => sql`${id}`),
+              sql`, `
+            )}]::integer[]) AS v`
+          );
         }
 
         // A customer line keeps its customer link only when the destination is

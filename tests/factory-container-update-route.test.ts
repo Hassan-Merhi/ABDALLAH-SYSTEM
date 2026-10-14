@@ -442,21 +442,23 @@ describe("PATCH /api/factory/containers/:id — freight payer canonicalisation",
     expect(after.freight_supplier_id).toBeNull();
   });
 
-  it("requires a purchase supplier for supplier-paid freight and defaults the freight supplier to it", async () => {
-    const withoutSupplier = await seedContainer({ supplierId: null, freight: "0" });
-    const refused = await patchContainer(withoutSupplier, { freight: "200", freightPaidBy: "supplier" });
-    expect(refused.status).toBe(400);
-    expect(refused.body.message).toMatch(/purchase supplier .*is required/i);
-
+  it("requires an explicit freight supplier for supplier-paid freight and never defaults to the goods supplier", async () => {
+    // #2245: freight is owed to its own chosen payee, never to the goods
+    // supplier by fallback.
     const withSupplier = await seedContainer({
       freight: "0",
       freightPaidBy: "own",
       freightOwnAccountId: ownAccountId,
       freightAccountId,
     });
+    const refused = await patchContainer(withSupplier, { freight: "200", freightPaidBy: "supplier", freightAccountId });
+    expect(refused.status).toBe(400);
+    expect(refused.body.message).toMatch(/select the freight supplier/i);
+
     const accepted = await patchContainer(withSupplier, {
       freight: "200",
       freightPaidBy: "supplier",
+      freightSupplierId: supplierId,
       freightAccountId,
     });
     expect(accepted.status).toBe(200);
@@ -473,6 +475,7 @@ describe("PATCH /api/factory/containers/:id — freight payer canonicalisation",
       freight: "125",
       freightPaidBy: "supplier",
       freightCurrencyCode: "USD",
+      freightSupplierId: supplierId,
     });
 
     expect(response.status).toBe(200);
@@ -553,7 +556,39 @@ describe("container goods value is exact", () => {
     expect(created.status, JSON.stringify(created.body)).toBe(200);
 
     const response = await patchContainer(created.body.id, { totalKg: "1000.500" });
-    expect(response.status).toBe(200);
+    expect(response.status, JSON.stringify(response.body)).toBe(200);
     expect(await importDaybookAmount(created.body.id)).toBe("350.18");
+  });
+
+  it("keeps the import credit on the goods supplier when freight is owed to another supplier", async () => {
+    const freightPayee = (
+      await pool.query<{ id: number }>(
+        `INSERT INTO factory_suppliers (company_id, name, is_active) VALUES ($1, $2, true) RETURNING id`,
+        [ctx.companyId, `${TEST_PREFIX} Freight Payee`]
+      )
+    ).rows[0].id;
+    seq += 1;
+    const created = await agent.post("/api/factory/containers").send({
+      containerNumber: `${TEST_PREFIX}-EXACT${seq}`,
+      supplierId,
+      currencyCode: "USD",
+      totalKg: "1000",
+      ratePerKg: "0.35",
+      arrivalDate: "2026-06-08",
+      freight: "90",
+      freightPaidBy: "supplier",
+      freightSupplierId: freightPayee,
+    });
+    expect(created.status, JSON.stringify(created.body)).toBe(200);
+
+    const response = await patchContainer(created.body.id, { totalKg: "1000.500" });
+    expect(response.status, JSON.stringify(response.body)).toBe(200);
+    const credit = await pool.query<{ factory_supplier_id: number; credit_amount: string }>(
+      `SELECT ve.factory_supplier_id, ve.credit_amount FROM voucher_entries ve
+         JOIN vouchers v ON v.id = ve.voucher_id
+        WHERE v.company_id = $1 AND v.voucher_number LIKE $2 AND ve.credit_amount > 0`,
+      [ctx.companyId, `FACTORY-IMPORT-${created.body.id}-%`]
+    );
+    expect(credit.rows).toEqual([{ factory_supplier_id: supplierId, credit_amount: "350.18" }]);
   });
 });

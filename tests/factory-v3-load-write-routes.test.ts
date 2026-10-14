@@ -140,6 +140,12 @@ afterAll(async () => {
   await deleteAuditLogRowsForTests(pool, "company_id = $1", [ctx.companyId]);
   await pool.query(`DELETE FROM factory_v3_loads WHERE company_id = $1`, [ctx.companyId]);
   await pool.query(`DELETE FROM customer_proformas WHERE company_id = $1`, [ctx.companyId]);
+  // Load and order posting writes customer-linked journal lines; drop them
+  // before the customers they reference.
+  await pool.query(`DELETE FROM voucher_entries WHERE voucher_id IN (SELECT id FROM vouchers WHERE company_id = $1)`, [
+    ctx.companyId,
+  ]);
+  await pool.query(`DELETE FROM vouchers WHERE company_id = $1`, [ctx.companyId]);
   await pool.query(`DELETE FROM customers WHERE company_id = $1`, [ctx.companyId]);
   await cleanupTestData(TEST_PREFIX);
   closeTestServer();

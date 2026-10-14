@@ -25,6 +25,7 @@ import {
   updateContainerCost,
 } from "./legacy-links";
 import { computeRemainingFraction, loadActiveCharges, loadCostInputs } from "./loaders";
+import { assertChargePostingDestination, assertResolvedHistoricalLinks } from "./guards";
 import { PostOffloadMutationParams, PostOffloadMutationResult } from "./types";
 import type { CascadeResult } from "../rawStockCostCascade";
 
@@ -166,19 +167,12 @@ export async function applyPostOffloadChargeMutation(
   if (action === "CREATE") {
     const { chargeData, accountingCtx } = params;
     if (!chargeData) throw new Error("chargeData is required for CREATE");
-    // Fail closed before any inventory costing or charge is saved. A charge
-    // without both sides of its ledger posting would otherwise become a
-    // permanent unposted financial operation.
-    if (
-      !accountingCtx ||
-      accountingCtx.voucherCompanyId !== companyId ||
-      accountingCtx.chargesPayableAcctId <= 0 ||
-      Number(Boolean(chargeData.ledgerAccountId)) + Number(Boolean(chargeData.supplierId)) !== 1
-    ) {
-      throw new Error(
-        "Post-offload charge requires exactly one company-owned expense account or supplier and a valid payable account."
-      );
-    }
+    assertChargePostingDestination(
+      companyId,
+      chargeData,
+      accountingCtx,
+      "Post-offload charge requires exactly one company-owned expense account or supplier and a valid payable account."
+    );
 
     // Compute OLD canonical cost
     const activeCharges = await loadActiveCharges(tx, companyId, containerId);
@@ -355,16 +349,12 @@ export async function applyPostOffloadChargeMutation(
     const { chargeId, chargeData, accountingCtx, expectedVersion } = params;
     if (!chargeId) throw new Error("chargeId is required for EDIT");
     if (!chargeData) throw new Error("chargeData is required for EDIT");
-    if (
-      !accountingCtx ||
-      accountingCtx.voucherCompanyId !== companyId ||
-      accountingCtx.chargesPayableAcctId <= 0 ||
-      Number(Boolean(chargeData.ledgerAccountId)) + Number(Boolean(chargeData.supplierId)) !== 1
-    ) {
-      throw new Error(
-        "Charge editing requires a valid same-company ledger destination; no unposted charge changes are permitted."
-      );
-    }
+    assertChargePostingDestination(
+      companyId,
+      chargeData,
+      accountingCtx,
+      "Charge editing requires a valid same-company ledger destination; no unposted charge changes are permitted."
+    );
 
     // Lock the charge row FOR UPDATE
     const [rawCharge] = await tx
@@ -387,14 +377,7 @@ export async function applyPostOffloadChargeMutation(
 
     // Resolve legacy accounting links if needed
     const chargeRow = await resolveLegacyPostOffloadAccountingLinks(tx, companyId, containerId, rawCharge);
-    // Never edit/undo a historical charge if its accounting identity cannot be
-    // resolved. Otherwise the charge/cost changes while the original payable
-    // voucher survives and cannot be retired or updated.
-    if (!chargeRow.voucherId || !chargeRow.daybookEntryId) {
-      throw new Error(
-        `Charge #${chargeRow.id} has missing historical voucher/daybook links. Reconcile the original records before editing or undoing it.`
-      );
-    }
+    assertResolvedHistoricalLinks(chargeRow);
 
     // Compute OLD canonical cost (all active charges, including old version of this one)
     const activeCharges = await loadActiveCharges(tx, companyId, containerId);
@@ -745,14 +728,7 @@ export async function applyPostOffloadChargeMutation(
 
     // Resolve legacy accounting links if needed
     const chargeRow = await resolveLegacyPostOffloadAccountingLinks(tx, companyId, containerId, rawCharge);
-    // Never edit/undo a historical charge if its accounting identity cannot be
-    // resolved. Otherwise the charge/cost changes while the original payable
-    // voucher survives and cannot be retired or updated.
-    if (!chargeRow.voucherId || !chargeRow.daybookEntryId) {
-      throw new Error(
-        `Charge #${chargeRow.id} has missing historical voucher/daybook links. Reconcile the original records before editing or undoing it.`
-      );
-    }
+    assertResolvedHistoricalLinks(chargeRow);
 
     // Compute OLD canonical cost (with this charge included)
     const activeCharges = await loadActiveCharges(tx, companyId, containerId);

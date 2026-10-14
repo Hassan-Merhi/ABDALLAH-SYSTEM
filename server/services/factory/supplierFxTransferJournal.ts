@@ -14,9 +14,9 @@
 import { sql } from "drizzle-orm";
 import type { DbTransaction } from "../../db";
 import { MoneyDecimal, toMoney } from "../../lib/money";
+import { resolveRoundingAccountIdTx } from "../accounting/engineRounding";
 import { postFactoryVoucherTx } from "./factoryVoucherPosting";
 
-const COMPANY_ROUNDING_CODE = "ROUNDING";
 const ZERO = new MoneyDecimal(0);
 
 export interface SupplierFxJournalDocument {
@@ -107,12 +107,6 @@ export async function postSupplierFxTransferJournalTx(
     throw new Error(`Unsupported financial supplier FX transfer kind #${document.id}`);
   }
   const amounts = describeSupplierFxConversion(document);
-  const rounding = await tx.execute(sql`
-    SELECT id FROM ledger_accounts
-     WHERE company_id = ${document.companyId} AND code = ${COMPANY_ROUNDING_CODE}
-       AND deleted_at IS NULL LIMIT 2
-  `);
-  if (rounding.rows.length !== 1) throw new Error("Unique company rounding ledger account required");
   const lines: Array<{
     factorySupplierId?: number;
     ledgerAccountId?: number;
@@ -137,8 +131,10 @@ export async function postSupplierFxTransferJournalTx(
     },
   ];
   if (amounts.residual.abs().gt(ZERO)) {
+    // The engine's ROUNDING system account, provisioned on first use; only a
+    // transfer with a sub-cent residual needs it.
     lines.push({
-      ledgerAccountId: Number(rounding.rows[0].id),
+      ledgerAccountId: await resolveRoundingAccountIdTx(tx, document.companyId),
       currency: "USD",
       ...(amounts.residual.gt(0)
         ? { debit: amounts.residual.toFixed(6) }

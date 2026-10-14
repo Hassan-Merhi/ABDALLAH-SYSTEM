@@ -232,14 +232,20 @@ describe("account change rules (policy)", () => {
       after: { accountType: after, subType: null },
     });
     for (const role of ["Admin", "Owner", "Developer"]) {
-      expect(code(() => assertAccountChangeAllowed({ role, lines: lines(1), type: type("Expense", "Asset") }))).toBeNull();
-      expect(code(() => assertAccountChangeAllowed({ role, lines: lines(1), type: type("Income", "Liability") }))).toBeNull();
+      expect(
+        code(() => assertAccountChangeAllowed({ role, lines: lines(1), type: type("Expense", "Asset") }))
+      ).toBeNull();
+      expect(
+        code(() => assertAccountChangeAllowed({ role, lines: lines(1), type: type("Income", "Liability") }))
+      ).toBeNull();
     }
     expect(
       code(() => assertAccountChangeAllowed({ role: "Manager", lines: lines(1), type: type("Expense", "Asset") }))
     ).toBe(ACCOUNT_TYPE_CATEGORY_CHANGE_CODE);
     expect(
-      code(() => assertAccountChangeAllowed({ role: "Manager", lines: lines(1), type: type("Expense", "Direct Expense") }))
+      code(() =>
+        assertAccountChangeAllowed({ role: "Manager", lines: lines(1), type: type("Expense", "Direct Expense") })
+      )
     ).toBeNull();
     expect(
       code(() => assertAccountChangeAllowed({ role: "Manager", lines: lines(0, 2), type: type("Expense", "Asset") }))
@@ -482,6 +488,41 @@ describe("transfer-account", () => {
     });
     const audit = (await auditRows("voucher_entries", to)).at(-1);
     expect(audit?.changes.movedEntries.old).toEqual([expect.objectContaining({ entryId, ledgerAccountId: from })]);
+  });
+
+  it("refuses the whole move when any of several vouchers is in a closed period", async () => {
+    const from = await ledgerAccount("XFER-CLOSED-FROM", "Expense");
+    const to = await ledgerAccount("XFER-CLOSED-TO", "Expense");
+    const openVoucherId = await postAgainst({ ledger_account_id: from });
+    const closedVoucherId = await postAgainst({ ledger_account_id: from }, "3.00", "2024-03-15");
+    const entryIds = (
+      await pool.query(
+        `SELECT id FROM voucher_entries WHERE voucher_id = ANY($1::int[]) AND ledger_account_id = $2 ORDER BY id`,
+        [[openVoucherId, closedVoucherId], from]
+      )
+    ).rows.map((row) => row.id as number);
+    expect(entryIds).toHaveLength(2);
+
+    const closingVoucherId = await postAgainst({ ledger_account_id: ctx.salesAccountId }, "1.00", "2024-03-31");
+    await pool.query(
+      `INSERT INTO fiscal_period_closures (company_id, period_start_date, period_end_date, closed_by_user_id,
+         closing_voucher_id, retained_earnings_account_id, total_income, total_expense, net_income, status)
+       VALUES ($1, '2024-03-01', '2024-03-31', $2, $3, $4, 0, 0, 0, 'CLOSED')`,
+      [ctx.companyId, ctx.userId, closingVoucherId, ctx.cashAccountId]
+    );
+    try {
+      const refused = await agent.post("/api/voucher-entries/transfer-account").send({ entryIds, toAccountId: to });
+      expect(refused.status).toBeGreaterThanOrEqual(400);
+      const ledgers = (
+        await pool.query(`SELECT ledger_account_id FROM voucher_entries WHERE id = ANY($1::int[])`, [entryIds])
+      ).rows.map((row) => row.ledger_account_id);
+      expect(ledgers).toEqual([from, from]);
+    } finally {
+      await withFixtureTransaction(async (client) => {
+        await client.query(`SET LOCAL app.closed_period_override = 'on'`);
+        await client.query(`DELETE FROM fiscal_period_closures WHERE company_id = $1`, [ctx.companyId]);
+      });
+    }
   });
 });
 
