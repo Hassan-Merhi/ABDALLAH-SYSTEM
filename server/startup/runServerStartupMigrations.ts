@@ -513,16 +513,19 @@ END $mig$`;
     // them (order deleted / container row deleted) are returned to IN_STOCK.
     try {
       const orphanResult = await migrationClient.query(`
-          UPDATE factory_bales
+          UPDATE factory_bales AS fb
           SET status = 'IN_STOCK', updated_at = NOW()
-          WHERE status = 'RESERVED_FOR_ORDER'
-            AND deleted_at IS NULL
-            AND id NOT IN (
-              SELECT cob.bale_id
-              FROM customer_order_bales cob
-              INNER JOIN customer_orders co ON co.id = cob.order_id
-              WHERE co.deleted_at IS NULL
-                AND co.status IN ('LOADING', 'PENDING_VERIFICATION', 'VERIFIED')
+          WHERE fb.status = 'RESERVED_FOR_ORDER'
+            AND fb.deleted_at IS NULL
+            AND NOT EXISTS (
+              SELECT 1
+                FROM customer_order_bales cob
+                JOIN customer_orders co ON co.id = cob.order_id
+               WHERE cob.bale_id = fb.id
+                 AND co.company_id = fb.company_id
+                 AND co.deleted_at IS NULL
+                 AND co.status IN ('DRAFT', 'LOADING', 'PENDING_VERIFICATION',
+                                   'VERIFIED', 'FINALIZED', 'DISPATCHED', 'SOLD')
             )
           RETURNING id
         `);
