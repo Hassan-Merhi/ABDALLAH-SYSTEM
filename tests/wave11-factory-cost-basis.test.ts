@@ -771,7 +771,7 @@ describe("the reviewed bale re-cost", () => {
     const after = await factoryStockValuation(db, companyId);
     // The per-bale cost change reduces finished goods; it does not restore
     // or duplicate a physical bale, and the order stays VERIFIED.
-    expect(Number(before.finished.minus(after.finished))).toBeCloseTo(960, 2);
+    expect(Number(before.soldNotInvoiced.cost) - Number(after.soldNotInvoiced.cost)).toBeCloseTo(960, 2);
     expect((await one<{ status: string }>("SELECT status FROM customer_orders WHERE id=$1", [order.id])).status).toBe("VERIFIED");
 
     const audit = await call("GET /api/factory/bale-cost/historical-sold-audit", {
