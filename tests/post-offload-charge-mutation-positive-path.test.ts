@@ -337,7 +337,9 @@ describe("post-offload charge mutation positive paths", () => {
     expect(rebuilt[0].values).toHaveLength(2);
   });
 
-  it("repairs missing daybook/accounting links during an edit and credits the selected supplier", async () => {
+  it("refuses to edit a historical charge whose voucher/daybook links cannot be resolved", async () => {
+    // #2241: editing an unresolved historical charge would change its cost while
+    // the original payable voucher survives unretired, so it fails closed.
     const existing = {
       id: 41,
       version: 1,
@@ -346,54 +348,25 @@ describe("post-offload charge mutation positive paths", () => {
       daybookEntryId: null,
       voucherId: null,
     };
-    const supplierCharge = { ...chargeData, ledgerAccountId: null, supplierId: 66 };
-    harness.selectResults.push([container], [existing], [{ rate: "5.08000000" }]);
-    harness.loadActiveCharges
-      .mockResolvedValueOnce([{ id: 41, amount: "50" }])
-      .mockResolvedValueOnce([{ id: 41, amount: "60" }]);
-    harness.computeCorrectContainerCost.mockReturnValueOnce(oldCost).mockReturnValueOnce(newCost);
-    harness.postFactoryVoucherTx.mockResolvedValue({ voucher: { id: 52 }, entries: [], replayed: false });
-    harness.writeDaybookEntry.mockResolvedValue({ id: 303 });
+    harness.selectResults.push([container], [existing]);
 
-    const result = await applyPostOffloadChargeMutation(harness.tx, {
-      action: "EDIT",
-      companyId: 4,
-      containerId: 9,
-      chargeId: 41,
-      expectedVersion: 1,
-      txDate: "2026-08-11",
-      userId: "user-7",
-      chargeData: supplierCharge,
-      accountingCtx: { voucherCompanyId: 4, chargesPayableAcctId: 88 },
-    } as never);
-
-    expect(result).toMatchObject({ action: "EDIT", chargeId: 41 });
-    expect(harness.writeDaybookEntry).toHaveBeenCalledWith(
-      harness.tx,
-      expect.objectContaining({
-        referenceId: 9,
-        amountCurrency: 60,
-      })
-    );
-    expect(harness.postFactoryVoucherTx).toHaveBeenCalledWith(
-      harness.tx,
-      expect.objectContaining({
-        currency: "EUR",
-        source: { sourceType: "factory-post-offload-charge", sourceId: "4:9:41", phase: "voucher" },
-        lines: [
-          expect.objectContaining({ ledgerAccountId: 88, debit: "60" }),
-          expect.objectContaining({ factorySupplierId: 66, credit: "60" }),
-        ],
-      })
-    );
-    expect(harness.updatedValues).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          table: harness.tables.factoryOffloadAdditionalCharges,
-          values: expect.objectContaining({ daybookEntryId: 303, voucherId: 52 }),
-        }),
-      ])
-    );
+    await expect(
+      applyPostOffloadChargeMutation(harness.tx, {
+        action: "EDIT",
+        companyId: 4,
+        containerId: 9,
+        chargeId: 41,
+        expectedVersion: 1,
+        txDate: "2026-08-11",
+        userId: "user-7",
+        chargeData: { ...chargeData, ledgerAccountId: null, supplierId: 66 },
+        accountingCtx: { voucherCompanyId: 4, chargesPayableAcctId: 88 },
+      } as never)
+    ).rejects.toThrow(/missing historical voucher\/daybook links/);
+    expect(harness.cascadeContainerCostChange).not.toHaveBeenCalled();
+    expect(harness.postFactoryVoucherTx).not.toHaveBeenCalled();
+    expect(harness.writeDaybookEntry).not.toHaveBeenCalled();
+    expect(harness.updatedValues).toHaveLength(0);
   });
 
   it("undoes a charge once with a negative cost cascade, voucher tombstone, and exact reversing daybook entry", async () => {

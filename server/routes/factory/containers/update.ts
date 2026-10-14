@@ -437,7 +437,9 @@ export function registerFactoryContainerUpdateRoutes(app: Express) {
                     .update(voucherEntries)
                     .set({
                       ...normalizedCr,
-                      factorySupplierId: updated.freightSupplierId,
+                      // The import (goods) payable belongs to the goods supplier;
+                      // only the freight journal credits the freight payee.
+                      factorySupplierId: updated.supplierId,
                       ledgerAccountId: null,
                     })
                     .where(eq(voucherEntries.id, creditLines[0].id));
