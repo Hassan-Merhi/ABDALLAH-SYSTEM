@@ -82,6 +82,7 @@ export function registerBaleRecostRoutes(app: Express) {
         }
         const result = await applyBaleRecost(companyId, {
           planHash,
+          confirmVerifiedSoldBales: req.body?.confirmVerifiedSoldBales === true,
           actor: {
             userId: String(req.session.userId ?? ""),
             username: req.session.username || String(req.session.userId ?? "unknown"),
