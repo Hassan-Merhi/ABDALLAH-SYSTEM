@@ -1,7 +1,7 @@
 # Dead-code cleanup — final report and handoff
 
 Branch `refactor/erp-dead-code-cleanup` (mirrored to `claude/blissful-bell-w6imct`).
-Baseline: `main@3a210f315ddba5aaf0bbe6dee21b5d5e3417b97f`. Not merged into `main`.
+Baseline: `main@3a210f315ddba5aaf0bbe6dee21b5d5e3417b97f`. Merged into `main` on 2026-10-14 at the owner's instruction.
 
 > Phases 3–13 were verified statically only. The §14 validation was then run with the owner's
 > approval on 2026-10-13, after merging `origin/main@0599a9bab`; results are in
@@ -269,12 +269,18 @@ The rest also failed on `origin/main` and are fixed in `e0366b058`:
   have no annotated control left; the registry test and the remote-support E2E use
   `view-details`.
 
+**Re-validated after merging `origin/main@b1e633768` (2026-10-14):** `npm ci`, check, lint
+(0/0), `node build.mjs`, all 26 scripts and the frontend suite (2,147) pass. The backend suite
+(7,053) showed two failures, both fixed in `c38ee7fdb`: an audit-table name in the new
+change-customer test, and the PDF statement test, which main's #2224 had broken. The merge
+also adds tests and translations for main's new change-customer route.
+
 ## Follow-up commits
 
 - `af159468b` — `_`-binding backlog cleared and ESLint `varsIgnorePattern` removed (above).
 - `a1f08d895` — build-plugin transform targets restored (above).
 - The owner-decision commit that follows it applies the table above.
-- `fe6662055`, `8e2d90103` (merge of `origin/main@0599a9bab`), `1e6bb2ed9`, `0a5d708d2`, `e0366b058` — validation-run fixes (above).
+- `fe6662055`, `8e2d90103` (merge of `origin/main@0599a9bab`), `1e6bb2ed9`, `0a5d708d2`, `e0366b058`, `f4c3b730d` (merge of `origin/main@b1e633768`), `c38ee7fdb` — validation-run fixes (above).
 - `7265326db` — merge of `origin/main`; stale `config/company-scope-review.json` entry for the
   stock registrar deleted in the first Phase 3 session removed (that audit fails on stale rows).
 
