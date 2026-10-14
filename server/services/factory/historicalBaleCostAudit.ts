@@ -163,7 +163,7 @@ export async function historicalBaleCostAuditPreview(
         FROM classified
        WHERE order_id IS NOT NULL
        GROUP BY order_id, order_status, invoice_number, container_number, review_group
-       ORDER BY nominal_difference::numeric DESC
+       ORDER BY SUM(nominal_difference) DESC
        LIMIT 300
     `),
   ]);
