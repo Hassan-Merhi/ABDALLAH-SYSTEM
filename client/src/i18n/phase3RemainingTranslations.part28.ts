@@ -504,4 +504,35 @@ export const phase3RemainingTranslationsPart28: readonly Phase3SharedUiEntry[] =
     ar: "تعذّرت قراءة جدول البيانات هذا.",
     fr: "Impossible de lire cette feuille de calcul.",
   },
+  {
+    en: "Raw materials and existing batches recorded in this mix.",
+    ar: "المواد الخام والدفعات الموجودة المسجّلة في هذا الخليط.",
+    fr: "Matières premières et lots existants enregistrés dans ce mélange.",
+  },
+  {
+    en: "No recorded source materials found for this batch.",
+    ar: "لم يتم العثور على مواد مصدر مسجّلة لهذه الدفعة.",
+    fr: "Aucune matière source enregistrée trouvée pour ce lot.",
+  },
+  { en: "Source / Container", ar: "المصدر / الحاوية", fr: "Source / Conteneur" },
+  {
+    en: "Unable to load mix batch sources",
+    ar: "تعذّر تحميل مصادر دفعة الخلط",
+    fr: "Impossible de charger les sources du lot de mélange",
+  },
+  {
+    en: "Unable to load mix batch details",
+    ar: "تعذّر تحميل تفاصيل دفعة الخلط",
+    fr: "Impossible de charger les détails du lot de mélange",
+  },
+  {
+    en: "Unable to load the recorded sources for this mix batch.",
+    ar: "تعذّر تحميل المصادر المسجّلة لدفعة الخلط هذه.",
+    fr: "Impossible de charger les sources enregistrées de ce lot de mélange.",
+  },
+  {
+    en: "Unable to load this mix batch's details. Please try again.",
+    ar: "تعذّر تحميل تفاصيل دفعة الخلط هذه. يُرجى المحاولة مرة أخرى.",
+    fr: "Impossible de charger les détails de ce lot de mélange. Veuillez réessayer.",
+  },
 ];
