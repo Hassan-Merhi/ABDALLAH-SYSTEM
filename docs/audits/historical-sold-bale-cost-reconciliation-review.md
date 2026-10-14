@@ -14,7 +14,9 @@ Legacy no-mix bale records sometimes stored the catalogue **price per bale** in 
 
 ## New owner/admin screening endpoint
 
-`GET /api/factory/bale-cost/historical-sold-audit?group=OPEN_VERIFIED_UNINVOICED&limit=100&offset=0`
+`GET /api/factory/bale-cost/historical-sold-audit?group=INVOICED_OR_FINALIZED&orderId=123&limit=100&offset=0`
+
+Omit `orderId` to list all rows for a group. The response includes an `orders` section containing the grouped, read-only per-invoice screening estimates so reviewers can inspect an individual customer order without paging through unrelated bales.
 
 Returns:
 - summary totals grouped by evidence and current stored state
