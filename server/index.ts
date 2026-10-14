@@ -54,6 +54,7 @@ import { ensureFactoryStaffTrackingSchema } from "./startup/factoryStaffTracking
 import { ensureFactoryContainerPlannerSchemaOnBoot } from "./startup/factoryContainerPlannerSchema";
 import { ensurePriorityScanSchema } from "./startup/priorityScanSchema";
 import { ensureFactoryBaleOrderIntegrity } from "./startup/ensureFactoryBaleOrderIntegrity";
+import { runApprovedLegacyBaleUnitCostRepair } from "./startup/runApprovedLegacyBaleUnitCostRepair";
 import { ensureFactorySheetsSacksSchema } from "./startup/factorySheetsSacksSchema";
 import { ensureRecurringJournalSchema } from "./services/accounting/ensureRecurringJournalSchema";
 import { bootstrapRecurringJournalFromEnvironment } from "./services/accounting/recurringJournalBootstrap";
@@ -321,6 +322,9 @@ let migrationsDone = false;
       // Before accepting requests, repair old completed-order bales and install
       // the DB guard even when bulk migrations are disabled.
       await ensureFactoryBaleOrderIntegrity(pool);
+      // Explicitly owner-approved, one-time monetary correction. Disabled by
+      // default and guarded against repeat execution or accounting cutover.
+      await runApprovedLegacyBaleUnitCostRepair(pool);
       if (migrationsEnabled) {
         try {
           await runMigrations();
