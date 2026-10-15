@@ -141,9 +141,10 @@ export function renderLegacyPriorityLogo(label: Pick<LabelData, "referenceNumber
 }
 
 /** Preserve customer logos; print the default HMD logo without a gray image filter. */
-function renderSmallHmdLogo(label: LabelData, cssClass = "logo-img"): string {
+function renderSmallHmdLogo(label: LabelData, cssClass = "logo-img", showPriorityColor = true): string {
+  // Keep validation for all formats, but only paper labels visualize priority colors.
   const color = validatePriorityLabelColor(label);
-  if (!color) {
+  if (!color || !showPriorityColor) {
     const logoClass = label.customerLogoUrl ? cssClass : `${cssClass} hmd-default-logo`;
     return `<img class="${logoClass}" src="${label.customerLogoUrl || HMD_LOGO_BASE64}" alt="Logo" />`;
   }
@@ -426,7 +427,7 @@ export function generateStickerLabelsHtml(labels: LabelData[]) {
         <div class="label">
           <div class="label-content">
             <div class="label-top">
-              <div class="logo-section">${renderSmallHmdLogo(label, "sticker-logo")}</div>
+              <div class="logo-section">${renderSmallHmdLogo(label, "sticker-logo", false)}</div>
               <div class="info-section">
                 <div><span class="info-label">PIECES:</span> <span class="info-value">${formatLabelNum(label.pieces)}</span></div>
                 <div><span class="info-label">ARTICLE:</span> <span class="info-value">${escapePriorityText(label.articleCode)}</span></div>
@@ -456,7 +457,6 @@ export function generateStickerLabelsHtml(labels: LabelData[]) {
     .logo-section { flex-shrink: 0; }
     .sticker-logo { height: 10mm; width: auto; object-fit: contain; display: block; }
     .hmd-default-logo { background: #fff !important; filter: contrast(3) !important; }
-    ${priorityColorBoxCss(20, 10)}
     .info-section { text-align: right; font-size: 7.5pt; line-height: 1.3; }
     .info-label { font-weight: 900; }
     .info-value { font-weight: 900; }
@@ -470,7 +470,6 @@ export function generateStickerLabelsHtml(labels: LabelData[]) {
     @media print {
       .print-note { display: none !important; }
       * { color: #000 !important; }
-      .priority-color-box { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
       .info-label, .info-value, .ref-barcode-number, .ref-bale-name { -webkit-text-stroke: 0.3px #000; }
       img { filter: contrast(3) brightness(0.9); image-rendering: crisp-edges; image-rendering: -webkit-optimize-contrast; }
       .sticker-logo, .ref-barcode-img { filter: none; image-rendering: pixelated; }
