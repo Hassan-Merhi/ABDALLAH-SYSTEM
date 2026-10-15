@@ -15,6 +15,7 @@ export const PRIORITY_SCAN_COLORS = [
   "#000000",
   "#B0E0E6",
   "#DB7093",
+  "#A7FC00",
 ] as const;
 
 export type PriorityScanColor = (typeof PRIORITY_SCAN_COLORS)[number];
