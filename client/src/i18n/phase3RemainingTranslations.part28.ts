@@ -303,9 +303,9 @@ export const phase3RemainingTranslationsPart28: readonly Phase3SharedUiEntry[] =
     fr: "Le suivi automatique des conteneurs est désactivé. Mettez à jour les données du conteneur manuellement ou par import Excel.",
   },
   {
-    en: "Priority color must be one of the 12 approved HEX colors.",
-    ar: "يجب أن يكون لون الأولوية أحد ألوان HEX الاثني عشر المعتمدة.",
-    fr: "La couleur de priorité doit être l'une des 12 couleurs HEX approuvées.",
+    en: "Priority color must be one of the 10 approved HEX colors.",
+    ar: "يجب أن يكون لون الأولوية أحد ألوان HEX العشرة المعتمدة.",
+    fr: "La couleur de priorité doit être l'une des 10 couleurs HEX approuvées.",
   },
   {
     en: "Automated container tracking is disabled. Update container data manually or by import.",
