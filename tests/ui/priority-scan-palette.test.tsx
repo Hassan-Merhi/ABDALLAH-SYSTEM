@@ -18,7 +18,7 @@ const approved = [
   "#9400D3",
   "#DAA520",
   "#6A5ACD",
-  "#FFB6C1",
+  "#B22222",
   "#F7E7CE",
   "#614051",
   "#B0E0E6",
@@ -55,6 +55,11 @@ describe("Priority Scan fixed palette", () => {
   it("exposes exactly the approved 12 colors in order", () => {
     expect(PRIORITY_SCAN_COLORS).toEqual(approved);
     expect(new Set(PRIORITY_SCAN_COLORS).size).toBe(12);
+  });
+
+  it("replaces pink with firebrick for new priority selections", () => {
+    expect(isApprovedPriorityScanColor("#B22222")).toBe(true);
+    expect(isApprovedPriorityScanColor("#FFB6C1")).toBe(false);
   });
 
   it.each(approved)("lets a user select and save %s", async (color) => {
