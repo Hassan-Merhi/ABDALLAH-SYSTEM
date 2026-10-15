@@ -22,8 +22,11 @@ import { translatePriorityScanText, type PriorityScanTranslationKey } from "@/i1
 import {
   DEFAULT_PRIORITY_SCAN_COLOR,
   PRIORITY_SCAN_COLORS,
+  getPriorityScanLetter,
+  getPriorityScanLetterInk,
   isApprovedPriorityScanColor,
 } from "@shared/priorityScanColors";
+import { PriorityScanColorLetter } from "./PriorityScanColorLetter";
 
 const PRIORITY_SCAN_CONFIGS_URL = "/api/factory/customer-orders/loading-list/priority-scan-configs";
 const DEFAULT_COLOR = DEFAULT_PRIORITY_SCAN_COLOR;
@@ -201,11 +204,7 @@ export function PriorityScanLoadingControl({ load }: PriorityScanLoadingControlP
               data-testid={`button-priority-config-${load.id}`}
               title={canManagePriority ? tr("editPriorityTitle") : tr("editColorTitle")}
             >
-              <span
-                className="h-3.5 w-3.5 rounded-full border border-black/15 shadow-xs"
-                style={{ backgroundColor: activeConfig.color }}
-                aria-hidden="true"
-              />
+              <PriorityScanColorLetter color={activeConfig.color} size="sm" />
               {canManagePriority ? tr("priorityNumber", { priority: activeConfig.priority }) : tr("editColor")}
             </Button>
             {canManagePriority && (
@@ -281,17 +280,19 @@ export function PriorityScanLoadingControl({ load }: PriorityScanLoadingControlP
                     <button
                       key={color}
                       type="button"
-                      className={`h-8 w-8 rounded-full border-2 transition-transform ${selected ? "border-foreground scale-110" : "border-border"} ${unavailable ? "opacity-30 cursor-not-allowed" : "hover:scale-105"}`}
-                      style={{ backgroundColor: color }}
+                      className={`h-8 w-8 inline-flex items-center justify-center rounded-full border-2 font-bold text-sm transition-transform ${selected ? "border-foreground scale-110" : "border-border"} ${unavailable ? "opacity-30 cursor-not-allowed" : "hover:scale-105"}`}
+                      style={{ backgroundColor: color, color: getPriorityScanLetterInk(color) }}
                       onClick={() => selectPreset(color)}
                       disabled={unavailable}
                       aria-label={tr("useColor", { color })}
-                      title={unavailable ? tr("colorUsed") : color}
-                    />
+                      title={unavailable ? tr("colorUsed") : `${getPriorityScanLetter(color)} · ${color}`}
+                    >
+                      <span aria-hidden="true">{getPriorityScanLetter(color)}</span>
+                    </button>
                   );
                 })}
                 <Badge variant="outline" className="font-mono text-xs" aria-live="polite">
-                  {selectedColor.toUpperCase()}
+                  {getPriorityScanLetter(selectedColor) ? `${getPriorityScanLetter(selectedColor)} · ` : ""}{selectedColor.toUpperCase()}
                 </Badge>
               </div>
               {config?.color && !isApprovedPriorityScanColor(config.color) && (
