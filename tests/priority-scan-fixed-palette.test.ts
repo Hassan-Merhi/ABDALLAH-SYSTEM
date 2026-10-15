@@ -1,5 +1,5 @@
 /**
- * Server enforcement of the fixed ten-color Priority Scan palette.
+ * Server enforcement of the fixed eleven-color Priority Scan palette.
  *
  * The UI only offers the approved swatches, but the write API is the real
  * boundary: it must refuse custom colors, persist the canonical HEX value,
@@ -94,7 +94,7 @@ afterAll(async () => {
 }, 60000);
 
 describe("Priority Scan fixed palette write API", () => {
-  it("accepts all ten approved colors at once and stores their canonical HEX value", async () => {
+  it("accepts all eleven approved colors at once and stores their canonical HEX value", async () => {
     await disableAll();
     for (const [index, color] of PRIORITY_SCAN_COLORS.entries()) {
       const orderId = await createLoading();
@@ -107,13 +107,13 @@ describe("Priority Scan fixed palette write API", () => {
       expect(await storedConfig(orderId)).toMatchObject({ color, color_key: color.toLowerCase(), enabled: true });
     }
 
-    // Every approved color is now active, so an eleventh loading has nothing left.
-    const eleventh = await createLoading();
+    // Every approved color is now active, so a twelfth loading has nothing left.
+    const twelfth = await createLoading();
     for (const color of PRIORITY_SCAN_COLORS) {
-      const duplicate = await agent.put(configPath(eleventh)).send({ color, priority: 11, enabled: true });
+      const duplicate = await agent.put(configPath(twelfth)).send({ color, priority: 12, enabled: true });
       expect(duplicate.status).toBe(409);
     }
-    expect(await storedConfig(eleventh)).toBeUndefined();
+    expect(await storedConfig(twelfth)).toBeUndefined();
   }, 60000);
 
   it.each([
@@ -138,7 +138,7 @@ describe("Priority Scan fixed palette write API", () => {
     const orderId = await createLoading();
     const response = await agent.put(configPath(orderId)).send({ color, priority: 1, enabled: true });
     expect(response.status).toBe(400);
-    expect(String(response.body.message)).toMatch(/10 approved/);
+    expect(String(response.body.message)).toMatch(/11 approved/);
     expect(await storedConfig(orderId)).toBeUndefined();
   });
 
