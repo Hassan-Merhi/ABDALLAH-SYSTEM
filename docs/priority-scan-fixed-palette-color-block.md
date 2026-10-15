@@ -18,6 +18,26 @@ The authoritative **new/edited** palette now contains exactly **11 fixed colors*
 10. `#DB7093`
 11. `#A7FC00`
 
+## Fixed color letters (M–W) — 2026-10-15
+
+These eleven letters are fixed visual identifiers for the **HEX colors**, not priority queue numbers. They appear inside the Set Priority color selector and beside active priorities, and in Priority Scan's color-flash panel, queue, and condensed/detailed scan history:
+
+| Color HEX | Fixed letter |
+| --- | --- |
+| `#9400D3` | **M** |
+| `#F28500` | **N** |
+| `#FFD700` | **O** |
+| `#39FF14` | **P** |
+| `#808000` | **Q** |
+| `#B22222` | **R** |
+| `#6A5ACD` | **S** |
+| `#000000` | **T** |
+| `#B0E0E6` | **U** |
+| `#DB7093` | **V** |
+| `#A7FC00` | **W** |
+
+The mapping is centralized in `shared/priorityScanColors.ts` and is case-insensitive for saved HEX values. Historical colors outside the approved list show no letter. Changing queue positions never changes the letter. This is **UI only**; it does not save new data, recolor past allocations, or put letters onto printed stickers/A4/A5 labels. The later meanings of these letters are not yet defined.
+
 The shared `PRIORITY_SCAN_COLORS` list controls the UI, server write validation, and default selection. Removed palette colors are rejected for new assignments and explicit recolors; already saved allocation colors and printed historical snapshots are preserved and can still be displayed/reprinted. Existing priority position-only moves preserve their stored legacy colors. No historical database update or palette migration is required.
 
 The remainder of this document records earlier verification of previous palette revisions and must not be treated as certification of this eleven-color revision. See PR #2265 for the latest change and verification status.
