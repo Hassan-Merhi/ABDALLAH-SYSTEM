@@ -251,9 +251,9 @@ describe("Automatic Priority Printing labels", () => {
         expect(box?.getAttribute("data-priority-color")).toBe(color.toLowerCase());
         expect(letter?.textContent).toBe(getPriorityScanLetter(color));
         expect(letter?.getAttribute("data-priority-letter")).toBe(getPriorityScanLetter(color));
-        expect(letter?.style.getPropertyValue("color")).toBe(getPriorityScanLetterInk(color));
+        expect(letter?.getAttribute("style")).toContain(`color: ${getPriorityScanLetterInk(color)} !important`);
         expect(letter?.style.getPropertyPriority("color")).toBe("important");
-        expect(letter?.style.getPropertyPriority("-webkit-text-fill-color")).toBe("important");
+        expect(letter?.getAttribute("style")).toContain(`-webkit-text-fill-color: ${getPriorityScanLetterInk(color)} !important`);
         expect(box?.querySelector(".priority-color-box-text")).toBeNull();
         expect(html).toContain(`width: ${width}; height: ${height}`);
         expect(html).toContain("overflow: hidden; box-sizing: border-box");
