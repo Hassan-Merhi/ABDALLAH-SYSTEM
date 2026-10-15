@@ -4,7 +4,7 @@ Implementation branch: `feat/priority-scan-fixed-11-colors-label-box` — PR #21
 
 ## Current approved Priority Scan palette — 2026-10-15
 
-The authoritative **new/edited** palette now contains exactly **10 fixed colors** in this order:
+The authoritative **new/edited** palette now contains exactly **11 fixed colors** in this order:
 
 1. `#9400D3`
 2. `#F28500`
@@ -16,10 +16,11 @@ The authoritative **new/edited** palette now contains exactly **10 fixed colors*
 8. `#000000`
 9. `#B0E0E6`
 10. `#DB7093`
+11. `#A7FC00`
 
 The shared `PRIORITY_SCAN_COLORS` list controls the UI, server write validation, and default selection. Removed palette colors are rejected for new assignments and explicit recolors; already saved allocation colors and printed historical snapshots are preserved and can still be displayed/reprinted. Existing priority position-only moves preserve their stored legacy colors. No historical database update or palette migration is required.
 
-The remainder of this document records earlier verification of previous palette revisions and must not be treated as certification of this ten-color revision. See PR #2265 for the latest change and verification status.
+The remainder of this document records earlier verification of previous palette revisions and must not be treated as certification of this eleven-color revision. See PR #2265 for the latest change and verification status.
 
 ## Sticker-label exception — 2026-10-15
 
@@ -27,7 +28,7 @@ The current print policy allows saved Priority Scan colors only on A4/A5 paper l
 
 ## Behavior
 
-- New/edited Priority Scan colors use the 10 values in `shared/priorityScanColors.ts`, in their fixed display order. Each active company loading must have a distinct color.
+- New/edited Priority Scan colors use the 11 values in `shared/priorityScanColors.ts`, in their fixed display order. Each active company loading must have a distinct color.
 - The Pending Loadings editor renders only those swatches. Previously stored non-palette colors remain visible and recorded; saving a different color selects an approved swatch.
 - Moving an existing active queue position omits `color` and sends `enabled: true` and `priority`; the server preserves the existing color and colorKey. Create/re-enable/color-change requests cannot omit an approved color.
 - The print renderer uses the recorded allocation color (not the current queue palette), normalizes legacy named/short HEX values safely and rejects unsafe colors.
