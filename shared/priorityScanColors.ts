@@ -12,7 +12,7 @@ export const PRIORITY_SCAN_COLORS = [
   "#9400D3",
   "#DAA520",
   "#6A5ACD",
-  "#FFB6C1",
+  "#B22222",
   "#F7E7CE",
   "#614051",
   "#B0E0E6",
