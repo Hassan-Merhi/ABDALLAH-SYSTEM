@@ -216,7 +216,7 @@ describe("Priority Scan fixed palette write API", () => {
       const move = await agent.put(configPath(orderId)).send({ priority: 1, enabled: true });
       expect(move.status).toBe(403);
       // Non-managers may still pick an approved color, but not a custom one.
-      expect((await agent.put(configPath(orderId)).send({ color: "#db7093", enabled: true })).status).toBe(200);
+      expect((await agent.put(configPath(orderId)).send({ color: "#DB7093", enabled: true })).status).toBe(200);
       // #000000 joined the approved palette; a custom colour is still refused.
       expect((await agent.put(configPath(orderId)).send({ color: "#000000", enabled: true })).status).toBe(200);
       expect((await agent.put(configPath(orderId)).send({ color: "#123456", enabled: true })).status).toBe(400);
