@@ -36,7 +36,7 @@ These eleven letters are fixed visual identifiers for the **HEX colors**, not pr
 | `#DB7093` | **V** |
 | `#A7FC00` | **W** |
 
-The mapping is centralized in `shared/priorityScanColors.ts` and is case-insensitive for saved HEX values. Historical colors outside the approved list show no letter. Changing queue positions never changes the letter. This is **UI only**; it does not save new data, recolor past allocations, or put letters onto printed stickers/A4/A5 labels. The later meanings of these letters are not yet defined.
+The mapping is centralized in `shared/priorityScanColors.ts` and is case-insensitive for saved HEX values. Historical colors outside the approved list show no letter. Changing queue positions never changes the letter. The mapping is **display-only**: it does not save new data, rewrite past allocations, or change queue positions. Printing now also uses the matching letter for current fixed HEX colors: a black bold **24pt** letter beside the HMD/customer logo on the uncolored 3×1.97-inch sticker, and a centered high-contrast letter inside the existing colored rectangle on A4 (**30pt**) and A5 (**25pt**). Older colors outside the fixed palette keep the previous HMD-only presentation on paper and no sticker letter. The meanings of these letters are not yet defined.
 
 The shared `PRIORITY_SCAN_COLORS` list controls the UI, server write validation, and default selection. Removed palette colors are rejected for new assignments and explicit recolors; already saved allocation colors and printed historical snapshots are preserved and can still be displayed/reprinted. Existing priority position-only moves preserve their stored legacy colors. No historical database update or palette migration is required.
 
@@ -44,7 +44,7 @@ The remainder of this document records earlier verification of previous palette 
 
 ## Sticker-label exception — 2026-10-15
 
-The current print policy allows saved Priority Scan colors only on A4/A5 paper labels; sticker labels always display the ordinary HMD/customer logo with no priority color fill. Historical verification below describes earlier code that also colored stickers, so those historical test results do **not** certify the new sticker-print behavior.
+Only A4/A5 paper labels use the saved priority **color fill**. Each approved color's **fixed M–W letter** appears centered inside that rectangle in legible black/white, sized to fit (A4 25×14 mm box with 30pt letter, A5 22×12 mm box with 25pt letter). Sticker labels keep the normal HMD/customer logo, with the matching **24pt black letter directly alongside it** on a white background—no priority fill. Ordinary and legacy-colored stickers have no extra letter. Historical test records below describe earlier code and do not certify these newer print details.
 
 ## Behavior
 
@@ -52,8 +52,8 @@ The current print policy allows saved Priority Scan colors only on A4/A5 paper l
 - The Pending Loadings editor renders only those swatches. Previously stored non-palette colors remain visible and recorded; saving a different color selects an approved swatch.
 - Moving an existing active queue position omits `color` and sends `enabled: true` and `priority`; the server preserves the existing color and colorKey. Create/re-enable/color-change requests cannot omit an approved color.
 - The print renderer uses the recorded allocation color (not the current queue palette), normalizes legacy named/short HEX values safely and rejects unsafe colors.
-- On A4/A5 paper, color-bearing priority labels replace the small HMD logo with a solid rounded saved-color block. Sticker labels never display this color block; they retain the ordinary HMD/customer logo even for priority allocations. Non-priority labels keep their original logo and other content.
-- A4 and A5 paper labels use the shared priority color block (A4 25×14 mm; A5 22×12 mm); the separate legacy Pressing/Production templates retain their existing 25×14 mm color block. The 3×1.97-inch sticker format is black-on-white and has no priority-color CSS. These print-only changes do not change saved colors or historical allocations.
+- On A4/A5 paper, approved priority colors replace the small HMD logo with the saved-color block containing the fixed centered M–W letter (light/dark ink is chosen for contrast); legacy saved colors retain their HMD fallback inside the block. Stickers never display a priority-color fill and instead show the ordinary HMD/customer logo with a black M–W letter next to it for an approved color. Non-priority labels keep their original logo and other content.
+- A4 and A5 use the existing 25×14 mm and 22×12 mm boxes respectively, with centered letters clipped within those bounds. Legacy Pressing/Production templates retain their original 25×14 mm color box and HMD mark. Sticker layout remains 3×1.97 inches; the letter sits in a 9×10 mm monochrome space by the logo. Saved colors, barcode/reference content and historical allocations remain unchanged.
 - Preflight and reprint audits reject stale mismatches between the prepared order/color and recorded order/color. The system does not rewrite historical colors or allocation snapshots.
 
 ## Local verification and Claude handoff — 2026-10-10
