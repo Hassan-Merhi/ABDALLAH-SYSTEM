@@ -140,11 +140,12 @@ export function renderLegacyPriorityLogo(label: Pick<LabelData, "referenceNumber
   );
 }
 
-/** Ordinary labels keep their original logo markup byte-for-byte. */
+/** Preserve customer logos; print the default HMD logo without a gray image filter. */
 function renderSmallHmdLogo(label: LabelData, cssClass = "logo-img"): string {
   const color = validatePriorityLabelColor(label);
   if (!color) {
-    return `<img class="${cssClass}" src="${label.customerLogoUrl || HMD_LOGO_BASE64}" alt="Logo" />`;
+    const logoClass = label.customerLogoUrl ? cssClass : `${cssClass} hmd-default-logo`;
+    return `<img class="${logoClass}" src="${label.customerLogoUrl || HMD_LOGO_BASE64}" alt="Logo" />`;
   }
   return renderPriorityColorBox(label, `${cssClass} priority-color-box`);
 }
@@ -196,6 +197,7 @@ const detailBlockCss = `
     .label-top { display: flex; justify-content: space-between; align-items: center; }
     .logo-section { flex-shrink: 0; }
     .logo-img { height: 14mm; width: auto; object-fit: contain; display: block; }
+    .hmd-default-logo { background: #fff !important; filter: contrast(3) !important; }
     ${priorityColorBoxCss(25, 14)}
     .info-section { text-align: right; font-size: 8pt; line-height: 1.4; }
     .info-key { font-weight: 900; }
@@ -379,6 +381,7 @@ export function generateA5LabelsHtml(labels: LabelData[]) {
     .label-top { display: flex; justify-content: space-between; align-items: center; }
     .logo-section { flex-shrink: 0; }
     .logo-img { height: 12mm; width: auto; object-fit: contain; display: block; }
+    .hmd-default-logo { background: #fff !important; filter: contrast(3) !important; }
     ${priorityColorBoxCss(22, 12)}
     .info-section { text-align: right; font-size: 7pt; line-height: 1.4; }
     .info-key { font-weight: 900; }
@@ -452,6 +455,7 @@ export function generateStickerLabelsHtml(labels: LabelData[]) {
     .label-top { display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
     .logo-section { flex-shrink: 0; }
     .sticker-logo { height: 10mm; width: auto; object-fit: contain; display: block; }
+    .hmd-default-logo { background: #fff !important; filter: contrast(3) !important; }
     ${priorityColorBoxCss(20, 10)}
     .info-section { text-align: right; font-size: 7.5pt; line-height: 1.3; }
     .info-label { font-weight: 900; }
