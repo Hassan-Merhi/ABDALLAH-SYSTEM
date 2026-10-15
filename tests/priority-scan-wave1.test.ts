@@ -108,12 +108,12 @@ describe("Priority Scan Wave 1 configuration foundation", () => {
     // only active loading keeps it at #1.
     const update = await agent
       .put(`/api/factory/customer-orders/${orderId}/loading-list/priority-scan-config`)
-      .send({ color: "#db7093", priority: 3, enabled: true });
+      .send({ color: "#DB7093", priority: 3, enabled: true });
 
     expect(update.status).toBe(200);
     expect(update.body).toMatchObject({
       orderId,
-      color: "#db7093",
+      color: "#DB7093",
       priority: 1,
       enabled: true,
       createdBy: create.body.createdBy,
@@ -137,7 +137,7 @@ describe("Priority Scan Wave 1 configuration foundation", () => {
     const list = await agent.get("/api/factory/customer-orders/loading-list/priority-scan-configs");
     expect(list.status).toBe(200);
     const listed = list.body.some(
-      (row: { orderId: number; color: string }) => row.orderId === orderId && row.color === "#db7093"
+      (row: { orderId: number; color: string }) => row.orderId === orderId && row.color === "#DB7093"
     );
     expect(listed).toBe(true);
   });
