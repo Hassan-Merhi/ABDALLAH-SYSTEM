@@ -4,7 +4,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { PriorityScanLoadingControl } from "@/pages/factory/PriorityScanLoadingControl";
 import { apiRequest } from "@/lib/queryClient";
 import { translatePriorityScanText } from "@/i18n/priorityScanTranslations";
-import { isApprovedPriorityScanColor, PRIORITY_SCAN_COLORS } from "@shared/priorityScanColors";
+import {
+  getPriorityScanLetter,
+  getPriorityScanLetterInk,
+  isApprovedPriorityScanColor,
+  PRIORITY_SCAN_COLOR_LETTERS,
+  PRIORITY_SCAN_COLORS,
+} from "@shared/priorityScanColors";
+import { PriorityScanColorLetter } from "@/pages/factory/PriorityScanColorLetter";
 
 vi.mock("@/contexts/ApplicationLanguageContext", () => ({ useApplicationLanguage: () => ({ language: "en" }) }));
 vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: vi.fn() }) }));
@@ -23,6 +30,7 @@ const approved = [
   "#DB7093",
   "#A7FC00",
 ];
+const letters = ["M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W"] as const;
 const clients: QueryClient[] = [];
 const configsUrl = "/api/factory/customer-orders/loading-list/priority-scan-configs";
 function mount(
@@ -56,6 +64,48 @@ describe("Priority Scan fixed palette", () => {
     expect(new Set(PRIORITY_SCAN_COLORS).size).toBe(11);
   });
 
+  it("locks unique M-W letters to fixed HEX values independently of queue priority", () => {
+    expect(Object.keys(PRIORITY_SCAN_COLOR_LETTERS)).toEqual(approved);
+    expect(new Set(Object.values(PRIORITY_SCAN_COLOR_LETTERS)).size).toBe(11);
+    approved.forEach((hex, index) => {
+      expect(getPriorityScanLetter(hex)).toBe(letters[index]);
+      expect(getPriorityScanLetter(hex.toLowerCase())).toBe(letters[index]);
+    });
+    for (const legacy of ["Navy", "#dc2626", "#FFB6C1", "red", null, 1]) {
+      expect(getPriorityScanLetter(legacy)).toBeNull();
+    }
+  });
+
+  it("uses legible lettering on dark and light swatches", () => {
+    expect(getPriorityScanLetterInk("#000000")).toBe("#FFFFFF");
+    expect(getPriorityScanLetterInk("#9400D3")).toBe("#FFFFFF");
+    expect(getPriorityScanLetterInk("#FFD700")).toBe("#000000");
+    expect(getPriorityScanLetterInk("#A7FC00")).toBe("#000000");
+  });
+
+  it.each(approved.map((hex, index) => [hex, letters[index]] as const))(
+    "renders fixed letter %s on its reusable color badge",
+    (color, letter) => {
+      render(<PriorityScanColorLetter color={color} />);
+      const swatch = screen.getByRole("img", { name: `Priority color ${color}, letter ${letter}` });
+      expect(swatch).toHaveTextContent(letter);
+      expect(swatch).toHaveStyle({ backgroundColor: color });
+    }
+  );
+
+  it("never invents a letter for a legacy color", () => {
+    render(<PriorityScanColorLetter color="Navy" />);
+    expect(screen.getByRole("img", { name: "Legacy priority color Navy" })).toBeEmptyDOMElement();
+  });
+
+  it("shows fixed letters for saved priorities without changing queue-position controls", () => {
+    mount([{ id: 1, orderId: 42, color: "#9400D3", priority: 7, enabled: true }]);
+    const button = screen.getByTestId("button-priority-config-42");
+    expect(button).toHaveTextContent("M");
+    expect(button).toHaveTextContent("#7");
+    expect(screen.getByRole("img", { name: "Priority color #9400D3, letter M" })).toBeInTheDocument();
+  });
+
   it("accepts only the fixed new palette, not removed selections", () => {
     for (const color of approved) expect(isApprovedPriorityScanColor(color)).toBe(true);
     for (const removed of ["#7FFF00", "#FFE066", "#FF00FF", "#DAA520", "#F7E7CE", "#614051", "#FFB6C1"]) {
@@ -67,7 +117,11 @@ describe("Priority Scan fixed palette", () => {
     mount();
     fireEvent.click(screen.getByTestId("button-set-priority-42"));
     expect(screen.getAllByRole("button", { name: /Use color/ })).toHaveLength(11);
-    fireEvent.click(screen.getByRole("button", { name: `Use color ${color}` }));
+    const swatch = screen.getByRole("button", { name: `Use color ${color}` });
+    const letter = letters[approved.indexOf(color)];
+    expect(swatch).toHaveTextContent(letter);
+    fireEvent.click(swatch);
+    expect(screen.getByText(`${letter} · ${color}`)).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("button-save-priority-42"));
     await waitFor(() =>
       expect(apiRequest).toHaveBeenCalledWith(
