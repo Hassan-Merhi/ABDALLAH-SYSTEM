@@ -5,18 +5,16 @@
  * historical allocation colors or print snapshots to match this list.
  */
 export const PRIORITY_SCAN_COLORS = [
-  "#7FFF00",
-  "#FFE066",
-  "#808000",
-  "#FF00FF",
   "#9400D3",
-  "#DAA520",
+  "#F28500",
+  "#FFD700",
+  "#39FF14",
+  "#808000",
+  "#B22222",
   "#6A5ACD",
-  "#FFB6C1",
-  "#F7E7CE",
-  "#614051",
-  "#B0E0E6",
   "#000000",
+  "#B0E0E6",
+  "#DB7093",
 ] as const;
 
 export type PriorityScanColor = (typeof PRIORITY_SCAN_COLORS)[number];

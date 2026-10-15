@@ -141,7 +141,7 @@ describe("Automatic Priority Printing labels", () => {
         /<div class="(?:logo-img|sticker-logo) priority-color-box"[^>]*><span class="priority-color-box-text">HMD<\/span><\/div>/g,
         "<LOGO>"
       )
-      .replace(/<img class="(?:logo-img|sticker-logo)"[^>]*\/>/g, "<LOGO>");
+      .replace(/<img class="(?:logo-img|sticker-logo)(?: hmd-default-logo)?"[^>]*\/>/g, "<LOGO>");
   }
 
   it("replaces the small logo with a solid rounded box in the saved legacy color, marked HMD", () => {
@@ -173,7 +173,7 @@ describe("Automatic Priority Printing labels", () => {
     ["A5", generateA5LabelsHtml, "22mm", "12mm"],
     ["sticker", generateStickerLabelsHtml, "20mm", "10mm"],
   ] as const)("sizes the %s color box to its logo area on screen and in print", (_name, print, width, height) => {
-    const html = print([label({ priorityColor: "#7FFF00" })]);
+    const html = print([label({ priorityColor: "#39FF14" })]);
     const [screenCss, printCss = ""] = html.split("@media print");
     // The preview must show the box (an empty div with no width renders invisibly).
     expect(screenCss).toContain(`.priority-color-box { width: ${width}; height: ${height}; border-radius: 2mm;`);
@@ -196,6 +196,22 @@ describe("Automatic Priority Printing labels", () => {
     expect(a4).not.toContain("priority-print-a4");
     expect(a4).not.toMatch(/stripe/i);
     expect(generateA5LabelsHtml([priority])).toContain("a5-page a5-page1");
+  });
+
+  it("keeps the default HMD logo black on white in A4, A5 and sticker print", () => {
+    for (const print of printers) {
+      const html = print([label()]);
+      const doc = new DOMParser().parseFromString(html, "text/html");
+      const logo = doc.querySelector('img[alt="Logo"]');
+      expect(logo?.classList.contains("hmd-default-logo")).toBe(true);
+      // The global print brightness(0.9) used to turn white into #e6e6e6.
+      expect(html).toContain(".hmd-default-logo { background: #fff !important; filter: contrast(3) !important; }");
+      const custom = new DOMParser().parseFromString(
+        print([label({ customerLogoUrl: "https://example.test/customer.png" })]),
+        "text/html"
+      ).querySelector('img[alt="Logo"]');
+      expect(custom?.classList.contains("hmd-default-logo")).toBe(false);
+    }
   });
 
   it("leaves ordinary labels with their original logo markup", () => {
