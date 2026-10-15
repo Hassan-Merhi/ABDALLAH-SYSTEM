@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { companies } from "@shared/schema";
 
 import { db } from "../../db";
+import { HttpError } from "../../lib/httpHandlers";
 import { assertCompanyAccess, CompanyAccessError } from "../../security/companyAccessBoundary";
 import { getCompanyRequestRuntimeContext, runWithCompanyRequestRuntimeContext } from "./companyRequestRuntimeContext";
 import {
@@ -10,12 +11,12 @@ import {
   runWithDatabaseScopeRuntimeContext,
 } from "./databaseScopeRuntimeContext";
 
-export class ParentCompanyPostingScopeError extends Error {
+export class ParentCompanyPostingScopeError extends HttpError {
   readonly code = "PARENT_COMPANY_POSTING_SCOPE_INVALID";
   readonly status: number;
 
   constructor(message: string, status = 403) {
-    super(message);
+    super(status, message);
     this.name = "ParentCompanyPostingScopeError";
     this.status = status;
   }
@@ -79,5 +80,60 @@ export async function runWithVerifiedParentCompanyScope<T>(parentCompanyId: numb
 
   return runWithCompanyRequestRuntimeContext({ ...requestContext, authorizedCompanyIds }, () =>
     runWithDatabaseScopeRuntimeContext(createTenantDatabaseScope(parentCompanyId, [], "active-company"), run)
+  );
+}
+
+/**
+ * PO edits must update the subsidiary purchase voucher and the matching parent
+ * receivable/payable voucher in ONE transaction. Unlike posting only to the
+ * parent, this scope permits BOTH verified tenants while retaining RLS.
+ *
+ * The parent link comes from companies.parent_company_id, never the legacy
+ * global parentCompanyId setting or the request payload.
+ */
+export async function runWithVerifiedPoParentScope<T>(
+  subsidiaryCompanyId: number,
+  run: (parentCompanyId: number | null) => Promise<T>
+): Promise<T> {
+  const requestContext = getCompanyRequestRuntimeContext();
+  const databaseScope = getDatabaseScopeRuntimeContext();
+  if (
+    !requestContext ||
+    databaseScope?.kind !== "tenant" ||
+    requestContext.companyId !== subsidiaryCompanyId ||
+    databaseScope.companyId !== subsidiaryCompanyId
+  ) {
+    throw new ParentCompanyPostingScopeError("Purchase order edit requires the active subsidiary tenant scope.", 403);
+  }
+
+  const [subsidiary] = await db
+    .select({ parentCompanyId: companies.parentCompanyId })
+    .from(companies)
+    .where(eq(companies.id, subsidiaryCompanyId))
+    .limit(1);
+  if (!subsidiary) {
+    throw new ParentCompanyPostingScopeError("Purchase order company not found.", 404);
+  }
+
+  const parentCompanyId = subsidiary.parentCompanyId ?? null;
+  if (parentCompanyId === null) return run(null);
+  if (parentCompanyId === subsidiaryCompanyId) {
+    throw new ParentCompanyPostingScopeError("A company cannot be its own parent.");
+  }
+  try {
+    await assertCompanyAccess(requestContext.userId, parentCompanyId);
+  } catch (error) {
+    if (error instanceof CompanyAccessError) {
+      throw new ParentCompanyPostingScopeError("No access to the linked parent company.", error.status);
+    }
+    throw error;
+  }
+
+  const authorizedCompanyIds = [...new Set([...(requestContext.authorizedCompanyIds ?? []), parentCompanyId])];
+  return runWithCompanyRequestRuntimeContext({ ...requestContext, authorizedCompanyIds }, () =>
+    runWithDatabaseScopeRuntimeContext(
+      createTenantDatabaseScope(subsidiaryCompanyId, authorizedCompanyIds, "authorized-companies"),
+      () => run(parentCompanyId)
+    )
   );
 }

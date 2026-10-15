@@ -2,8 +2,8 @@ import { logger } from "../../lib/logger";
 import type { Request, Response, NextFunction } from "express";
 import { db } from "../../db";
 import { storage } from "../../storage";
-import { vouchers, voucherEntries, intercompanyPosConfigs } from "@shared/schema";
-import { eq, and, or, sql, like, isNull } from "drizzle-orm";
+import { vouchers, voucherEntries, ledgerAccounts, companies, intercompanyPosConfigs } from "@shared/schema";
+import { eq, and, or, sql, like, ilike, isNull } from "drizzle-orm";
 import type { DatabaseOrTransaction, DbTransaction } from "../../db";
 import { postFactoryVoucherTx, usdLineAmounts } from "../../services/factory/factoryVoucherPosting";
 import { VoucherCorrectionError, editPostedFactoryVoucherTx } from "../../services/factory/factoryVoucherCorrection";
@@ -99,20 +99,38 @@ export async function syncIntercoParentVoucher(
   poNumbers: string | string[],
   grossTotal: MoneyInput,
   containerNumber?: string,
-  freightOpts?: IntercoFreightOpts
+  freightOpts?: IntercoFreightOpts,
+  verifiedParentCompanyId?: number,
+  verifiedSubsidiaryCompanyId?: number
 ): Promise<SyncIntercoResult> {
   // A voucher's entry rewrites must commit together (balanced-voucher check runs at COMMIT).
   if ("rollback" in dbOrTx) {
-    return syncIntercoParentVoucherOn(dbOrTx, poNumbers, grossTotal, containerNumber, freightOpts);
+    return syncIntercoParentVoucherOn(
+      dbOrTx,
+      poNumbers,
+      grossTotal,
+      containerNumber,
+      freightOpts,
+      verifiedParentCompanyId,
+      verifiedSubsidiaryCompanyId
+    );
   }
   try {
     return await dbOrTx.transaction((tx) =>
-      syncIntercoParentVoucherOn(tx, poNumbers, grossTotal, containerNumber, freightOpts)
+      syncIntercoParentVoucherOn(
+        tx,
+        poNumbers,
+        grossTotal,
+        containerNumber,
+        freightOpts,
+        verifiedParentCompanyId,
+        verifiedSubsidiaryCompanyId
+      )
     );
   } catch (err) {
     if (err instanceof VoucherCorrectionError) throw err;
     logger.error("[syncIntercoParentVoucher] Error syncing parent INTERCO voucher:", { error: err });
-    return { found: false, updated: false, amount: toMoney(grossTotal).toFixed(2) };
+    throw err;
   }
 }
 
@@ -121,7 +139,9 @@ async function syncIntercoParentVoucherOn(
   poNumbers: string | string[],
   grossTotal: MoneyInput,
   containerNumber?: string,
-  freightOpts?: IntercoFreightOpts
+  freightOpts?: IntercoFreightOpts,
+  verifiedParentCompanyId?: number,
+  verifiedSubsidiaryCompanyId?: number
 ): Promise<SyncIntercoResult> {
   // Amounts stay exact: numeric(20, 2) totals above about 10^15 have no cents left as numbers.
   const gross = toMoney(grossTotal);
@@ -132,7 +152,7 @@ async function syncIntercoParentVoucherOn(
   // Always a transaction here (syncIntercoParentVoucher opens one).
   const tx = dbOrTx as DbTransaction;
   try {
-    const parentCompanyId = await storage.getParentCompanyId();
+    const parentCompanyId = verifiedParentCompanyId ?? (await storage.getParentCompanyId());
     if (!parentCompanyId) return { found: false, updated: false, amount: amountStr };
 
     const nums = Array.isArray(poNumbers) ? poNumbers.filter(Boolean) : [poNumbers];
@@ -145,6 +165,9 @@ async function syncIntercoParentVoucherOn(
     const likeConditions = nums.flatMap((n) => [
       like(vouchers.voucherNumber, `INTERCO-PARENT-${n}-%`),
       like(vouchers.voucherNumber, `INTERCO-${n}-%`),
+      // The live PO importer writes IC-PO-2024-290-{timestamp}; this
+      // format was missing from the edit lookup (Beira/Mali regression).
+      like(vouchers.voucherNumber, `IC-${n}-%`),
       like(vouchers.voucherNumber, `IC-%-${n}-%`),
     ]);
     const patternClause = likeConditions.length === 1 ? likeConditions[0] : or(...likeConditions);
@@ -183,7 +206,7 @@ async function syncIntercoParentVoucherOn(
           .where(
             and(
               eq(vouchers.companyId, parentCompanyId),
-            isNull(vouchers.deletedAt),
+              isNull(vouchers.deletedAt),
               patternClause,
               like(voucherEntries.narration, `%${containerNumber}%`)
             )
@@ -195,13 +218,58 @@ async function syncIntercoParentVoucherOn(
       const [byPo] = await dbOrTx
         .select({ id: vouchers.id, totalAmount: vouchers.totalAmount })
         .from(vouchers)
-        .where(and(eq(vouchers.companyId, parentCompanyId),
-            isNull(vouchers.deletedAt), patternClause))
+        .where(and(eq(vouchers.companyId, parentCompanyId), isNull(vouchers.deletedAt), patternClause))
         .limit(1);
       parentVoucher = byPo;
     }
 
+    // Some older PO imports used a generic JOURNAL-{timestamp} number.
+    // Only accept those when BOTH the exact container and this subsidiary's
+    // named parent receivable debit are present. A generic journal must never
+    // be treated as intercompany based on its amount or date alone.
+    if (!parentVoucher && verifiedParentCompanyId && verifiedSubsidiaryCompanyId && containerNumber) {
+      const [subsidiary] = await dbOrTx
+        .select({ name: companies.name })
+        .from(companies)
+        .where(eq(companies.id, verifiedSubsidiaryCompanyId))
+        .limit(1);
+      if (subsidiary) {
+        const parentCreditName = `${subsidiary.name} Credit`;
+        const matchingLegacy = await dbOrTx
+          .select({ id: vouchers.id, totalAmount: vouchers.totalAmount })
+          .from(vouchers)
+          .innerJoin(voucherEntries, eq(voucherEntries.voucherId, vouchers.id))
+          .innerJoin(ledgerAccounts, eq(voucherEntries.ledgerAccountId, ledgerAccounts.id))
+          .where(
+            and(
+              eq(vouchers.companyId, parentCompanyId),
+              isNull(vouchers.deletedAt),
+              like(vouchers.voucherNumber, "JOURNAL-%"),
+              like(vouchers.description, `%${containerNumber}%`),
+              eq(ledgerAccounts.companyId, parentCompanyId),
+              ilike(ledgerAccounts.name, parentCreditName),
+              sql`${voucherEntries.debitAmount} > 0`
+            )
+          )
+          .limit(2);
+        if (matchingLegacy.length > 1) {
+          throw new Error(
+            `Multiple legacy parent journals match container ${containerNumber}; reconcile them before editing.`
+          );
+        }
+        parentVoucher = matchingLegacy[0];
+      }
+    }
+
     if (!parentVoucher) {
+      // A verified subsidiary must never silently succeed or manufacture a
+      // second journal if the original parent entry cannot be located.
+      if (verifiedParentCompanyId) {
+        logger.warn(
+          `[syncIntercoParentVoucher] Required parent journal missing: PO(s) ${nums.join(", ")} container ${containerNumber ?? "unknown"}`
+        );
+        return { found: false, updated: false, amount: amountStr };
+      }
       // ── Fallback: no INTERCO-PARENT voucher exists for this PO.
       // When freight opts + subsidiary company ID are provided, create (or update) a
       // standalone PARENT-FREIGHT- journal in the parent company so the freight
@@ -229,8 +297,13 @@ async function syncIntercoParentVoucherOn(
           const [existingFallback] = await dbOrTx
             .select({ id: vouchers.id })
             .from(vouchers)
-            .where(and(eq(vouchers.companyId, parentCompanyId),
-            isNull(vouchers.deletedAt), eq(vouchers.voucherNumber, fallbackVoucherNum)))
+            .where(
+              and(
+                eq(vouchers.companyId, parentCompanyId),
+                isNull(vouchers.deletedAt),
+                eq(vouchers.voucherNumber, fallbackVoucherNum)
+              )
+            )
             .limit(1);
 
           if (existingFallback) {
@@ -343,7 +416,10 @@ async function syncIntercoParentVoucherOn(
         freightNarrationMismatch = !(fe.narration || "").includes(containerNumber);
       }
     }
-    if (!totalMismatch && !freightEntryMissing && !freightNarrationMismatch) {
+    const staleFreightEntries = !hasFreight
+      ? parentEntries.filter((entry) => toMoney(entry.creditAmount).gt(0) && /^Freight - /i.test(entry.narration ?? ""))
+      : [];
+    if (!totalMismatch && !freightEntryMissing && !freightNarrationMismatch && staleFreightEntries.length === 0) {
       return { found: true, updated: false, voucherId: parentVoucher.id, amount: amountStr, oldAmount: oldAmountStr };
     }
 
@@ -399,8 +475,20 @@ async function syncIntercoParentVoucherOn(
             });
           }
         } else {
-          // No freight split — update all entries to grossTotal (original behaviour)
+          // Reversing parent-paid freight must remove its old freight credit;
+          // merely scaling every credit would double-count the payable.
+          if (staleFreightEntries.length) {
+            await tx.delete(voucherEntries).where(
+              sql`${voucherEntries.id} IN (${sql.join(
+                staleFreightEntries.map((entry) => sql`${entry.id}`),
+                sql`, `
+              )})`
+            );
+          }
+          // No freight split — update the purchase debit and supplier credit.
+          const staleIds = new Set(staleFreightEntries.map((entry) => entry.id));
           for (const entry of parentEntries) {
+            if (staleIds.has(entry.id)) continue;
             if (toMoney(entry.debitAmount).greaterThan(0)) {
               await tx.update(voucherEntries).set(usdLineAmounts(amountStr, 0)).where(eq(voucherEntries.id, entry.id));
             } else if (toMoney(entry.creditAmount).greaterThan(0)) {
@@ -416,7 +504,7 @@ async function syncIntercoParentVoucherOn(
     // A refused edit (closed period) is the caller's answer, not a missing voucher.
     if (err instanceof VoucherCorrectionError) throw err;
     logger.error("[syncIntercoParentVoucher] Error syncing parent INTERCO voucher:", { error: err });
-    return { found: false, updated: false, amount: amountStr };
+    throw err;
   }
 }
 
