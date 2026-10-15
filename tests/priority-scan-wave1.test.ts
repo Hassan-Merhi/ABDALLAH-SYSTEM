@@ -426,7 +426,7 @@ describe("Priority Scan Wave 1 configuration foundation", () => {
     const loading = await createLoading();
     const priority = await agent
       .put(`/api/factory/customer-orders/${loading}/loading-list/priority-scan-config`)
-      .send({ color: "#FFB6C1", priority: 9999, enabled: true });
+      .send({ color: "#B22222", priority: 9999, enabled: true });
     expect(priority.status).toBe(200);
 
     const referenceNumber = `${PREFIX.toUpperCase()}-UNMATCHED-DAILY`;
