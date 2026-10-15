@@ -21,6 +21,7 @@ const approved = [
   "#000000",
   "#B0E0E6",
   "#DB7093",
+  "#A7FC00",
 ];
 const clients: QueryClient[] = [];
 const configsUrl = "/api/factory/customer-orders/loading-list/priority-scan-configs";
@@ -50,9 +51,9 @@ afterEach(() => {
 });
 
 describe("Priority Scan fixed palette", () => {
-  it("exposes exactly the approved 10 colors in order", () => {
+  it("exposes exactly the approved 11 colors in order", () => {
     expect(PRIORITY_SCAN_COLORS).toEqual(approved);
-    expect(new Set(PRIORITY_SCAN_COLORS).size).toBe(10);
+    expect(new Set(PRIORITY_SCAN_COLORS).size).toBe(11);
   });
 
   it("accepts only the fixed new palette, not removed selections", () => {
@@ -65,7 +66,7 @@ describe("Priority Scan fixed palette", () => {
   it.each(approved)("lets a user select and save %s", async (color) => {
     mount();
     fireEvent.click(screen.getByTestId("button-set-priority-42"));
-    expect(screen.getAllByRole("button", { name: /Use color/ })).toHaveLength(10);
+    expect(screen.getAllByRole("button", { name: /Use color/ })).toHaveLength(11);
     fireEvent.click(screen.getByRole("button", { name: `Use color ${color}` }));
     fireEvent.click(screen.getByTestId("button-save-priority-42"));
     await waitFor(() =>
@@ -200,6 +201,6 @@ describe("Priority Scan fixed palette", () => {
     const notice = translatePriorityScanText("legacyPriorityColorNotice", language, { color: "#123456" });
     expect(notice).toContain("#123456");
     expect(notice).not.toContain("{color}");
-    expect(notice).toContain(language === "ar" ? "العشرة" : "10");
+    expect(notice).toContain(language === "ar" ? "الأحد عشر" : "11");
   });
 });
