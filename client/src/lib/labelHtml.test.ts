@@ -133,7 +133,8 @@ describe("A5 and sticker labels", () => {
 });
 
 describe("Automatic Priority Printing labels", () => {
-  const printers = [generateCombinedLabelsHtml, generateA5LabelsHtml, generateStickerLabelsHtml];
+  const paperPrinters = [generateCombinedLabelsHtml, generateA5LabelsHtml];
+  const printers = [...paperPrinters, generateStickerLabelsHtml];
 
   function stripPriorityLogo(html: string): string {
     return html
@@ -144,9 +145,9 @@ describe("Automatic Priority Printing labels", () => {
       .replace(/<img class="(?:logo-img|sticker-logo)(?: hmd-default-logo)?"[^>]*\/>/g, "<LOGO>");
   }
 
-  it("replaces the small logo with a solid rounded box in the saved legacy color, marked HMD", () => {
+  it("replaces the A4/A5 small logo with a saved priority color block marked HMD", () => {
     const bale = label({ priorityColor: "#dc2626", priorityOrderId: 123, priorityNumber: 1 });
-    for (const print of printers) {
+    for (const print of paperPrinters) {
       const html = print([bale]);
       const doc = new DOMParser().parseFromString(html, "text/html");
       const boxes = doc.querySelectorAll(".priority-color-box");
@@ -171,7 +172,6 @@ describe("Automatic Priority Printing labels", () => {
   it.each([
     ["A4", generateCombinedLabelsHtml, "25mm", "14mm"],
     ["A5", generateA5LabelsHtml, "22mm", "12mm"],
-    ["sticker", generateStickerLabelsHtml, "20mm", "10mm"],
   ] as const)("sizes the %s color box to its logo area on screen and in print", (_name, print, width, height) => {
     const html = print([label({ priorityColor: "#39FF14" })]);
     const [screenCss, printCss = ""] = html.split("@media print");
@@ -181,6 +181,34 @@ describe("Automatic Priority Printing labels", () => {
     const printRule = printCss.match(/\.priority-color-box \{[^}]*\}/)?.[0] ?? "";
     expect(printRule).toContain("print-color-adjust: exact !important");
     expect(printRule).not.toMatch(/width|height/);
+  });
+
+  it("keeps the ordinary HMD/customer logo on sticker labels for new and historical priorities", () => {
+    for (const color of [...PRIORITY_SCAN_COLORS, "#dc2626", "Blue"]) {
+      for (const logoUrl of [undefined, "https://example.test/customer-logo.png"]) {
+        const sticker = generateStickerLabelsHtml([
+          label({ priorityColor: color, customerLogoUrl: logoUrl, referenceNumber: "REF/001 A" }),
+        ]);
+        const normal = generateStickerLabelsHtml([
+          label({ customerLogoUrl: logoUrl, referenceNumber: "REF/001 A" }),
+        ]);
+        // Sticker content must not vary with priority allocation or its saved color.
+        expect(sticker).toBe(normal);
+        const doc = new DOMParser().parseFromString(sticker, "text/html");
+        expect(doc.querySelector(".priority-color-box")).toBeNull();
+        const logo = doc.querySelector(".sticker-logo");
+        expect(logo?.tagName).toBe("IMG");
+        expect(logo?.getAttribute("alt")).toBe("Logo");
+        expect(logo?.classList.contains("hmd-default-logo")).toBe(!logoUrl);
+        if (logoUrl) expect(logo?.getAttribute("src")).toBe(logoUrl);
+        expect(sticker).not.toContain("data-priority-color");
+        expect(sticker).not.toContain(".priority-color-box {");
+        expect(sticker).toContain("/api/barcode/REF%2F001%20A");
+        expect(sticker).toContain("REF/001 A");
+        expect(sticker).toContain("ART-100");
+        expect(sticker).toContain("45.5 KGS");
+      }
+    }
   });
 
   it("keeps the exact ordinary A4/A5/sticker layout and large HMD banners for priority bales", () => {
@@ -245,7 +273,8 @@ describe("Automatic Priority Printing labels", () => {
   it("keeps sticker dimensions, article and reference unchanged", () => {
     const html = generateStickerLabelsHtml([label({ priorityColor: "Blue", priorityNumber: 2 })]);
     expect(html).toContain("@page { size: 3in 1.97in");
-    expect(html).toContain('data-priority-color="#2563eb"');
+    expect(html).not.toContain("data-priority-color");
+    expect(html).toContain('class="sticker-logo hmd-default-logo"');
     expect(html).toContain('class="ref-barcode-img"');
     expect(html).toContain("REF-001");
     expect(html).toContain("ART-100");
@@ -258,7 +287,7 @@ describe("Automatic Priority Printing labels", () => {
       label({ referenceNumber: "NORMAL-02" }),
       label({ referenceNumber: "PRIORITY-03", priorityColor: "#2563eb" }),
     ];
-    for (const print of printers) {
+    for (const print of paperPrinters) {
       const html = print(items);
       expect(new DOMParser().parseFromString(html, "text/html").querySelectorAll(".priority-color-box")).toHaveLength(
         2
@@ -273,6 +302,9 @@ describe("Automatic Priority Printing labels", () => {
       expect(normal.querySelector(".priority-color-box")).toBeNull();
       expect(normal.querySelector('img[alt="Logo"]')).not.toBeNull();
     }
+    const stickerDoc = new DOMParser().parseFromString(generateStickerLabelsHtml(items), "text/html");
+    expect(stickerDoc.querySelectorAll(".priority-color-box")).toHaveLength(0);
+    expect(stickerDoc.querySelectorAll('.sticker-logo[alt="Logo"]')).toHaveLength(items.length);
   });
 
   it("renders product text as escaped content", () => {
@@ -306,9 +338,9 @@ describe("Pressing/Production priority logo replacement", () => {
   });
 
   it.each(PRIORITY_SCAN_COLORS)(
-    "prints approved %s across all shared label renderers without changing the barcode",
+    "prints approved %s on A4/A5 only, without changing sticker barcodes",
     (color) => {
-      for (const print of [generateCombinedLabelsHtml, generateA5LabelsHtml, generateStickerLabelsHtml]) {
+      for (const print of paperPrinters) {
         const input = label({ referenceNumber: "REF/001 A", priorityColor: color });
         const html = print([input]);
         expect(html).toContain(`data-priority-color="${color.toLowerCase()}"`);
@@ -316,6 +348,9 @@ describe("Pressing/Production priority logo replacement", () => {
         expect(html).toContain("REF/001 A");
         expect(input.priorityColor).toBe(color);
       }
+      const sticker = generateStickerLabelsHtml([label({ referenceNumber: "REF/001 A", priorityColor: color })]);
+      expect(sticker).not.toContain("data-priority-color");
+      expect(sticker).toContain("/api/barcode/REF%2F001%20A");
       expect(renderLegacyPriorityLogo({ referenceNumber: "R1", priorityColor: color })).toContain(
         `data-priority-color="${color.toLowerCase()}"`
       );

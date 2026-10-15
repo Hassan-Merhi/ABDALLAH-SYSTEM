@@ -4,7 +4,7 @@ Implementation branch: `feat/priority-scan-fixed-11-colors-label-box` — PR #21
 
 ## Current approved Priority Scan palette — 2026-10-15
 
-The authoritative **new/edited** palette now contains exactly **10 fixed colors** in this order:
+The authoritative **new/edited** palette now contains exactly **11 fixed colors** in this order:
 
 1. `#9400D3`
 2. `#F28500`
@@ -16,19 +16,24 @@ The authoritative **new/edited** palette now contains exactly **10 fixed colors*
 8. `#000000`
 9. `#B0E0E6`
 10. `#DB7093`
+11. `#A7FC00`
 
 The shared `PRIORITY_SCAN_COLORS` list controls the UI, server write validation, and default selection. Removed palette colors are rejected for new assignments and explicit recolors; already saved allocation colors and printed historical snapshots are preserved and can still be displayed/reprinted. Existing priority position-only moves preserve their stored legacy colors. No historical database update or palette migration is required.
 
-The remainder of this document records earlier verification of previous palette revisions and must not be treated as certification of this ten-color revision. See PR #2265 for the latest change and verification status.
+The remainder of this document records earlier verification of previous palette revisions and must not be treated as certification of this eleven-color revision. See PR #2265 for the latest change and verification status.
+
+## Sticker-label exception — 2026-10-15
+
+The current print policy allows saved Priority Scan colors only on A4/A5 paper labels; sticker labels always display the ordinary HMD/customer logo with no priority color fill. Historical verification below describes earlier code that also colored stickers, so those historical test results do **not** certify the new sticker-print behavior.
 
 ## Behavior
 
-- New/edited Priority Scan colors use the 10 values in `shared/priorityScanColors.ts`, in their fixed display order. Each active company loading must have a distinct color.
+- New/edited Priority Scan colors use the 11 values in `shared/priorityScanColors.ts`, in their fixed display order. Each active company loading must have a distinct color.
 - The Pending Loadings editor renders only those swatches. Previously stored non-palette colors remain visible and recorded; saving a different color selects an approved swatch.
 - Moving an existing active queue position omits `color` and sends `enabled: true` and `priority`; the server preserves the existing color and colorKey. Create/re-enable/color-change requests cannot omit an approved color.
 - The print renderer uses the recorded allocation color (not the current queue palette), normalizes legacy named/short HEX values safely and rejects unsafe colors.
-- Where the small priority HMD logo used to appear, color-bearing labels show a plain solid rounded rectangle instead. No text or logo is inside the block. Non-priority labels keep their original logo and all other label content.
-- A4 and A5 use the shared detail markup; stickers and the separate Pressing/Production label templates use the same saved-color block principle. Box sizes come from `priorityColorBoxCss()` and are identical on screen and in print: A4 25×14 mm, A5 22×12 mm, sticker 20×10 mm, Pressing/Production 25×14 mm.
+- On A4/A5 paper, color-bearing priority labels replace the small HMD logo with a solid rounded saved-color block. Sticker labels never display this color block; they retain the ordinary HMD/customer logo even for priority allocations. Non-priority labels keep their original logo and other content.
+- A4 and A5 paper labels use the shared priority color block (A4 25×14 mm; A5 22×12 mm); the separate legacy Pressing/Production templates retain their existing 25×14 mm color block. The 3×1.97-inch sticker format is black-on-white and has no priority-color CSS. These print-only changes do not change saved colors or historical allocations.
 - Preflight and reprint audits reject stale mismatches between the prepared order/color and recorded order/color. The system does not rewrite historical colors or allocation snapshots.
 
 ## Local verification and Claude handoff — 2026-10-10
