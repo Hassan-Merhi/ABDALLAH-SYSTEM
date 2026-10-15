@@ -15,6 +15,9 @@ import { ToastAction } from "@/components/ui/toast";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import type { FactoryMixBatch } from "@shared/schema";
+import { MIX_BATCH_TARGET_OPTIONS, selectMixBatchTarget } from "@/pages/factory/production-raw-stock/mixBatchCategoryTargets";
+import { useApplicationLanguage } from "@/contexts/ApplicationLanguageContext";
+import { mixBatchTargetTranslation } from "@/i18n/mixBatchCategoryTargetTranslations";
 
 interface SupplierRawStock {
   supplierName: string;
@@ -63,6 +66,8 @@ interface CreateMixBatchDialogProps {
 
 export function CreateMixBatchDialog({ open, onOpenChange, onCreated }: CreateMixBatchDialogProps) {
   const { toast } = useToast();
+  const { language } = useApplicationLanguage();
+  const tierText = (key: Parameters<typeof mixBatchTargetTranslation>[0], values?: Record<string, string | number>) => mixBatchTargetTranslation(key, language, values);
   const [mode, setMode] = useState<DialogMode>("new");
   const [targetBatchId, setTargetBatchId] = useState<string>("");
   const [selectedSources, setSelectedSources] = useState<SourceSelection[]>([]);
@@ -349,6 +354,7 @@ export function CreateMixBatchDialog({ open, onOpenChange, onCreated }: CreateMi
   const totalWeight = selectedSources.reduce((sum, s) => sum + s.weightKg, 0);
   const totalCost = selectedSources.reduce((sum, s) => sum + s.totalCost, 0);
   const blendedCostPerKg = totalWeight > 0 ? totalCost / totalWeight : 0;
+  const automaticTargetTons = selectMixBatchTarget(totalWeight);
   const hasAnySources = selectedSources.length > 0;
   const isPending = createMutation.isPending || topUpMutation.isPending;
 
@@ -389,6 +395,34 @@ export function CreateMixBatchDialog({ open, onOpenChange, onCreated }: CreateMi
               Add to Existing Batch
             </Button>
           </div>
+
+          {mode === "new" && (
+            <div className="space-y-2" data-testid="mix-batch-production-target-selector">
+              <div className="flex flex-wrap items-center gap-2">
+                <Label>{tierText("productionTarget")}</Label>
+                <span role="status" className="text-xs text-muted-foreground" data-testid="mix-batch-production-target-status">
+                  {totalWeight > 0
+                    ? tierText("tierLabel", { kg: formatNumber(totalWeight), ton: automaticTargetTons })
+                    : tierText("selectSources")}
+                </span>
+              </div>
+              <div className="inline-flex max-w-full rounded-md border border-border bg-muted/40 p-1 gap-1" role="group" aria-label="Automatically selected production target">
+                {MIX_BATCH_TARGET_OPTIONS.map((tons) => (
+                  <span
+                    key={tons}
+                    aria-current={automaticTargetTons === tons ? "true" : undefined}
+                    className={automaticTargetTons === tons
+                      ? "flex min-h-9 min-w-20 items-center justify-center rounded-md bg-primary px-3 text-sm font-semibold text-primary-foreground shadow-sm"
+                      : "flex min-h-9 min-w-20 items-center justify-center rounded-md px-3 text-sm font-semibold text-muted-foreground"}
+                    data-testid={`mix-batch-target-${tons}`}
+                  >
+                    {tierText("tons", { ton: tons })}
+                  </span>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">{tierText("advances")}</p>
+            </div>
+          )}
 
           {/* Top-up: pick target batch */}
           {mode === "topup" && (
