@@ -84,10 +84,16 @@ export function consolidateContainerCharges(
         row.referenceId == null) return;
 
     let orderId: number | undefined;
+    // Historical PRE-vouchers may not have a charge.voucher_id backlink.
+    // Parse their deterministic identity before trying a narration fallback.
+    const historicalPre = /^CHARGE-PRE-(\d+)-(\d+)$/.exec(row.referenceNumber ?? "");
     if (chargeOrderByVoucherId.has(row.referenceId)) {
       const linkedId = chargeOrderByVoucherId.get(row.referenceId);
       if (linkedId !== undefined && linkedId > 0 && orderInfo(linkedId)) orderId = linkedId;
       // An ambiguous or invalid explicit link must not fall back to narration.
+    } else if (historicalPre) {
+      const preOrderId = Number(historicalPre[1]);
+      if (orderInfo(preOrderId)) orderId = preOrderId;
     } else {
       const container = containerFromChargeNarration(row.description);
       if (!container) return;
@@ -97,9 +103,16 @@ export function consolidateContainerCharges(
     if (orderId === undefined) return;
     const order = orderInfo(orderId);
     if (!order ||
-        ["CANCELLED", "DELETED"].includes(order.status.toUpperCase()) ||
         row.companyId !== rows[0]?.companyId ||
         row.customerId !== rows[0]?.customerId) return;
+
+    // No charge attached to a container is a customer-statement entry until
+    // its invoice is FINALIZED. Existing CHARGE-PRE vouchers remain in the
+    // general ledger for audit, but are held out of the customer statement.
+    if (order.status.toUpperCase() !== "FINALIZED") {
+      removed.add(index);
+      return;
+    }
 
     const saleIndex = saleByOrder.get(orderId);
     const sale = saleIndex !== undefined && saleIndex >= 0 ? result[saleIndex] : undefined;
@@ -121,9 +134,8 @@ export function consolidateContainerCharges(
       return;
     }
 
-    // A verified/not-yet-finalized container has posted charges but no Sale.
-    // Report these honestly as container costs, not as a completed sale or an
-    // anonymous Journal. Preserve each posting date for period reports.
+    // A finalized order can still have an unmatched or cross-period charge.
+    // Show it separately as a container cost while preserving its posting date.
     const bucket = periodBucket(row.transactionDate, window);
     const key = `${orderId}|${row.transactionDate.slice(0, 10)}|${row.currency.toUpperCase()}|${bucket}`;
     const existingIndex = standaloneByKey.get(key);
