@@ -38,7 +38,22 @@ import { readExcel, sheetToJson } from "../../excelHelper";
 import { parsePoImportSheetRows } from "../import/poImportExcelParser";
 import { supplierService } from "../suppliers/supplierService";
 import { SP_CONTAINER_EXCEL_IMPORT_PARSE_PATH, buildSpContainerExcelImport } from "@shared/spContainerExcelImport";
+import { isGoldenCoastOtwSource, FRESH_START_OTW_SOURCE_NAME } from "@shared/goldenCoastOtwSource";
 
+
+// GC-LSHI partner-capital roles are authoritative; never rely on a browser-sent
+// company name or a client flag to decide whether supplier-free posting is safe.
+async function isFreshStartOtwCompany(companyId: number): Promise<boolean> {
+  const accounts = await db.select({
+    subType: ledgerAccounts.subType,
+  }).from(ledgerAccounts).where(and(
+    eq(ledgerAccounts.companyId, companyId),
+    isNull(ledgerAccounts.deletedAt),
+    eq(ledgerAccounts.active, true),
+    inArray(ledgerAccounts.subType, ["gc_partner_capital", "gc_owner_capital"]),
+  ));
+  return isGoldenCoastOtwSource(accounts);
+}
 
 // Validate Supplier Payable Excel imports before any invoice or voucher is written.
 // The same check is repeated inside the posting transaction after taking a
@@ -48,6 +63,7 @@ async function validateSpExcelImport(
   body: Record<string, unknown>,
   tx: Pick<typeof db, "select"> = db,
   checkSupplier = true,
+  freshStartOtw = false,
 ): Promise<{ errors: string[]; warnings: string[] }> {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -59,7 +75,16 @@ async function validateSpExcelImport(
   const discountPct = Number(body.discountPct ?? 0);
   const lines = Array.isArray(body.lines) ? (body.lines as Array<Record<string, unknown>>) : null;
 
-  if (!Number.isSafeInteger(supplierId) || supplierId <= 0) errors.push("Select a valid supplier.");
+  if (freshStartOtw) {
+    if (body.supplierId != null && body.supplierId !== "" && body.supplierId !== 0) {
+      errors.push("Fresh Start FZE imports cannot be linked to a supplier account.");
+    }
+    if (String(body.supplierName ?? "") !== FRESH_START_OTW_SOURCE_NAME) {
+      errors.push("Fresh Start FZE is the required internal container source.");
+    }
+  } else if (!Number.isSafeInteger(supplierId) || supplierId <= 0) {
+    errors.push("Select a valid supplier.");
+  }
   if (!containerNumber) errors.push("Container number is required.");
   if (!invoiceNumber) errors.push("Invoice / PO number is required.");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(invoiceDate) || Number.isNaN(Date.parse(invoiceDate))) {
@@ -73,7 +98,7 @@ async function validateSpExcelImport(
     errors.push("Excel must contain 1 to 10,000 valid item lines.");
   }
 
-  if (checkSupplier && Number.isSafeInteger(supplierId) && supplierId > 0) {
+  if (!freshStartOtw && checkSupplier && Number.isSafeInteger(supplierId) && supplierId > 0) {
     const companySuppliers = await supplierService.list(companyId, "");
     const supplier = companySuppliers.find((s) => s.id === supplierId);
     if (!supplier) {
@@ -185,7 +210,7 @@ export function registerSpContainerRoutes(app: Express) {
       const {
         importSource,
         supplierId,
-        supplierName,
+        supplierName: requestedSupplierName,
         containerNumber,
         invoiceNumber,
         invoiceDate,
@@ -201,15 +226,17 @@ export function registerSpContainerRoutes(app: Express) {
         otwClearingAccountId,
       } = req.body;
 
-      if (!supplierName || !invoiceNumber || !invoiceDate) {
+      if (!invoiceNumber || !invoiceDate || (importSource !== "excel" && !requestedSupplierName)) {
         return res.status(400).json({ message: "supplierName, invoiceNumber, invoiceDate are required" });
       }
+      const freshStartOtw = importSource === "excel" && await isFreshStartOtwCompany(companyId);
+      const supplierName = freshStartOtw ? FRESH_START_OTW_SOURCE_NAME : requestedSupplierName;
 
       if (importSource === "excel" && (otwAccountId || otwClearingAccountId)) {
         return res.status(400).json({ message: "Excel imports must use the Supplier Payable company\u0027s configured Goods OTW accounts." });
       }
       if (importSource === "excel") {
-        const validation = await validateSpExcelImport(companyId, req.body);
+        const validation = await validateSpExcelImport(companyId, req.body, db, true, freshStartOtw);
         if (validation.errors.length) return res.status(400).json({ code: "SP_EXCEL_IMPORT_INVALID", message: validation.errors.join("; "), ...validation });
       }
 
@@ -250,12 +277,12 @@ export function registerSpContainerRoutes(app: Express) {
       }
 
       const totalUsd = (parseMoneyInput(invoiceTotalUsd) ?? toMoney(0)).toDecimalPlaces(2);
-      const supplierIdNum = supplierId ? parseInt(String(supplierId)) : null;
+      const supplierIdNum = freshStartOtw ? null : supplierId ? parseInt(String(supplierId)) : null;
 
       const result = await db.transaction(async (tx) => {
         if (importSource === "excel") {
           await tx.execute(sql`SELECT pg_advisory_xact_lock(${companyId}, 20831016)`);
-          const recheck = await validateSpExcelImport(companyId, req.body, tx, false);
+          const recheck = await validateSpExcelImport(companyId, req.body, tx, false, freshStartOtw);
           if (recheck.errors.length) {
             const error = new Error(recheck.errors.join("; ")) as Error & { code?: string };
             error.code = "SP_EXCEL_IMPORT_INVALID";
@@ -267,7 +294,7 @@ export function registerSpContainerRoutes(app: Express) {
           .values({
             companyId,
             supplierId: supplierIdNum,
-            supplierName,
+            supplierName: supplierName,
             containerNumber: containerNumber || null,
             invoiceNumber,
             invoiceDate,
@@ -373,7 +400,8 @@ export function registerSpContainerRoutes(app: Express) {
         return res.status(400).json({ message: "No valid item rows found" });
       }
 
-      const suppliers = await supplierService.list(companyId, "");
+      const freshStartOtwSource = await isFreshStartOtwCompany(companyId);
+      const suppliers = freshStartOtwSource ? [] : await supplierService.list(companyId, "");
       const supplierOptions = suppliers.map((supplier) => ({
         id: supplier.id,
         legalName: supplier.legalName,
@@ -381,7 +409,7 @@ export function registerSpContainerRoutes(app: Express) {
       }));
       const containers = parsed.preview.map((container) => buildSpContainerExcelImport(container, supplierOptions));
 
-      res.json({ fileName: req.file.originalname, rowCount: rawData.length, containers });
+      res.json({ fileName: req.file.originalname, rowCount: rawData.length, freshStartOtwSource, containers });
     } catch (error: unknown) {
       logger.error("SP container Excel import parse failed", { error });
       res.status(500).json({ message: getErrorMessage(error) });
@@ -394,7 +422,8 @@ export function registerSpContainerRoutes(app: Express) {
     try {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
-      res.json(await validateSpExcelImport(companyId, req.body));
+      const freshStartOtw = await isFreshStartOtwCompany(companyId);
+      res.json(await validateSpExcelImport(companyId, req.body, db, true, freshStartOtw));
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
     }
