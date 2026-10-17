@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useCompany } from "@/contexts/CompanyContext";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -58,22 +59,34 @@ function formatDays(times: WeeklyTimes): string {
 
 export function ScheduledWhatsAppMessagesTab() {
   const { toast } = useToast();
+  const { selectedCompany } = useCompany();
+  const companyId = selectedCompany?.id;
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<Form>(blankForm);
   const [editorOpen, setEditorOpen] = useState(false);
   const { data: schedules = [], isLoading: loading } = useQuery<Schedule[]>({
-    queryKey: ["/api/whatsapp/message-schedules"],
+    queryKey: ["/api/whatsapp/message-schedules", companyId],
+    enabled: !!companyId,
   });
   const { data: whatsappSettings } = useQuery<{ enabled: boolean; hasCredentials: boolean }>({
     queryKey: ["/api/whatsapp/settings"],
+    enabled: !!companyId,
   });
   const { data: recipients = [] } = useQuery<Group[]>({
-    queryKey: ["/api/whatsapp/recipients"],
+    queryKey: ["/api/whatsapp/recipients", companyId],
+    enabled: !!companyId,
   });
   const { data: history = [] } = useQuery<Delivery[]>({
-    queryKey: ["/api/whatsapp/message-schedules/history"],
+    queryKey: ["/api/whatsapp/message-schedules/history", companyId],
+    enabled: !!companyId,
     refetchInterval: 60000,
   });
+  useEffect(() => {
+    setEditorOpen(false);
+    setEditingId(null);
+    setForm(blankForm());
+  }, [companyId]);
+
   const groups = recipients.filter((r) => r.active && r.isGroup);
 
   const refresh = () => {
