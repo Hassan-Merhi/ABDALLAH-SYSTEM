@@ -131,7 +131,9 @@ export default function Settings() {
     },
     {
       label: "WhatsApp",
-      items: [{ key: "scheduled-whatsapp-messages", label: "Scheduled Messages", icon: MessageSquareText }],
+      items: ["Admin", "Owner", "Developer"].includes(currentUser?.role ?? "")
+        ? [{ key: "scheduled-whatsapp-messages", label: "Scheduled Messages", icon: MessageSquareText }]
+        : [],
     },
     {
       label: "Accounting",
