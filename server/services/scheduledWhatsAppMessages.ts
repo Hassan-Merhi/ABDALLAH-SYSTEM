@@ -111,6 +111,13 @@ export function shouldSendScheduledMessage(row: ScheduledMessageRow, now: Date) 
 
 export async function runScheduledWhatsAppMessages(now: Date = new Date()): Promise<void> {
   await ensureScheduledWhatsAppMessageSchema();
+  // A process may stop after its provider POST. Never auto-retry that uncertain
+  // delivery; mark the claim for investigation without risking a duplicate.
+  await pool.query(
+    "UPDATE whatsapp_message_schedule_deliveries SET status = 'failed', " +
+    "error = 'Delivery outcome uncertain after scheduler interruption; not retried automatically' " +
+    "WHERE status = 'sending' AND created_at < now() - interval '10 minutes'"
+  );
   const wa = await getWaSettings();
   if (!wa?.enabled || !wa.instanceId || !wa.apiToken) return;
 
