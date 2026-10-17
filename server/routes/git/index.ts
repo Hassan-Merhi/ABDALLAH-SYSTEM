@@ -10,6 +10,7 @@ import { registerGitReportRoutes } from "./gitReportRoutes";
 import { registerGitImportRoutes } from "./gitImportRoutes";
 import { registerGitWhatsappRoutes } from "./gitWhatsappRoutes";
 import { registerGitAgentRoutes } from "./gitAgentRoutes";
+import { registerStockTransferExportWhatsAppRoutes } from "../stockTransferExportWhatsAppRoutes";
 import { registerSpGitTrackingRoutes } from "./spGitTrackingRoutes";
 import { registerSpGitTrackingImportRoutes } from "./spGitTrackingImportRoutes";
 
@@ -18,6 +19,7 @@ export function registerGitRoutes(app: Express) {
   registerGitImportRoutes(app);
   registerGitWhatsappRoutes(app);
   registerGitAgentRoutes(app);
+  registerStockTransferExportWhatsAppRoutes(app);
   registerSpGitTrackingRoutes(app);
   registerSpGitTrackingImportRoutes(app);
 }
