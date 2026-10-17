@@ -4,11 +4,11 @@
  */
 import type { Express, Request, Response } from "express";
 import ExcelJS from "exceljs";
-import { requireAuth, requireRole } from "../../auth";
-import { pool } from "../../db";
-import { getErrorMessage } from "../../lib/httpHandlers";
-import { logger } from "../../lib/logger";
-import { getWaSettings, sendWhatsAppFileToChatId } from "../../services/whatsappService";
+import { requireAuth, requireRole } from "../auth";
+import { pool } from "../db";
+import { getErrorMessage } from "../lib/httpHandlers";
+import { logger } from "../lib/logger";
+import { getWaSettings, sendWhatsAppFileToChatId } from "../services/whatsappService";
 
 const groupIdPattern = /^\d{5,25}@g\.us$/;
 let tableSetup: Promise<void> | null = null;
