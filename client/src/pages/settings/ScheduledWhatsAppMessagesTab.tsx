@@ -64,6 +64,9 @@ export function ScheduledWhatsAppMessagesTab() {
   const { data: schedules = [], isLoading: loading } = useQuery<Schedule[]>({
     queryKey: ["/api/whatsapp/message-schedules"],
   });
+  const { data: whatsappSettings } = useQuery<{ enabled: boolean; hasCredentials: boolean }>({
+    queryKey: ["/api/whatsapp/settings"],
+  });
   const { data: recipients = [] } = useQuery<Group[]>({
     queryKey: ["/api/whatsapp/recipients"],
   });
@@ -146,6 +149,15 @@ export function ScheduledWhatsAppMessagesTab() {
           <Plus className="w-4 h-4 mr-2" /> New message
         </Button>
       </div>
+
+      {whatsappSettings && (!whatsappSettings.enabled || !whatsappSettings.hasCredentials) && (
+        <Card>
+          <CardContent className="py-4 text-sm text-muted-foreground">
+            Automatic messages require the main WhatsApp connection and its master switch to be enabled.
+            Configure them in Settings → Export Center → WhatsApp Export.
+          </CardContent>
+        </Card>
+      )}
 
       {!groups.length && (
         <Card>
