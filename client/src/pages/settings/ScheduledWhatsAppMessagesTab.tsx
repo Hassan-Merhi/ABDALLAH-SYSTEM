@@ -5,7 +5,6 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -13,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { CalendarClock, CheckCircle2, Clock, Pencil, Plus, Trash2, MessageSquare } from "lucide-react";
 import type { ClientErrorLike } from "@/lib/clientError";
+import { ScheduledWhatsAppGroupPicker } from "./ScheduledWhatsAppGroupPicker";
 
 type WeeklyTimes = Record<string, string>;
 type Schedule = {
@@ -172,11 +172,11 @@ export function ScheduledWhatsAppMessagesTab() {
         </Card>
       )}
 
-      {!groups.length && (
+      {!groups.length && !editorOpen && (
         <Card>
           <CardContent className="py-4 text-sm text-muted-foreground">
-            No active WhatsApp groups are saved for this company. Add groups under
-            Settings → Export Center → WhatsApp Export first, then return here.
+            No WhatsApp groups are saved for this company yet. Click New message,
+            then search your connected groups or add a group manually.
           </CardContent>
         </Card>
       )}
@@ -248,17 +248,16 @@ export function ScheduledWhatsAppMessagesTab() {
 
             <div className="space-y-3">
               <h3 className="font-medium">Send to WhatsApp groups</h3>
-              <p className="text-sm text-muted-foreground">Choose one or more groups from this company’s saved WhatsApp groups.</p>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {groups.map((group) => (
-                  <label key={group.id} className="flex items-center gap-3 border rounded-lg p-3 cursor-pointer">
-                    <Checkbox checked={form.recipientIds.includes(group.id)}
-                      onCheckedChange={(checked) => setField("recipientIds",
-                        checked ? [...form.recipientIds, group.id] : form.recipientIds.filter((id) => id !== group.id))} />
-                    <span className="text-sm truncate" title={group.name}>{group.name}</span>
-                  </label>
-                ))}
-              </div>
+              <p className="text-sm text-muted-foreground">
+                Search saved groups, find groups from your connected WhatsApp, or add new groups manually.
+                You can select as many groups as you need.
+              </p>
+              <ScheduledWhatsAppGroupPicker
+                key={String(companyId ?? "no-company")}
+                recipients={recipients}
+                selectedIds={form.recipientIds}
+                onChange={(ids) => setField("recipientIds", ids)}
+              />
             </div>
 
             <div className="flex items-center justify-between gap-4 border rounded-lg p-3">
