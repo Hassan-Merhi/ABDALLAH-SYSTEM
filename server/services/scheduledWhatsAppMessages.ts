@@ -10,26 +10,40 @@ import { getErrorMessage } from "../lib/httpHandlers";
 import { getWaSettings, sendWhatsAppTextToChatId } from "./whatsappService";
 
 const schemaStatements = [
-  "CREATE TABLE IF NOT EXISTS whatsapp_message_schedules (" +
-    "id bigserial PRIMARY KEY, company_id integer NOT NULL REFERENCES companies(id) ON DELETE CASCADE, " +
-    "title varchar(120) NOT NULL, message text NOT NULL, timezone text NOT NULL DEFAULT 'Asia/Beirut', " +
-    "weekly_times jsonb NOT NULL DEFAULT '{}'::jsonb, start_date date, end_date date, " +
-    "enabled boolean NOT NULL DEFAULT false, created_at timestamptz NOT NULL DEFAULT now(), " +
-    "updated_at timestamptz NOT NULL DEFAULT now(), " +
-    "CONSTRAINT whatsapp_message_schedules_message_nonempty CHECK (char_length(trim(message)) > 0))",
+  `CREATE TABLE IF NOT EXISTS whatsapp_message_schedules (
+    id bigserial PRIMARY KEY,
+    company_id integer NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    title varchar(120) NOT NULL,
+    message text NOT NULL,
+    timezone text NOT NULL DEFAULT 'Asia/Beirut',
+    weekly_times jsonb NOT NULL DEFAULT '{}'::jsonb,
+    start_date date,
+    end_date date,
+    enabled boolean NOT NULL DEFAULT false,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT whatsapp_message_schedules_message_nonempty CHECK (char_length(trim(message)) > 0)
+  )`,
   "CREATE INDEX IF NOT EXISTS whatsapp_message_schedules_company_idx ON whatsapp_message_schedules (company_id, enabled)",
-  "CREATE TABLE IF NOT EXISTS whatsapp_message_schedule_recipients (" +
-    "schedule_id bigint NOT NULL REFERENCES whatsapp_message_schedules(id) ON DELETE CASCADE, " +
-    "recipient_id integer NOT NULL REFERENCES whatsapp_recipients(id) ON DELETE CASCADE, " +
-    "PRIMARY KEY (schedule_id, recipient_id))",
-  "CREATE TABLE IF NOT EXISTS whatsapp_message_schedule_deliveries (" +
-    "id bigserial PRIMARY KEY, schedule_id bigint NOT NULL REFERENCES whatsapp_message_schedules(id) ON DELETE CASCADE, " +
-    "recipient_id integer REFERENCES whatsapp_recipients(id) ON DELETE SET NULL, " +
-    "recipient_name text NOT NULL, local_date date NOT NULL, message_snapshot text NOT NULL, " +
-    "status text NOT NULL DEFAULT 'sending' CHECK (status IN ('sending','sent','failed')), " +
-    "error text, created_at timestamptz NOT NULL DEFAULT now(), sent_at timestamptz, " +
-    "UNIQUE (schedule_id, recipient_id, local_date))",
-  "CREATE INDEX IF NOT EXISTS whatsapp_message_schedule_deliveries_company_idx ON whatsapp_message_schedule_deliveries (schedule_id, created_at DESC)"
+  `CREATE TABLE IF NOT EXISTS whatsapp_message_schedule_recipients (
+    schedule_id bigint NOT NULL REFERENCES whatsapp_message_schedules(id) ON DELETE CASCADE,
+    recipient_id integer NOT NULL REFERENCES whatsapp_recipients(id) ON DELETE CASCADE,
+    PRIMARY KEY (schedule_id, recipient_id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS whatsapp_message_schedule_deliveries (
+    id bigserial PRIMARY KEY,
+    schedule_id bigint NOT NULL REFERENCES whatsapp_message_schedules(id) ON DELETE CASCADE,
+    recipient_id integer REFERENCES whatsapp_recipients(id) ON DELETE SET NULL,
+    recipient_name text NOT NULL,
+    local_date date NOT NULL,
+    message_snapshot text NOT NULL,
+    status text NOT NULL DEFAULT 'sending' CHECK (status IN ('sending','sent','failed')),
+    error text,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    sent_at timestamptz,
+    UNIQUE (schedule_id, recipient_id, local_date)
+  )`,
+  "CREATE INDEX IF NOT EXISTS whatsapp_message_schedule_deliveries_company_idx ON whatsapp_message_schedule_deliveries (schedule_id, created_at DESC)",
 ];
 
 let ensuring: Promise<void> | null = null;
@@ -69,8 +83,14 @@ const weekdays: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 
 
 export function getScheduledMessageLocalParts(date: Date, timezone: string) {
   const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit",
-    weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
   }).formatToParts(date);
   const map = new Map(parts.map((part) => [part.type, part.value]));
   return {
@@ -100,8 +120,11 @@ export function shouldSendScheduledMessage(row: ScheduledMessageRow, now: Date) 
   const local = getScheduledMessageLocalParts(now, row.timezone);
   const sendTime = row.weekly_times?.[String(local.dayOfWeek)];
   if (!sendTime || local.localTime < sendTime) return null;
-  if ((dateString(row.start_date) && local.localDate < dateString(row.start_date)!) ||
-      (dateString(row.end_date) && local.localDate > dateString(row.end_date)!)) return null;
+  if (
+    (dateString(row.start_date) && local.localDate < dateString(row.start_date)!) ||
+    (dateString(row.end_date) && local.localDate > dateString(row.end_date)!)
+  )
+    return null;
   // Creating/changing a schedule after its time today must not unexpectedly send
   // an already elapsed occurrence. Downtime after a legitimately due time CAN catch up.
   const changed = getScheduledMessageLocalParts(new Date(row.updated_at || row.created_at), row.timezone);
@@ -115,29 +138,32 @@ export async function runScheduledWhatsAppMessages(now: Date = new Date()): Prom
   // delivery; mark the claim for investigation without risking a duplicate.
   await pool.query(
     "UPDATE whatsapp_message_schedule_deliveries SET status = 'failed', " +
-    "error = 'Delivery outcome uncertain after scheduler interruption; not retried automatically' " +
-    "WHERE status = 'sending' AND created_at < now() - interval '10 minutes'"
+      "error = 'Delivery outcome uncertain after scheduler interruption; not retried automatically' " +
+      "WHERE status = 'sending' AND created_at < now() - interval '10 minutes'"
   );
   const wa = await getWaSettings();
   if (!wa?.enabled || !wa.instanceId || !wa.apiToken) return;
 
   const schedules = await pool.query<ScheduledMessageRow>(
     "SELECT id, company_id, message, timezone, weekly_times, start_date::text, end_date::text, " +
-    "created_at, updated_at FROM whatsapp_message_schedules WHERE enabled = true"
+      "created_at, updated_at FROM whatsapp_message_schedules WHERE enabled = true"
   );
   for (const schedule of schedules.rows) {
-    let localDate: string | null = null;
+    let localDate: string | null;
     try {
       localDate = shouldSendScheduledMessage(schedule, now);
     } catch (err) {
-      logger.warn("Scheduled WhatsApp message has invalid timezone", { scheduleId: schedule.id, error: getErrorMessage(err) });
+      logger.warn("Scheduled WhatsApp message has invalid timezone", {
+        scheduleId: schedule.id,
+        error: getErrorMessage(err),
+      });
       continue;
     }
     if (!localDate) continue;
     const recipients = await pool.query<{ id: number; name: string; chat_id: string }>(
       "SELECT r.id, r.name, r.chat_id FROM whatsapp_message_schedule_recipients sr " +
-      "JOIN whatsapp_recipients r ON r.id = sr.recipient_id " +
-      "WHERE sr.schedule_id = $1 AND r.company_id = $2 AND r.active = true AND r.is_group = true",
+        "JOIN whatsapp_recipients r ON r.id = sr.recipient_id " +
+        "WHERE sr.schedule_id = $1 AND r.company_id = $2 AND r.active = true AND r.is_group = true",
       [schedule.id, schedule.company_id]
     );
 
@@ -146,9 +172,9 @@ export async function runScheduledWhatsAppMessages(now: Date = new Date()): Prom
       // ambiguous WhatsApp POSTs: provider timeouts might mean the send succeeded.
       const claim = await pool.query(
         "INSERT INTO whatsapp_message_schedule_deliveries " +
-        "(schedule_id, recipient_id, recipient_name, local_date, message_snapshot, status) " +
-        "VALUES ($1, $2, $3, $4::date, $5, 'sending') " +
-        "ON CONFLICT (schedule_id, recipient_id, local_date) DO NOTHING RETURNING id",
+          "(schedule_id, recipient_id, recipient_name, local_date, message_snapshot, status) " +
+          "VALUES ($1, $2, $3, $4::date, $5, 'sending') " +
+          "ON CONFLICT (schedule_id, recipient_id, local_date) DO NOTHING RETURNING id",
         [schedule.id, recipient.id, recipient.name, localDate, schedule.message]
       );
       if (!claim.rowCount) continue;
@@ -157,7 +183,11 @@ export async function runScheduledWhatsAppMessages(now: Date = new Date()): Prom
         const sent = await sendWhatsAppTextToChatId(recipient.chat_id, schedule.message);
         await pool.query(
           "UPDATE whatsapp_message_schedule_deliveries SET status = $2, error = $3, sent_at = CASE WHEN $2 = 'sent' THEN now() ELSE NULL END WHERE id = $1",
-          [deliveryId, sent.success ? "sent" : "failed", sent.success ? null : (sent.error || "Green API rejected the message").slice(0, 1000)]
+          [
+            deliveryId,
+            sent.success ? "sent" : "failed",
+            sent.success ? null : (sent.error || "Green API rejected the message").slice(0, 1000),
+          ]
         );
       } catch (err) {
         const message = getErrorMessage(err) || "Delivery outcome uncertain";
@@ -165,7 +195,11 @@ export async function runScheduledWhatsAppMessages(now: Date = new Date()): Prom
           "UPDATE whatsapp_message_schedule_deliveries SET status = 'failed', error = $2 WHERE id = $1",
           [deliveryId, message.slice(0, 1000)]
         );
-        logger.error("Scheduled WhatsApp message delivery failed", { scheduleId: schedule.id, deliveryId, error: message });
+        logger.error("Scheduled WhatsApp message delivery failed", {
+          scheduleId: schedule.id,
+          deliveryId,
+          error: message,
+        });
       }
     }
   }
