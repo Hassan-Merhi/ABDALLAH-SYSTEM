@@ -4,6 +4,7 @@
   "type": "module",
   "license": "UNLICENSED",
   "scripts": {
+    "test:fuzz": "node node_modules/vitest/vitest.mjs run tests/security-input-fuzz.test.ts",
     "prepare": "node scripts/setup-git-hooks.mjs",
     "dev": "node --import ./server/startupPreload.mjs ./node_modules/tsx/dist/cli.mjs server/index.ts",
     "prebuild": "node -e \"require.resolve('vite'); require.resolve('esbuild'); console.log('Build dependencies OK')\" && node scripts/verify-lockfile-registry.mjs",
@@ -203,6 +204,7 @@
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react-hooks": "7.1.1",
     "eslint-plugin-unused-imports": "^4.4.1",
+    "fast-check": "4.3.0",
     "istanbul-lib-coverage": "3.2.2",
     "jsdom": "^30.0.0",
     "prettier": "^3.8.4",
