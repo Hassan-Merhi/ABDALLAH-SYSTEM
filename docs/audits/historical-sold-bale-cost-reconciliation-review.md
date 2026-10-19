@@ -1,6 +1,6 @@
 # Historical factory bale costs: review-only reconciliation
 
-**Release status: unapproved. Do not merge to main, deploy to Render, or run production cost updates until the Owner explicitly approves.**
+**Release status: the Owner approved merging this review-only audit and the guarded recost path to main on 2026-10-19. Production cost updates still require the explicit second Owner confirmation at execution time described below.**
 
 ## Background
 Legacy no-mix bale records sometimes stored the catalogue **price per bale** in the `cost_per_kg` column and multiplied it by weight to obtain `total_cost`. The modern stock-entry path uses `stockEntryBaleCost` and correctly records `total_cost = production_price` and `cost_per_kg = production_price / weight_kg`. The approved one-time repair already corrected eligible unsold physical stock; this work concerns bale rows marked `SOLD` and historical deleted/available edge rows.

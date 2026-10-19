@@ -469,8 +469,10 @@ export async function applyBaleRecost(
     if (plan.mixes.length === 0 && plan.bales.length === 0) {
       throw new BaleRecostRefusal("NOTHING_TO_APPLY", FACTORY_BALE_RECOST_NOTHING_MESSAGE);
     }
-    if (plan.bales.some((b) => b.eligibility === "sold-on-uninvoiced-verified-order") &&
-        params.confirmVerifiedSoldBales !== true) {
+    if (
+      plan.bales.some((b) => b.eligibility === "sold-on-uninvoiced-verified-order") &&
+      params.confirmVerifiedSoldBales !== true
+    ) {
       throw new BaleRecostRefusal(
         "VERIFIED_SOLD_CONFIRM_REQUIRED",
         "The plan contains bales marked SOLD on uninvoiced VERIFIED orders. Review their current-catalogue cost basis and explicitly confirm these bales before applying."

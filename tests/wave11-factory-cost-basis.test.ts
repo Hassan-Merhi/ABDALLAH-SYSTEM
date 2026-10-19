@@ -681,9 +681,9 @@ describe("the reviewed bale re-cost", () => {
     const finalized = await bale({ status: "SOLD", weight: "25", costPerKg: "40", totalCost: "1000" });
 
     const link = async (baleId: number, status: string, invoiced: boolean) => {
-      const rec = await one<{ reference_number: string }>(
-        "SELECT reference_number FROM factory_bales WHERE id = $1", [baleId]
-      );
+      const rec = await one<{ reference_number: string }>("SELECT reference_number FROM factory_bales WHERE id = $1", [
+        baleId,
+      ]);
       const order = await one<{ id: number }>(
         `INSERT INTO customer_orders
           (company_id, customer_id, order_date, status, invoice_number, finalized_at)
@@ -727,10 +727,10 @@ describe("the reviewed bale re-cost", () => {
 
     // Even without changing the stored SOLD status, an invoice issued between
     // preview and apply must invalidate the previously reviewed plan hash.
-    await pool.query(
-      "UPDATE customer_orders SET invoice_number=$1, finalized_at=NOW() WHERE id=$2",
-      [`INV-${unbilledOrder}`, unbilledOrder]
-    );
+    await pool.query("UPDATE customer_orders SET invoice_number=$1, finalized_at=NOW() WHERE id=$2", [
+      `INV-${unbilledOrder}`,
+      unbilledOrder,
+    ]);
     const refused = await call("POST /api/factory/bale-cost/recost-apply", {
       user: { role: "Owner" },
       body: { confirm: true, confirmVerifiedSoldBales: true, planHash: preview.body.planHash },
@@ -743,7 +743,9 @@ describe("the reviewed bale re-cost", () => {
 
   it("includes uninvoiced VERIFIED-order SOLD bales in book stock and changes their value only after both approvals", async () => {
     const preinvoiceSold = await bale({ status: "SOLD", weight: "25", costPerKg: "40", totalCost: "1000" });
-    const rec = await one<{ reference_number: string }>("SELECT reference_number FROM factory_bales WHERE id=$1", [preinvoiceSold]);
+    const rec = await one<{ reference_number: string }>("SELECT reference_number FROM factory_bales WHERE id=$1", [
+      preinvoiceSold,
+    ]);
     const order = await one<{ id: number }>(
       "INSERT INTO customer_orders (company_id, customer_id, order_date, status) VALUES ($1,$2,$3,'VERIFIED') RETURNING id",
       [companyId, customerId, today]
@@ -763,7 +765,7 @@ describe("the reviewed bale re-cost", () => {
     });
     expect(applied.statusCode).toBe(200);
     expect(applied.body.voucherId).toBeNull(); // No perpetual-inventory cutover in test.
-    expect((await baleCost(preinvoiceSold))).toMatchObject({
+    expect(await baleCost(preinvoiceSold)).toMatchObject({
       status: "SOLD",
       total_cost: "40.0000000",
       cost_per_kg: "1.6000000",
@@ -772,7 +774,9 @@ describe("the reviewed bale re-cost", () => {
     // The per-bale cost change reduces finished goods; it does not restore
     // or duplicate a physical bale, and the order stays VERIFIED.
     expect(Number(before.soldNotInvoiced.cost) - Number(after.soldNotInvoiced.cost)).toBeCloseTo(960, 2);
-    expect((await one<{ status: string }>("SELECT status FROM customer_orders WHERE id=$1", [order.id])).status).toBe("VERIFIED");
+    expect((await one<{ status: string }>("SELECT status FROM customer_orders WHERE id=$1", [order.id])).status).toBe(
+      "VERIFIED"
+    );
 
     const audit = await call("GET /api/factory/bale-cost/historical-sold-audit", {
       query: { group: "OPEN_VERIFIED_UNINVOICED", limit: "10", offset: "0" },

@@ -17,7 +17,7 @@ export const HISTORICAL_BALE_AUDIT_GROUPS = [
   "DELETED_REVIEW_ONLY",
   "AVAILABLE_REVIEW_ONLY",
 ] as const;
-export type HistoricalBaleAuditGroup = typeof HISTORICAL_BALE_AUDIT_GROUPS[number];
+export type HistoricalBaleAuditGroup = (typeof HISTORICAL_BALE_AUDIT_GROUPS)[number];
 
 const candidateSet = (companyId: number) => sql`
   WITH candidate AS (

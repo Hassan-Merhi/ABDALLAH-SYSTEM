@@ -29,22 +29,40 @@ export function registerBaleRecostRoutes(app: Express) {
         const companyId = companyOf(req);
         if (!companyId) return res.status(400).json({ message: "No company selected" });
         const rawGroup = req.query.group;
-        if (rawGroup != null &&
-            (typeof rawGroup !== "string" || !HISTORICAL_BALE_AUDIT_GROUPS.includes(rawGroup as HistoricalBaleAuditGroup))) {
+        if (
+          rawGroup != null &&
+          (typeof rawGroup !== "string" || !HISTORICAL_BALE_AUDIT_GROUPS.includes(rawGroup as HistoricalBaleAuditGroup))
+        ) {
           return res.status(400).json({ message: "Unknown audit group" });
         }
         const limit = typeof req.query.limit === "string" ? Number(req.query.limit) : 100;
         const offset = typeof req.query.offset === "string" ? Number(req.query.offset) : 0;
-        const orderId = req.query.orderId == null ? undefined
-          : typeof req.query.orderId === "string" ? Number(req.query.orderId) : NaN;
-        if (!Number.isSafeInteger(limit) || !Number.isSafeInteger(offset) || limit < 1 || limit > 250 || offset < 0 ||
-            (orderId != null && (!Number.isSafeInteger(orderId) || orderId < 1))) {
-          return res.status(400).json({ message: "limit must be 1–250; offset nonnegative; orderId a positive integer" });
+        const orderId =
+          req.query.orderId == null
+            ? undefined
+            : typeof req.query.orderId === "string"
+              ? Number(req.query.orderId)
+              : NaN;
+        if (
+          !Number.isSafeInteger(limit) ||
+          !Number.isSafeInteger(offset) ||
+          limit < 1 ||
+          limit > 250 ||
+          offset < 0 ||
+          (orderId != null && (!Number.isSafeInteger(orderId) || orderId < 1))
+        ) {
+          return res
+            .status(400)
+            .json({ message: "limit must be 1–250; offset nonnegative; orderId a positive integer" });
         }
-        res.json(await historicalBaleCostAuditPreview(companyId, {
-          group: rawGroup as HistoricalBaleAuditGroup | undefined,
-          orderId, limit, offset,
-        }));
+        res.json(
+          await historicalBaleCostAuditPreview(companyId, {
+            group: rawGroup as HistoricalBaleAuditGroup | undefined,
+            orderId,
+            limit,
+            offset,
+          })
+        );
       } catch (error: unknown) {
         logger.error("Historical factory bale costing audit failed:", { error });
         res.status(500).json({ message: getErrorMessage(error) });
