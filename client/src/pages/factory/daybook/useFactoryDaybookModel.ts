@@ -24,6 +24,7 @@ import { hasAnyOpenDialog } from "@/hooks/use-escape-back";
 import type { DaybookEntry, DisplayEntry, FactoryDaybookUIState } from "./types";
 import {
   parseBalesMeta,
+  withLiveLoadingAmounts,
   expandBaleEntries,
   formatDaybookDescription,
   formatTxType,
@@ -186,6 +187,47 @@ export function useFactoryDaybookModel() {
   const hiddenErpCosts: string[] = myErpPages?.hiddenErpCostFields ?? [];
   const showAmounts = !hiddenErpCosts.includes("daybook_amounts");
 
+  // Keep Loading Started amounts live while the Daybook is open, without
+  // refetching the multi-MB daybook list on every bale scan. The backend owns
+  // the price: these are saved customer_orders.grand_total values, not a second
+  // client-side pricing calculation. Poll only the order IDs on this page.
+  const loadingOrderIdsKey = useMemo(
+    () =>
+      [...new Set(
+        entries
+          .filter((entry) => entry.txType === "LOADING_CREATED" && entry.referenceId && entry.currencyCode === "USD")
+          .map((entry) => entry.referenceId as number)
+      )].sort((a, b) => a - b).join(","),
+    [entries]
+  );
+  const { data: liveLoadingAmounts } = useQuery<{ amounts: Record<string, string> }>({
+    queryKey: ["/api/factory/daybook/loading-amounts", loadingOrderIdsKey],
+    enabled: showAmounts && !!loadingOrderIdsKey,
+    queryFn: async () => {
+      const ids = loadingOrderIdsKey.split(",");
+      const chunks: string[] = [];
+      for (let i = 0; i < ids.length; i += 150) chunks.push(ids.slice(i, i + 150).join(","));
+      const results = await Promise.all(chunks.map(async (orderIds) => {
+        const res = await fetch(
+          `/api/factory/daybook/loading-amounts?orderIds=${encodeURIComponent(orderIds)}`,
+          { credentials: "include" }
+        );
+        if (!res.ok) throw new Error("Could not retrieve current loading totals");
+        return (await res.json()) as { amounts: Record<string, string> };
+      }));
+      return { amounts: Object.assign({}, ...results.map((result) => result.amounts)) as Record<string, string> };
+    },
+    refetchInterval: 2_500,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: false,
+    retry: 1,
+  });
+  const displayedEntries = useMemo(
+    () => withLiveLoadingAmounts(entries, liveLoadingAmounts?.amounts),
+    [entries, liveLoadingAmounts]
+  );
+
+
   // ── URL deep link: ?entryId= or ?voucherId= on mount ─────────────────────
   useEffect(() => {
     if (urlEntryHandled || isLoading || entries.length === 0) return;
@@ -215,7 +257,7 @@ export function useFactoryDaybookModel() {
 
   // ── Client-side filters (search, amount range, status) ────────────────────
   const filteredEntries = useMemo(() => {
-    let result = entries;
+    let result = displayedEntries;
     // Always hide worker edit audit entries
     result = result.filter((e) => e.txType !== "WORKER_EDITED");
     // Non-admins only see their own entries (View Only users are observers — they see everything)
@@ -248,7 +290,7 @@ export function useFactoryDaybookModel() {
     });
     return result;
   }, [
-    entries,
+    displayedEntries,
     isAdminOrOwner,
     currentUser?.role,
     currentUser?.id,
