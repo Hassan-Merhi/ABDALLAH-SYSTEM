@@ -703,8 +703,35 @@ describe("the reviewed bale re-cost", () => {
     await link(invoiceMarked, "VERIFIED", true);
     await link(finalized, "FINALIZED", true);
 
+    // A bale on two VERIFIED orders: one clean, one whose SALE ledger entry
+    // exists even though the order row never received an invoice number.
+    const saleLedgerBacked = await bale({ status: "SOLD", weight: "25", costPerKg: "40", totalCost: "1000" });
+    await link(saleLedgerBacked, "VERIFIED", false);
+    const saleLedgerOrder = await link(saleLedgerBacked, "VERIFIED", false);
+    await pool.query(
+      `INSERT INTO customer_balances
+        (company_id, customer_id, transaction_date, transaction_type, reference_type, reference_id,
+         debit_amount, credit_amount, balance, description)
+       VALUES ($1,$2,$3,'SALE','INVOICE',$4,60,0,60,'historical sale')`,
+      [companyId, customerId, today, saleLedgerOrder]
+    );
+
     const preview = await call("GET /api/factory/bale-cost/recost-preview", { user: { role: "Owner" } });
     expect(preview.statusCode).toBe(200);
+    expect(preview.body.bales.some((r: { id: number }) => r.id === saleLedgerBacked)).toBe(false);
+
+    // The read-only audit ranks the SALE-ledger order above the clean one, so
+    // the bale reports as invoice evidence rather than as an open order.
+    const evidence = await call("GET /api/factory/bale-cost/historical-sold-audit", {
+      query: { group: "VERIFIED_WITH_INVOICE_EVIDENCE", limit: "50", offset: "0" },
+      user: { role: "Owner" },
+    });
+    expect(evidence.statusCode).toBe(200);
+    expect(evidence.body.details.find((r: { id: number }) => r.id === saleLedgerBacked)).toMatchObject({
+      order_id: saleLedgerOrder,
+      sale_balance_exists: true,
+      review_group: "VERIFIED_WITH_INVOICE_EVIDENCE",
+    });
     expect(preview.body.bales.find((r: { id: number }) => r.id === unbilled)).toMatchObject({
       status: "SOLD",
       eligibility: "sold-on-uninvoiced-verified-order",
@@ -739,6 +766,7 @@ describe("the reviewed bale re-cost", () => {
     expect((await baleCost(unbilled)).total_cost).toBe("1000.0000000");
     expect((await baleCost(invoiceMarked)).total_cost).toBe("1000.0000000");
     expect((await baleCost(finalized)).total_cost).toBe("1000.0000000");
+    expect((await baleCost(saleLedgerBacked)).total_cost).toBe("1000.0000000");
   });
 
   it("includes uninvoiced VERIFIED-order SOLD bales in book stock and changes their value only after both approvals", async () => {

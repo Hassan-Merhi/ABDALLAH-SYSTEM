@@ -227,6 +227,15 @@ export async function planBaleRecostTx(tx: DbTransaction, companyId: number): Pr
                    OR EXISTS (
                      SELECT 1 FROM factory_invoice_document_snapshots ds
                       WHERE ds.company_id = ${companyId} AND ds.order_id = co.id
+                   )
+                   -- A SALE ledger entry on any linked order is invoice evidence
+                   -- too, even when the order row itself still reads VERIFIED.
+                   OR EXISTS (
+                     SELECT 1 FROM customer_balances cb
+                      WHERE cb.company_id = ${companyId}
+                        AND cb.reference_type = 'INVOICE'
+                        AND cb.reference_id = co.id
+                        AND cb.transaction_type = 'SALE'
                    ))
          )
        ORDER BY b.id

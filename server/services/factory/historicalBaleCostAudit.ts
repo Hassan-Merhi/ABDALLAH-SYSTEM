@@ -34,33 +34,42 @@ const candidateSet = (companyId: number) => sql`
       JOIN factory_bale_products p
         ON p.id = b.product_id AND p.company_id = b.company_id
       LEFT JOIN LATERAL (
-        SELECT co.id, co.status, co.invoice_number, co.finalized_at,
-               co.container_number,
-               EXISTS (
-                 SELECT 1 FROM factory_invoice_document_snapshots snap
-                  WHERE snap.company_id = ${companyId} AND snap.order_id = co.id
-               ) AS document_frozen,
-               EXISTS (
-                 SELECT 1 FROM customer_balances cb
-                  WHERE cb.company_id = ${companyId}
-                    AND cb.reference_type = 'INVOICE'
-                    AND cb.reference_id = co.id
-                    AND cb.transaction_type = 'SALE'
-               ) AS sale_balance_exists
-          FROM customer_order_bales cob
-          JOIN customer_orders co ON co.id = cob.order_id
-         WHERE cob.bale_id = b.id
-           AND co.company_id = ${companyId}
-           AND co.deleted_at IS NULL
+        -- Of every order linked to the bale, keep the one carrying the
+        -- strongest invoice evidence, so a later clean VERIFIED link cannot
+        -- hide an older frozen document or SALE ledger entry.
+        SELECT linked.*
+          FROM (
+            SELECT co.id, co.status, co.invoice_number, co.finalized_at,
+                   co.container_number,
+                   EXISTS (
+                     SELECT 1 FROM factory_invoice_document_snapshots snap
+                      WHERE snap.company_id = ${companyId} AND snap.order_id = co.id
+                   ) AS document_frozen,
+                   EXISTS (
+                     SELECT 1 FROM customer_balances cb
+                      WHERE cb.company_id = ${companyId}
+                        AND cb.reference_type = 'INVOICE'
+                        AND cb.reference_id = co.id
+                        AND cb.transaction_type = 'SALE'
+                   ) AS sale_balance_exists
+              FROM customer_order_bales cob
+              JOIN customer_orders co ON co.id = cob.order_id
+             WHERE cob.bale_id = b.id
+               AND co.company_id = ${companyId}
+               AND co.deleted_at IS NULL
+          ) linked
          ORDER BY
-           CASE WHEN co.status IN ('FINALIZED','DISPATCHED','SOLD','INVOICED','COMPLETED') THEN 0
-                WHEN co.invoice_number IS NOT NULL OR co.finalized_at IS NOT NULL THEN 1
-                WHEN co.status = 'VERIFIED' THEN 2 ELSE 3 END,
-           co.id DESC
+           CASE WHEN linked.status IN ('FINALIZED','DISPATCHED','SOLD','INVOICED','COMPLETED') THEN 0
+                WHEN linked.invoice_number IS NOT NULL OR linked.finalized_at IS NOT NULL
+                  OR linked.document_frozen OR linked.sale_balance_exists THEN 1
+                WHEN linked.status = 'VERIFIED' THEN 2 ELSE 3 END,
+           linked.id DESC
          LIMIT 1
       ) o ON TRUE
      WHERE b.company_id = ${companyId}
-       AND b.deleted_at IS NULL
+       -- Physical deletion stamps deleted_at alongside status = 'DELETED';
+       -- those rows belong to the read-only deleted cohort.
+       AND (b.deleted_at IS NULL OR b.status = 'DELETED')
        AND b.mix_batch_id IS NULL
        AND b.status IN ('SOLD','DELETED','AVAILABLE')
        AND p.deleted_at IS NULL
