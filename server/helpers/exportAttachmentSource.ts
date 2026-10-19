@@ -33,19 +33,47 @@ function getMarkerPayload(source: ExportAttachmentSource): ExportFileMarkerPaylo
  * directory (or the configured export bridge temp dir). Refuse any other path so
  * a malformed attachment source can never read or delete arbitrary files.
  */
-function resolveManagedExportPath(filePath: string): string {
-  // This is the traversal guard: the resolved path is checked against the managed roots below.
-  // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal
+function resolveManagedExportPath(filePath: string): string;
+function resolveManagedExportPath(filePath: string, allowMissing: true): string | undefined;
+function resolveManagedExportPath(filePath: string, allowMissing = false): string | undefined {
   const resolved = path.resolve(filePath);
-  const roots = [os.tmpdir(), process.env.EXPORT_BRIDGE_TEMP_DIR]
-    .filter((root): root is string => Boolean(root))
-    // Roots come from the OS temp dir and server configuration, not from requests.
-    // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal
-    .map((root) => path.resolve(root) + path.sep);
-  if (!roots.some((root) => resolved.startsWith(root))) {
-    throw new Error("Invalid file path");
+  const directory = path.dirname(resolved);
+  const filename = path.basename(resolved);
+  const archiveRoot = path.resolve(os.tmpdir());
+  const bridgeRoot = path.resolve(process.env.EXPORT_BRIDGE_TEMP_DIR || path.join(os.tmpdir(), "erp-export-bridge"));
+
+  // Only the two server-created artifact families may be attached or removed.
+  // Being anywhere beneath a writable /tmp directory is NOT sufficient.
+  const isArchive = directory === archiveRoot && /^erp-export-[a-zA-Z0-9_-]+-\d{13}\.zip$/.test(filename);
+  const isBridge =
+    directory === bridgeRoot &&
+    /^\d{13}-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(xlsx|attachment)$/i.test(filename);
+  if (!isArchive && !isBridge) throw new Error("EXPORT_PATH_ERR");
+
+  const trustedRoot = fs.realpathSync.native(isArchive ? archiveRoot : bridgeRoot);
+  if (fs.realpathSync.native(directory) !== trustedRoot) {
+    throw new Error("EXPORT_PATH_ERR");
   }
-  return resolved;
+  // Resolve a real file entry under a trusted root. The path used for the
+  // filesystem operation is built from the OS directory entry, not the caller's
+  // string; the caller only selects an exact, validated server artifact name.
+  const entry = fs.readdirSync(trustedRoot, { withFileTypes: true }).find((item) => item.name === filename);
+  if (!entry) {
+    if (allowMissing) return undefined;
+    throw new Error("EXPORT_PATH_ERR");
+  }
+  if (!entry.isFile()) throw new Error("EXPORT_PATH_ERR");
+
+  const safePath = trustedRoot.endsWith(path.sep) ? trustedRoot + entry.name : trustedRoot + path.sep + entry.name;
+  const metadata = fs.lstatSync(safePath);
+  // Do not follow symbolic links or accept hard-linked files as export artifacts.
+  if (!metadata.isFile() || metadata.isSymbolicLink() || metadata.nlink !== 1) {
+    throw new Error("EXPORT_PATH_ERR");
+  }
+  if (path.dirname(fs.realpathSync.native(safePath)) !== trustedRoot) {
+    throw new Error("EXPORT_PATH_ERR");
+  }
+  return safePath;
 }
 
 function getFileAttachment(source: ExportAttachmentSource): { filePath: string; sizeBytes: number } | undefined {
@@ -66,7 +94,8 @@ function requireBufferSource(source: ExportAttachmentSource): Buffer {
 export function armExportAttachmentCleanup(source: ExportAttachmentSource, delayMs = DEFAULT_CLEANUP_DELAY_MS): void {
   const marker = getMarkerPayload(source);
   if (!marker?.managedAttachment) return;
-  const filePath = resolveManagedExportPath(marker.path);
+  const filePath = resolveManagedExportPath(marker.path, true);
+  if (!filePath) return;
 
   if (marker.cleanupTimer) clearTimeout(marker.cleanupTimer);
   marker.cleanupTimer = setTimeout(() => {
@@ -85,7 +114,9 @@ export async function releaseManagedExportAttachment(source: ExportAttachmentSou
   if (!marker?.managedAttachment) return;
   if (marker.cleanupTimer) clearTimeout(marker.cleanupTimer);
   marker.cleanupTimer = undefined;
-  await fs.promises.rm(resolveManagedExportPath(marker.path), { force: true }).catch((error: unknown) => {
+  const filePath = resolveManagedExportPath(marker.path, true);
+  if (!filePath) return;
+  await fs.promises.rm(filePath, { force: true }).catch((error: unknown) => {
     if ((error as { code?: string }).code !== "ENOENT") throw error;
   });
 }

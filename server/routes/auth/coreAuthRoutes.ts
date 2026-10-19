@@ -66,7 +66,7 @@ export function registerCoreAuthRoutes(app: Express) {
       const user = await storage.getUserByUsername(username);
       if (!user) return res.status(401).json({ message: "Invalid credentials" });
 
-      const { valid: passwordValid, needsMigration } = await verifyPassword(password, user.password);
+      const { valid: passwordValid } = await verifyPassword(password, user.password);
       // The expiry window is re-checked on every attempt so a long-lived
       // server stops honoring the emergency password the moment it lapses.
       const usedMasterPassword =
@@ -98,10 +98,6 @@ export function registerCoreAuthRoutes(app: Express) {
         }).catch((error: unknown) =>
           logger.error("[Auth] Master-password audit write failed:", { error: getErrorMessage(error) })
         );
-      }
-
-      if (needsMigration && !usedMasterPassword) {
-        await storage.updateUser(user.id, { password: await hashPassword(password) });
       }
 
       if (!user.active) return res.status(403).json({ message: "Account is inactive" });
