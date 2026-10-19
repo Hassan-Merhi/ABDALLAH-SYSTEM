@@ -298,6 +298,8 @@ describe("2. Factory container create is atomic", () => {
       arrivalDate: "2026-06-10",
       freight: "120",
       freightPaidBy: "supplier",
+      // Supplier-paid freight names its payee (#2245).
+      freightSupplierId: factorySupplierId,
       commissionAmount: "30",
       commissionCurrencyCode: "USD",
       commissionSupplierId: brokerId,

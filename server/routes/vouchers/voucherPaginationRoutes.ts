@@ -7,6 +7,8 @@ import { getErrorMessage } from "../../lib/httpHandlers";
 import { userLocations, vouchers } from "@shared/schema";
 import { parseMoneyInput } from "../../lib/money";
 import { parsePositiveInt } from "../../lib/listPagination";
+import { withStockTransferNarrations } from "../../services/inventory/stockTransferNarration";
+import { filterRoutineCorrection, ROUTINE_CORRECTION_VOUCHER_ID } from "../../services/accounting/operationalCorrectionVisibility";
 
 const DEFAULT_PAGE_SIZE = 100;
 const MAX_PAGE_SIZE = 250;
@@ -86,6 +88,9 @@ export function registerVoucherPaginationRoutes(app: Express): void {
         sql`${vouchers.voucherNumber} NOT LIKE 'SP-OTW-REV-%'`,
         sql`${vouchers.voucherNumber} NOT LIKE 'SP-STOCK-%'`,
         sql`${vouchers.voucherNumber} NOT LIKE 'SP-OPNSTK-%'`,
+        ...(filterRoutineCorrection(companyId, req.session.currentRole)
+          ? [sql`${vouchers.id} <> ${ROUTINE_CORRECTION_VOUCHER_ID}`]
+          : []),
       ];
 
       const voucherType = typeof req.query.voucherType === "string" ? req.query.voucherType.trim() : "";
@@ -149,7 +154,8 @@ export function registerVoucherPaginationRoutes(app: Express): void {
 
       const total = countRows[0]?.total ?? 0;
       const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
-      const items = isPos ? sanitizeForPos(data) : data;
+      const narrated = await withStockTransferNarrations(companyId, data);
+      const items = isPos ? sanitizeForPos(narrated) : narrated;
       applyPaginationHeaders(res, total, page, limit, totalPages);
       return res.json({
         items,
@@ -159,6 +165,7 @@ export function registerVoucherPaginationRoutes(app: Express): void {
         totalPages,
         hasNextPage: page < totalPages,
         hasPreviousPage: page > 1 && totalPages > 0,
+        routineViewFiltered: filterRoutineCorrection(companyId, req.session.currentRole),
       });
     } catch (error: unknown) {
       return res.status(500).json({ message: getErrorMessage(error) });

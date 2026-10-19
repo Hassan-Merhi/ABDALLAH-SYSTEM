@@ -51,7 +51,9 @@ export function registerFactoryContainerUpdateRoutes(app: Express) {
       const id = parseId(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
 
-      const b = req.body;
+      // Keep a mutable copy: the edit dialog submits unchanged goods fields.
+      // Those fields must not be mistaken for a new accounting event.
+      const b: Record<string, unknown> = { ...(req.body || {}) };
 
       // Helper: coerce empty-string / undefined to null for numeric/integer columns
       const dec = (v: unknown) => (v === "" || v === undefined || v === null ? null : String(v));
@@ -121,6 +123,62 @@ export function registerFactoryContainerUpdateRoutes(app: Express) {
         .where(and(eq(factoryContainers.id, id), eq(factoryContainers.companyId, companyId)));
       if (!existing) return res.status(404).json({ message: "Container not found" });
 
+      // The edit dialog sends the entire goods section on each Save, including
+      // when the user only changed an ETA, note, duty or freight. Preserve
+      // historical goods, supplier and FX fields if their values are unchanged.
+      // No-op fields must not trigger an import-journal backfill or revaluation.
+      const goodsFxModeChanged =
+        (b.fxRateSource !== undefined &&
+          String(b.fxRateSource || "auto").toLowerCase() !== String(existing.fxRateSource || "auto").toLowerCase()) ||
+        (b.currencyCode !== undefined &&
+          String(b.currencyCode || "USD").toUpperCase() !== String(existing.currencyCode || "USD").toUpperCase());
+      const unchangedGoodsFields = {
+        supplierId: updateData.supplierId === existing.supplierId,
+        totalKg: toMoney(updateData.totalKg).eq(toMoney(existing.totalKg)),
+        ratePerKg: toMoney(updateData.ratePerKg).eq(toMoney(existing.ratePerKg)),
+        currencyCode:
+          String(updateData.currencyCode || "USD").toUpperCase() ===
+          String(existing.currencyCode || "USD").toUpperCase(),
+        fxRateSource: String(updateData.fxRateSource || "auto") === String(existing.fxRateSource || "auto"),
+        // A switch to manual FX is a genuine action even when the displayed
+        // numeric rate matches the old row. Keep the submitted rate so the
+        // manual-rate validation can run, instead of treating it as absent.
+        fxRateToUsd: !goodsFxModeChanged && toMoney(updateData.fxRateToUsd).eq(toMoney(existing.fxRateToUsd)),
+      };
+      for (const field of Object.keys(unchangedGoodsFields) as Array<keyof typeof unchangedGoodsFields>) {
+        if (b[field] === undefined || unchangedGoodsFields[field]) {
+          delete b[field];
+          delete updateData[field];
+        }
+      }
+
+      // Do the same for freight/commission: otherwise a full-form notes edit
+      // can create a missing legacy freight or commission journal, or silently
+      // reprice an existing one. Only a genuine charge edit should sync it.
+      const unchangedChargeFields = {
+        freight: toMoney(updateData.freight).eq(toMoney(existing.freight)),
+        freightCurrencyCode:
+          String(updateData.freightCurrencyCode || "USD").toUpperCase() ===
+          String(existing.freightCurrencyCode || "USD").toUpperCase(),
+        freightAccountId: updateData.freightAccountId === existing.freightAccountId,
+        freightSupplierId: updateData.freightSupplierId === existing.freightSupplierId,
+        freightPaidBy: String(updateData.freightPaidBy || "supplier") === String(existing.freightPaidBy || "supplier"),
+        freightOwnAccountId: updateData.freightOwnAccountId === existing.freightOwnAccountId,
+        commissionAmount: toMoney(updateData.commissionAmount).eq(toMoney(existing.commissionAmount)),
+        commissionCurrencyCode:
+          String(updateData.commissionCurrencyCode || "USD").toUpperCase() ===
+          String(existing.commissionCurrencyCode || "USD").toUpperCase(),
+        commissionAccountId: updateData.commissionAccountId === existing.commissionAccountId,
+        commissionSupplierId: updateData.commissionSupplierId === existing.commissionSupplierId,
+        commissionNotes: updateData.commissionNotes === existing.commissionNotes,
+      };
+      for (const field of Object.keys(unchangedChargeFields) as Array<keyof typeof unchangedChargeFields>) {
+        if (b[field] === undefined || unchangedChargeFields[field]) {
+          delete b[field];
+          delete updateData[field];
+        }
+      }
+
       // Resolve commission FX when commission amount or currency changed.
       // A partial PATCH that touches an unrelated field must preserve existing commission FX.
       const commissionChanged = b.commissionAmount !== undefined || b.commissionCurrencyCode !== undefined;
@@ -166,7 +224,12 @@ export function registerFactoryContainerUpdateRoutes(app: Express) {
       }
 
       // FX rate computation (same logic as before)
-      const needsFxCalc = updateData.currencyCode || updateData.ratePerKg || updateData.fxRateSource;
+      const needsFxCalc =
+        updateData.currencyCode ||
+        updateData.ratePerKg ||
+        updateData.fxRateSource ||
+        (updateData.fxRateToUsd !== undefined &&
+          (updateData.fxRateSource || existing.fxRateSource || "auto") === "manual");
       if (needsFxCalc) {
         const currencyCode = updateData.currencyCode || existing.currencyCode || "USD";
         const fxRateSource = updateData.fxRateSource || existing.fxRateSource || "auto";
@@ -190,6 +253,9 @@ export function registerFactoryContainerUpdateRoutes(app: Express) {
           // confirmed already (or, absent the flag on this row, looks like a real explicit
           // rate under the legacy heuristic).
           const explicitRate = b.fxRateToUsd !== undefined ? parseMoneyInput(dec(b.fxRateToUsd) ?? "") : null;
+          if (b.fxRateToUsd !== undefined && (!explicitRate || !explicitRate.greaterThan(0))) {
+            return res.status(400).json({ message: "Manual FX rate must be a positive number." });
+          }
           let fxRateNum: Decimal;
           if (explicitRate && explicitRate.greaterThan(0)) {
             // A manual rate is accepted only where a recorded dated rate exists (the factory document rule).
@@ -225,17 +291,34 @@ export function registerFactoryContainerUpdateRoutes(app: Express) {
         typeof updateData.freightPaidBy === "string" ? updateData.freightPaidBy : existing.freightPaidBy || "supplier";
       const effectiveFreightOwnAccountId =
         updateData.freightOwnAccountId !== undefined ? updateData.freightOwnAccountId : existing.freightOwnAccountId;
-      const effectiveSupplierId = updateData.supplierId !== undefined ? updateData.supplierId : existing.supplierId;
+      const effectiveFreightSupplierId =
+        updateData.freightSupplierId !== undefined ? updateData.freightSupplierId : existing.freightSupplierId;
 
-      // Auto-create freight ledger account if effective freight > 0 and no account selected
-      if (!updateData.freightAccountId && toMoney(effectiveFreight).greaterThan(0)) {
+      const freightNeedsSync = [
+        "freight",
+        "freightCurrencyCode",
+        "freightAccountId",
+        "freightSupplierId",
+        "freightPaidBy",
+        "freightOwnAccountId",
+        "supplierId",
+        "currencyCode",
+        "ratePerKg",
+        "fxRateToUsd",
+        "fxRateSource",
+      ].some((f) => f in b);
+
+      // A notes-only/ETA-only edit must not repair or reject historical freight
+      // records with incomplete payer details. Validate/canonicalize only when
+      // freight posting inputs really change.
+      const effectiveFreightAccountId =
+        updateData.freightAccountId !== undefined ? updateData.freightAccountId : existing.freightAccountId;
+      if (freightNeedsSync && !effectiveFreightAccountId && toMoney(effectiveFreight).greaterThan(0)) {
         updateData.freightAccountId = await getOrCreateLedgerAccount(companyId, "FREIGHT", "Freight");
       }
 
-      // Canonicalize freight payer fields so switching "own" ↔ "supplier" never
-      // leaves a stale value in the opposing field.  Rules are enforced using
-      // the EFFECTIVE values (not just what was sent in this request).
-      {
+      // Canonicalize only when the freight payable is being changed.
+      if (freightNeedsSync) {
         if (toMoney(effectiveFreight).lessThanOrEqualTo(0)) {
           // Rule A: no freight → clear both payer fields
           updateData.freightSupplierId = null;
@@ -253,16 +336,22 @@ export function registerFactoryContainerUpdateRoutes(app: Express) {
           }
           updateData.freightSupplierId = null;
         } else {
-          // Rule C: supplier-paid freight → require a purchase supplier, clear own account
-          if (!effectiveSupplierId) {
+          // Freight is owed to its own chosen payee, never to the goods supplier by fallback.
+          if (!effectiveFreightSupplierId) {
             return res.status(400).json({
-              message: "A purchase supplier (supplierId) is required when freightPaidBy is 'supplier'",
+              message: "Select the freight supplier before saving supplier-paid freight.",
             });
           }
-          updateData.freightOwnAccountId = null;
-          if (!updateData.freightSupplierId) {
-            updateData.freightSupplierId = effectiveSupplierId;
+          const [freightPayee] = await db
+            .select({ id: factorySuppliers.id })
+            .from(factorySuppliers)
+            .where(and(eq(factorySuppliers.id, effectiveFreightSupplierId), eq(factorySuppliers.companyId, companyId)))
+            .limit(1);
+          if (!freightPayee) {
+            return res.status(400).json({ message: "The selected freight supplier must belong to this company." });
           }
+          updateData.freightOwnAccountId = null;
+          updateData.freightSupplierId = effectiveFreightSupplierId;
         }
       }
 
@@ -273,26 +362,79 @@ export function registerFactoryContainerUpdateRoutes(app: Express) {
       // must NOT trigger resolveStoredFxRateOrThrow — doing so causes a 400
       // for EUR/AUD containers that have freight but no confirmed FX rate,
       // because the import only changes the ETA, not anything freight-related.
-      const freightNeedsSync = [
-        "freight",
-        "freightCurrencyCode",
-        "freightAccountId",
-        "freightSupplierId",
-        "freightPaidBy",
-        "freightOwnAccountId",
-        "supplierId",
-        "currencyCode",
-        "ratePerKg",
-        "fxRateToUsd",
-        "fxRateSource",
-      ].some((f) => f in b);
-
       // A container's goods payable MUST follow changes to the supplier, goods value,
       // currency and historical rate. Previously only the descriptive daybook row
       // followed those edits, which left the supplier's actual ledger incorrect.
-      const goodsNeedsSync = ["supplierId", "totalKg", "ratePerKg", "currencyCode", "fxRateToUsd", "fxRateSource"].some(
+      let goodsNeedsSync = ["supplierId", "totalKg", "ratePerKg", "currencyCode", "fxRateToUsd", "fxRateSource"].some(
         (f) => f in b
       );
+
+      // The original goods credit on the 18 reviewed legacy containers was
+      // subsequently corrected by a separate, balanced EUR reclassification.
+      // Editing the original goods journal again would leave that correction in
+      // place and double-count the supplier transfer. A future change must first
+      // use a reviewed, compensating-voucher workflow, not a silent in-place edit.
+      if (goodsNeedsSync) {
+        const [reviewedReclassification] = await db
+          .select({ id: vouchers.id })
+          .from(vouchers)
+          .where(
+            and(
+              eq(vouchers.companyId, companyId),
+              eq(vouchers.voucherNumber, `FACTORY-PAYABLE-RECLASS-20261015-${id}`),
+              isNull(vouchers.deletedAt)
+            )
+          )
+          .limit(1);
+        // After the owner's audited compensating journal is posted, the
+        // original supplier credit is authoritative again. Only keep this
+        // special lock while the Oct-15 reclassification is uncompensated.
+        const [undoJournal] = reviewedReclassification
+          ? await db
+              .select({ id: vouchers.id })
+              .from(vouchers)
+              .where(
+                and(
+                  eq(vouchers.companyId, companyId),
+                  eq(vouchers.voucherNumber, `FACTORY-PAYABLE-RECLASS-REV-20261015-${id}`),
+                  isNull(vouchers.deletedAt)
+                )
+              )
+              .limit(1)
+          : [];
+        if (reviewedReclassification && !undoJournal) {
+          const goodsActuallyChanged =
+            (b.supplierId !== undefined && int(b.supplierId) !== existing.supplierId) ||
+            (b.totalKg !== undefined && !toMoney(dec(b.totalKg)).eq(toMoney(existing.totalKg))) ||
+            (b.ratePerKg !== undefined && !toMoney(dec(b.ratePerKg)).eq(toMoney(existing.ratePerKg))) ||
+            (b.currencyCode !== undefined &&
+              String(b.currencyCode || "USD").toUpperCase() !== String(existing.currencyCode || "USD").toUpperCase()) ||
+            (b.fxRateToUsd !== undefined && !toMoney(dec(b.fxRateToUsd)).eq(toMoney(existing.fxRateToUsd))) ||
+            (b.fxRateSource !== undefined &&
+              String(b.fxRateSource || "auto") !== String(existing.fxRateSource || "auto"));
+          if (goodsActuallyChanged) {
+            return res.status(409).json({
+              code: "FACTORY_IMPORT_RECLASS_REVIEW_REQUIRED",
+              message: "FPR_LOCKED",
+              correctionVoucherId: reviewedReclassification.id,
+            });
+          }
+          // Many edit dialogs submit unchanged goods fields with unrelated
+          // updates. Permit those edits without resynchronizing (and thereby
+          // corrupting) the original imported-goods payable or stored FX.
+          goodsNeedsSync = false;
+          delete updateData.supplierId;
+          delete updateData.totalKg;
+          delete updateData.ratePerKg;
+          delete updateData.currencyCode;
+          delete updateData.fxRateToUsd;
+          delete updateData.fxRateSource;
+          delete updateData.fxRateToUsdImport;
+          delete updateData.fxRateDateImport;
+          delete updateData.fxRateConfirmed;
+          delete updateData.ratePerKgUsd;
+        }
+      }
       const existingImports = goodsNeedsSync
         ? await db
             .select()
@@ -312,6 +454,30 @@ export function registerFactoryContainerUpdateRoutes(app: Express) {
           message:
             "Multiple live import journals exist for this container. Reconcile them before changing supplier or goods value.",
         });
+      }
+
+      // A container created with no goods quantity/value has no initial goods
+      // payable. When a user explicitly enters its FIRST positive goods value,
+      // post the initial liability through the normal voucher engine. This is
+      // not a historical backfill: a container whose old goods value was
+      // positive must still follow the reviewed backfill workflow.
+      const previousGoodsValue = toMoney(existing.totalKg).times(toMoney(existing.ratePerKg));
+      let firstGoodsCostAccountId: number | null = null;
+      if (goodsNeedsSync && existingImports.length === 0 && previousGoodsValue.isZero()) {
+        // A retired/soft-deleted voucher is historical evidence. Never post a
+        // replacement automatically merely because the live query finds none.
+        const [historicalImport] = await db
+          .select({ id: vouchers.id })
+          .from(vouchers)
+          .where(and(eq(vouchers.companyId, companyId), ilike(vouchers.voucherNumber, `FACTORY-IMPORT-${id}-%`)))
+          .limit(1);
+        if (!historicalImport) {
+          firstGoodsCostAccountId = await getOrCreateLedgerAccount(
+            companyId,
+            "FACTORY_IMPORT_COST",
+            "Factory Import Cost"
+          );
+        }
       }
 
       // Find any existing freight voucher for this container (stable or timestamped number)
@@ -430,16 +596,42 @@ export function registerFactoryContainerUpdateRoutes(app: Express) {
                     .update(voucherEntries)
                     .set({
                       ...normalizedCr,
+                      // The import (goods) payable belongs to the goods supplier;
+                      // only the freight journal credits the freight payee.
                       factorySupplierId: updated.supplierId,
                       ledgerAccountId: null,
                     })
                     .where(eq(voucherEntries.id, creditLines[0].id));
                 }
               );
+            } else if (firstGoodsCostAccountId && previousGoodsValue.isZero()) {
+              // An explicit first-time goods entry on a previously zero-value
+              // container: Dr import cost / Cr the selected goods supplier.
+              // Post on the edit date rather than silently backdating a liability.
+              await postFactoryVoucherTx(tx, {
+                companyId,
+                voucherNumber: (generation) => `FACTORY-IMPORT-${id}-${generation}`,
+                voucherDate: getClientDate(req),
+                description: `Goods import - container ${updated.containerNumber}`,
+                currency: goodsCcy,
+                fxRateToUsd: String(goodsFx),
+                source: { sourceType: "factory-container-import", sourceId: id, phase: "goods" },
+                lines: [
+                  {
+                    ledgerAccountId: firstGoodsCostAccountId,
+                    debit: goodsValue,
+                    narration: `Goods import cost - container ${updated.containerNumber}`,
+                  },
+                  {
+                    factorySupplierId: updated.supplierId,
+                    credit: goodsValue,
+                    narration: `Goods payable to supplier - container ${updated.containerNumber}`,
+                  },
+                ],
+              });
             } else {
-              // Historical documents must not acquire a new liability merely
-              // because a user edits a container. Require the audited,
-              // explicitly-selected backfill workflow instead.
+              // Legacy positive-value (or previously reversed) imports still
+              // require explicit review; an edit must never re-create history.
               throw new Error(
                 "This container has no goods-import journal. Review it in the import-credit backfill preview and post the missing journal explicitly before editing its goods or supplier."
               );
@@ -512,12 +704,12 @@ export function registerFactoryContainerUpdateRoutes(app: Express) {
                           ...normFreightCr,
                         })
                         .where(eq(voucherEntries.id, fe.id));
-                    } else if (newFreightPaidBy === "supplier" && updated.supplierId) {
+                    } else if (newFreightPaidBy === "supplier" && updated.freightSupplierId) {
                       // Cr Supplier
                       await tx
                         .update(voucherEntries)
                         .set({
-                          factorySupplierId: updated.supplierId,
+                          factorySupplierId: updated.freightSupplierId,
                           ledgerAccountId: null,
                           ...normFreightCr,
                         })
@@ -567,9 +759,9 @@ export function registerFactoryContainerUpdateRoutes(app: Express) {
                 credit: newFreightAmt,
                 narration: `Freight paid via own account - container ${updated.containerNumber}`,
               });
-            } else if (newFreightPaidBy === "supplier" && updated.supplierId) {
+            } else if (newFreightPaidBy === "supplier" && updated.freightSupplierId) {
               lines.push({
-                factorySupplierId: updated.supplierId,
+                factorySupplierId: updated.freightSupplierId,
                 credit: newFreightAmt,
                 narration: `Freight payable to supplier - container ${updated.containerNumber}`,
               });

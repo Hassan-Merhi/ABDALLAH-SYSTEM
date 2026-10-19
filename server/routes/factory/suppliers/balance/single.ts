@@ -91,7 +91,13 @@ export function registerSupplierBalanceSingleRoutes(app: Express) {
             // Financial supplier FX journals are already represented by the source
             // FX-transfer rows. Counting their supplier debit as a second payment
             // subtracts the same transfer twice from operational balances.
-            sql`${vouchers.voucherNumber} NOT LIKE 'FACTORY-SFX-%'`
+            sql`${vouchers.voucherNumber} NOT LIKE 'FACTORY-SFX-%'`,
+              // Audited supplier reclassification and its compensating reversal
+              // are balanced GL transfers, NOT payments. Counting only their
+              // debit legs creates fake payments and corrupts broker pools.
+              sql`${vouchers.voucherNumber} NOT LIKE 'FACTORY-PAYABLE-RECLASS-%'`,
+              // Posted freight/FX repair journals are non-payment ledger corrections.
+              sql`${vouchers.voucherNumber} NOT LIKE 'FACTORY-CORRECTION-%'`
           )
         );
       for (const row of voucherPaymentRows) {

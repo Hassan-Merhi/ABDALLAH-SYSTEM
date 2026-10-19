@@ -303,9 +303,9 @@ export const phase3RemainingTranslationsPart28: readonly Phase3SharedUiEntry[] =
     fr: "Le suivi automatique des conteneurs est désactivé. Mettez à jour les données du conteneur manuellement ou par import Excel.",
   },
   {
-    en: "Priority color must be one of the 12 approved HEX colors.",
-    ar: "يجب أن يكون لون الأولوية أحد ألوان HEX الاثني عشر المعتمدة.",
-    fr: "La couleur de priorité doit être l'une des 12 couleurs HEX approuvées.",
+    en: "Priority color must be one of the 11 approved HEX colors.",
+    ar: "يجب أن يكون لون الأولوية أحد ألوان HEX الأحد عشر المعتمدة.",
+    fr: "La couleur de priorité doit être l'une des 11 couleurs HEX approuvées.",
   },
   {
     en: "Automated container tracking is disabled. Update container data manually or by import.",
@@ -476,5 +476,153 @@ export const phase3RemainingTranslationsPart28: readonly Phase3SharedUiEntry[] =
     en: "Missing confirmed USD exchange rate for ${cc}",
     ar: "سعر الصرف المؤكد بالدولار الأمريكي مفقود لـ {{0}}",
     fr: "Taux de change USD confirmé manquant pour {{0}}",
+  },
+  { en: "Freight Supplier (required)", ar: "مورد الشحن (مطلوب)", fr: "Fournisseur du fret (obligatoire)" },
+  {
+    en: "Freight can be payable to a different supplier than the goods purchase.",
+    ar: "يمكن أن يكون الشحن مستحقًا لمورد مختلف عن مورد شراء البضائع.",
+    fr: "Le fret peut être dû à un fournisseur différent de celui de l'achat des marchandises.",
+  },
+  { en: "Import Stock Transfer", ar: "استيراد تحويل المخزون", fr: "Importer un transfert de stock" },
+  {
+    en: "Correct the spreadsheet and upload it again. No rows were changed.",
+    ar: "صحّح جدول البيانات ثم ارفعه مرة أخرى. لم يتم تغيير أي صفوف.",
+    fr: "Corrigez la feuille de calcul et téléversez-la à nouveau. Aucune ligne n'a été modifiée.",
+  },
+  {
+    en: "Loading the spreadsheet will replace the item rows currently on this form.",
+    ar: "سيؤدي تحميل جدول البيانات إلى استبدال صفوف الأصناف الموجودة حاليًا في هذا النموذج.",
+    fr: "Le chargement de la feuille de calcul remplacera les lignes d'articles actuellement dans ce formulaire.",
+  },
+  {
+    en: "${result.entries.length} stock item(s) loaded from Excel. Review quantities and press Save Transfer.",
+    ar: "تم تحميل {{0}} صنف (أصناف) مخزون من Excel. راجع الكميات ثم اضغط حفظ التحويل.",
+    fr: "{{0}} article(s) de stock chargé(s) depuis Excel. Vérifiez les quantités puis appuyez sur Enregistrer le transfert.",
+  },
+  {
+    en: "Could not read this spreadsheet.",
+    ar: "تعذّرت قراءة جدول البيانات هذا.",
+    fr: "Impossible de lire cette feuille de calcul.",
+  },
+  {
+    en: "Raw materials and existing batches recorded in this mix.",
+    ar: "المواد الخام والدفعات الموجودة المسجّلة في هذا الخليط.",
+    fr: "Matières premières et lots existants enregistrés dans ce mélange.",
+  },
+  {
+    en: "No recorded source materials found for this batch.",
+    ar: "لم يتم العثور على مواد مصدر مسجّلة لهذه الدفعة.",
+    fr: "Aucune matière source enregistrée trouvée pour ce lot.",
+  },
+  { en: "Source / Container", ar: "المصدر / الحاوية", fr: "Source / Conteneur" },
+  {
+    en: "Unable to load mix batch sources",
+    ar: "تعذّر تحميل مصادر دفعة الخلط",
+    fr: "Impossible de charger les sources du lot de mélange",
+  },
+  {
+    en: "Unable to load mix batch details",
+    ar: "تعذّر تحميل تفاصيل دفعة الخلط",
+    fr: "Impossible de charger les détails du lot de mélange",
+  },
+  {
+    en: "Unable to load the recorded sources for this mix batch.",
+    ar: "تعذّر تحميل المصادر المسجّلة لدفعة الخلط هذه.",
+    fr: "Impossible de charger les sources enregistrées de ce lot de mélange.",
+  },
+  {
+    en: "Unable to load this mix batch's details. Please try again.",
+    ar: "تعذّر تحميل تفاصيل دفعة الخلط هذه. يُرجى المحاولة مرة أخرى.",
+    fr: "Impossible de charger les détails de ce lot de mélange. Veuillez réessayer.",
+  },
+  {
+    en: "Automatically selected production target",
+    ar: "هدف الإنتاج المحدد تلقائيًا",
+    fr: "Objectif de production sélectionné automatiquement",
+  },
+  {
+    en: "Save a Fixed Production Plan before sending a target comparison.",
+    ar: "احفظ خطة إنتاج ثابتة قبل إرسال مقارنة الأهداف.",
+    fr: "Enregistrez un plan de production fixe avant d'envoyer une comparaison des objectifs.",
+  },
+  {
+    en: "You owe",
+    ar: "مستحق عليك",
+    fr: "Vous devez",
+  },
+  {
+    en: "Owed to you",
+    ar: "مستحق لك",
+    fr: "Dû à vous",
+  },
+  {
+    en: "USD equivalent at current Factory Settings exchange rates",
+    ar: "المعادل بالدولار الأمريكي وفق أسعار الصرف الحالية في إعدادات المصنع",
+    fr: "Équivalent USD aux taux de change actuels des paramètres de l'usine",
+  },
+  {
+    en: "Historical FX conversion needs review.",
+    ar: "تحويل العملات التاريخي يحتاج إلى مراجعة.",
+    fr: "La conversion de change historique doit être vérifiée.",
+  },
+  {
+    en: "Invalid 20-ton quantity for supplier ${key}",
+    ar: "كمية 20 طنًا غير صالحة للمورد {{0}}",
+    fr: "Quantité de 20 tonnes invalide pour le fournisseur {{0}}",
+  },
+  {
+    en: "Historical loading date repair refused: incomplete/foreign existing audit",
+    ar: "تم رفض إصلاح تاريخ التحميل التاريخي: سجل التدقيق الحالي غير مكتمل أو غير مطابق",
+    fr: "Réparation de la date de chargement historique refusée : audit existant incomplet ou étranger",
+  },
+  {
+    en: "Historical loading date repair refused: audit exists but saved dates were altered",
+    ar: "تم رفض إصلاح تاريخ التحميل التاريخي: سجل التدقيق موجود لكن التواريخ المحفوظة تم تعديلها",
+    fr: "Réparation de la date de chargement historique refusée : l'audit existe mais les dates enregistrées ont été modifiées",
+  },
+  {
+    en: "Historical loading date repair refused: preflight matched ${locked.rowCount}/${PLAN.length} orders",
+    ar: "تم رفض إصلاح تاريخ التحميل التاريخي: التحقق المسبق طابق {{0}}/{{1}} من الطلبات",
+    fr: "Réparation de la date de chargement historique refusée : la vérification préalable a trouvé {{0}}/{{1}} commandes",
+  },
+  {
+    en: "Historical loading date repair refused: incomplete before-image",
+    ar: "تم رفض إصلاح تاريخ التحميل التاريخي: النسخة السابقة غير مكتملة",
+    fr: "Réparation de la date de chargement historique refusée : image avant modification incomplète",
+  },
+  {
+    en: "Historical loading date repair refused: incomplete update",
+    ar: "تم رفض إصلاح تاريخ التحميل التاريخي: التحديث غير مكتمل",
+    fr: "Réparation de la date de chargement historique refusée : mise à jour incomplète",
+  },
+  {
+    en: "Historical loading date repair refused: verification failed",
+    ar: "تم رفض إصلاح تاريخ التحميل التاريخي: فشل التحقق",
+    fr: "Réparation de la date de chargement historique refusée : échec de la vérification",
+  },
+  {
+    en: "Order 207 date repair audit exists, but the saved date no longer matches",
+    ar: "سجل تدقيق إصلاح تاريخ الطلب 207 موجود، لكن التاريخ المحفوظ لم يعد مطابقًا",
+    fr: "L'audit de réparation de la date de la commande 207 existe, mais la date enregistrée ne correspond plus",
+  },
+  {
+    en: "Returned loading date repair refused: order 207 or its original event changed",
+    ar: "تم رفض إصلاح تاريخ تحميل المرتجع: الطلب 207 أو حدثه الأصلي قد تغيّر",
+    fr: "Réparation de la date de chargement du retour refusée : la commande 207 ou son événement d'origine a changé",
+  },
+  {
+    en: "Returned loading date repair backup failed",
+    ar: "فشل النسخ الاحتياطي لإصلاح تاريخ تحميل المرتجع",
+    fr: "Échec de la sauvegarde de la réparation de la date de chargement du retour",
+  },
+  {
+    en: "Returned loading date repair update failed",
+    ar: "فشل تحديث إصلاح تاريخ تحميل المرتجع",
+    fr: "Échec de la mise à jour de la réparation de la date de chargement du retour",
+  },
+  {
+    en: "Returned loading date repair verification failed",
+    ar: "فشل التحقق من إصلاح تاريخ تحميل المرتجع",
+    fr: "Échec de la vérification de la réparation de la date de chargement du retour",
   },
 ];

@@ -1,4 +1,5 @@
 import { db } from "../../db";
+import { syncLoadingStartedDaybookTotal } from "./customer-orders/loadingDaybookAmount";
 import {
   ledgerAccounts,
   customerOrderBales,
@@ -15,8 +16,7 @@ import {
   factoryOffloadAdditionalCharges,
 } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
-import bcrypt from "bcryptjs";
-import { createHash, timingSafeEqual } from "node:crypto";
+import { verifyPasswordBcryptOnly } from "../helpers/passwordHelpers";
 import { resolveStoredFxRate, UnresolvedExchangeRateError } from "../../services/factory/currencyConversion";
 import type { DbTransaction, DatabaseOrTransaction } from "../../db";
 import type Decimal from "decimal.js";
@@ -93,12 +93,8 @@ export function isLegacySHA256Hash(hash: string): boolean {
 }
 
 export async function verifySupervisorPassword(password: string, hash: string): Promise<boolean> {
-  if (isLegacySHA256Hash(hash)) {
-    const actual = createHash("sha256").update(password, "utf8").digest();
-    const expected = Buffer.from(hash, "hex");
-    return actual.length === expected.length && timingSafeEqual(actual, expected);
-  }
-  return bcrypt.compare(password, hash);
+  // Shared bcrypt-only step-up; old SHA-256 accounts must first log in and migrate.
+  return verifyPasswordBcryptOnly(password, hash);
 }
 
 export async function recalculateOrderTotals(dbConn: DatabaseOrTransaction, orderId: number) {
@@ -206,6 +202,9 @@ export async function recalculateOrderTotals(dbConn: DatabaseOrTransaction, orde
       updatedAt: new Date(),
     })
     .where(eq(customerOrders.id, orderId));
+
+  // Scans removed, swapped or repriced use this same synchronized loading event.
+  await syncLoadingStartedDaybookTotal(dbConn, orderId);
 
   // Perpetual inventory (wave 8.4): a finalized order's invoice journal follows its new totals.
   const [owner] = await dbConn

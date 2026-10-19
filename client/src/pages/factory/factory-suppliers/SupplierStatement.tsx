@@ -24,7 +24,6 @@ import {
 } from "lucide-react";
 import { StatementResponse, SupplierWithBalance, type StatementDisplayRow } from "./factorySupplierTypes";
 import { LinkedSupplierExposure } from "./LinkedSupplierExposure";
-import { LedgerBalancePanel } from "./LedgerBalancePanel";
 import type { useFactorySuppliersModel } from "./useFactorySuppliersModel";
 
 type SuppliersModel = ReturnType<typeof useFactorySuppliersModel>;
@@ -107,7 +106,6 @@ export function SupplierStatement({
   setFxConversionOpen,
   setFxConversionForm,
   setFxSourceType,
-  allSuppliers,
   subAccountsByParent,
   wrapAdminAction,
   deleteFxTransferMutation,
@@ -287,16 +285,6 @@ export function SupplierStatement({
           </label>
         )}
       </div>
-
-      {statementData.ledgerView && (
-        <LedgerBalancePanel
-          view={statementData.ledgerView}
-          operationalTotal={statementData.summary.operationalNetPayable}
-          formatNum={formatNum}
-          usdEquivalentBalance={allSuppliers.find((supplier) => supplier.id === statementSupplierId)?.usdEquivalentBalance}
-          usdEquivalentMissingRates={allSuppliers.find((supplier) => supplier.id === statementSupplierId)?.usdEquivalentMissingRates}
-        />
-      )}
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
         {!isBrokerStatement && (

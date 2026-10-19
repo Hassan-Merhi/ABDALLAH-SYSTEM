@@ -12,6 +12,8 @@ import { Plus, Trash2, FileText, TrendingDown, TrendingUp, Loader2, Building2 } 
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { apiRequest } from "@/lib/queryClient";
+import { spContainerInvoiceChargeLines } from "@shared/spContainerInvoiceCharges";
+import { FRESH_START_OTW_SOURCE_NAME } from "@shared/goldenCoastOtwSource";
 
 function fmt2(v: string | number | null | undefined) {
   const n = parseFloat(String(v ?? "0"));
@@ -55,6 +57,10 @@ interface SpOffloadContainer {
   invoiceNumber?: string | null;
   discountPct?: string | number | null;
   invoiceTotalUsd?: string | number | null;
+  freightEstimateUsd?: string | number | null;
+  surchargeUsd?: string | number | null;
+  fumigationUsd?: string | number | null;
+  documentChargesUsd?: string | number | null;
   lines?: SpContainerLine[];
   prepaid?: SpPrepaidCharge[];
 }
@@ -103,6 +109,8 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
   const [offloadDate, setOffloadDate] = useState(new Date().toISOString().slice(0, 10));
   const [chargeLines, setChargeLines] = useState<ChargeLine[]>([]);
   const [selectedLocationId, setSelectedLocationId] = useState("");
+  const [phase8RequestId, setPhase8RequestId] = useState(() => crypto.randomUUID());
+  const freshStartOtw = container?.supplierName === FRESH_START_OTW_SOURCE_NAME;
 
   const { data: statusData } = useQuery<SpSetupStatus>({
     queryKey: ["/api/sp/setup/status"],
@@ -137,6 +145,30 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
         toast({ title: "Select a location", variant: "destructive" });
         return Promise.reject(new Error("Select a location"));
       }
+      if (freshStartOtw) {
+        const active = chargeLines.filter((charge) => Number(charge.amountUsd) > 0);
+        if (active.some((charge) => charge.chargeType !== "paid_now")) {
+          return Promise.reject(new Error("Fresh Start Phase 8 supports additional charges paid from one bank account only. Invoice charges are already included in Goods OTW."));
+        }
+        const distinctBanks = [...new Set(active.map((charge) => charge.creditBankAccountId))];
+        if (active.length > 0 && (distinctBanks.length !== 1 || !Number(distinctBanks[0]))) {
+          return Promise.reject(new Error("Select one bank account for additional offload charges."));
+        }
+        return apiRequest("POST", "/api/sp/golden-coast/phase8/offload", {
+          clientRequestId: phase8RequestId,
+          containerId: container.id,
+          locationId: Number(selectedLocationId),
+          offloadDate,
+          charges: active.map((charge) => ({
+            chargeType: "other",
+            description: charge.description,
+            amountUsd: charge.amountUsd,
+          })),
+          chargeFundingAccount: active.length > 0
+            ? { kind: "bank", id: Number(distinctBanks[0]) }
+            : null,
+        });
+      }
       return apiRequest("POST", "/api/sp/offload", {
         containerId: container.id,
         offloadDate,
@@ -151,6 +183,7 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
       onOpenChange(false);
       setChargeLines([]);
       setSelectedLocationId("");
+      setPhase8RequestId(crypto.randomUUID());
       onSuccess?.();
     },
     onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
@@ -164,7 +197,11 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
     (s, l) => s + parseFloat(String(l.qty ?? "0")) * parseFloat(String(l.unitRateUsd ?? "0")) * discountFactor,
     0
   );
-  const totalLandedCost = chargeLines.reduce((s, c) => s + parseFloat(c.amountUsd || "0"), 0);
+  // Supplier-invoice charges stated on the container; the server adds them to this
+  // offload itself, so they are shown here but cannot be edited or removed.
+  const invoiceCharges = spContainerInvoiceChargeLines(container);
+  const invoiceChargesTotal = invoiceCharges.reduce((s, c) => s + c.amountUsd, 0);
+  const totalLandedCost = invoiceChargesTotal + chargeLines.reduce((s, c) => s + parseFloat(c.amountUsd || "0"), 0);
   const totalFinalCost = totalBaseCost + totalLandedCost;
   const invoiceTotal = parseFloat(String(container.invoiceTotalUsd ?? "0"));
 
@@ -271,7 +308,26 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
               </Button>
             </div>
 
-            {chargeLines.length === 0 && (
+            {invoiceCharges.length > 0 && (
+              <div
+                className="rounded-md border border-border bg-muted/30 p-3 space-y-1"
+                data-testid="sp-invoice-charges"
+              >
+                <p className="text-xs font-medium text-muted-foreground">
+                  {freshStartOtw
+                    ? "Already included in Goods OTW — allocated into stock cost once on offload"
+                    : "From the container invoice — added automatically (Cr Cost Clearing)"}
+                </p>
+                {invoiceCharges.map((c) => (
+                  <div key={c.kind} className="flex items-center justify-between text-xs">
+                    <span>{c.description}</span>
+                    <span className="tabular-nums font-medium">{fmt2(c.amountUsd)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {chargeLines.length === 0 && invoiceCharges.length === 0 && (
               <p className="text-sm text-muted-foreground py-2">
                 No charges — all stock cost will equal the discounted base cost.
               </p>
@@ -290,7 +346,7 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {CHARGE_TYPES.map((t) => (
+                      {CHARGE_TYPES.filter((t) => !freshStartOtw || t.value === "paid_now").map((t) => (
                         <SelectItem key={t.value} value={t.value}>
                           {t.label}
                         </SelectItem>
@@ -441,122 +497,46 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
 
           <Separator />
 
-          {/* Accounting Preview */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <FileText className="h-4 w-4 text-muted-foreground" />
-              <div>
-                <p className="text-sm font-medium">Accounting Preview</p>
-                <p className="text-xs text-muted-foreground">
-                  {agentCharges.length > 0
-                    ? "Three journal vouchers will be created: two in SP Test Co, one in HADI L'SHI"
-                    : "Two journal vouchers will be created on confirm"}
-                </p>
+          {freshStartOtw ? (
+            <div className="rounded-md border border-border bg-muted/20 p-3 space-y-2" data-testid="fresh-start-phase8-offload-preview">
+              <p className="text-sm font-medium">Golden Coast Phase 8 — Accounting Preview</p>
+              <p className="text-xs text-muted-foreground">
+                One balanced journal transfers the existing Goods OTW amount into stock.
+                Invoice freight and discount are already included; no supplier or clearing charge is created again.
+              </p>
+              <div className="flex justify-between text-sm">
+                <span>Dr Stock on Floor</span><strong>{fmt2(totalFinalCost)}</strong>
               </div>
+              <div className="flex justify-between text-sm">
+                <span>Cr Goods OTW</span><strong>{fmt2(invoiceTotal)}</strong>
+              </div>
+              {activeCharges.length > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span>Cr selected bank — additional charges only</span>
+                  <strong>{fmt2(activeCharges.reduce((sum, charge) => sum + Number(charge.amountUsd), 0))}</strong>
+                </div>
+              )}
             </div>
-
-            {/* Voucher A: OTW Reversal */}
-            <div className="space-y-1">
-              <div className="flex items-center gap-1.5">
-                <TrendingDown className="h-3.5 w-3.5 text-muted-foreground" />
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                  Voucher A — Goods OTW Reversal (SP Test Co)
-                </p>
-              </div>
-              <div className="rounded-md border border-border bg-muted/20 p-3 space-y-1">
-                <div className="grid grid-cols-3 text-xs text-muted-foreground font-medium pb-1 border-b border-border/40">
-                  <span className="col-span-2">Account</span>
-                  <span className="text-right">Dr / Cr</span>
-                </div>
-                <div className="grid grid-cols-3 text-xs py-0.5">
-                  <span className="col-span-2 font-medium">
-                    {otwClrAcct?.name ?? "Goods OTW Clearing"}{" "}
-                    <Badge variant="secondary" className="text-xs ml-1">
-                      Dr
-                    </Badge>
-                  </span>
-                  <span className="text-right tabular-nums font-semibold">{fmt2(invoiceTotal)}</span>
-                </div>
-                <div className="grid grid-cols-3 text-xs py-0.5 text-muted-foreground">
-                  <span className="col-span-2 pl-4">{otwAcct?.name ?? "Goods OTW"} (Cr)</span>
-                  <span className="text-right tabular-nums">{fmt2(invoiceTotal)}</span>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium">Accounting Preview</p>
+                  <p className="text-xs text-muted-foreground">
+                    {agentCharges.length > 0
+                      ? "Three journal vouchers will be created: two in SP Test Co, one in HADI L'SHI"
+                      : "Two journal vouchers will be created on confirm"}
+                  </p>
                 </div>
               </div>
-            </div>
-
-            {/* Voucher B: Stock Creation */}
-            <div className="space-y-1">
-              <div className="flex items-center gap-1.5">
-                <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                  Voucher B — Stock Creation (SP Test Co)
-                </p>
-              </div>
-              <div className="rounded-md border border-border bg-muted/20 p-3 space-y-1">
-                <div className="grid grid-cols-3 text-xs text-muted-foreground font-medium pb-1 border-b border-border/40">
-                  <span className="col-span-2">Account</span>
-                  <span className="text-right">Dr / Cr</span>
-                </div>
-                <div className="grid grid-cols-3 text-xs py-0.5">
-                  <span className="col-span-2 font-medium">
-                    {stockAcct?.name ?? "SP Stock on Floor"}{" "}
-                    <Badge variant="secondary" className="text-xs ml-1">
-                      Dr
-                    </Badge>
-                  </span>
-                  <span className="text-right tabular-nums font-semibold">{fmt2(totalFinalCost)}</span>
-                </div>
-                <div className="grid grid-cols-3 text-xs py-0.5 text-muted-foreground">
-                  <span className="col-span-2 pl-4">
-                    {costClrAcct?.name ?? "SP Cost Clearing"} — base supplier cost (Cr)
-                  </span>
-                  <span className="text-right tabular-nums">{fmt2(totalBaseCost)}</span>
-                </div>
-                {activeCharges.map((c, idx) => {
-                  const amt = parseFloat(c.amountUsd || "0");
-                  let creditLabel: string;
-                  if (c.chargeType === "prepaid_used") {
-                    const p = (container.prepaid || []).find((x) => String(x.id) === c.prepaidChargeId);
-                    creditLabel = prepaidAcct?.name ?? "SP Prepaid Charges";
-                    if (p) creditLabel += ` — ${p.chargeType}`;
-                  } else if (c.chargeType === "paid_now") {
-                    const b = (statusData?.bankAccounts || []).find((x) => String(x.id) === c.creditBankAccountId);
-                    creditLabel = b ? b.bankName : "Bank Account";
-                  } else if (c.chargeType === "unpaid_payable" || c.chargeType === "other") {
-                    const a = ledgerAccounts.find((x) => String(x.id) === c.creditLedgerAccountId);
-                    creditLabel = a ? `${a.name}` : "Ledger Account";
-                  } else if (c.chargeType === "parent_agent") {
-                    creditLabel = prepaidExpAcct?.name ?? "Prepaid Expenses";
-                    const agent = parentAgents.find((x) => String(x.ledger_account_id) === c.parentAgentAccountId);
-                    if (agent) creditLabel += ` (via ${agent.account_name})`;
-                  } else {
-                    creditLabel = `${costClrAcct?.name ?? "Cost Clearing"} — freight`;
-                  }
-                  return (
-                    <div key={idx} className="grid grid-cols-3 text-xs py-0.5 text-muted-foreground">
-                      <span className="col-span-2 pl-4">
-                        {creditLabel} (Cr){c.description ? ` — ${c.description}` : ""}
-                      </span>
-                      <span className="text-right tabular-nums">{fmt2(amt)}</span>
-                    </div>
-                  );
-                })}
-                {activeCharges.length === 0 && (
-                  <div className="grid grid-cols-3 text-xs py-0.5 text-muted-foreground">
-                    <span className="col-span-2 pl-4">No landed charges — Cr equals base cost only</span>
-                    <span className="text-right tabular-nums">—</span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Voucher C: HADI L'SHI Agent Journal — only if agent charges exist */}
-            {agentCharges.length > 0 && (
+  
+              {/* Voucher A: OTW Reversal */}
               <div className="space-y-1">
                 <div className="flex items-center gap-1.5">
-                  <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+                  <TrendingDown className="h-3.5 w-3.5 text-muted-foreground" />
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                    Voucher C — Agent Charges (HADI L'SHI)
+                    Voucher A — Goods OTW Reversal (SP Test Co)
                   </p>
                 </div>
                 <div className="rounded-md border border-border bg-muted/20 p-3 space-y-1">
@@ -564,36 +544,141 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
                     <span className="col-span-2">Account</span>
                     <span className="text-right">Dr / Cr</span>
                   </div>
-                  {agentCharges.map((c, idx) => {
-                    const agent = parentAgents.find((x) => String(x.ledger_account_id) === c.parentAgentAccountId);
-                    return (
-                      <div key={idx} className="grid grid-cols-3 text-xs py-0.5">
-                        <span className="col-span-2 font-medium">
-                          {agent?.account_name ?? "Agent Account"}{" "}
-                          <Badge variant="secondary" className="text-xs ml-1">
-                            Dr
-                          </Badge>
-                          {c.description ? <span className="text-muted-foreground ml-1">— {c.description}</span> : null}
-                        </span>
-                        <span className="text-right tabular-nums font-semibold">
-                          {fmt2(parseFloat(c.amountUsd || "0"))}
-                        </span>
-                      </div>
-                    );
-                  })}
-                  <div className="grid grid-cols-3 text-xs py-0.5 text-muted-foreground border-t border-border/40 pt-1 mt-1">
-                    <span className="col-span-2 pl-4">
-                      {hadiIcAcct?.name ?? "SP Test Co — Intercompany"} (Cr)
-                      <Badge variant="outline" className="text-xs ml-1">
-                        excluded from Net Position
+                  <div className="grid grid-cols-3 text-xs py-0.5">
+                    <span className="col-span-2 font-medium">
+                      {otwClrAcct?.name ?? "Goods OTW Clearing"}{" "}
+                      <Badge variant="secondary" className="text-xs ml-1">
+                        Dr
                       </Badge>
                     </span>
-                    <span className="text-right tabular-nums">{fmt2(totalAgentCharges)}</span>
+                    <span className="text-right tabular-nums font-semibold">{fmt2(invoiceTotal)}</span>
+                  </div>
+                  <div className="grid grid-cols-3 text-xs py-0.5 text-muted-foreground">
+                    <span className="col-span-2 pl-4">{otwAcct?.name ?? "Goods OTW"} (Cr)</span>
+                    <span className="text-right tabular-nums">{fmt2(invoiceTotal)}</span>
                   </div>
                 </div>
               </div>
-            )}
-          </div>
+  
+              {/* Voucher B: Stock Creation */}
+              <div className="space-y-1">
+                <div className="flex items-center gap-1.5">
+                  <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Voucher B — Stock Creation (SP Test Co)
+                  </p>
+                </div>
+                <div className="rounded-md border border-border bg-muted/20 p-3 space-y-1">
+                  <div className="grid grid-cols-3 text-xs text-muted-foreground font-medium pb-1 border-b border-border/40">
+                    <span className="col-span-2">Account</span>
+                    <span className="text-right">Dr / Cr</span>
+                  </div>
+                  <div className="grid grid-cols-3 text-xs py-0.5">
+                    <span className="col-span-2 font-medium">
+                      {stockAcct?.name ?? "SP Stock on Floor"}{" "}
+                      <Badge variant="secondary" className="text-xs ml-1">
+                        Dr
+                      </Badge>
+                    </span>
+                    <span className="text-right tabular-nums font-semibold">{fmt2(totalFinalCost)}</span>
+                  </div>
+                  <div className="grid grid-cols-3 text-xs py-0.5 text-muted-foreground">
+                    <span className="col-span-2 pl-4">
+                      {costClrAcct?.name ?? "SP Cost Clearing"} — base supplier cost (Cr)
+                    </span>
+                    <span className="text-right tabular-nums">{fmt2(totalBaseCost)}</span>
+                  </div>
+                  {invoiceCharges.map((c) => (
+                    <div key={c.kind} className="grid grid-cols-3 text-xs py-0.5 text-muted-foreground">
+                      <span className="col-span-2 pl-4">
+                        {costClrAcct?.name ?? "Cost Clearing"} (Cr) — {c.description}
+                      </span>
+                      <span className="text-right tabular-nums">{fmt2(c.amountUsd)}</span>
+                    </div>
+                  ))}
+                  {activeCharges.map((c, idx) => {
+                    const amt = parseFloat(c.amountUsd || "0");
+                    let creditLabel: string;
+                    if (c.chargeType === "prepaid_used") {
+                      const p = (container.prepaid || []).find((x) => String(x.id) === c.prepaidChargeId);
+                      creditLabel = prepaidAcct?.name ?? "SP Prepaid Charges";
+                      if (p) creditLabel += ` — ${p.chargeType}`;
+                    } else if (c.chargeType === "paid_now") {
+                      const b = (statusData?.bankAccounts || []).find((x) => String(x.id) === c.creditBankAccountId);
+                      creditLabel = b ? b.bankName : "Bank Account";
+                    } else if (c.chargeType === "unpaid_payable" || c.chargeType === "other") {
+                      const a = ledgerAccounts.find((x) => String(x.id) === c.creditLedgerAccountId);
+                      creditLabel = a ? `${a.name}` : "Ledger Account";
+                    } else if (c.chargeType === "parent_agent") {
+                      creditLabel = prepaidExpAcct?.name ?? "Prepaid Expenses";
+                      const agent = parentAgents.find((x) => String(x.ledger_account_id) === c.parentAgentAccountId);
+                      if (agent) creditLabel += ` (via ${agent.account_name})`;
+                    } else {
+                      creditLabel = `${costClrAcct?.name ?? "Cost Clearing"} — freight`;
+                    }
+                    return (
+                      <div key={idx} className="grid grid-cols-3 text-xs py-0.5 text-muted-foreground">
+                        <span className="col-span-2 pl-4">
+                          {creditLabel} (Cr){c.description ? ` — ${c.description}` : ""}
+                        </span>
+                        <span className="text-right tabular-nums">{fmt2(amt)}</span>
+                      </div>
+                    );
+                  })}
+                  {activeCharges.length === 0 && invoiceCharges.length === 0 && (
+                    <div className="grid grid-cols-3 text-xs py-0.5 text-muted-foreground">
+                      <span className="col-span-2 pl-4">No landed charges — Cr equals base cost only</span>
+                      <span className="text-right tabular-nums">—</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+  
+              {/* Voucher C: HADI L'SHI Agent Journal — only if agent charges exist */}
+              {agentCharges.length > 0 && (
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1.5">
+                    <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      Voucher C — Agent Charges (HADI L'SHI)
+                    </p>
+                  </div>
+                  <div className="rounded-md border border-border bg-muted/20 p-3 space-y-1">
+                    <div className="grid grid-cols-3 text-xs text-muted-foreground font-medium pb-1 border-b border-border/40">
+                      <span className="col-span-2">Account</span>
+                      <span className="text-right">Dr / Cr</span>
+                    </div>
+                    {agentCharges.map((c, idx) => {
+                      const agent = parentAgents.find((x) => String(x.ledger_account_id) === c.parentAgentAccountId);
+                      return (
+                        <div key={idx} className="grid grid-cols-3 text-xs py-0.5">
+                          <span className="col-span-2 font-medium">
+                            {agent?.account_name ?? "Agent Account"}{" "}
+                            <Badge variant="secondary" className="text-xs ml-1">
+                              Dr
+                            </Badge>
+                            {c.description ? <span className="text-muted-foreground ml-1">— {c.description}</span> : null}
+                          </span>
+                          <span className="text-right tabular-nums font-semibold">
+                            {fmt2(parseFloat(c.amountUsd || "0"))}
+                          </span>
+                        </div>
+                      );
+                    })}
+                    <div className="grid grid-cols-3 text-xs py-0.5 text-muted-foreground border-t border-border/40 pt-1 mt-1">
+                      <span className="col-span-2 pl-4">
+                        {hadiIcAcct?.name ?? "SP Test Co — Intercompany"} (Cr)
+                        <Badge variant="outline" className="text-xs ml-1">
+                          excluded from Net Position
+                        </Badge>
+                      </span>
+                      <span className="text-right tabular-nums">{fmt2(totalAgentCharges)}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Actions */}
           <div className="flex justify-end gap-2 pt-2">

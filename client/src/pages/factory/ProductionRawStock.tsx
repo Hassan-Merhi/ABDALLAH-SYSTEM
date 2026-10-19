@@ -3,19 +3,23 @@ import { useState, useMemo, useRef } from "react";
 import { useAdminOverride } from "@/hooks/use-admin-override";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { FlaskConical, ArrowDown, Tag, Layers } from "lucide-react";
+import { FlaskConical, ArrowDown, Tag, Layers, Calculator } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
+import { useApplicationLanguage } from "@/contexts/ApplicationLanguageContext";
+import { translateFixedProductionPlanner } from "@/i18n/fixedProductionPlannerTranslations";
 import { getApiRequest } from "@/lib/factoryApi";
 import type { FactoryMixBatch } from "@shared/schema";
 
 import { SupplierCategoriesDialog } from "./production-raw-stock/ProductionRawStockHelpers";
 import { RawStockTable, type RawStockRow } from "./production-raw-stock/RawStockTable";
 import { MixBatchList, type MixBatchPrintRow, type MixBatchRow } from "./production-raw-stock/MixBatchList";
+import type { MixBatchSupplierCategory } from "./production-raw-stock/mixBatchCategoryTargets";
 import { KpiCards } from "./production-raw-stock/KpiCards";
 import { OffloadDialog } from "./production-raw-stock/OffloadDialog";
+import { FixedProductionPlannerDialog } from "./production-raw-stock/FixedProductionPlannerDialog";
 import type {
   OffloadContainer,
   OffloadLedgerAccount,
@@ -39,9 +43,11 @@ export default function ProductionRawStock() {
   const { formatDisplayDate } = useDateFormat();
   const { toast } = useToast();
   const appMode = useAppMode();
+  const { language } = useApplicationLanguage();
   const modeApiRequest = getApiRequest(appMode);
 
   const [offloadDialogOpen, setOffloadDialogOpen] = useState(false);
+  const [fixedPlannerOpen, setFixedPlannerOpen] = useState(false);
   const [categoriesDialogOpen, setCategoriesDialogOpen] = useState(false);
   const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
   const [deductDialogOpen, setDeductDialogOpen] = useState(false);
@@ -57,7 +63,7 @@ export default function ProductionRawStock() {
 
   const mixBatchPrintRef = useRef<HTMLDivElement>(null);
 
-  const { data: rawStock } = useQuery<RawStockRow[]>({
+  const { data: rawStock, isFetching: rawStockLoading, isError: rawStockError } = useQuery<RawStockRow[]>({
     queryKey: ["/api/factory/raw-stock"],
   });
 
@@ -65,7 +71,7 @@ export default function ProductionRawStock() {
     queryKey: ["/api/factory/mix-batches"],
   });
 
-  const { data: factorySuppliers = [] } = useQuery<OffloadSupplierOption[]>({
+  const { data: factorySuppliers = [], isFetching: suppliersLoading, isError: suppliersError } = useQuery<OffloadSupplierOption[]>({
     queryKey: ["/api/factory/suppliers"],
   });
 
@@ -84,6 +90,27 @@ export default function ProductionRawStock() {
     queryKey: [`/api/factory/mix-batches-by-date?date=${encodeURIComponent(mixBatchDate)}`],
     enabled: !!mixBatchDate,
   });
+
+  const { data: reportCategories = [], isLoading: reportCategoriesLoading, isError: reportCategoriesError } =
+    useQuery<MixBatchSupplierCategory[]>({
+      queryKey: ["/api/factory/supplier-categories"],
+      staleTime: 60_000,
+      refetchOnWindowFocus: false,
+    });
+
+  const {
+    data: fixedProductionPlan,
+    isLoading: fixedProductionPlanLoading,
+    isError: fixedProductionPlanError,
+  } = useQuery<{ allocations20t: Record<string, number>; revision: number; locked: boolean }>({
+    queryKey: ["/api/factory/raw-stock/fixed-production-planner"],
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  });
+  const reportAllocations = fixedProductionPlan && fixedProductionPlan.revision > 0
+    ? fixedProductionPlan.allocations20t : null;
+  const reportLoading = mixBatchesByDateLoading || reportCategoriesLoading || suppliersLoading ||
+    fixedProductionPlanLoading || reportCategoriesError || suppliersError || fixedProductionPlanError;
 
   const offloadMutation = useMutation({
     mutationFn: async (data: OffloadPayload) => {
@@ -168,6 +195,7 @@ export default function ProductionRawStock() {
   const sendWhatsAppMutation = useMutation({
     mutationFn: async () => {
       if (!mixBatchPrintRef.current) throw new Error("Nothing to capture");
+      if (!reportAllocations || reportLoading) throw new Error("Save a Fixed Production Plan before sending a target comparison.");
       const html2canvas = (await import("html2canvas")).default;
       const canvas = await html2canvas(mixBatchPrintRef.current, { backgroundColor: "#111827", scale: 2 });
       const imageBase64 = canvas.toDataURL("image/png");
@@ -226,6 +254,14 @@ export default function ProductionRawStock() {
           </div>
         </div>
         <div className="grid w-full grid-cols-1 gap-2 min-[360px]:grid-cols-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:justify-end">
+          <Button
+            variant="outline"
+            onClick={() => setFixedPlannerOpen(true)}
+            className="h-11 gap-2 rounded-lg border-blue-500/40 px-3 text-xs font-semibold sm:h-9"
+            data-testid="button-fixed-production-planner"
+          >
+            <Calculator className="h-4 w-4" /> {translateFixedProductionPlanner("title", language)}
+          </Button>
           <Button
             onClick={() => setCreateMixBatchOpen(true)}
             className="h-11 gap-2 rounded-lg bg-blue-600 px-3 text-xs font-semibold text-white shadow-xs transition-all hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-md dark:bg-blue-500 dark:hover:bg-blue-400 sm:h-9"
@@ -299,10 +335,25 @@ export default function ProductionRawStock() {
             mixBatchesByDate={mixBatchesByDate}
             mixBatchesByDateLoading={mixBatchesByDateLoading}
             mixBatchPrintRef={mixBatchPrintRef}
+            reportCategories={reportCategories}
+            reportSuppliers={factorySuppliers}
+            reportAllocations={reportAllocations}
+            reportLoading={reportLoading}
             formatDisplayDate={formatDisplayDate}
           />
         </section>
       </div>
+
+      <FixedProductionPlannerDialog
+        open={fixedPlannerOpen}
+        onOpenChange={setFixedPlannerOpen}
+        rawStock={rawStock || []}
+        rawStockLoading={rawStockLoading}
+        rawStockError={rawStockError}
+        suppliers={factorySuppliers}
+        suppliersLoading={suppliersLoading}
+        suppliersError={suppliersError}
+      />
 
       <CreateMixBatchDialog
         open={createMixBatchOpen}

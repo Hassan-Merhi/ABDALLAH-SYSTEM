@@ -11,6 +11,8 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useApplicationLanguage } from "@/contexts/ApplicationLanguageContext";
 import { useCompany } from "@/contexts/CompanyContext";
 import { translatePriorityScanText, type PriorityScanTranslationKey } from "@/i18n/priorityScanTranslations";
+import { getPriorityScanLetter, getPriorityScanLetterInk } from "@shared/priorityScanColors";
+import { PriorityScanColorLetter } from "./PriorityScanColorLetter";
 import {
   PRIORITY_SCAN_HISTORY_URL,
   fetchPriorityScanHistory,
@@ -122,7 +124,7 @@ export default function FactoryPriorityScan() {
   const condensedSessionScans = useMemo(() => {
     const grouped = new Map<
       string,
-      { name: string; articleCode: string | null; count: number; latestScannedAt: string }
+      { name: string; articleCode: string | null; count: number; latestScannedAt: string; colors: string[] }
     >();
 
     for (const scan of sessionScans) {
@@ -131,6 +133,9 @@ export default function FactoryPriorityScan() {
       const existing = grouped.get(key);
       if (existing) {
         existing.count += 1;
+        if (!existing.colors.some((color) => color.toLowerCase() === scan.color.toLowerCase())) {
+          existing.colors.push(scan.color);
+        }
         if (Date.parse(scan.scannedAt) > Date.parse(existing.latestScannedAt)) {
           existing.latestScannedAt = scan.scannedAt;
           existing.articleCode = scan.articleCode;
@@ -141,6 +146,7 @@ export default function FactoryPriorityScan() {
           articleCode: scan.articleCode,
           count: 1,
           latestScannedAt: scan.scannedAt,
+          colors: [scan.color],
         });
       }
     }
@@ -425,10 +431,22 @@ export default function FactoryPriorityScan() {
           data-testid="current-priority-color"
         >
           {currentPriorityBale && (
-            <span className="sr-only">
-              {currentPriorityBale.referenceNumber} · {tr("priorityNumber", { priority: currentPriorityBale.priority })}{" "}
-              · {tr("loadingNumber", { orderId: currentPriorityBale.orderId })}
-            </span>
+            <>
+              {getPriorityScanLetter(currentPriorityBale.color) && (
+                <span
+                  className="flex min-h-[230px] items-center justify-center font-black text-[clamp(5rem,12vw,9rem)] leading-none"
+                  style={{ color: getPriorityScanLetterInk(currentPriorityBale.color) }}
+                  data-testid="current-priority-letter"
+                  aria-label={`Letter ${getPriorityScanLetter(currentPriorityBale.color)}`}
+                >
+                  {getPriorityScanLetter(currentPriorityBale.color)}
+                </span>
+              )}
+              <span className="sr-only">
+                {currentPriorityBale.referenceNumber} · {tr("priorityNumber", { priority: currentPriorityBale.priority })}{" "}
+                · {tr("loadingNumber", { orderId: currentPriorityBale.orderId })}
+              </span>
+            </>
           )}
         </section>
       </div>
@@ -459,11 +477,7 @@ export default function FactoryPriorityScan() {
                 data-testid={`priority-queue-row-${item.orderId}`}
               >
                 <div className="w-20 shrink-0 font-semibold">#{item.priority}</div>
-                <span
-                  className="h-5 w-5 rounded-full border border-black/10 shrink-0"
-                  style={{ backgroundColor: item.color }}
-                  aria-label={tr("priorityColor", { color: item.color })}
-                />
+                <PriorityScanColorLetter color={item.color} />
                 <div className="min-w-0 flex-1">
                   <div className="font-medium truncate">
                     {item.load?.customerName || tr("loadingNumber", { orderId: item.orderId })}
@@ -531,6 +545,11 @@ export default function FactoryPriorityScan() {
                         <div className="text-xs text-muted-foreground font-mono truncate">{group.articleCode}</div>
                       )}
                     </div>
+                    <div className="flex flex-wrap items-center gap-1">
+                      {group.colors.map((color) => (
+                        <PriorityScanColorLetter key={color} color={color} size="sm" />
+                      ))}
+                    </div>
                     <Badge variant="secondary">{group.count} scanned</Badge>
                   </div>
                 ))}
@@ -543,11 +562,7 @@ export default function FactoryPriorityScan() {
                     <div className="font-mono font-medium min-w-[150px]">{scan.referenceNumber}</div>
                     <div className="flex-1 min-w-0 text-sm truncate">{scan.productName || tr("unnamedProduct")}</div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <span
-                        className="h-3.5 w-3.5 rounded-full border border-black/10"
-                        style={{ backgroundColor: scan.color }}
-                        aria-hidden="true"
-                      />
+                      <PriorityScanColorLetter color={scan.color} size="sm" />
                       <Badge variant="outline">
                         {tr("priorityNumber", { priority: scan.priority })} ·{" "}
                         {tr("loadingNumber", { orderId: scan.orderId })}

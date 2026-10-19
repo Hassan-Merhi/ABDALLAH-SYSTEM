@@ -108,12 +108,12 @@ describe("Priority Scan Wave 1 configuration foundation", () => {
     // only active loading keeps it at #1.
     const update = await agent
       .put(`/api/factory/customer-orders/${orderId}/loading-list/priority-scan-config`)
-      .send({ color: "#614051", priority: 3, enabled: true });
+      .send({ color: "#DB7093", priority: 3, enabled: true });
 
     expect(update.status).toBe(200);
     expect(update.body).toMatchObject({
       orderId,
-      color: "#614051",
+      color: "#DB7093",
       priority: 1,
       enabled: true,
       createdBy: create.body.createdBy,
@@ -137,7 +137,7 @@ describe("Priority Scan Wave 1 configuration foundation", () => {
     const list = await agent.get("/api/factory/customer-orders/loading-list/priority-scan-configs");
     expect(list.status).toBe(200);
     const listed = list.body.some(
-      (row: { orderId: number; color: string }) => row.orderId === orderId && row.color === "#614051"
+      (row: { orderId: number; color: string }) => row.orderId === orderId && row.color === "#DB7093"
     );
     expect(listed).toBe(true);
   });
@@ -170,14 +170,14 @@ describe("Priority Scan Wave 1 configuration foundation", () => {
     // inserted there and the rest shift down, keeping priorities 1..n.
     const queued = await agent
       .put(`/api/factory/customer-orders/${second}/loading-list/priority-scan-config`)
-      .send({ color: "#FFE066", priority: 10 });
+      .send({ color: "#FFD700", priority: 10 });
     expect(queued.status).toBe(200);
     const before = await activeQueue();
     expect(before.slice(-2)).toEqual([first, second]);
 
     const moved = await agent
       .put(`/api/factory/customer-orders/${second}/loading-list/priority-scan-config`)
-      .send({ color: "#FFE066", priority: 1 });
+      .send({ color: "#FFD700", priority: 1 });
     expect(moved.status).toBe(200);
     expect(moved.body.priority).toBe(1);
     expect(await activeQueue()).toEqual([second, ...before.filter((id) => id !== second)]);
@@ -260,25 +260,25 @@ describe("Priority Scan Wave 1 configuration foundation", () => {
     try {
       const colorOnly = await agent
         .put(`/api/factory/customer-orders/${memberLoading}/loading-list/priority-scan-config`)
-        .send({ color: "#7FFF00", enabled: true });
+        .send({ color: "#39FF14", enabled: true });
 
       expect(colorOnly.status).toBe(200);
-      expect(colorOnly.body.color).toBe("#7FFF00");
+      expect(colorOnly.body.color).toBe("#39FF14");
       expect(colorOnly.body.priority).toBe(activeCount + 1);
 
       const blockedPriority = await agent
         .put(`/api/factory/customer-orders/${memberLoading}/loading-list/priority-scan-config`)
-        .send({ color: "#FF00FF", priority: 1, enabled: true });
+        .send({ color: "#B22222", priority: 1, enabled: true });
 
       expect(blockedPriority.status).toBe(403);
       expect(blockedPriority.body.code).toBe("PRIORITY_POSITION_ADMIN_ONLY");
 
       const colorEdit = await agent
         .put(`/api/factory/customer-orders/${memberLoading}/loading-list/priority-scan-config`)
-        .send({ color: "#FF00FF", enabled: true });
+        .send({ color: "#B22222", enabled: true });
 
       expect(colorEdit.status).toBe(200);
-      expect(colorEdit.body.color).toBe("#FF00FF");
+      expect(colorEdit.body.color).toBe("#B22222");
       expect(colorEdit.body.priority).toBe(activeCount + 1);
 
       const blockedRemoval = await agent.delete(
@@ -290,7 +290,7 @@ describe("Priority Scan Wave 1 configuration foundation", () => {
       await setRole("Owner");
       const ownerPriority = await agent
         .put(`/api/factory/customer-orders/${memberLoading}/loading-list/priority-scan-config`)
-        .send({ color: "#FF00FF", priority: 1, enabled: true });
+        .send({ color: "#B22222", priority: 1, enabled: true });
       expect(ownerPriority.status).toBe(200);
       expect(ownerPriority.body.priority).toBe(1);
 
@@ -338,7 +338,7 @@ describe("Priority Scan Wave 1 configuration foundation", () => {
 
     const priority = await agent
       .put(`/api/factory/customer-orders/${orderId}/loading-list/priority-scan-config`)
-      .send({ color: "#F7E7CE", priority: 999, enabled: true });
+      .send({ color: "#F28500", priority: 999, enabled: true });
     expect(priority.status).toBe(200);
 
     const referenceNumber = `${PREFIX}-HIST-BALE`;
@@ -386,7 +386,7 @@ describe("Priority Scan Wave 1 configuration foundation", () => {
         expect.objectContaining({
           referenceNumber,
           orderId,
-          color: "#F7E7CE",
+          color: "#F28500",
           scannedBy: `${PREFIX}_testuser`,
         }),
         expect.objectContaining({
@@ -426,7 +426,7 @@ describe("Priority Scan Wave 1 configuration foundation", () => {
     const loading = await createLoading();
     const priority = await agent
       .put(`/api/factory/customer-orders/${loading}/loading-list/priority-scan-config`)
-      .send({ color: "#FFB6C1", priority: 9999, enabled: true });
+      .send({ color: "#B22222", priority: 9999, enabled: true });
     expect(priority.status).toBe(200);
 
     const referenceNumber = `${PREFIX.toUpperCase()}-UNMATCHED-DAILY`;
@@ -469,7 +469,7 @@ describe("Priority Scan Wave 1 configuration foundation", () => {
     const orderId = await createLoading();
     await agent
       .put(`/api/factory/customer-orders/${orderId}/loading-list/priority-scan-config`)
-      .send({ color: "#DAA520", priority: 30, enabled: true });
+      .send({ color: "#000000", priority: 30, enabled: true });
 
     const first = await agent.delete(`/api/factory/customer-orders/${orderId}/loading-list/priority-scan-config`);
     expect(first.status).toBe(200);

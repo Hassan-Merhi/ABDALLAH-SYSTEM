@@ -108,7 +108,9 @@ describe("factory supplier balance voucher payments (operational memo)", () => {
     expect(await balanceWithVoucherPayment({ ...normalizedCfa, exchangeRate: "655.957" })).toBe(-1000);
   });
 
-  it("converts a legacy foreign-currency payment exactly as before", async () => {
-    expect(await balanceWithVoucherPayment({ ...legacyEur, exchangeRate: "0.8" })).toBe(-1250);
+  it("converts a legacy foreign-currency payment by its USD-per-unit voucher rate", async () => {
+    // #2228: vouchers.exchangeRate is USD per unit, as in every other supplier
+    // reader, so 1000 EUR at 0.8 is 800 USD (it used to be divided, giving 1250).
+    expect(await balanceWithVoucherPayment({ ...legacyEur, exchangeRate: "0.8" })).toBe(-800);
   });
 });

@@ -15,9 +15,12 @@ describe("Phase 7 backend-message translations", () => {
     // release ratchet required (702), plus the 25 Priority Scan configuration,
     // queue and routing messages (#2032), plus the fixed-palette color and
     // legacy move guards that replaced the free-text color length message
-    // (#2141), for a total of 728.
-    expect(backendMessagesPhase7Translations).toHaveLength(728);
-    expect(new Set(backendMessagesPhase7Translations.map((entry) => entry.en)).size).toBe(728);
+    // (#2141), plus the 15 fail-closed post-offload, duty and reversal guards
+    // (#2241) and the 2 dedicated freight-payee guards (#2245), plus the 5
+    // intercompany parent-journal guards for purchase-order edits (#2261), for a
+    // total of 750.
+    expect(backendMessagesPhase7Translations).toHaveLength(750);
+    expect(new Set(backendMessagesPhase7Translations.map((entry) => entry.en)).size).toBe(750);
 
     for (const entry of backendMessagesPhase7Translations) {
       expect(entry.en.trim()).not.toBe("");

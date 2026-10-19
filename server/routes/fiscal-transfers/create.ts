@@ -14,6 +14,7 @@ import { logger } from "../../lib/logger";
 import { inventory, stockTransferVouchers, stockTransferItems, vouchers, locations } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 import { MoneyDecimal, parseMoneyInput, toMoney } from "../../lib/money";
+import { stockTransferNarrationTx } from "../../services/inventory/stockTransferNarration";
 import { allocateVoucherNumberTx } from "../../services/accounting/voucherNumbering";
 import { allStockItemsOwned, ownLocationIds } from "../helpers/companyOwnership";
 import { sendTransferWhatsApp } from "../../helpers/sendTransferWhatsApp";
@@ -231,7 +232,12 @@ export function registerStockTransferCreateRoutes(app: Express) {
                 voucherDate: effectiveDate,
               }),
               voucherDate: effectiveDate,
-              description: notes || null,
+              description: (typeof notes === "string" ? notes.trim() : "") || await stockTransferNarrationTx(
+                tx,
+                companyId,
+                normalizedMovementItems.map((item) => item.sourceLocationId),
+                Number(destinationLocationId)
+              ),
               totalAmount: "0",
               optional: optional === true,
             })

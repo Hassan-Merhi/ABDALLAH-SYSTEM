@@ -30,7 +30,8 @@ A saved snapshot is reused only while the bale is still linked to that loading. 
 
 ## Labels
 
-- A4, A5 and sticker labels keep the exact ordinary layout, sizes, banners and barcodes. For an allocated bale, only the small HMD logo inside the barcode information box changes: it is replaced by an empty solid rounded rectangle filled with the bale's **saved** priority color (A4 25×14 mm, A5 22×12 mm, sticker 20×10 mm — the same size on screen and in print), with no lettering inside it. The large HMD banners are unchanged. There is no colored stripe. See [priority-scan-fixed-palette-color-block.md](priority-scan-fixed-palette-color-block.md).
+- **A4/A5 paper labels only:** For an allocated bale, the small HMD logo is replaced by the saved priority color block (A4 25×14 mm with a centered 30pt letter, A5 22×12 mm with a centered 25pt letter). For the 11 approved colors the block shows its fixed M–W letter, with dark/light ink to remain legible; legacy saved colors retain their HMD fallback. Large banners and all barcodes/details stay unchanged. See [priority-scan-fixed-palette-color-block.md](priority-scan-fixed-palette-color-block.md).
+- **Sticker labels (3×1.97 inches) remain uncolored:** The ordinary small HMD logo (or customer logo, when provided) is printed even on priority bales. For the 11 fixed colors, a readable black bold 24pt M–W letter appears immediately next to that logo, without a priority-color block. Non-priority/legacy colors get no letter. Priority assignment, saved colors, reprint preflight and barcode content are unaffected.
 - Legacy Pressing and Production finalization labels replace their small "HMD / INTERNATIONAL GROUP" text with the same 25×14 mm saved-color rectangle; ordinary bales keep the text.
 - Bales without an allocation print exactly as before.
 - Colors come only from the server snapshot (`#RRGGBB`, `#RGB` or a known legacy name); an unrecognized color cancels printing instead of printing a misleading label.

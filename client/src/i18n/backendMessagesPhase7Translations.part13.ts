@@ -177,4 +177,114 @@ export const backendMessagesPhase7TranslationsPart13: readonly Phase7BackendMess
     ar: "البالة {0} موجودة بالفعل في {1} ({2}).",
     fr: "La balle {0} se trouve déjà dans {1} ({2}).",
   },
+  {
+    en: "Post-offload charge requires exactly one company-owned expense account or supplier and a valid payable account.",
+    ar: "تتطلب الرسوم بعد التفريغ حساب مصروف أو مورّدًا واحدًا تابعًا للشركة، وحساب مستحقات صالحًا.",
+    fr: "Les frais après déchargement nécessitent un compte de charges ou un fournisseur de la société, ainsi qu'un compte de dettes valide.",
+  },
+  {
+    en: "Charge editing requires a valid same-company ledger destination; no unposted charge changes are permitted.",
+    ar: "يتطلب تعديل الرسوم حسابًا محاسبيًا صالحًا تابعًا للشركة نفسها. لا يُسمح بتعديلات غير مُرحّلة.",
+    fr: "La modification des frais exige un compte comptable valide de la même société. Aucune modification non comptabilisée n'est autorisée.",
+  },
+  {
+    en: "Charge #${chargeRow.id} has missing historical voucher/daybook links. Reconcile the original records before editing or undoing it.",
+    ar: "تفتقد الرسوم رقم {0} إلى روابط السند أو دفتر اليومية التاريخية. يجب تسوية السجلات الأصلية قبل تعديلها أو إلغائها.",
+    fr: "Les frais n° {0} n'ont pas de liens historiques vers la pièce ou le journal. Rapprochez les écritures originales avant modification ou annulation.",
+  },
+  {
+    en: "Cannot reverse offload while ${activePostOffloadCharges.length} post-offload charge(s) remain active. Undo those charges first so their vouchers and supplier costing are reversed safely.",
+    ar: "لا يمكن عكس التفريغ مع وجود {0} رسوم نشطة بعد التفريغ. ألغِ هذه الرسوم أولاً لضمان عكس القيود وتكاليف المورد بأمان.",
+    fr: "Impossible d'annuler le déchargement tant que {0} frais restent actifs. Annulez-les d'abord pour rétablir correctement les écritures et le coût fournisseur.",
+  },
+  {
+    en: "Each post-offload charge needs exactly one ledger account or supplier before it can be saved.",
+    ar: "يجب تحديد حساب محاسبي واحد أو مورّد واحد لكل رسم بعد التفريغ قبل الحفظ.",
+    fr: "Chaque frais après déchargement exige exactement un compte comptable ou un fournisseur avant l'enregistrement.",
+  },
+  {
+    en: "Charge ledger account must belong to the selected company.",
+    ar: "يجب أن ينتمي الحساب المحاسبي للرسوم إلى الشركة المحددة.",
+    fr: "Le compte comptable des frais doit appartenir à la société sélectionnée.",
+  },
+  {
+    en: "A post-offload charge edit requires exactly one ledger account or supplier.",
+    ar: "يتطلب تعديل رسم بعد التفريغ حسابًا محاسبيًا واحدًا أو مورّدًا واحدًا.",
+    fr: "La modification des frais après déchargement exige exactement un compte comptable ou un fournisseur.",
+  },
+  {
+    en: "Select the freight supplier or paying account before offloading.",
+    ar: "اختر مورّد الشحن أو حساب الدفع قبل التفريغ.",
+    fr: "Sélectionnez le fournisseur de fret ou le compte de paiement avant le déchargement.",
+  },
+  {
+    en: "Select the other-charges supplier or paying account before offloading.",
+    ar: "اختر مورّد الرسوم الأخرى أو حساب الدفع قبل التفريغ.",
+    fr: "Sélectionnez le fournisseur des autres frais ou le compte de paiement avant le déchargement.",
+  },
+  {
+    en: "Select the duty payment account before confirming duties and offloading.",
+    ar: "اختر حساب سداد الرسوم الجمركية قبل تأكيدها والتفريغ.",
+    fr: "Sélectionnez le compte de règlement des droits de douane avant leur confirmation et le déchargement.",
+  },
+  {
+    en: "Each positive additional charge needs exactly one paying account or supplier.",
+    ar: "تتطلب كل رسوم إضافية موجبة حساب دفع واحدًا أو مورّدًا واحدًا.",
+    fr: "Chaque frais supplémentaire positif exige exactement un compte de paiement ou un fournisseur.",
+  },
+  {
+    en: "Duty on container ${container.containerNumber}",
+    ar: "رسوم جمركية على الحاوية {0}",
+    fr: "Droits de douane du conteneur {0}",
+  },
+  {
+    en: "Duty incurred - container ${container.containerNumber}",
+    ar: "رسوم جمركية مستحقة - الحاوية {0}",
+    fr: "Droits engagés - conteneur {0}",
+  },
+  {
+    en: "Duty paid or payable through account - container ${container.containerNumber}",
+    ar: "رسوم جمركية مدفوعة أو مستحقة عبر الحساب - الحاوية {0}",
+    fr: "Droits payés ou dus via le compte - conteneur {0}",
+  },
+  {
+    en: "Cannot reverse offload while post-offload charges remain active.",
+    ar: "لا يمكن عكس التفريغ مع وجود رسوم نشطة بعد التفريغ.",
+    fr: "Impossible d'annuler le déchargement tant que des frais restent actifs.",
+  },
+  {
+    en: "Select the freight supplier before saving supplier-paid freight.",
+    ar: "اختر مورّد الشحن قبل حفظ رسوم الشحن المستحقة على المورّد.",
+    fr: "Sélectionnez le fournisseur de fret avant d'enregistrer des frais de fret à sa charge.",
+  },
+  {
+    en: "The selected freight supplier must belong to this company.",
+    ar: "يجب أن ينتمي مورّد الشحن المحدد إلى هذه الشركة.",
+    fr: "Le fournisseur de fret sélectionné doit appartenir à cette société.",
+  },
+  {
+    en: "This company has no verified parent company for intercompany credit.",
+    ar: "لا توجد شركة أم معتمدة لهذه الشركة لتحديث الرصيد بين الشركات.",
+    fr: "Cette société n'a pas de société mère vérifiée pour le crédit intersociétés.",
+  },
+  {
+    en: "Parent intercompany journal missing for this container; purchase-order edit was not saved.",
+    ar: "قيد الشركة الأم لهذا الحاوية غير موجود؛ لم يتم حفظ تعديل أمر الشراء.",
+    fr: "Le journal intersociétés de la société mère est introuvable pour ce conteneur ; la modification du bon de commande n'a pas été enregistrée.",
+  },
+  {
+    en: 'No matching parent intercompany journal for container ${poContainerRow?.containerNumber ?? "unknown"}; nothing was changed.',
+    ar: "لا يوجد قيد مطابق لدى الشركة الأم للحاوية {0}؛ لم يتم إجراء أي تعديل.",
+    fr: "Aucun journal intersociétés correspondant pour le conteneur {0} ; aucune modification effectuée.",
+  },
+  {
+    en: 'Intercompany credit not synchronized for container ${_b1ContainerRow?.containerNumber ?? "unknown"} (PO ${existingPO.poNumber}). Parent journal missing; no changes saved.',
+    ar: "لم تتم مزامنة الرصيد بين الشركات للحاوية {0} (أمر الشراء {1}). قيد الشركة الأم مفقود؛ لم تُحفظ التعديلات.",
+    fr: "Le crédit intersociétés du conteneur {0} (BC {1}) n’a pas été synchronisé. Journal de la société mère introuvable ; modifications non enregistrées.",
+  },
+  {
+    en: "Multiple legacy parent journals match container ${containerNumber}; reconcile them before editing.",
+    ar: "توجد قيود قديمة متعددة لدى الشركة الأم تطابق الحاوية {0}؛ يرجى مطابقتها قبل التعديل.",
+    fr: "Plusieurs anciens journaux de la société mère correspondent au conteneur {0} ; rapprochez-les avant de modifier.",
+  },
 ];

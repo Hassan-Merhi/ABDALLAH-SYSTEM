@@ -51,11 +51,22 @@ import { listenWithRetry, registerGracefulShutdown } from "./startup/listenWithR
 import { registerProcessErrorHandlers } from "./startup/registerProcessErrorHandlers";
 import { runStartupMigrations, warmupDb } from "./startup/runServerStartupMigrations";
 import { ensureFactoryStaffTrackingSchema } from "./startup/factoryStaffTrackingSchema";
+import { ensureSupplierTrackingShopDutyDefaults } from "./startup/ensureSupplierTrackingShopDutyDefaults";
 import { ensureFactoryContainerPlannerSchemaOnBoot } from "./startup/factoryContainerPlannerSchema";
 import { ensurePriorityScanSchema } from "./startup/priorityScanSchema";
 import { ensureFactoryBaleOrderIntegrity } from "./startup/ensureFactoryBaleOrderIntegrity";
 import { runApprovedLegacyBaleUnitCostRepair } from "./startup/runApprovedLegacyBaleUnitCostRepair";
+import { runApprovedLegacySoldBaleUnitCostRepair } from "./startup/runApprovedLegacySoldBaleUnitCostRepair";
+import { runApprovedCustomerLoadingDateRepair } from "./startup/runApprovedCustomerLoadingDateRepair";
+import { runApprovedReturnedLoadingDateRepair } from "./startup/runApprovedReturnedLoadingDateRepair";
+import { runApprovedFactoryPayableReclassification } from "./startup/runApprovedFactoryPayableReclassification";
+import { runApprovedFactoryPayableUndo } from "./startup/runApprovedFactoryPayableUndo";
+import { runApprovedAboSobhiGoods82 } from "./startup/runApprovedAboSobhiGoods82";
+import { runApprovedAboJaberPayableFix } from "./startup/runApprovedAboJaberPayableFix";
+import { runApprovedUkBasma38 } from "./startup/runApprovedUkBasma38";
+import { runApprovedHmdEurogulfFreightRepair } from "./startup/runApprovedHmdEurogulfFreightRepair";
 import { ensureFactorySheetsSacksSchema } from "./startup/factorySheetsSacksSchema";
+import { ensureSpGitTracking } from "./lib/spGitTracking";
 import { ensureRecurringJournalSchema } from "./services/accounting/ensureRecurringJournalSchema";
 import { bootstrapRecurringJournalFromEnvironment } from "./services/accounting/recurringJournalBootstrap";
 import { ensureFactoryInvoiceDocumentSnapshotStore } from "./services/factoryInvoiceDocumentService";
@@ -291,6 +302,8 @@ let migrationsDone = false;
         logger.error("[startup] ✗ System account provisioning failed", { error: getErrorMessage(error) });
       });
       await ensureFinancialOperationRequests(pool);
+      await ensureSupplierTrackingShopDutyDefaults(pool);
+      logger.info("[startup] ✓ Supplier Tracking Shop/Duty defaults ensured");
       await ensureRecurringJournalSchema(pool);
       await ensurePriorityScanSchema(pool);
       logger.info("[startup] ✓ Priority Scan schema ensured");
@@ -325,6 +338,25 @@ let migrationsDone = false;
       // Explicitly owner-approved, one-time monetary correction. Disabled by
       // default and guarded against repeat execution or accounting cutover.
       await runApprovedLegacyBaleUnitCostRepair(pool);
+      // Owner-approved (2026-10-17) follow-up for the remaining historical/sold bales.
+      await runApprovedLegacySoldBaleUnitCostRepair(pool);
+      // One-time owner-authorized, company-12 historical loading-date reconciliation.
+      // Atomic before-image audit and exact first-submission evidence are required.
+      await runApprovedCustomerLoadingDateRepair(pool);
+      // Restore the original date for a historically confirmed order returned to LOADING.
+      await runApprovedReturnedLoadingDateRepair(pool);
+      // Owner-approved, idempotent reclassification of 18 original factory import payables.
+      // No-op unless explicitly enabled on the verified production Render service.
+      await runApprovedFactoryPayableReclassification();
+      await runApprovedFactoryPayableUndo();
+      // One-time exact goods payable catch-up for ABO SOBHI container TCLU8160430.
+      await runApprovedAboSobhiGoods82();
+      // One-time, source-reviewed, owner-approved company-12 JABER liability reassignment.
+      await runApprovedAboJaberPayableFix();
+      // Exact-source, owner-requested UK BASMA supplier statement reconciliation.
+      await runApprovedUkBasma38();
+      // Owner-approved EUROGULF freight reclass; no-op without exact Render opt-in.
+      await runApprovedHmdEurogulfFreightRepair();
       if (migrationsEnabled) {
         try {
           await runMigrations();
@@ -336,6 +368,10 @@ let migrationsDone = false;
           markStartupMigrationsComplete();
         }
       }
+      // Initialize isolated GIT metadata before production accepts requests.
+      // Financial SP containers and Goods OTW vouchers remain untouched.
+      await ensureSpGitTracking();
+      logger.info("[startup] ✓ Supplier Partner GIT tracking schema ensured");
     })
     .then(() => {
       listenWithRetry(server, port, () => runPostStartupJobs());

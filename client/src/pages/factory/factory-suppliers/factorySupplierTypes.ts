@@ -66,6 +66,10 @@ export interface SupplierWithBalance extends FactorySupplier {
   /** Read-only current-settings FX translation of signed native balances. Null if any rate is missing. */
   usdEquivalentBalance?: string | null;
   usdEquivalentMissingRates?: string[];
+  /** Non-broker cards follow the inside Settlement Statement's currency pools. */
+  displayBalanceBasis?: "settlement-statement";
+  /** The Settlement Statement's signed Net Balance per currency (positive = we owe). */
+  settlementBalances?: Array<{ currencyCode: string; balance: string }>;
   balanceBasis?: "ledger";
   notInLedgerTotal?: string;
   operationalMemo?: { label: string; totalValue: string; currencyBalances?: CurrencyBalance[]; fxUnresolved?: boolean };

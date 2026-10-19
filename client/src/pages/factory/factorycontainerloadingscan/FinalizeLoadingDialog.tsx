@@ -144,6 +144,7 @@ function ReviewTotals({ model }: { model: FactoryContainerLoadingScanModel }) {
 export function FinalizeLoadingDialog({ model }: { model: FactoryContainerLoadingScanModel }) {
   const { linkedProforma, proformaProgress, bales, totalWeight, finalizeMutation } = model;
   const hasProformaReview = !!linkedProforma && proformaProgress.length > 0;
+  const hasRemaining = hasProformaReview && proformaProgress.some((line) => line.remaining > 0);
   return (
     <Dialog open={model.showFinalizeDialog} onOpenChange={model.setShowFinalizeDialog}>
       <DialogContent className="max-w-2xl rounded-2xl">
@@ -182,11 +183,17 @@ export function FinalizeLoadingDialog({ model }: { model: FactoryContainerLoadin
               type="date"
               value={model.finalizeDate}
               onChange={(e) => model.setFinalizeDate(e.target.value)}
+              disabled={!!model.orderDetail?.loadingFinalizedAt}
               className="flex h-10 w-full rounded-xl border border-input bg-background px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
               data-testid="input-finalize-date"
             />
           </div>
-          <div className="flex items-center justify-end gap-2">
+          {hasRemaining && (
+            <p className="text-sm text-muted-foreground" data-testid="text-next-loading-remaining">
+              {model.tr("remainingOnlyNextLoadingHint")}
+            </p>
+          )}
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <Button
               variant="outline"
               onClick={() => model.setShowFinalizeDialog(false)}
@@ -200,8 +207,18 @@ export function FinalizeLoadingDialog({ model }: { model: FactoryContainerLoadin
               data-testid="button-confirm-finalize"
             >
               <CheckCircle className="mr-2 h-4 w-4" />
-              {finalizeMutation.isPending ? model.tr("finalizing") : model.tr("confirmFinalize")}
+              {finalizeMutation.isPending ? model.tr("finalizing") : model.tr("finalizeOnly")}
             </Button>
+            {hasRemaining && (
+              <Button
+                variant="secondary"
+                onClick={() => finalizeMutation.mutate({ txDate: model.finalizeDate, createNextLoading: true })}
+                disabled={finalizeMutation.isPending}
+                data-testid="button-finalize-open-next-loading"
+              >
+                {finalizeMutation.isPending ? model.tr("finalizing") : model.tr("finalizeOpenNextLoading")}
+              </Button>
+            )}
           </div>
         </div>
       </DialogContent>

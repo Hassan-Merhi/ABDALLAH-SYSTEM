@@ -25,6 +25,7 @@ import {
   updateContainerCost,
 } from "./legacy-links";
 import { computeRemainingFraction, loadActiveCharges, loadCostInputs } from "./loaders";
+import { assertChargePostingDestination, assertResolvedHistoricalLinks } from "./guards";
 import { PostOffloadMutationParams, PostOffloadMutationResult } from "./types";
 import type { CascadeResult } from "../rawStockCostCascade";
 
@@ -166,6 +167,12 @@ export async function applyPostOffloadChargeMutation(
   if (action === "CREATE") {
     const { chargeData, accountingCtx } = params;
     if (!chargeData) throw new Error("chargeData is required for CREATE");
+    assertChargePostingDestination(
+      companyId,
+      chargeData,
+      accountingCtx,
+      "Post-offload charge requires exactly one company-owned expense account or supplier and a valid payable account."
+    );
 
     // Compute OLD canonical cost
     const activeCharges = await loadActiveCharges(tx, companyId, containerId);
@@ -253,9 +260,10 @@ export async function applyPostOffloadChargeMutation(
       }),
     });
 
-    // Write voucher if accounting context is provided
-    let voucherId: number | null = null;
-    if (accountingCtx && accountingCtx.chargesPayableAcctId > 0) {
+    // The journal is mandatory and part of the charge/cost transaction.
+    // A posting failure rolls the charge and all costing changes back.
+    let voucherId: number;
+    {
       const { voucherCompanyId, chargesPayableAcctId } = accountingCtx;
       // Phase 22 (C): through the engine with the charge's posting identity; the
       // FACTORY-POC-{container}-{charge}- family number is read by
@@ -341,6 +349,12 @@ export async function applyPostOffloadChargeMutation(
     const { chargeId, chargeData, accountingCtx, expectedVersion } = params;
     if (!chargeId) throw new Error("chargeId is required for EDIT");
     if (!chargeData) throw new Error("chargeData is required for EDIT");
+    assertChargePostingDestination(
+      companyId,
+      chargeData,
+      accountingCtx,
+      "Charge editing requires a valid same-company ledger destination; no unposted charge changes are permitted."
+    );
 
     // Lock the charge row FOR UPDATE
     const [rawCharge] = await tx
@@ -363,6 +377,7 @@ export async function applyPostOffloadChargeMutation(
 
     // Resolve legacy accounting links if needed
     const chargeRow = await resolveLegacyPostOffloadAccountingLinks(tx, companyId, containerId, rawCharge);
+    assertResolvedHistoricalLinks(chargeRow);
 
     // Compute OLD canonical cost (all active charges, including old version of this one)
     const activeCharges = await loadActiveCharges(tx, companyId, containerId);
@@ -507,7 +522,7 @@ export async function applyPostOffloadChargeMutation(
     }
 
     // ── Update voucher in-place ─────────────────────────────────────────────
-    let newVoucherId = chargeRow.voucherId;
+    let newVoucherId: number | null = chargeRow.voucherId;
     const needsAccounting = !!(chargeData.ledgerAccountId || chargeData.supplierId);
     if (chargeRow.voucherId) {
       if (!needsAccounting) {
@@ -713,6 +728,7 @@ export async function applyPostOffloadChargeMutation(
 
     // Resolve legacy accounting links if needed
     const chargeRow = await resolveLegacyPostOffloadAccountingLinks(tx, companyId, containerId, rawCharge);
+    assertResolvedHistoricalLinks(chargeRow);
 
     // Compute OLD canonical cost (with this charge included)
     const activeCharges = await loadActiveCharges(tx, companyId, containerId);

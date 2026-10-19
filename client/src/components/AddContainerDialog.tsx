@@ -16,6 +16,9 @@ import { Plus, Trash2, ClipboardPaste, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { insertContainerSchema } from "@shared/schema";
+import type { SpExcelImportContainer } from "@shared/spContainerExcelImport";
+import { SpContainerExcelImport } from "./SpContainerExcelImport";
+import { spContainerInvoiceChargesTotal } from "@shared/spContainerInvoiceCharges";
 
 // ── ERP schema (unchanged) ───────────────────────────────────────────────────
 const erpFormSchema = insertContainerSchema
@@ -38,6 +41,8 @@ const spLineSchema = z.object({
   description: z.string().optional(),
   qty: z.string().min(1, "Required"),
   unitRateUsd: z.string().min(1, "Required"),
+  /** Stock item resolved from the Excel barcode or alias; manual lines leave it empty. */
+  stockItemId: z.number().nullable().optional(),
 });
 
 const spFormSchema = z.object({
@@ -49,6 +54,9 @@ const spFormSchema = z.object({
   invoiceTotalUsd: z.string().min(1, "Required"),
   discountPct: z.string().optional(),
   freightEstimateUsd: z.string().optional(),
+  surchargeUsd: z.string().optional(),
+  fumigationUsd: z.string().optional(),
+  documentChargesUsd: z.string().optional(),
   notes: z.string().optional(),
   lines: z.array(spLineSchema).min(1, "Add at least one line item"),
 });
@@ -302,8 +310,11 @@ function SpContainerForm({ onOpenChange }: { onOpenChange: (open: boolean) => vo
       invoiceTotalUsd: "",
       discountPct: "0",
       freightEstimateUsd: "0",
+      surchargeUsd: "0",
+      fumigationUsd: "0",
+      documentChargesUsd: "0",
       notes: "",
-      lines: [{ articleCode: "", description: "", qty: "", unitRateUsd: "" }],
+      lines: [{ articleCode: "", description: "", qty: "", unitRateUsd: "", stockItemId: null }],
     },
   });
 
@@ -312,6 +323,13 @@ function SpContainerForm({ onOpenChange }: { onOpenChange: (open: boolean) => vo
   const watchDiscount = form.watch("discountPct");
   const watchTotal = form.watch("invoiceTotalUsd");
 
+  const watchCharges = form.watch(["freightEstimateUsd", "surchargeUsd", "fumigationUsd", "documentChargesUsd"]);
+  const invoiceChargesTotal = spContainerInvoiceChargesTotal({
+    freightEstimateUsd: watchCharges[0],
+    surchargeUsd: watchCharges[1],
+    fumigationUsd: watchCharges[2],
+    documentChargesUsd: watchCharges[3],
+  });
   const discountFactor = 1 - parseFloat(watchDiscount || "0") / 100;
   const totalBaseCost = watchLines.reduce(
     (s, l) => s + parseFloat(l.qty || "0") * parseFloat(l.unitRateUsd || "0") * discountFactor,
@@ -361,6 +379,7 @@ function SpContainerForm({ onOpenChange }: { onOpenChange: (open: boolean) => vo
         description: r.length >= 4 ? r[1] : "",
         qty: r.length >= 4 ? r[2] : r[1],
         unitRateUsd: r.length >= 4 ? r[3] : r[2],
+        stockItemId: null,
       }));
     if (parsed.length > 0) {
       form.setValue("lines", parsed);
@@ -370,9 +389,45 @@ function SpContainerForm({ onOpenChange }: { onOpenChange: (open: boolean) => vo
     }
   }, [pasteText, form, toast]);
 
+  // Fill the form from the ERP "PO Import" Excel, recalculated server-side for the
+  // Supplier Partner model. Every field stays editable; Create Container posts the
+  // Goods OTW voucher exactly as a manual entry would.
+  const applyExcelImport = useCallback(
+    (imported: SpExcelImportContainer) => {
+      if (imported.supplierId !== null) {
+        form.setValue("supplierId", imported.supplierId, { shouldDirty: true });
+        form.setValue("supplierName", imported.supplierName, { shouldDirty: true });
+      }
+      if (imported.containerNumber) form.setValue("containerNumber", imported.containerNumber, { shouldDirty: true });
+      form.setValue("invoiceNumber", imported.suggestedInvoiceNumber, { shouldDirty: true });
+      form.setValue("invoiceTotalUsd", imported.invoiceTotalUsd.toFixed(2), { shouldDirty: true });
+      form.setValue("discountPct", String(imported.discountPct), { shouldDirty: true });
+      form.setValue("freightEstimateUsd", imported.freightEstimateUsd.toFixed(2), { shouldDirty: true });
+      form.setValue("surchargeUsd", imported.surchargeUsd.toFixed(2), { shouldDirty: true });
+      form.setValue("fumigationUsd", imported.fumigationUsd.toFixed(2), { shouldDirty: true });
+      form.setValue("documentChargesUsd", imported.documentChargesUsd.toFixed(2), { shouldDirty: true });
+      form.setValue("notes", imported.notes, { shouldDirty: true });
+      form.setValue(
+        "lines",
+        imported.lines.map((line) => ({
+          articleCode: line.articleCode,
+          description: line.description,
+          qty: String(line.qty),
+          unitRateUsd: String(line.unitRateUsd),
+          stockItemId: line.stockItemId,
+        })),
+        { shouldDirty: true }
+      );
+      setShowPaste(false);
+    },
+    [form]
+  );
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit((d) => createMutation.mutate(d))} className="space-y-5" noValidate>
+        <SpContainerExcelImport onApply={applyExcelImport} />
+
         {/* Supplier & Header */}
         <div className="space-y-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Supplier &amp; Invoice</p>
@@ -498,25 +553,30 @@ function SpContainerForm({ onOpenChange }: { onOpenChange: (open: boolean) => vo
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="freightEstimateUsd"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Freight Estimate (USD)</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      placeholder="0.00"
-                      {...field}
-                      data-testid="input-sp-freight-estimate"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {/* Supplier-invoice charges: part of the invoice total, added to landed cost at offload. */}
+            {(
+              [
+                { name: "freightEstimateUsd", label: "Freight (USD)", testId: "input-sp-freight-estimate" },
+                { name: "surchargeUsd", label: "Surcharge (USD)", testId: "input-sp-surcharge" },
+                { name: "fumigationUsd", label: "Fumigation (USD)", testId: "input-sp-fumigation" },
+                { name: "documentChargesUsd", label: "Document Charges (USD)", testId: "input-sp-document-charges" },
+              ] as const
+            ).map((charge) => (
+              <FormField
+                key={charge.name}
+                control={form.control}
+                name={charge.name}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{charge.label}</FormLabel>
+                    <FormControl>
+                      <Input type="number" step="0.01" placeholder="0.00" {...field} data-testid={charge.testId} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            ))}
             <FormField
               control={form.control}
               name="notes"
@@ -583,7 +643,9 @@ function SpContainerForm({ onOpenChange }: { onOpenChange: (open: boolean) => vo
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => append({ articleCode: "", description: "", qty: "", unitRateUsd: "" })}
+                onClick={() =>
+                  append({ articleCode: "", description: "", qty: "", unitRateUsd: "", stockItemId: null })
+                }
                 data-testid="button-sp-add-line"
               >
                 <Plus className="h-3.5 w-3.5 mr-1" />
@@ -707,6 +769,12 @@ function SpContainerForm({ onOpenChange }: { onOpenChange: (open: boolean) => vo
             <span>
               Discounted total: <span className="font-semibold">{fmt2(totalBaseCost)}</span>
             </span>
+            <span data-testid="text-sp-invoice-charges-total">
+              Invoice charges: <span className="font-semibold">{fmt2(invoiceChargesTotal)}</span>
+            </span>
+            <span data-testid="text-sp-expected-invoice-total">
+              Base + charges: <span className="font-semibold">{fmt2(totalBaseCost + invoiceChargesTotal)}</span>
+            </span>
           </div>
         </div>
 
@@ -732,7 +800,7 @@ export function AddContainerDialog({ open, onOpenChange, isSP = false }: AddCont
           <DialogTitle>{isSP ? "Import Container" : "Add Container"}</DialogTitle>
           <DialogDescription>
             {isSP
-              ? "Record a supplier invoice. Posts: Dr Goods OTW / Cr Goods OTW Clearing."
+              ? "Upload the PO Import Excel or record the supplier invoice by hand. Posts: Dr Goods OTW / Cr Goods OTW Clearing."
               : "Manually add a container to the system"}
           </DialogDescription>
         </DialogHeader>

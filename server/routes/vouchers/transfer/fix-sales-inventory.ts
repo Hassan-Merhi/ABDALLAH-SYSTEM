@@ -15,7 +15,6 @@ import {
 } from "../../../services/accounting/perpetualInventory/cutoverRefusal";
 import { inventory, stockItems, vouchers, salesItems, locations } from "@shared/schema";
 import { eq, and, sql } from "drizzle-orm";
-import { toMoney } from "../../../lib/money";
 
 export function registerSalesInventoryFixRoutes(app: Express) {
   // Fix inventory for Sales vouchers that were edited with location changes
@@ -34,39 +33,11 @@ export function registerSalesInventoryFixRoutes(app: Express) {
       // Wave 11: rewrites stock with no journal; refused after the cut-over.
       await assertNoInventoryCutoverTx(db, companyId, "fix-sales-inventory");
 
-      // Get all Sales vouchers for this company
+      // Count of Sales vouchers for this company (reported in the response)
       const salesVouchers = await db
-        .select()
+        .select({ id: vouchers.id })
         .from(vouchers)
         .where(and(eq(vouchers.companyId, companyId), eq(vouchers.voucherType, "Sales")));
-
-      const fixes = [];
-
-      for (const voucher of salesVouchers) {
-        if (!voucher.locationId) continue;
-
-        // Get sales items for this voucher
-        const items = await db.select().from(salesItems).where(eq(salesItems.voucherId, voucher.id));
-
-        for (const item of items) {
-          const quantity = toMoney(item.quantity).toNumber();
-
-          // Check if inventory at this location has this deduction
-          const [inv] = await db
-            .select()
-            .from(inventory)
-            .where(and(eq(inventory.locationId, voucher.locationId), eq(inventory.stockItemId, item.stockItemId)));
-
-          fixes.push({
-            voucherId: voucher.id,
-            voucherNumber: voucher.voucherNumber,
-            locationId: voucher.locationId,
-            stockItemId: item.stockItemId,
-            saleQuantity: quantity,
-            currentInventory: inv ? toMoney(inv.quantity).toNumber() : null,
-          });
-        }
-      }
 
       // Find inventory records with negative quantities that shouldn't have them
       const negativeInventory = await db

@@ -9,7 +9,11 @@ import {
   timestamp,
   uniqueIndex,
   index,
+  bigserial,
+  boolean,
+  check,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -25,7 +29,13 @@ export const spContainers = pgTable(
     invoiceDate: date("invoice_date").notNull(),
     invoiceTotalUsd: decimal("invoice_total_usd", { precision: 20, scale: 4 }).notNull().default("0"),
     discountPct: decimal("discount_pct", { precision: 8, scale: 4 }).default("0"),
+    // Supplier-invoice charges stated on the container (from the PO Import Excel or
+    // typed in). They are part of the invoice total and become landed cost at
+    // offload automatically, credited to SP Cost Clearing like the base goods cost.
     freightEstimateUsd: decimal("freight_estimate_usd", { precision: 20, scale: 4 }).default("0"),
+    surchargeUsd: decimal("surcharge_usd", { precision: 20, scale: 4 }).default("0"),
+    fumigationUsd: decimal("fumigation_usd", { precision: 20, scale: 4 }).default("0"),
+    documentChargesUsd: decimal("document_charges_usd", { precision: 20, scale: 4 }).default("0"),
     status: varchar("status", { length: 20 }).notNull().default("open"),
     goodsOtwVoucherId: integer("goods_otw_voucher_id"),
     notes: text("notes"),
@@ -236,3 +246,63 @@ export const spProfitSplits = pgTable(
 export const insertSpProfitSplitSchema = createInsertSchema(spProfitSplits).omit({ id: true, createdAt: true });
 export type InsertSpProfitSplit = z.infer<typeof insertSpProfitSplitSchema>;
 export type SpProfitSplit = typeof spProfitSplits.$inferSelect;
+
+/**
+ * Supplier Partner logistics tracking for a container (GIT import/edit only;
+ * no accounting). Mirrors the idempotent runtime DDL in
+ * server/lib/spGitTracking.ts, which still creates it on existing databases.
+ */
+export const spContainerGitTracking = pgTable(
+  "sp_container_git_tracking",
+  {
+    containerId: integer("container_id")
+      .primaryKey()
+      .references(() => spContainers.id, { onDelete: "cascade" }),
+    companyId: integer("company_id").notNull(),
+    status: varchar("status", { length: 24 }),
+    shopName: text("shop_name"),
+    eta: date("eta"),
+    transporter: text("transporter"),
+    transportFee: decimal("transport_fee", { precision: 20, scale: 4 }),
+    numberPlate: text("number_plate"),
+    trackingLocation: text("tracking_location"),
+    borderDate: date("border_date"),
+    agent: text("agent"),
+    dutyFee: decimal("duty_fee", { precision: 20, scale: 4 }),
+    docReceived: boolean("doc_received"),
+    trackingDescription: text("tracking_description"),
+    blDocs: text("bl_docs"),
+    docsSentDate: date("docs_sent_date"),
+    trackingLink: text("tracking_link"),
+    freightStatus: text("freight_status"),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    companyIdx: index("sp_container_git_tracking_company_idx").on(t.companyId),
+  })
+);
+
+/**
+ * Append-only developer corrections to a Golden Coast month's realized net
+ * profit. Mirrors the idempotent runtime DDL in
+ * server/routes/sp/spProfitManualCorrections.ts.
+ */
+export const spProfitManualCorrections = pgTable(
+  "sp_profit_manual_corrections",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    companyId: integer("company_id").notNull(),
+    periodMonth: varchar("period_month", { length: 7 }).notNull(),
+    targetNetProfit: decimal("target_net_profit", { precision: 20, scale: 2 }).notNull(),
+    originalNetProfit: decimal("original_net_profit", { precision: 20, scale: 2 }).notNull(),
+    reason: text("reason").notNull(),
+    actorId: text("actor_id").notNull(),
+    actorName: text("actor_name"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    periodIdx: index("sp_profit_manual_corrections_period_idx").on(t.companyId, t.periodMonth, t.id.desc()),
+    periodCheck: check("sp_manual_profit_period", sql`${t.periodMonth} ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'`),
+    reasonCheck: check("sp_manual_profit_reason", sql`char_length(${t.reason}) BETWEEN 5 AND 500`),
+  })
+);

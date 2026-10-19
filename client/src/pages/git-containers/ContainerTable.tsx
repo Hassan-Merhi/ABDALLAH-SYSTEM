@@ -11,6 +11,7 @@ import {
   InlineBoolCell,
 } from "./InlineCells";
 import { cn } from "@/lib/utils";
+import { gitContainerDetailPath } from "./gitTrackingPatchUrl";
 import { useBoundedTableRows } from "@/hooks/useBoundedTableRows";
 import { useErpPhoneLayout } from "@/hooks/use-erp-phone-layout";
 
@@ -44,14 +45,17 @@ export function ContainerTable({ containers, colVis, sessionCompanyId, onOpenDra
       <div
         ref={virtualRows.scrollRef}
         data-horizontal-scroll="true"
-        className="flex-1 overflow-auto custom-scrollbar relative"
+        className="min-w-0 w-full flex-1 overflow-auto custom-scrollbar relative"
       >
-        <div ref={printRef as React.RefObject<HTMLDivElement>}>
+        <div
+          ref={printRef as React.RefObject<HTMLDivElement>}
+          className={isPhone ? "min-w-0 w-full" : "w-max min-w-full"}
+        >
           {/* The container number stays in view while the wide table scrolls sideways (the page
               column scrolls it); the narrow row-number column slides under it. The card layout
               on phones is left alone. */}
           <Table
-            className="text-xs [&:not([data-mobile-cards])_tr>*:nth-child(2)]:sticky [&:not([data-mobile-cards])_tr>*:nth-child(2)]:left-0 [&:not([data-mobile-cards])_tr>*:nth-child(2)]:z-20 [&:not([data-mobile-cards])_tr>*:nth-child(2)]:shadow-[1px_0_0_hsl(var(--border))] [&:not([data-mobile-cards])_thead_tr>*:nth-child(2)]:bg-teal-800 dark:[&:not([data-mobile-cards])_thead_tr>*:nth-child(2)]:bg-teal-950 [&:not([data-mobile-cards])_tbody_tr>*:nth-child(2)]:bg-background"
+            className="w-max min-w-full text-xs [&:not([data-mobile-cards])_tr>*:nth-child(2)]:sticky [&:not([data-mobile-cards])_tr>*:nth-child(2)]:left-0 [&:not([data-mobile-cards])_tr>*:nth-child(2)]:z-20 [&:not([data-mobile-cards])_tr>*:nth-child(2)]:shadow-[1px_0_0_hsl(var(--border))] [&:not([data-mobile-cards])_thead_tr>*:nth-child(2)]:bg-teal-800 dark:[&:not([data-mobile-cards])_thead_tr>*:nth-child(2)]:bg-teal-950 [&:not([data-mobile-cards])_tbody_tr>*:nth-child(2)]:bg-background"
             wrapperClassName="overflow-visible border-0 rounded-none"
             mobileLayout="cards"
           >
@@ -144,7 +148,7 @@ export function ContainerTable({ containers, colVis, sessionCompanyId, onOpenDra
                         </TableCell>
                         <TableCell className="font-mono font-bold text-[11px] h-10">
                           <Link
-                            href={`/containers/${c.id}`}
+                            href={gitContainerDetailPath(c.id)}
                             className="text-foreground hover:text-primary hover:underline underline-offset-2 transition-colors"
                             onClick={(event) => event.stopPropagation()}
                             data-testid={`link-container-${c.id}`}

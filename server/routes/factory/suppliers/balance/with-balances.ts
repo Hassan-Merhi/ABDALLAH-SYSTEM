@@ -25,6 +25,7 @@ import {
 import { eq, and, sql, inArray, isNull } from "drizzle-orm";
 import { buildBrokerStatement, isPayableContainer, isSupplierPaidFreight, resolveDisplayFx } from "./_helpers";
 import { supplierUsdEquivalent } from "./supplierUsdEquivalent";
+import { loadSupplierSettlementBalances, type SupplierSettlementBalance } from "./settlementPools";
 import {
   emptyFactorySupplierLedgerView,
   FACTORY_SUPPLIER_OPERATIONAL_MEMO_LABEL,
@@ -114,7 +115,13 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
               // Financial supplier FX journals are already represented by the source
               // FX-transfer rows. Counting their supplier debit as a second payment
               // subtracts the same transfer twice from operational balances.
-              sql`${vouchers.voucherNumber} NOT LIKE 'FACTORY-SFX-%'`
+              sql`${vouchers.voucherNumber} NOT LIKE 'FACTORY-SFX-%'`,
+              // Audited supplier reclassification and its compensating reversal
+              // are balanced GL transfers, NOT payments. Counting only their
+              // debit legs creates fake payments and corrupts broker pools.
+              sql`${vouchers.voucherNumber} NOT LIKE 'FACTORY-PAYABLE-RECLASS-%'`,
+              // Posted freight/FX repair journals are non-payment ledger corrections.
+              sql`${vouchers.voucherNumber} NOT LIKE 'FACTORY-CORRECTION-%'`
             )
           );
         for (const row of voucherPaymentRows) {
@@ -178,11 +185,22 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
               )
           : [];
 
+      // The inside Settlement Statement's currency pools (honouring the OTW
+      // toggle), loaded in bulk. Each non-broker card shows exactly their
+      // current-rate USD equivalent: USD + Σ(native × Factory Settings rate).
+      const settlementBalancesPromise =
+        allSupplierIds.length > 0
+          ? loadSupplierSettlementBalances(companyId, { includeOtw, configuredFxRates })
+          : Promise.resolve(new Map<number, SupplierSettlementBalance>());
+
       // Primary balances (wave 13, owner decision 3): the ledger from the balance
       // engine, the native balance per currency of the same lines, and the
       // container amounts not yet in the ledger. The operational figures
       // computed below are returned only as a labelled memo.
-      const ledgerViews = await loadFactorySupplierLedgerViews(db, companyId, { ids: allSupplierIds });
+      const [settlementBalances, ledgerViews] = await Promise.all([
+        settlementBalancesPromise,
+        loadFactorySupplierLedgerViews(db, companyId, { ids: allSupplierIds }),
+      ]);
       const ledgerFields = (supplierId: number) => {
         const view = ledgerViews.get(supplierId) ?? emptyFactorySupplierLedgerView(supplierId);
         return {
@@ -518,12 +536,13 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
         suppliersList.filter((s) => s.isBroker || suppliersList.some((c) => c.parentId === s.id)).map((s) => s.id)
       );
       const brokerStmtMap: Record<number, NonNullable<Awaited<ReturnType<typeof buildBrokerStatement>>>> = {};
-      for (const s of suppliersList) {
-        if (brokerParentIds.has(s.id)) {
-          const stmt = await buildBrokerStatement(s.id, companyId, includeOtw);
-          if (stmt) brokerStmtMap[s.id] = stmt;
-        }
-      }
+      // Independent per-broker reads: run them together, not one after another.
+      await Promise.all(
+        [...brokerParentIds].map(async (brokerId) => {
+          const stmt = await buildBrokerStatement(brokerId, companyId, includeOtw);
+          if (stmt) brokerStmtMap[brokerId] = stmt;
+        })
+      );
 
       // Second pass: for parent suppliers, roll up children's stats
       const suppliersWithBalances = suppliersList.map((s) => {
@@ -531,8 +550,15 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
         const children = suppliersList.filter((c) => c.parentId === s.id);
 
         if (!brokerParentIds.has(s.id)) {
-          // Ordinary supplier — use the same ledger view as its own settlement statement.
-          // Even standalone brokers with no linked children take the broker path below.
+          const settlement = settlementBalances.get(s.id);
+          const settlementDisplay = settlement
+            ? {
+                displayBalanceBasis: "settlement-statement" as const,
+                usdEquivalentBalance: settlement.usdEquivalentBalance,
+                usdEquivalentMissingRates: settlement.usdEquivalentMissingRates,
+                settlementBalances: settlement.settlementBalances,
+              }
+            : {};
           return {
             ...s,
             totalContainers: own.totalContainers,
@@ -548,6 +574,7 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
             dueContainersCount: own.dueContainers.length,
             autoSettledFreightUsd: own.autoSettledFreightUsd.toFixed(2),
             ...ledgerFields(s.id),
+            ...settlementDisplay,
             operationalMemo: {
               label: FACTORY_SUPPLIER_OPERATIONAL_MEMO_LABEL,
               totalValue: own.balance.toFixed(2),

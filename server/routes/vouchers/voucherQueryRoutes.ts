@@ -20,6 +20,8 @@ import {
   sendCompanyAccessError,
 } from "../../security/companyAccessBoundary";
 import { toMoney } from "../../lib/money";
+import { withStockTransferNarrations } from "../../services/inventory/stockTransferNarration";
+import { keepRoutineVoucher } from "../../services/accounting/operationalCorrectionVisibility";
 
 /**
  * After saving a journal voucher, if it has a customer entry + a ledger account entry,
@@ -52,6 +54,10 @@ export function registerVoucherQueryRoutes(app: Express) {
         const fmt = (d: Date) => d.toISOString().slice(0, 10);
         vouchers = await storage.getVouchersByDateRange(access.activeCompanyId, fmt(start), fmt(end));
       }
+
+      vouchers = (await withStockTransferNarrations(access.activeCompanyId, vouchers)).filter((voucher) =>
+        keepRoutineVoucher(voucher, req.session.currentRole)
+      );
 
       // Strip totalAmount from Stock Transfer vouchers for POS users
       let sanitizedVouchers = isPOS

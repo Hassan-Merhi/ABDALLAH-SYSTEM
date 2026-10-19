@@ -35,6 +35,10 @@ afterAll(async () => {
   if (!ctx) return;
   await pool.query("DELETE FROM factory_fx_allocations WHERE company_id = $1", [ctx.companyId]);
   await pool.query("DELETE FROM factory_supplier_fx_transfers WHERE company_id = $1", [ctx.companyId]);
+  await pool.query("DELETE FROM voucher_entries WHERE voucher_id IN (SELECT id FROM vouchers WHERE company_id = $1)", [
+    ctx.companyId,
+  ]);
+  await pool.query("DELETE FROM vouchers WHERE company_id = $1", [ctx.companyId]);
   await pool.query("DELETE FROM factory_suppliers WHERE company_id = $1", [ctx.companyId]);
   await cleanupTestData(PREFIX);
   closeTestServer();

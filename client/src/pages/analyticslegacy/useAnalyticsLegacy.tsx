@@ -25,12 +25,11 @@ import { getApiRequest } from "@/lib/factoryApi";
 import type {
   Account,
   ContainerData,
-  FactoryContainerSalesData,
   FactoryCustomerOrderAnalytics,
   FactoryPosSummary,
-  FactorySalesByCustomer,
   Location,
   LocationSales,
+  NetProfitAccount,
   NetProfitStatementData,
   OpeningStockItemsData,
   OpeningStockSummaryData,
@@ -56,6 +55,43 @@ function isInventoryOnlyExpenseAccount(account: { code?: string | null; name?: s
 
   const name = (account.name || "").trim().toLowerCase();
   return name === "credit note - customer return" || name === "stock adjustment (production/consumption)";
+}
+
+type ExpensePeriodBreakdown = { accounts: NetProfitAccount[]; total: number };
+type ExpensePeriodResponse = { direct: ExpensePeriodBreakdown; indirect: ExpensePeriodBreakdown };
+
+/** Keep the account hierarchy for period movements without using lifetime balances. */
+function withExpenseParents(section: ExpensePeriodBreakdown, allAccounts: Account[]): ExpensePeriodBreakdown {
+  const ledgerAccounts = new Map(allAccounts.filter((a) => a.type === "ledger").map((a) => [a.accountId, a]));
+  const rows = section.accounts
+    .filter((a) => !isInventoryOnlyExpenseAccount(a))
+    .map((a) => ({
+      ...a,
+      code: a.code ?? "",
+      parentId: ledgerAccounts.get(a.id)?.parentId ?? undefined,
+    }));
+  const seen = new Set(rows.map((a) => a.id));
+  for (const row of [...rows]) {
+    if (!row.parentId || seen.has(row.parentId)) continue;
+    const parent = ledgerAccounts.get(row.parentId);
+    if (!parent) continue;
+    rows.push({
+      id: parent.accountId,
+      code: parent.code ?? "",
+      name: parent.name,
+      debit: 0,
+      credit: 0,
+      balance: 0,
+      parentId: parent.parentId ?? undefined,
+    });
+    seen.add(parent.accountId);
+  }
+  // The report total is the actual net postings, not the sum of absolute child balances.
+  // If inventory-only rows slipped through, exclude their net amounts from the total.
+  const excluded = section.accounts
+    .filter((a) => isInventoryOnlyExpenseAccount(a))
+    .reduce((sum, a) => sum + Number(a.balance || 0), 0);
+  return { accounts: rows, total: Number(section.total) - excluded };
 }
 
 function sanitizeNetProfitInventoryExpenses(data: NetProfitStatementData): NetProfitStatementData {
@@ -149,11 +185,7 @@ export function useAnalyticsLegacy() {
   const balStartDate = periodFilter.fromDate;
   const balEndDate = periodFilter.toDate;
 
-  // Factory-specific filters
-  const [factoryContainerCustomerId, setFactoryContainerCustomerId] = useState("all");
-  const [factoryContainerStartDate, setFactoryContainerStartDate] = useState("");
-  const [factoryContainerEndDate, setFactoryContainerEndDate] = useState("");
-  const [factoryContainerPaymentStatus, setFactoryContainerPaymentStatus] = useState("all");
+  // Factory sales analytics drilldowns
   const [expandedCustomerRows, setExpandedCustomerRows] = useState<Set<number>>(new Set());
 
   const [activeSection, setActiveSection] = useState("assets");
@@ -399,21 +431,6 @@ export function useAnalyticsLegacy() {
     return qs ? `${base}?${qs}` : base;
   };
 
-  // This list is only needed to populate the separate Container Report customer
-  // selector. Keep it unfiltered by the sales page's global period.
-  const { data: factorySalesByCustomer = [] } = useQuery<FactorySalesByCustomer[]>({
-    queryKey: ["/api/factory/analytics/sales-by-customer", selectedCompany?.id],
-    queryFn: async () => {
-      const res = await fetch("/api/factory/analytics/sales-by-customer", {
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Failed to fetch factory sales");
-      return res.json();
-    },
-    enabled: !!selectedCompany && appMode === "factory" && activeSection === "containers",
-    staleTime: 5 * 60 * 1000,
-  });
-
   const buildFactoryOrderAnalyticsUrl = () => {
     const params = new URLSearchParams();
     if (periodFilter.fromDate) params.append("startDate", periodFilter.fromDate);
@@ -460,27 +477,6 @@ export function useAnalyticsLegacy() {
     enabled: !!selectedCompany && appMode === "factory" && activeSection === "sales",
   });
 
-  const buildFactoryContainerSalesUrl = () => {
-    const params = new URLSearchParams();
-    if (factoryContainerStartDate) params.append("startDate", factoryContainerStartDate);
-    if (factoryContainerEndDate) params.append("endDate", factoryContainerEndDate);
-    if (factoryContainerCustomerId && factoryContainerCustomerId !== "all")
-      params.append("customerId", factoryContainerCustomerId);
-    if (factoryContainerPaymentStatus && factoryContainerPaymentStatus !== "all")
-      params.append("paymentStatus", factoryContainerPaymentStatus);
-    return `/api/factory/analytics/container-sales-report?${params}`;
-  };
-
-  const { data: factoryContainerSales, isLoading: loadingFactoryContainerSales } = useQuery<FactoryContainerSalesData>({
-    queryKey: [buildFactoryContainerSalesUrl(), selectedCompany?.id],
-    queryFn: async ({ queryKey }) => {
-      const res = await fetch(queryKey[0] as string, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch factory container sales");
-      return res.json();
-    },
-    enabled: appMode === "factory",
-  });
-
   // Fetch Opening Stock Summary
   const buildOpeningStockUrl = () => {
     const params = new URLSearchParams();
@@ -499,6 +495,46 @@ export function useAnalyticsLegacy() {
     },
     enabled: !!selectedCompany,
   });
+
+  // Expense cards are period activity, not as-of closing ledger balances.
+  // Their dedicated drill-downs also stay pinned to the Factory company.
+  const showingExpensePeriod = ["expenses", "direct-expenses", "indirect-expenses"].includes(activeSection);
+  const {
+    data: rawPeriodExpenses,
+    isLoading: loadingPeriodExpenses,
+    isError: periodExpensesError,
+  } = useQuery<ExpensePeriodResponse>({
+    queryKey: ["analytics-period-expenses", appMode, selectedCompany?.id, plStartDate, plEndDate],
+    queryFn: async () => {
+      const base =
+        appMode === "factory" ? "/api/factory/analytics" : "/api/reports/net-profit-statement";
+      const params = new URLSearchParams();
+      if (plStartDate) params.set("startDate", plStartDate);
+      if (plEndDate) params.set("endDate", plEndDate);
+      const suffix = params.toString() ? `?${params}` : "";
+      const [directResponse, indirectResponse] = await Promise.all([
+        fetch(`${base}/direct-expenses${suffix}`, { credentials: "include" }),
+        fetch(`${base}/indirect-expenses${suffix}`, { credentials: "include" }),
+      ]);
+      if (!directResponse.ok || !indirectResponse.ok) {
+        throw new Error("Could not load expenses for the selected period");
+      }
+      return {
+        direct: (await directResponse.json()) as ExpensePeriodBreakdown,
+        indirect: (await indirectResponse.json()) as ExpensePeriodBreakdown,
+      };
+    },
+    enabled: !!selectedCompany && showingExpensePeriod,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+    retry: 1,
+  });
+  const periodExpenses = rawPeriodExpenses
+    ? {
+        direct: withExpenseParents(rawPeriodExpenses.direct, accounts),
+        indirect: withExpenseParents(rawPeriodExpenses.indirect, accounts),
+      }
+    : undefined;
 
   // Fetch Net Profit Statement
   const { data: netProfitData, isLoading: loadingNetProfit } = useQuery<NetProfitStatementData>({
@@ -720,14 +756,6 @@ export function useAnalyticsLegacy() {
     plEndDate,
     balStartDate,
     balEndDate,
-    factoryContainerCustomerId,
-    setFactoryContainerCustomerId,
-    factoryContainerStartDate,
-    setFactoryContainerStartDate,
-    factoryContainerEndDate,
-    setFactoryContainerEndDate,
-    factoryContainerPaymentStatus,
-    setFactoryContainerPaymentStatus,
     expandedCustomerRows,
     setExpandedCustomerRows,
     activeSection,
@@ -754,12 +782,14 @@ export function useAnalyticsLegacy() {
     loadingFactoryCustomerOrders,
     factoryPosSummary,
     loadingFactoryPos,
-    buildFactoryContainerSalesUrl,
     buildOpeningStockUrl,
     openingStockData,
     loadingOpeningStock,
     netProfitData,
     loadingNetProfit,
+    periodExpenses,
+    loadingPeriodExpenses,
+    periodExpensesError,
     toggleNetProfitSection,
     toggleStockGroup,
     toggleAccount,
@@ -785,10 +815,7 @@ export function useAnalyticsLegacy() {
     renderHierarchicalAccounts,
     renderPLAccountTable,
     containerData,
-    factoryContainerSales,
-    factorySalesByCustomer,
     loadingContainers,
-    loadingFactoryContainerSales,
     navigate,
     salesData,
     transactions,

@@ -122,6 +122,60 @@ export function runPostStartupJobs(): void {
     unrefTimer(fxDaybookTimer);
   }
 
+  // Company 12 historical post-offload charge voucher/daybook LINKS ONLY.
+  // No voucher posting or inventory cost rewrite. Disabled normally.
+  const chargeLinkRepairMode = process.env.ERP_REPAIR_POST_OFFLOAD_LINKS_20261014;
+  if (chargeLinkRepairMode === "company-12-preview" || chargeLinkRepairMode === "company-12-apply") {
+    const linkRepairTimer = setTimeout(async () => {
+      try {
+        const repair = await import("../../scripts/repair-post-offload-charge-links-20261014");
+        await repair.reconcileContainerChargeLinks20261014(chargeLinkRepairMode === "company-12-apply");
+        logger.info("[ContainerChargeLinks] Historical accounting-link repair completed");
+      } catch (error: unknown) {
+        logger.error("[ContainerChargeLinks] Historical accounting-link repair refused", {
+          error: getErrorMessage(error),
+        });
+      }
+    }, 12000);
+    unrefTimer(linkRepairTimer);
+  }
+
+  // Audited company 12 historical freight corrections, dated 14 Oct 2026.
+  // Explicit preview/apply switch. Keeps original vouchers intact.
+  const freightReviewMode = process.env.ERP_RECONCILE_FREIGHT_HISTORY_20261014;
+  if (freightReviewMode === "company-12-preview" || freightReviewMode === "company-12-apply") {
+    const freightReviewTimer = setTimeout(async () => {
+      try {
+        const review = await import("../../scripts/reconcile-factory-freight-20261014");
+        await review.reconcileFactoryFreight20261014(freightReviewMode === "company-12-apply");
+        logger.info("[FactoryFreightCorrection] Historical freight review completed");
+      } catch (error: unknown) {
+        logger.error("[FactoryFreightCorrection] Historical freight review stopped", {
+          error: getErrorMessage(error),
+        });
+      }
+    }, 12000);
+    unrefTimer(freightReviewTimer);
+  }
+
+  // Company 12: recover 36 verified historical freight suppliers from
+  // existing balanced vouchers; no money or inventory mutation.
+  const payeeLinkMode = process.env.ERP_REPAIR_FREIGHT_PAYEES_20261014;
+  if (payeeLinkMode === "company-12-preview" || payeeLinkMode === "company-12-apply") {
+    const payeeLinkTimer = setTimeout(async () => {
+      try {
+        const repair = await import("../../scripts/reconcile-legacy-freight-payee-links-20261014");
+        await repair.reconcileLegacyFreightPayeeLinks20261014(payeeLinkMode === "company-12-apply");
+        logger.info("[LegacyFreightPayees] Audited freight supplier metadata repair completed");
+      } catch (error: unknown) {
+        logger.error("[LegacyFreightPayees] Audited freight supplier metadata repair refused", {
+          error: getErrorMessage(error),
+        });
+      }
+    }, 12000);
+    unrefTimer(payeeLinkTimer);
+  }
+
   // Live vessel/AIS tracking is intentionally disabled. Container movement is
   // maintained manually or through Excel imports.
 
