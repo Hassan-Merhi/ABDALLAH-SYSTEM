@@ -367,7 +367,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     ? fxWallets?.wallets?.find((w) => w.wallet.ledgerAccountId === paymentAccountId)
     : undefined;
 
-  // Identify the supplier's native payable, not the USD-base total in the picker.
+  // A broker's EUR payable is its Parties settlement pool, NOT its GL EUR lines.
+  // Other suppliers still use their posted native EUR ledger payable.
   const fxSelectedBeneficiary = entries[0];
   const fxSupplierId = selectedFxWallet && fxSelectedBeneficiary?.accountType === "factorySupplier"
     ? fxSelectedBeneficiary.accountId : 0;
@@ -376,27 +377,40 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     isPending: fxSupplierBalancePending,
     isError: fxSupplierBalanceError,
   } = useQuery<{
-    nativeBalances: Array<{ currencyCode: string; balance: string; legacyUnconvertedLines: number }>;
+    fxEurPayable?: { balance: string; basis: "broker-statement" | "native-ledger"; includeOtw: boolean; eligible: boolean };
   }>({
     queryKey: ["/api/factory/suppliers", selectedCompany?.id, fxSupplierId, "balance", "fx-payment"],
     queryFn: async () => {
-      const response = await fetch(`/api/factory/suppliers/${fxSupplierId}/balance`, { credentials: "include" });
+      const response = await fetch(`/api/factory/suppliers/${fxSupplierId}/balance?fxEurPayout=true`, { credentials: "include" });
       if (!response.ok) throw new Error("Unable to load supplier currency balance");
       return response.json();
     },
     enabled: !!fxSupplierId && isFactoryMode && !isPOS,
     staleTime: 15_000,
   });
-  const supplierEurBucket = fxSupplierBalance?.nativeBalances?.find(
-    (bucket) => bucket.currencyCode === "EUR" && bucket.legacyUnconvertedLines === 0
-  );
-  const fxSupplierEurBalance = Math.max(0, Number(supplierEurBucket?.balance || 0));
+  const fxSupplierEurBalance = fxSupplierBalance?.fxEurPayable?.eligible
+    ? Math.max(0, Number(fxSupplierBalance.fxEurPayable.balance))
+    : 0;
+  const fxSupplierEurBasis = fxSupplierBalance?.fxEurPayable?.basis ?? null;
   const fxBeneficiaryKey = `${selectedCompany?.id}:${fxSelectedBeneficiary?.accountType}:${fxSelectedBeneficiary?.accountId}`;
   const fxPayoutCurrency: "EUR" | "USD" =
     fxCurrencyOverride?.beneficiary === fxBeneficiaryKey
       ? fxCurrencyOverride.currency
       : fxSupplierId && fxSupplierEurBalance > 0 ? "EUR" : "USD";
   const fxSupplierBalanceLoading = !!fxSupplierId && (fxSupplierBalancePending || fxSupplierBalanceError);
+  // When an async currency lookup changes the payout from USD to EUR, never
+  // silently reinterpret an amount typed while the lookup was loading.
+  useEffect(() => {
+    if (!fxSupplierId || !fxSupplierBalance?.fxEurPayable ||
+        fxCurrencyOverride?.beneficiary === fxBeneficiaryKey) return;
+    if (Number(form.getValues("entries.0.amount") || 0) > 0) {
+      form.setValue("entries.0.amount", "");
+    }
+    setFxCurrencyOverride({
+      beneficiary: fxBeneficiaryKey,
+      currency: fxSupplierBalance.fxEurPayable.eligible ? "EUR" : "USD",
+    });
+  }, [fxSupplierId, fxSupplierBalance?.fxEurPayable, fxBeneficiaryKey, fxCurrencyOverride, form]);
   const changeFxPayoutCurrency = (currency: "EUR" | "USD") => {
     if (currency === fxPayoutCurrency) return;
     setFxCurrencyOverride({ beneficiary: fxBeneficiaryKey, currency });
@@ -535,6 +549,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       discardPaymentDraft();
       fxPaymentRequestRef.current = null;
       setFxPaymentRate("");
+      setFxCurrencyOverride(null);
       queryClient.invalidateQueries({ queryKey: ["/api/factory/fx-agent-wallets"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/net-position"] });
@@ -861,6 +876,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                 onFxPaymentRateChange={setFxPaymentRate}
                 fxPayoutCurrency={fxPayoutCurrency}
                 fxSupplierEurBalance={fxSupplierId ? fxSupplierEurBalance : null}
+                fxSupplierEurBasis={fxSupplierEurBasis}
                 fxSupplierBalanceLoading={fxSupplierBalanceLoading}
                 onFxPayoutCurrencyChange={changeFxPayoutCurrency}
                 voucherNumber={voucherToEdit?.voucherNumber}
