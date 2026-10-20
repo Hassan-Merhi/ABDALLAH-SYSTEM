@@ -1,3 +1,7 @@
+import { sql } from "drizzle-orm";
+import { resultRows } from "../../../lib/queryResult";
+import type { ProformaCapacityExecutor } from "./proformaCapacity";
+
 /**
  * Merge proforma articles created after a loading's expected-plan snapshot.
  *
@@ -41,4 +45,35 @@ export function mergeNewProformaArticles<T extends {
     return true;
   });
   return [...savedLines, ...missing];
+}
+
+/**
+ * Ordinary (direct) loadings follow master proforma edits while open.
+ * Continuations are explicitly marked by their LOADING_CREATED daybook entry.
+ * Other loadings (including V5 container allocations) own saved plans and must
+ * not be overwritten by master edits.
+ */
+export type LoadingPlanKind = "ordinary" | "continuation" | "snapshot";
+
+export async function getLoadingPlanKind(
+  executor: ProformaCapacityExecutor,
+  companyId: number,
+  orderId: number
+): Promise<LoadingPlanKind> {
+  const rows = resultRows<{ description: string | null }>(await executor.execute(sql`
+    SELECT description FROM factory_daybook_entries
+    WHERE company_id = ${companyId}
+      AND reference_table = 'customer_orders'
+      AND reference_id = ${orderId}
+      AND tx_type = 'LOADING_CREATED'
+    ORDER BY id DESC LIMIT 1
+  `));
+  const description = rows[0]?.description ?? "";
+  if (description.startsWith("Continuation of loading #")) return "continuation";
+  if (description.startsWith("Loading started for customer:")) return "ordinary";
+  return "snapshot";
+}
+
+export function usesLiveMasterProforma(status: string | null | undefined, planKind: LoadingPlanKind): boolean {
+  return planKind === "ordinary" && ["LOADING", "PENDING_VERIFICATION"].includes(status || "");
 }
