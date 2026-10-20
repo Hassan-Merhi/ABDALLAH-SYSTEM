@@ -348,6 +348,11 @@ export const wave8ReleaseTranslationsPart3: readonly Phase3SharedUiEntry[] = [
     fr: "Les écarts nominaux sont des estimations de contrôle, non des coûts historiques approuvés ni des écritures de régularisation.",
   },
   {
+    en: "Account groups layout could not be read",
+    ar: "تعذّرت قراءة تخطيط مجموعات الحسابات",
+    fr: "La disposition des groupes de comptes n’a pas pu être lue",
+  },
+  {
     en: "Pending orders at selling price (not invoiced; for information, their bales are in stock at cost)",
     ar: "طلبات معلّقة بسعر البيع (غير مفوترة؛ للعلم فقط، بالاتها ضمن المخزون بالتكلفة)",
     fr: "Commandes en attente au prix de vente (non facturées ; pour information, leurs balles sont en stock au coût)",
