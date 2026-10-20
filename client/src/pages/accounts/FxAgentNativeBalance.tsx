@@ -36,14 +36,19 @@ export function FxAgentNativeBalance({
   }
 
   if (compact) {
+    // Only show spendable native balances. Historic USD remains in the statement/audit view.
+    const hasUsdBalance = Math.round(Number(wallet.state.usd) * 100) !== 0;
+
     return (
-      <div className="flex flex-col items-end gap-0.5 font-mono tabular-nums" data-testid="fx-agent-native-compact">
+      <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-0.5 font-mono tabular-nums" data-testid="fx-agent-native-compact">
         <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
           EUR {fmt(wallet.state.eur)}
         </span>
-        <span className="text-[11px] text-muted-foreground">
-          USD {fmt(wallet.state.usd)} · Historic USD {fmt(wallet.ledgerBookUsd)}
-        </span>
+        {hasUsdBalance && (
+          <span className="text-sm font-semibold text-muted-foreground">
+            USD {fmt(wallet.state.usd)}
+          </span>
+        )}
       </div>
     );
   }
