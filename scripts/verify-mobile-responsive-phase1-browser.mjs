@@ -147,6 +147,16 @@ async function openRoute(page, route) {
   return response?.status() ?? null;
 }
 
+// /account-groups opens on the Display Groups editor. The legacy two-pane
+// ledger hierarchy is one toggle away, and its phone stacking is what this
+// smoke certifies, so switch to it before reading the route state.
+async function openLegacyAccountGroups(page) {
+  await page.waitForSelector('[data-testid="button-mode-ledger-groups"]', { visible: true, timeout: TIMEOUT_MS });
+  await page.click('[data-testid="button-mode-ledger-groups"]');
+  await page.waitForSelector('[data-testid="button-create-group"]', { timeout: TIMEOUT_MS });
+  await settle(page);
+}
+
 async function verifyErpMoreSheet(page, viewport, route) {
   const failures = [];
   if (viewport.width > 639) return failures;
@@ -280,6 +290,9 @@ async function readState(page, route, workspace) {
         "(max-width: 639px), (hover: none) and (pointer: coarse) and (max-height: 500px)",
       ).matches;
     } else if (currentRoute === "/account-groups") {
+      // openLegacyAccountGroups has switched the page to the legacy two-pane
+      // ledger hierarchy, whose stacking contract this smoke certifies. A
+      // missing anchor fails the route rather than skipping the check.
       const anchor = document.querySelector('[data-testid="button-create-group"]');
       const displayRoot = document.querySelector('[data-testid="account-display-groups-root"]');
       state.anchorVisible = Boolean(visibleRect(anchor));
@@ -400,6 +413,7 @@ try {
         await selectCompany(page, group.companyCode);
         for (const route of group.routes) {
           const status = await openRoute(page, route);
+          if (route === "/account-groups") await openLegacyAccountGroups(page);
           const state = await readState(page, route, group.workspace);
           const failures = assertState(state, viewport, route, group.workspace);
           if (group.workspace === "erp" && route === group.routes[0]) {

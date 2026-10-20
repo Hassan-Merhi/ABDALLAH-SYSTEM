@@ -60,7 +60,12 @@ export default function DisplayAccountGroups() {
     queryFn: async () => {
       const r = await fetch(layoutUrl, { credentials: "include" });
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message || "Cannot load account groups");
-      return r.json();
+      const body = (await r.json()) as Partial<AccountDisplayLayout> | null;
+      // A successful response without a nodes list is not a layout. Treating
+      // it as an empty editable layout would let Save replace the company-wide
+      // order with the synthesized rows, so it surfaces as a load error instead.
+      if (!body || !Array.isArray(body.nodes)) throw new Error("Account groups layout could not be read");
+      return body as AccountDisplayLayout;
     },
     enabled: !!selectedCompany,
     staleTime: 30000,
