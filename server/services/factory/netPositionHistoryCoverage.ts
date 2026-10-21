@@ -131,9 +131,17 @@ export function summarizeHistoricalEvidence(
   counters: EvidenceCounters,
 ): FactoryHistoricalCoverage {
   const measured = (Object.keys(definition) as (keyof EvidenceCounters)[])
-    .map(key => ({ ...definition[key], records: Number(counters[key]) }));
-  // Validate before filtering: an invalid, negative or NULL count must never
-  // disappear as though it were proof of zero missing historical events.
+    .map(key => {
+      const raw = counters[key];
+      // Number(null) and Number("") silently become zero; a missing counter
+      // must never masquerade as historical evidence coverage.
+      const records = raw === null || raw === undefined || raw === ""
+        ? Number.NaN
+        : Number(raw);
+      return { ...definition[key], records };
+    });
+  // Validate before filtering: invalid, negative or NULL counts must never
+  // disappear as though they proved zero missing historical events.
   if (measured.some(item => !Number.isSafeInteger(item.records) || item.records < 0)) {
     throw new Error("HISTORICAL_COVERAGE_COUNT_INVALID");
   }
