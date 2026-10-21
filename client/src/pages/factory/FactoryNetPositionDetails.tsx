@@ -397,11 +397,14 @@ function CustomNetPositionView({
   const payrollMatchesReport = !!payrollData && payrollData.asOf === asOf &&
     Math.round((payrollData.employees ?? []).reduce((sum, employee) => sum + employee.balance, 0) * 100)
       === Math.round((payrollRow?.value ?? 0) * 100);
-  // Never drop an aggregate Payroll Payable while its separate breakdown is
-  // loading, stale, or inconsistent with the same as-of main snapshot.
+  // Preserve an existing saved hide choice for the aggregate payable.
+  // When hidden, keep the aggregate row hidden rather than exposing new
+  // visible employee rows as soon as the breakdown finishes loading.
+  const splitPayroll = payrollMatchesReport && !hiddenKeys.has("onUs:Payroll Payable");
+  // Never drop the aggregate while the breakdown is loading or inconsistent.
   const payrollEmployees = useMemo(
-    () => payrollMatchesReport ? payrollData?.employees ?? [] : [],
-    [payrollMatchesReport, payrollData?.employees]
+    () => splitPayroll ? payrollData?.employees ?? [] : [],
+    [splitPayroll, payrollData?.employees]
   );
 
   const toggleKey = useCallback((key: string) => {
@@ -436,9 +439,9 @@ function CustomNetPositionView({
   const onUsAccounts = useMemo(
     () =>
       (data.onUs.accounts || [])
-        .filter((a) => !(payrollMatchesReport && a.code === "EMPLOYEE_PAYROLL_PAYABLE"))
+        .filter((a) => !(splitPayroll && a.code === "EMPLOYEE_PAYROLL_PAYABLE"))
         .map((a) => ({ ...a, side: "onUs" as const })),
-    [data, payrollMatchesReport]
+    [data, splitPayroll]
   );
 
   const visibleForUs = useMemo(
