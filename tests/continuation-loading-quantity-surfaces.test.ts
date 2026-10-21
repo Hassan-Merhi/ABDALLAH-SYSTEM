@@ -29,16 +29,20 @@ describe("continuation loading quantities across screens", () => {
   });
 
   it("uses 179 instead of the original 273 for a new empty continuation", () => {
-    expect(getRemainingBales({
-      proformaExpectedBales: "179",
-      totalQtyBales: 0,
-      continuationRemainingBales: "179",
-    })).toBe(179);
-    expect(getRemainingBales({
-      proformaExpectedBales: "273",
-      totalQtyBales: 0,
-      continuationRemainingBales: "179",
-    })).toBe(179);
+    expect(
+      getRemainingBales({
+        proformaExpectedBales: "179",
+        totalQtyBales: 0,
+        continuationRemainingBales: "179",
+      })
+    ).toBe(179);
+    expect(
+      getRemainingBales({
+        proformaExpectedBales: "273",
+        totalQtyBales: 0,
+        continuationRemainingBales: "179",
+      })
+    ).toBe(179);
   });
 
   it("does not show lost-bale recovery warnings for an empty loading still in progress", () => {
