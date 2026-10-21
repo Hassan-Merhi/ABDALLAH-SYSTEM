@@ -130,12 +130,14 @@ export function summarizeHistoricalEvidence(
   scope: FactoryNetPositionAsOf,
   counters: EvidenceCounters,
 ): FactoryHistoricalCoverage {
-  const gaps = (Object.keys(definition) as (keyof EvidenceCounters)[])
-    .map(key => ({ ...definition[key], records: Number(counters[key] || 0) }))
-    .filter(item => item.records > 0);
-  if (gaps.some(item => !Number.isSafeInteger(item.records) || item.records < 0)) {
+  const measured = (Object.keys(definition) as (keyof EvidenceCounters)[])
+    .map(key => ({ ...definition[key], records: Number(counters[key]) }));
+  // Validate before filtering: an invalid, negative or NULL count must never
+  // disappear as though it were proof of zero missing historical events.
+  if (measured.some(item => !Number.isSafeInteger(item.records) || item.records < 0)) {
     throw new Error("HISTORICAL_COVERAGE_COUNT_INVALID");
   }
+  const gaps = measured.filter(item => item.records > 0);
   return { asOf: scope.asOf, basis: "known-at-cutoff", certified: false, status: "partial", gaps };
 }
 
