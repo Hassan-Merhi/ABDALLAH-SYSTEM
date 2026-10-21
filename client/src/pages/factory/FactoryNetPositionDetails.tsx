@@ -807,7 +807,15 @@ export default function FactoryNetPositionDetails() {
 
       {data?.historyCompleteness === "partial" && (
         <div role="status" className="text-sm text-amber-700 dark:text-amber-300" data-testid="historical-data-warning">
-          {data.historyWarnings?.[0] || "Historical reconstruction is incomplete; some values may still reflect current state."}
+          <p>{data.historyWarnings?.[0] || "Historical reconstruction is incomplete; some values may still reflect current state."}</p>
+          {!!data.historyWarnings?.slice(1).length && (
+            <details className="mt-1">
+              <summary className="cursor-pointer">Historical data limitations ({data.historyWarnings.length - 1})</summary>
+              <ul className="list-disc pl-5 mt-1 space-y-1">
+                {data.historyWarnings.slice(1).map((warning, index) => <li key={index}>{warning}</li>)}
+              </ul>
+            </details>
+          )}
         </div>
       )}
       <div className="text-xs text-muted-foreground -mt-2" data-testid="text-inventory-valuation-mode">
