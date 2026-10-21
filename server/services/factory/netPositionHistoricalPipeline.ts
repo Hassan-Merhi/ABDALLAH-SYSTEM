@@ -308,10 +308,17 @@ export async function loadHistoricalFactoryPipeline(
   scope: FactoryNetPositionAsOf,
   getConfigFx: (cc: string) => number,
 ): Promise<DatedPipelineSnapshot> {
-  const [otw, orders] = await Promise.all([
-    getHistoricalOtw(companyId, scope, getConfigFx),
-    getHistoricalOrders(companyId, scope),
-  ]);
+  let otw: Awaited<ReturnType<typeof getHistoricalOtw>>;
+  let orders: Awaited<ReturnType<typeof getHistoricalOrders>>;
+  try {
+    [otw, orders] = await Promise.all([
+      getHistoricalOtw(companyId, scope, getConfigFx),
+      getHistoricalOrders(companyId, scope),
+    ]);
+  } catch (cause) {
+    // Never substitute today's container or order totals for a failed date.
+    throw new Error("HISTORICAL_NET_POSITION_PIPELINE_FAILED", { cause });
+  }
   const sum = (items: readonly DatedPipelineOrder[]) => cents(
     items.reduce((acc, item) => acc.plus(decimal(item.grandTotal)), new MoneyDecimal(0))
   );
