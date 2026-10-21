@@ -156,7 +156,7 @@ export default function FactoryNetPosition() {
               Today
             </Button>
           )}
-                      <Button
+          <Button
               variant="outline"
               size="sm"
               onClick={() => refetch()}
@@ -166,7 +166,6 @@ export default function FactoryNetPosition() {
               <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? "animate-spin" : ""}`} />
               Refresh
             </Button>
-          )}
         </div>
       </div>
 
