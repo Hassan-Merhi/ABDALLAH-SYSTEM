@@ -25,6 +25,8 @@ All Factory Net Position cards, category subtotals, expanded account rows, custo
 - **Overview duplicate names:** distinct custom visibility keys for same-named account rows; expanded category rows use stable enough unique ledger ID/code/index keys rather than colliding on account name.
 - **Company isolation:** the main report query on both Factory pages uses `companyQueryKey(..., selectedCompany?.id, asOf, valuationMode)`; the detailed payroll side-query uses `companyQueryKey(..., response.companyId, asOf)`. A cached result for company A can no longer be silently reused as company B's after switching factories. The response's own company ID is authoritative for the payroll side-panel.
 - **Cache:** previous-day snapshots are not cached infinitely. Switching the historical date or Cost/Selling valuation switches the request key. Partial-history warnings and detailed legacy-data limitations from previous phases remain visible without rewriting any vouchers or inventing values.
+- **Manual refresh and timezone safety:** both Factory Net Position pages expose Refresh for historical dates as well as Today. The overview disables date navigation until the server has supplied the business-day cutoff, avoiding the browser's current day being mistaken for the company's day near midnight.
+- **Company-scoped custom-view preferences:** overview and details persist hidden account choices separately for each factory company ID, remounting the custom section on a company change. Preferences persist across selected dates *within* the same factory but are never silently carried to another company's accounts.
 
 ## Historical invariants
 
