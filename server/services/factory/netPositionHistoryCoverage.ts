@@ -160,7 +160,9 @@ export async function loadFactoryHistoricalCoverage(
 
   // Only aggregate COUNTs are returned: no customer names, financial values,
   // credentials or personally identifying notes in the diagnostic response.
-  const rows = resultRows<EvidenceCounters>(await db.execute(sql`
+  let rows: EvidenceCounters[];
+  try {
+    rows = resultRows<EvidenceCounters>(await db.execute(sql`
     SELECT
       (SELECT COUNT(*) FROM factory_raw_stock rs
         JOIN factory_containers fc ON fc.id = rs.container_id AND fc.company_id = ${companyId}
@@ -172,10 +174,14 @@ export async function loadFactoryHistoricalCoverage(
           )) AS legacy_raw,
 
       (SELECT COUNT(*) FROM factory_container_receipts r
+        JOIN factory_containers fc ON fc.id = r.container_id AND fc.company_id = r.company_id
         WHERE r.company_id = ${companyId}
           AND r.receipt_date <= ${scope.asOf}::date
           AND ${known(sql`r.created_at`, scope)}
-          AND (r.fixed_cost_per_kg_usd IS NULL OR r.fixed_cost_per_kg_usd <= 0)) AS missing_receipt_rate,
+          AND (COALESCE(r.fixed_cost_per_kg_usd,0) <= 0
+            AND NOT (UPPER(COALESCE(fc.currency_code,'USD')) = 'USD'
+                     AND COALESCE(r.fixed_cost_per_kg,0) > 0))
+      ) AS missing_receipt_rate,
 
       ((SELECT COUNT(*) FROM customer_order_bales cob
           JOIN customer_orders co ON co.id = cob.order_id AND co.company_id = ${companyId}
@@ -225,6 +231,7 @@ export async function loadFactoryHistoricalCoverage(
          WHERE ${known(sql`ms.created_at`, scope)}
            AND ${known(sql`mb.created_at`, scope)}
            AND ms.source_batch_id IS NULL
+           AND UPPER(COALESCE(ms.source_type, '')) <> 'BATCH'
            AND ms.inventory_supplier_id IS NULL
            AND ms.supplier_id IS NULL
            AND NOT EXISTS (
@@ -232,6 +239,11 @@ export async function loadFactoryHistoricalCoverage(
               WHERE fc.company_id = ${companyId} AND fc.id = ms.container_id AND fc.supplier_id IS NOT NULL
            )) AS unowned_mix_sources
   `));
+  } catch (cause) {
+    // Physical schema and read-model availability are prerequisites.
+    // Never substitute "0 missing history" when a coverage query failed.
+    throw new Error("HISTORICAL_COVERAGE_QUERY_FAILED", { cause });
+  }
   const counters = rows[0];
   if (!counters) throw new Error("HISTORICAL_COVERAGE_QUERY_EMPTY");
   return summarizeHistoricalEvidence(scope, counters);
