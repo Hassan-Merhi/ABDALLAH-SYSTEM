@@ -97,7 +97,10 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         SELECT DISTINCT ON (currency_code) currency_code, rate_to_usd
         FROM factory_fx_rates
         WHERE company_id = ${companyId} AND source = 'manual' AND effective_date <= ${asOf}::date
-        ORDER BY currency_code, effective_date DESC
+          ${asOfContext.isHistorical
+            ? sql`AND ${netPositionRecordedThrough(sql`created_at`, asOfContext, "utc-naive-timestamp")}`
+            : sql``}
+        ORDER BY currency_code, effective_date DESC, created_at DESC, id DESC
       `);
       const configFxRates: Record<string, number> = {};
       for (const row of fxRateRows.rows) {
