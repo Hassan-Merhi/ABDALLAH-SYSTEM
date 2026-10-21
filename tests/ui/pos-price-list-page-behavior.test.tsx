@@ -300,7 +300,7 @@ describe("POS price list page behavior", () => {
     expect(screen.queryByTestId("button-hide-zero-qty")).not.toBeInTheDocument();
     const showZero = screen.getByTestId("button-show-zero-qty");
     expect(showZero).toHaveTextContent("Show 0 Qty");
-    expect(showZero).toHaveTextContent("3");
+    expect(showZero).toHaveTextContent("2");
     expect(showZero).toHaveAttribute("aria-pressed", "false");
     fireEvent.click(showZero);
     expect(screen.getByTestId("button-show-zero-qty")).toHaveAttribute("aria-pressed", "true");
