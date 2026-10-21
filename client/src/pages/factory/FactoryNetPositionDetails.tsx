@@ -372,9 +372,10 @@ function CustomNetPositionView({
   formatAmount: (n: number) => string;
   asOf: string;
 }) {
+  const storageKey = `${STORAGE_KEY}:${data.companyId ?? "no-company"}`;
   const [hiddenKeys, setHiddenKeys] = useState<Set<string>>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = localStorage.getItem(storageKey);
       return saved ? new Set(JSON.parse(saved)) : new Set();
     } catch {
       return new Set();
@@ -413,22 +414,22 @@ function CustomNetPositionView({
       if (next.has(key)) next.delete(key);
       else next.add(key);
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify([...next]));
+        localStorage.setItem(storageKey, JSON.stringify([...next]));
       } catch {
         // Storage is unavailable in private mode and can throw on quota; the value is a convenience, not state we need.
       }
       return next;
     });
-  }, []);
+  }, [storageKey]);
 
   const showAll = useCallback(() => {
     setHiddenKeys(new Set());
     try {
-      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(storageKey);
     } catch {
       // Storage is unavailable in private mode and can throw on quota; the value is a convenience, not state we need.
     }
-  }, []);
+  }, [storageKey]);
 
   const forUsAccounts = useMemo(
     () => (data.forUs.accounts || []).map((a) => ({ ...a, side: "forUs" as const })),
@@ -938,7 +939,7 @@ export default function FactoryNetPositionDetails() {
         />
       </div>
 
-      {data && <CustomNetPositionView data={data} formatAmount={formatAmount} asOf={displayAsOf} />}
+      {data && <CustomNetPositionView key={data.companyId ?? "no-company"} data={data} formatAmount={formatAmount} asOf={displayAsOf} />}
     </div>
   );
 }
