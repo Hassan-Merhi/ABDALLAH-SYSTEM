@@ -199,6 +199,12 @@ async function customerMemoRows(executor: Executor, query: MemoQuery): Promise<C
   const { companyId, ids, asOf, knownAt } = query;
   const invoiceCreated = knownAt ? sql`AND ${netPositionRecordedThrough(sql`co.created_at`, knownAt, "utc-naive-timestamp")}` : sql``;
   const cacheCreated = knownAt ? sql`AND ${netPositionRecordedThrough(sql`cb.created_at`, knownAt, "utc-naive-timestamp")}` : sql``;
+  const invoiceNotDeleted = knownAt
+    ? sql`(co.deleted_at IS NULL OR NOT ${netPositionRecordedThrough(sql`co.deleted_at`, knownAt, "utc-naive-timestamp")})`
+    : sql`co.deleted_at IS NULL`;
+  const cvNotDeleted = knownAt
+    ? sql`(cv.deleted_at IS NULL OR NOT ${netPositionRecordedThrough(sql`cv.deleted_at`, knownAt, "utc-naive-timestamp")})`
+    : sql`cv.deleted_at IS NULL`;
   const invoiceDate = sql`COALESCE(co.finalized_at, co.created_at)::date`;
   const invoices = rowsOf<CustomerMemoRow>(
     executor,
@@ -209,7 +215,7 @@ async function customerMemoRows(executor: Executor, query: MemoQuery): Promise<C
              (COALESCE(co.grand_total, 0) - COALESCE((
                 SELECT SUM(ch.amount) FROM customer_order_charges ch
                   JOIN vouchers cv ON cv.company_id = co.company_id
-                                  AND cv.deleted_at IS NULL AND cv.optional = false${bookedBy("cv", asOf, knownAt)}
+                                  AND ${cvNotDeleted} AND cv.optional = false${bookedBy("cv", asOf, knownAt)}
                                   AND (
                                     cv.id = ch.voucher_id
                                     OR (
@@ -232,7 +238,7 @@ async function customerMemoRows(executor: Executor, query: MemoQuery): Promise<C
              co.grand_total::text AS extra
         FROM customer_orders co
         LEFT JOIN customer_dispatch_batches b ON b.id = co.dispatch_batch_id AND b.company_id = co.company_id
-       WHERE co.company_id = ${companyId} AND co.status = 'FINALIZED' AND co.deleted_at IS NULL
+       WHERE co.company_id = ${companyId} AND co.status = 'FINALIZED' AND ${invoiceNotDeleted}
          AND co.customer_id IN (${idList(ids)})
          ${invoiceCreated}
          AND NOT ${liveVoucherExists(
@@ -279,7 +285,7 @@ async function customerMemoRows(executor: Executor, query: MemoQuery): Promise<C
          AND NOT (cb.reference_type = 'voucher' AND EXISTS (
                SELECT 1 FROM vouchers rv
                 WHERE rv.id = cb.reference_id AND rv.company_id = cb.company_id
-                  AND rv.deleted_at IS NULL AND rv.optional = false${bookedBy("rv", asOf, knownAt)}))
+                  AND ${knownAt ? sql`(rv.deleted_at IS NULL OR NOT ${netPositionRecordedThrough(sql`rv.deleted_at`, knownAt, "utc-naive-timestamp")})` : sql`rv.deleted_at IS NULL`} AND rv.optional = false${bookedBy("rv", asOf, knownAt)}))
          ${dateCut(sql`cb.transaction_date::date`, asOf)}
     `
   );
