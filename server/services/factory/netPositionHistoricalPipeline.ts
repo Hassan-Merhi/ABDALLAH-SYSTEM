@@ -58,6 +58,19 @@ export function orderStageAt(events: {
   return "UNKNOWN";
 }
 
+/** Retain precisely the not-yet-received share of each planned container. */
+export function historicalOtwRemaining(plannedKg: string, receivedKg: string) {
+  const planned = decimal(plannedKg);
+  const received = decimal(receivedKg);
+  if (planned.lte(0)) return { remainingKg: new MoneyDecimal(0), share: new MoneyDecimal(0), exceeded: false };
+  const remainingKg = MoneyDecimal.max(planned.minus(received), 0);
+  return {
+    remainingKg,
+    share: remainingKg.div(planned),
+    exceeded: received.gt(planned),
+  };
+}
+
 type ContainerRow = {
   id: number; status: string; planned_kg: string; goods_rate: string;
   final_payable: string; currency_code: string; freight: string;
@@ -130,10 +143,9 @@ async function getHistoricalOtw(
       warnings.add("HISTORICAL_OTW_PLANNED_WEIGHT_MISSING");
       continue;
     }
-    if (received.gt(planned)) warnings.add("HISTORICAL_OTW_RECEIPTS_EXCEED_PLAN");
-    const remaining = MoneyDecimal.max(planned.minus(received), 0);
-    if (remaining.isZero()) continue;
-    const ratio = remaining.div(planned);
+    const { remainingKg, share: ratio, exceeded } = historicalOtwRemaining(c.planned_kg, received.toFixed());
+    if (exceeded) warnings.add("HISTORICAL_OTW_RECEIPTS_EXCEED_PLAN");
+    if (remainingKg.isZero()) continue;
     const nativeGoods = decimal(c.goods_rate).gt(0)
       ? planned.times(decimal(c.goods_rate))
       : decimal(c.final_payable);
