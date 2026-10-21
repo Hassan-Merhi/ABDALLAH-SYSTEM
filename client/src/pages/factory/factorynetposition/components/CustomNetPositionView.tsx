@@ -13,7 +13,8 @@ import type { CustomViewAccount, NetPositionData } from "../types";
 import { fmt, loadCustomViewHidden, saveCustomViewHidden } from "../utils";
 
 export function CustomNetPositionView({ data }: { data: NetPositionData }) {
-  const [hiddenKeys, setHiddenKeys] = useState<Set<string>>(() => loadCustomViewHidden());
+  const companyId = data.companyId;
+  const [hiddenKeys, setHiddenKeys] = useState<Set<string>>(() => loadCustomViewHidden(companyId));
 
   const allAccounts = useMemo<CustomViewAccount[]>(() => {
     const accountKey = (side: "forUs" | "onUs", rows: typeof data.forUs.accounts, a: typeof rows[number], index: number) =>
@@ -46,16 +47,16 @@ export function CustomNetPositionView({ data }: { data: NetPositionData }) {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
       else next.add(key);
-      saveCustomViewHidden(next);
+      saveCustomViewHidden(next, companyId);
       return next;
     });
-  }, []);
+  }, [companyId]);
 
   const resetAll = useCallback(() => {
     const empty = new Set<string>();
     setHiddenKeys(empty);
-    saveCustomViewHidden(empty);
-  }, []);
+    saveCustomViewHidden(empty, companyId);
+  }, [companyId]);
 
   const visibleForUsTotal = useMemo(
     () => allAccounts.filter((a) => a.side === "forUs" && !hiddenKeys.has(a.key)).reduce((s, a) => s + a.value, 0),
