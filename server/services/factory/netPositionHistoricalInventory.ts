@@ -217,7 +217,8 @@ async function rawMaterialAt(companyId: number, scope: FactoryNetPositionAsOf) {
 async function finishedStockAt(companyId: number, scope: FactoryNetPositionAsOf, valuationMode: "cost" | "selling") {
   const rows = resultRows<{
     total_cost: string; total_selling: string;
-    missing_finalization: string; missing_scan_time: string; mutable_prices: string;
+    missing_finalization: string; missing_scan_time: string;
+    uncertain_removals: string; mutable_prices: string;
   }>(await db.execute(sql`
     WITH eligible AS (
       SELECT b.id, b.status, b.total_cost::numeric AS original_cost,
@@ -228,7 +229,7 @@ async function finishedStockAt(companyId: number, scope: FactoryNetPositionAsOf,
                 JOIN customer_orders co ON co.id = cob.order_id AND co.company_id = ${companyId}
                 WHERE cob.bale_id = b.id
                   AND cob.scanned_at IS NOT NULL
-                  AND ${nextCutoff(scope, "cob.scanned_at")}
+                  AND ${netPositionRecordedThrough(sql`cob.scanned_at`, scope, "timestamptz")}
                   AND ${nextCutoff(scope, "co.created_at")}
              ) OR EXISTS (
                 -- A scan cancelled after the selected day was still allocated
@@ -237,7 +238,7 @@ async function finishedStockAt(companyId: number, scope: FactoryNetPositionAsOf,
                 JOIN customer_orders co ON co.id = coh.order_id AND co.company_id = ${companyId}
                 WHERE coh.bale_id = b.id
                   AND coh.scanned_at IS NOT NULL
-                  AND ${nextCutoff(scope, "coh.scanned_at")}
+                  AND ${netPositionRecordedThrough(sql`coh.scanned_at`, scope, "timestamptz")}
                   AND NOT ${netPositionRecordedThrough(sql`coh.cancelled_at`, scope, "timestamptz")}
                   AND ${nextCutoff(scope, "co.created_at")}
              )) AS scanned_before,
@@ -268,6 +269,7 @@ async function finishedStockAt(companyId: number, scope: FactoryNetPositionAsOf,
            COUNT(*) FILTER (WHERE status IN ('FINALIZED','SOLD','DISPATCHED')
                AND finalized_at IS NULL)::text AS missing_finalization,
            COUNT(*) FILTER (WHERE missing_scan_time)::text AS missing_scan_time,
+           COUNT(*) FILTER (WHERE status IN ('REMOVED','REPACKED') AND deleted_at IS NULL)::text AS uncertain_removals,
            COUNT(*) FILTER (WHERE current_catalog_selling > 0)::text AS mutable_prices
       FROM eligible
   `));
@@ -275,6 +277,7 @@ async function finishedStockAt(companyId: number, scope: FactoryNetPositionAsOf,
   const warnings: string[] = [];
   if (Number(row.missing_finalization || 0) > 0) warnings.push("HISTORICAL_STOCK_FINALIZATION_TIME_MISSING");
   if (Number(row.missing_scan_time || 0) > 0) warnings.push("HISTORICAL_STOCK_SCAN_TIME_MISSING");
+  if (Number(row.uncertain_removals || 0) > 0) warnings.push("HISTORICAL_STOCK_REMOVAL_TIME_UNKNOWN");
   if (valuationMode === "selling" && Number(row.mutable_prices || 0) > 0) {
     warnings.push("HISTORICAL_STOCK_SELLING_PRICE_UNVERSIONED");
   }
