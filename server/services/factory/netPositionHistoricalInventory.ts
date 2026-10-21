@@ -16,7 +16,7 @@ import { db } from "../../db";
 import { resultRows } from "../../lib/queryResult";
 import { MoneyDecimal, toMoney } from "../../lib/money";
 import { getFactoryBalanceOnTableSnapshot } from "./productionBalanceOnTable";
-import { netPositionRecordedThrough } from "./netPositionAsOf";
+import { netPositionLegacyScanKnown, netPositionRecordedThrough } from "./netPositionAsOf";
 import { getLockedSupplierRatesReadOnlyBulk } from "./rawStockLockedRateBulk";
 import { sqlArray } from "../../lib/sqlArray";
 
@@ -393,6 +393,12 @@ async function finishedStockAt(companyId: number, scope: FactoryNetPositionAsOf,
                   AND coh.scanned_at IS NOT NULL
                   AND ${netPositionRecordedThrough(sql`coh.scanned_at`, scope, "timestamptz")}
                   AND NOT ${netPositionRecordedThrough(sql`coh.cancelled_at`, scope, "timestamptz")}
+                  AND ${orderLiveThen}
+             ) OR EXISTS (
+                SELECT 1 FROM customer_order_bales cob
+                JOIN customer_orders co ON co.id = cob.order_id AND co.company_id = ${companyId}
+                WHERE cob.bale_id = b.id
+                  AND ${netPositionLegacyScanKnown("cob", "co", companyId, scope)}
                   AND ${orderLiveThen}
              ) OR EXISTS (
                 -- Legacy scan without a time: allocated then only when its

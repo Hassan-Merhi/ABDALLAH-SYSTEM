@@ -27,12 +27,14 @@ Each category applies the live report's own rule to the state that existed that 
 | Worker advances | `SUM(remaining_balance)` | Original amount, minus dated repayment rows, minus payroll advance deductions without a repayment row (oldest first, as payroll generation does) |
 | Prepaid Rent | ACTIVE contracts on active FACTORY units, `|expected − posted|` | Same rule. A contract that is no longer ACTIVE counts only while its term covered the date. Payments must be recorded and posted by the cutoff. |
 | Factory Raw Materials | Remaining kg × supplier locked rate (landed cost for unassigned) | Receipt, adjustment and mix-source replay to remaining kg. Valued at the locked rate when the supplier had no later receipt (the rate moves only at offload); otherwise at the replayed moving-average cost, flagged. |
-| Stock in Hand | IN_STOCK bales not on an open/completed order, at catalogue cost or selling price | A bale row unchanged since the cutoff uses its status. A changed one is rebuilt: entered stock at `finalized_at`; left it through a dated scan on a live order, a dated waste dispatch, or deletion. |
+| Stock in Hand | IN_STOCK bales not on an open/completed order, at catalogue cost or selling price | A bale row unchanged since the cutoff uses its status. A changed one is rebuilt: entered stock at `finalized_at`; left it through a dated scan on a live order, a legacy untimed scan (see below), a dated waste dispatch, or deletion. |
 | Balance on Table | Mix weight − bale weight (excluding DELETED/REMOVED/REPACKED) at the cumulative batch rate | Batches recorded by the cutoff, minus top-up source rows recorded later. The same bale exclusions apply only where the status was already set by the cutoff. |
 | Factory Stock OTW | PENDING / IN_TRANSIT / ARRIVED containers at final payable (else rate × kg) + freight + commission + other charges | In transit until a receipt is known by the cutoff. A container offloaded later is valued from its pre-offload charge snapshot. **A partial receipt ends OTW, exactly as today** (no remaining-kg share; owner decision 2026-10-21, superseding the 6,000 kg expectation in the Phase 9 handoff). |
-| Verified / Loading orders (pending is informational only) | Current status, `grand_total` | Stage from recorded transitions (daybook `ORDER_VERIFIED` / `LOADING_SUBMITTED` created by the cutoff, `loading_started_at`). An order row unchanged since the cutoff keeps its stored status and `grand_total`; a changed one is valued at its dated scans, without charges. |
+| Verified / Loading orders (pending is informational only) | Current status, `grand_total` | Stage from recorded transitions (daybook `ORDER_VERIFIED` / `LOADING_SUBMITTED` created by the cutoff, `loading_started_at`). An order row unchanged since the cutoff keeps its stored status and `grand_total`; a changed one is valued at its dated and legacy untimed scans, without charges. |
 
 **Double counting.** A scanned bale leaves Stock in Hand from its scan time and appears only through its order. A received container leaves OTW and becomes raw stock and a supplier payable. Mix consumption moves raw material to Balance on Table, and pressing moves it on to bales. Customer-linked and legacy `EMP-` ledger accounts are excluded from the ledger rows, because their movement is shown on the customer or employee row. The integrity guard (`netPositionHistoricalIntegrity.ts`) rejects a past-date response whose headers, categories, source fields and order lists differ by a cent.
+
+**Legacy untimed scans.** `scanned_at` is filled by a trigger that did not exist before scan times were recorded. A scan without a time counts as made by the cutoff only when its order was created before the company's first timed scan, that first timed scan was itself recorded by the cutoff, and the bale has no cancel/restore history on that order. Any other untimed scan stays unknown. No time is invented: this is a lower bound, because the row existed before tracking began.
 
 **Cost/Selling.** Only Stock in Hand changes (catalogue production price vs selling price). Balance on Table stays at cost.
 
@@ -66,19 +68,28 @@ Run in a local, disposable PostgreSQL 16 built the way CI builds it (`drizzle-ki
   - a future date and an impossible date are rejected.
 - **Today unchanged:** the same fixture's live report is identical to `origin/main`'s, in both modes, apart from the added metadata fields. So is the report-characterization fixture.
 
+## Read-only check against production (2026-10-21)
+
+The owner authorized `SELECT`-only queries (each in a read-only transaction) on the production database for the factory company (id 12, "HMD INT GROUP - BEIRUT"). Nothing was written.
+
+- **Timezone not set.** `company_settings.timezone` is empty, so every cutoff is UTC midnight (02:00–03:00 in Beirut). Setting it to `Asia/Beirut` is an owner decision; it was not changed.
+- **Backdated vouchers** (dated on or before a day, entered after it): 13 for Oct 19 and 12 for Oct 20. The largest are `INV-GL-12-168` (customer invoice 32,485, dated Sep 22, entered Oct 21), `INS-2026-09` (insurance accrual 1,690.66, dated Sep 1, entered Oct 20), and twelve container-charge journals `FACTORY-POC-*` (dated Aug 13 to Oct 19, entered Oct 21). They are correctly absent before the day they were entered.
+- **Receipts and OTW**: receipts for containers CMAU3958580 (Oct 19), ECMU5477380 (Oct 20) and SEKU5800740 (Oct 21). In transit: 7, 11 (four new containers created Oct 20) and 10 containers.
+- **Defect found and fixed**: orders 140 and 149 were verified on Oct 19 and Oct 20 and invoiced on Oct 21. All 1,210 of their scans pre-date scan-time tracking (the first timed scan is 2026-08-31). Before the legacy rule, these orders were valued at 0 and their sold bales counted as stock. With the rule, Verified orders on Oct 19 and Oct 20 rise by 65,515 (scanned value 33,880 + 31,635; the charges in `grand_total` are not versioned) and Stock in Hand at cost falls by 44,226. The database test now covers this case.
+- **Not checked**: the full report could not be run against production from here (no application connection), so complete Oct 19–21 totals are still unverified. A run on a production copy is needed to certify them.
+
 ## Known limitations (stay `partial`; do not backfill)
 
 These have no surviving original values. The report keeps them flagged and invents nothing.
 
 1. **Voucher edits** delete the original lines. An edited voucher shows its edited amounts on earlier dates (coverage `HISTORICAL_COVERAGE_VOUCHER_EDITED_LATER`). Hard-deleted vouchers, repayments, supplier payments and FX rates vanish from history.
 2. **Catalogue prices, container masters** (kg, rate, charges, currency), **bale costs, order line prices and rent expected amounts** are unversioned. A past date uses the current values, or the pre-offload snapshot for containers.
-3. **Bale status without a dated event**: legacy scans with no `scanned_at`; undated restore of a cancelled scan (the restore re-inserts the original scan time and deletes the archive row); removal, repack or swap without a timestamp; stock entry without `finalized_at`.
+3. **Bale status without a dated event**: untimed scans outside the legacy rule above; undated restore of a cancelled scan (the restore re-inserts the original scan time and deletes the archive row); removal, repack or swap without a timestamp; stock entry without `finalized_at`.
 4. **Order lifecycle**: re-verification deletes and rewrites the `ORDER_VERIFIED` daybook entry, and un-verify deletes it. An invoice reverted later does not appear as finalized in between.
 5. **Flags with no history**: employee and unit `active`, contract `status`, customer/supplier soft-delete restores, supplier–broker links, ledger opening balances and types, the locked supplier rate between offloads.
 6. The business-date part of some cutoffs uses the UTC date of a timestamp (`offloaded_at::date`, invoice date). This is off by a day only for events within the UTC offset of midnight.
 
 ## Not done, needs separate approval
 
-- **Reconciliation against real company data.** Read-only access to the production database was not authorized for this work. `scripts/sql/factory-net-position-historical-readonly-audit.sql` (read-only transaction, runs cleanly on a test schema) is the worksheet for it. Until it is run against a replica, real Oct 19–21 figures are **unverified**.
 - **Indexes.** `scripts/sql/factory-net-position-historical-indexes.sql` was not applied. Run `EXPLAIN (ANALYZE, BUFFERS)` on a replica first; the highest-value candidates are `voucher_entries (voucher_id, created_at)`, `customer_order_bales (bale_id, scanned_at)`, `customer_order_bales_history (bale_id, cancelled_at)`, `factory_container_receipts (company_id, container_id, created_at)` and `factory_mix_batch_sources (mix_batch_id, created_at)`.
 - **Startup preload in CI.** CI boots `node dist/index.js` without `server/startupPreload.mjs`, so the `scanned_at` columns exist in CI only because the database test installs them with the production bridge.

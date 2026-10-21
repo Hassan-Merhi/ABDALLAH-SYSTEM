@@ -11,7 +11,7 @@ import type { FactoryNetPositionAsOf } from "@shared/factoryNetPositionAsOf";
 import { db } from "../../db";
 import { resultRows } from "../../lib/queryResult";
 import { MoneyDecimal, toMoney } from "../../lib/money";
-import { netPositionRecordedThrough } from "./netPositionAsOf";
+import { netPositionLegacyScanKnown, netPositionRecordedThrough } from "./netPositionAsOf";
 
 const decimal = (v: unknown): Decimal => toMoney(v as string | number | null | undefined);
 const cents = (v: Decimal): number => v.toDecimalPlaces(2, MoneyDecimal.ROUND_HALF_UP).toNumber();
@@ -321,6 +321,11 @@ async function getHistoricalOrders(
               AND ${isBefore(scope, "prior.cancelled_at", "timestamptz")}
          )
       UNION ALL
+      SELECT cob.order_id, cob.bale_id, cob.scanned_at, cob.price_used, 0 AS archived
+        FROM customer_order_bales cob
+        JOIN customer_orders co ON co.id = cob.order_id AND co.company_id = ${companyId}
+       WHERE ${netPositionLegacyScanKnown("cob", "co", companyId, scope)}
+      UNION ALL
       SELECT h.order_id, h.bale_id, h.scanned_at, h.price_used, 1 AS archived
         FROM customer_order_bales_history h
         JOIN customer_orders co ON co.id = h.order_id AND co.company_id = ${companyId}
@@ -363,7 +368,8 @@ async function getHistoricalOrders(
            (COALESCE(${isBefore(scope, "o.updated_at")},false)
              AND NOT EXISTS (SELECT 1 FROM customer_order_bales cob
                               WHERE cob.order_id = o.id
-                                AND (cob.scanned_at IS NULL OR NOT ${isBefore(scope, "cob.scanned_at", "timestamptz")}))
+                                AND (cob.scanned_at IS NULL OR NOT ${isBefore(scope, "cob.scanned_at", "timestamptz")})
+                                AND NOT ${netPositionLegacyScanKnown("cob", "o", companyId, scope)})
              AND NOT EXISTS (SELECT 1 FROM customer_order_bales_history h
                               WHERE h.order_id = o.id
                                 AND (h.cancelled_at IS NULL OR NOT ${isBefore(scope, "h.cancelled_at", "timestamptz")}))
@@ -371,7 +377,8 @@ async function getHistoricalOrders(
            COALESCE(t.qty, '0') AS scanned_qty,
            COALESCE(t.scanned_value, '0') AS scanned_value,
            (SELECT COUNT(*)::text FROM customer_order_bales cob
-             WHERE cob.order_id = o.id AND cob.scanned_at IS NULL) AS unknown_scans,
+             WHERE cob.order_id = o.id AND cob.scanned_at IS NULL
+               AND NOT ${netPositionLegacyScanKnown("cob", "o", companyId, scope)}) AS unknown_scans,
            (EXISTS (SELECT 1 FROM customer_order_charges ch WHERE ch.order_id = o.id)
              OR COALESCE(o.freight_amount,0)::numeric <> 0
              OR COALESCE(o.other_charges_total,0)::numeric <> 0) AS had_charges,

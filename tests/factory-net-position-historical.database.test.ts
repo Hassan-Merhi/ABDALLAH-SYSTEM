@@ -275,6 +275,7 @@ databaseDescribe("Factory Net Position historical date filter (database)", () =>
     ids.bale2 = await bale("B2-", "IN_STOCK", 100, "2026-10-21 15:00", "2026-10-21 15:00"); // pressed Oct 21
     ids.bale3 = await bale("B3-", "RESERVED_FOR_ORDER", 0, "2026-10-10 08:00", "2026-10-21 16:00"); // scanned Oct 21
     ids.bale4 = await bale("B4-", "SOLD", 0, "2026-10-10 08:00", "2026-10-21 17:00"); // scanned Oct 12, verified Oct 21
+    ids.bale5 = await bale("B5-", "SOLD", 0, "2026-10-05 08:00", "2026-10-21 18:00"); // legacy untimed scan, invoiced Oct 21
 
     // ── Rent: a FACTORY shop contract from Oct 1 with 100 due on Oct 1; the
     //    tenant's 60, dated Oct 15, was only entered and posted on Oct 20.
@@ -309,7 +310,17 @@ databaseDescribe("Factory Net Position historical date filter (database)", () =>
     await db.execute(sql`INSERT INTO customer_order_bales (order_id, bale_id, bale_reference, location_id, weight, price_used, scanned_at) VALUES
       (${ids.order1}, ${ids.bale3}, 'B3', ${ids.location}, 0, 60, '2026-10-21 16:00+00'),
       (${ids.order2}, ${ids.bale4}, 'B4', ${ids.location}, 0, 70, '2026-10-12 08:00+00')`);
+    // O3 predates scan-time tracking (the company's first timed scan is
+    // Oct 12): verified Oct 7 with an untimed scan, invoiced only Oct 21.
+    ids.order3 =
+      await one(sql`INSERT INTO customer_orders (company_id, customer_id, order_date, status, grand_total, total_qty_bales,
+        loading_started_at, verified_at, finalized_at, created_at, updated_at)
+      VALUES (${companyId}, ${ids.customer}, '2026-10-05', 'FINALIZED', 95, 1, '2026-10-05 08:00', '2026-10-07 08:00', '2026-10-21 18:00',
+        '2026-10-05 08:00', '2026-10-21 18:00') RETURNING id`);
+    await db.execute(sql`INSERT INTO customer_order_bales (order_id, bale_id, bale_reference, location_id, weight, price_used) VALUES
+      (${ids.order3}, ${ids.bale5}, 'B5', ${ids.location}, 0, 90)`);
     await db.execute(sql`INSERT INTO factory_daybook_entries (company_id, tx_date, tx_type, description, reference_id, reference_table, created_at) VALUES
+      (${companyId}, '2026-10-07', 'ORDER_VERIFIED', 'Order verified', ${ids.order3}, 'customer_orders', '2026-10-07 08:00'),
       (${companyId}, '2026-10-19', 'LOADING_SUBMITTED', 'Loading submitted', ${ids.order2}, 'customer_orders', '2026-10-21 17:00'),
       (${companyId}, '2026-10-19', 'ORDER_VERIFIED', 'Order verified', ${ids.order2}, 'customer_orders', '2026-10-21 17:00')`);
   }, 60_000);
@@ -378,12 +389,13 @@ databaseDescribe("Factory Net Position historical date filter (database)", () =>
     );
     expect(d20.onUs.accounts.some((a) => a.name === "Late Loan")).toBe(false);
 
-    // Customer invoice entered Oct 21 with an Oct 19 date.
+    // Customer invoice entered Oct 21 with an Oct 19 date, plus O3's
+    // unposted invoice of 95, finalized on Oct 21.
     expect([
       row(d19, "forUs", "CUSTOMER_DR"),
       row(d20, "forUs", "CUSTOMER_DR"),
       row(d21, "forUs", "CUSTOMER_DR"),
-    ]).toEqual([0, 0, 300]);
+    ]).toEqual([0, 0, 300 + 95]);
 
     // Payroll payable: 300 accrued Oct 18; 100 paid (entered Oct 21).
     expect([d19.payrollPayable, d20.payrollPayable, d21.payrollPayable]).toEqual([300, 300, 200]);
@@ -417,12 +429,14 @@ databaseDescribe("Factory Net Position historical date filter (database)", () =>
     expect([d19.balanceOnTableValue, d20.balanceOnTableValue, d21.balanceOnTableValue]).toEqual([0, 125, 75]);
 
     // Stock in hand at catalogue cost 40: bales 1 and 3 (3 is scanned Oct 21),
-    // then bales 1 and 2. Bale 4 has been on an order since Oct 12.
+    // then bales 1 and 2. Bale 4 has been on an order since Oct 12, bale 5
+    // (untimed legacy scan) since before scan times were recorded.
     expect([d19.inventoryValue, d20.inventoryValue, d21.inventoryValue]).toEqual([80, 80, 80]);
 
     // O2 was submitted (verified) only on Oct 21, although dated Oct 19:
     // it is a loading order before then, valued by its recorded scans.
-    expect([d19.verifiedTotal, d20.verifiedTotal, d21.verifiedTotal]).toEqual([0, 0, 70]);
+    // O3 is verified until its Oct 21 invoice, valued by its legacy scan.
+    expect([d19.verifiedTotal, d20.verifiedTotal, d21.verifiedTotal]).toEqual([90, 90, 70]);
     expect([d19.loadingTotal, d20.loadingTotal, d21.loadingTotal]).toEqual([70, 70, 60]);
 
     // The 500 payment entered Oct 21 lowers the supplier only from Oct 21,

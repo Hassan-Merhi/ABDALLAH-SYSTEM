@@ -85,3 +85,32 @@ export function netPositionVoucherEntryKnown(entryCreatedAt: SQL, voucherId: SQL
                     WHERE known_ve.voucher_id = ${voucherId}
                       AND ${netPositionRecordedThrough(sql`known_ve.created_at`, scope, "utc-naive-timestamp")}))`;
 }
+
+/**
+ * A scan row without scanned_at was written before the scan-time trigger was
+ * installed, unless it was restored from an undated history row or saved
+ * without scanned_by. It is therefore known by the cutoff when its order
+ * predates the company's first timed scan, that first timed scan was itself
+ * recorded by the cutoff, and the bale was never cancelled from that order.
+ * Anything else stays unknown; no scan time is invented.
+ */
+export function netPositionLegacyScanKnown(
+  scanAlias: string,
+  orderAlias: string,
+  companyId: number,
+  scope: FactoryNetPositionAsOf
+): SQL {
+  const scan = sql.raw(scanAlias);
+  const order = sql.raw(orderAlias);
+  return sql`(${scan}.scanned_at IS NULL
+    AND NOT EXISTS (SELECT 1 FROM customer_order_bales_history legacy_h
+                     WHERE legacy_h.order_id = ${scan}.order_id AND legacy_h.bale_id = ${scan}.bale_id)
+    AND EXISTS (SELECT 1 FROM (
+                  SELECT MIN(first_cob.scanned_at) AS started
+                    FROM customer_order_bales first_cob
+                    JOIN customer_orders first_co ON first_co.id = first_cob.order_id
+                   WHERE first_co.company_id = ${companyId}) tracking
+                 WHERE tracking.started IS NOT NULL
+                   AND ${netPositionRecordedThrough(sql`tracking.started`, scope, "timestamptz")}
+                   AND ${order}.created_at < (tracking.started AT TIME ZONE 'UTC')))`;
+}
