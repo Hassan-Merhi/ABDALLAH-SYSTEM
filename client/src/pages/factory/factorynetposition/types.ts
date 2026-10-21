@@ -35,6 +35,7 @@ export interface OrderItem {
 }
 
 export interface NetPositionData {
+  companyId?: number;
   asOf?: string;
   businessToday?: string;
   timeZone?: string;
