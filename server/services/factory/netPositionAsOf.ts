@@ -24,7 +24,8 @@ export async function resolveFactoryNetPositionAsOf(
     .from(companySettings)
     .where(eq(companySettings.companyId, companyId))
     .limit(1);
-  const timeZone = isValidNetPositionTimezone(settings?.timezone) ? settings.timezone : "UTC";
+  const configuredTimezone = settings?.timezone;
+  const timeZone = isValidNetPositionTimezone(configuredTimezone) ? configuredTimezone : "UTC";
   const businessToday = netPositionBusinessDay(now, timeZone);
   const asOf = resolveFactoryNetPositionDay(requestedAsOf, businessToday);
   return {
