@@ -31,13 +31,25 @@ const harness = vi.hoisted(() => {
     computeNetPositionSupplierBalances: vi.fn(),
     getCustomerLedgerAndMemo: vi.fn(),
     loadHeldChargeSnapshot: vi.fn(),
+    resolveFactoryAsOf: vi.fn(),
+    loadNetPositionEmployees: vi.fn(),
+    applyHistoricProjection: vi.fn(),
     loggerError: vi.fn(),
   };
 });
 
-// Since #2212 the factory net position takes each customer at the Parties
-// page's combined ledger + operational balance, and employees straight from
-// employees.currentBalance.
+// Factory Net Position preserves present-day employee cache parity; historical
+// dates replay recorded vouchers and employee openings instead.
+vi.mock("../server/services/factory/netPositionEmployees", () => ({
+  loadFactoryNetPositionEmployees: harness.loadNetPositionEmployees,
+}));
+vi.mock("../server/routes/factory/employee-pos/netPositionHistoricalCorrection", () => ({
+  applyHistoricalOperationalCorrection: harness.applyHistoricProjection,
+}));
+vi.mock("../server/services/factory/netPositionAsOf", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../server/services/factory/netPositionAsOf")>()),
+  resolveFactoryNetPositionAsOf: harness.resolveFactoryAsOf,
+}));
 vi.mock("../server/routes/factory/customers-core/customerLedgerSplit", () => ({
   getCustomerLedgerAndMemo: harness.getCustomerLedgerAndMemo,
 }));
@@ -143,6 +155,17 @@ describe("Phase 33D employee/factory net position", () => {
     });
     harness.getCustomerLedgerAndMemo.mockResolvedValue(new Map());
     harness.loadHeldChargeSnapshot.mockResolvedValue({ byCustomer: new Map(), voucherIds: new Set() });
+    harness.loadNetPositionEmployees.mockResolvedValue([]);
+    harness.applyHistoricProjection.mockImplementation(async (_company: number, _scope: any, body: any) => body);
+    harness.resolveFactoryAsOf.mockImplementation(async (_company: number, requested: any) => {
+      const today = harness.getClientDate();
+      if (requested !== undefined && (typeof requested !== "string" || !/^\\d{4}-\\d{2}-\\d{2}$/.test(requested))) {
+        const { FactoryNetPositionDateError } = await import("../shared/factoryNetPositionAsOf");
+        throw new FactoryNetPositionDateError("INVALID_AS_OF_DATE");
+      }
+      const asOf = requested || today;
+      return { asOf, businessToday: today, timeZone: "UTC", isHistorical: asOf < today, historyBasis: "known-at-cutoff" };
+    });
   });
 
   it("returns 400 when neither the session nor an active factory company can resolve a company", async () => {
@@ -294,6 +317,10 @@ describe("Phase 33D employee/factory net position", () => {
       ]
     );
 
+    harness.loadNetPositionEmployees.mockResolvedValue([
+      { id: 11, name: "Bob Owes", code: "BOB", balance: -12 },
+      { id: 12, name: "Pat Due", code: "PAT", balance: 20 },
+    ]);
     const res = resHarness();
     await routes.get("GET /api/factory/net-position")!(req({ query: { asOf: "2026-09-15" } }), res);
 
@@ -369,7 +396,7 @@ describe("Phase 33D employee/factory net position", () => {
     expect(supplierArgs.getConfigFx("USD")).toBe(1);
     // A currency with no confirmed manual rate is refused, never guessed (#2216).
     expect(() => supplierArgs.getConfigFx("EUR")).toThrow("Missing confirmed USD exchange rate for EUR");
-    expect(harness.getCustomerLedgerAndMemo).toHaveBeenCalledWith(7, [5, 6], "2026-09-15");
+    expect(harness.getCustomerLedgerAndMemo).toHaveBeenCalledWith(7, [5, 6], "2026-09-15", expect.objectContaining({ asOf: "2026-09-15" }));
   });
 
   it("excludes both ledger sides of unfinalized charges before classifying net position", async () => {
@@ -426,14 +453,14 @@ describe("Phase 33D employee/factory net position", () => {
     expect(harness.classifyNetPositionAccounts.mock.calls[0][1].get(1)).toEqual({ debit: 0.3, credit: 0 });
   });
 
-  it("falls back to the client date when asOf is malformed", async () => {
+  it("rejects a malformed historical date instead of silently using today", async () => {
     harness.executeResults.push({ rows: [] }, { rows: [] });
     harness.selectResults.push([], [], [], [], [], []);
     const res = resHarness();
 
     await routes.get("GET /api/factory/net-position")!(req({ query: { asOf: "17/09/2026" } }), res);
 
-    expect(res.body.asOf).toBe("2026-09-17");
-    expect(harness.getClientDate).toHaveBeenCalledOnce();
+    expect(res.statusCode).toBe(400);
+    expect(res.body.code).toBe("INVALID_AS_OF_DATE");
   });
 });
