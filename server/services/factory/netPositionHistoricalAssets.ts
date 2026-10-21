@@ -6,7 +6,7 @@
  * their current ACTIVE status); worker advances are replayed from original
  * amount and dated individual repayments (not remaining_balance).
  */
-import { and, eq, inArray, lte, sql } from "drizzle-orm";
+import { and, eq, inArray, lte, sql, type SQL } from "drizzle-orm";
 import { propertyContracts, propertyMonthlyLedger, propertyPayments, propertyUnits,
   factoryWorkerAdvances, factoryAdvanceRepayments } from "@shared/schema";
 import type { FactoryNetPositionAsOf } from "@shared/factoryNetPositionAsOf";
@@ -18,7 +18,7 @@ import { netPositionRecordedThrough } from "./netPositionAsOf";
 const value = (v: string | number | null | undefined) => toMoney(v);
 const cents = (v: InstanceType<typeof MoneyDecimal>) =>
   v.toDecimalPlaces(2, MoneyDecimal.ROUND_HALF_UP).toNumber();
-const recorded = (column: ReturnType<typeof sql>, scope: FactoryNetPositionAsOf) =>
+const recorded = (column: SQL, scope: FactoryNetPositionAsOf) =>
   netPositionRecordedThrough(column, scope, "utc-naive-timestamp");
 
 export type HistoricalAssetLiabilityOperations = {
@@ -53,7 +53,6 @@ async function factoryWorkerAdvancesAsOf(companyId: number, scope: FactoryNetPos
   const advances = await db.select({
     id: factoryWorkerAdvances.id,
     amount: factoryWorkerAdvances.amount,
-    currentRemaining: factoryWorkerAdvances.remainingBalance,
   }).from(factoryWorkerAdvances).where(and(
     eq(factoryWorkerAdvances.companyId, companyId),
     lte(factoryWorkerAdvances.advanceDate, scope.asOf),
@@ -143,9 +142,9 @@ async function factoryRentalAsOf(companyId: number, scope: FactoryNetPositionAsO
   ]);
   const warnings = new Set<string>();
   warnings.add("HISTORICAL_RENT_EXPECTED_AMOUNTS_UNVERSIONED");
-  if (contracts.some(c => c.status !== "ACTIVE")) {
-    warnings.add("HISTORICAL_RENT_CONTRACT_STATUS_UNVERSIONED");
-  }
+  // Status ACTIVE/EXPIRED/CANCELLED is mutable with no reliable transition
+  // timestamps. Even currently ACTIVE contracts may have been reopened.
+  warnings.add("HISTORICAL_RENT_CONTRACT_STATUS_UNVERSIONED");
   const sums = new Map<number, { expected: InstanceType<typeof MoneyDecimal>; paid: InstanceType<typeof MoneyDecimal> }>();
   for (const contract of contracts) sums.set(contract.id, { expected: new MoneyDecimal(0), paid: new MoneyDecimal(0) });
   const billingDays = new Map(contracts.map(c => [c.id, getRentalBillingDay(c.startDate)]));
