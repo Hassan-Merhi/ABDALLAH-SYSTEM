@@ -900,6 +900,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       });
       res.json({
         ...datedBody,
+        companyId,
         businessToday: asOfContext.businessToday,
         timeZone: asOfContext.timeZone,
         historyBasis: asOfContext.historyBasis,
