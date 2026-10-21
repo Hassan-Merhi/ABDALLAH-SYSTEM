@@ -42,6 +42,7 @@ export type HistoricalOrderStage = "PENDING_VERIFICATION" | "LOADING" | "VERIFIE
 export function orderStageAt(events: {
   created: boolean; loadingStarted: boolean; verified: boolean; invoiced: boolean;
   currentStatus: string;
+  currentStateKnown?: boolean;
   loadingStartedAt?: string | null;
   verifiedAt?: string | null;
 }): HistoricalOrderStage {
@@ -54,7 +55,9 @@ export function orderStageAt(events: {
       events.loadingStartedAt > events.verifiedAt) return "LOADING";
   if (events.verified) return "VERIFIED";
   if (events.loadingStarted) return "LOADING";
-  if (events.currentStatus === "PENDING_VERIFICATION") return "PENDING_VERIFICATION";
+  if (events.currentStatus === "PENDING_VERIFICATION" && events.currentStateKnown) {
+    return "PENDING_VERIFICATION";
+  }
   return "UNKNOWN";
 }
 
@@ -174,6 +177,7 @@ type OrderRow = {
   loading_started_at: string | null; verified_at: string | null;
   finalized_at: string | null; updated_at: string;
   loading_before: boolean; verified_before: boolean; finalized_before: boolean;
+  state_known_before: boolean;
   scanned_qty: string; scanned_value: string; unknown_scans: string;
   had_charges: boolean; had_unknown_restores: boolean;
   unproven_verification: boolean;
@@ -226,6 +230,7 @@ async function getHistoricalOrders(
                      OR COALESCE(${isBefore(scope, "o.loading_finalized_at")},false))
                   THEN o.updated_at ELSE NULL END)::text AS verified_at,
            o.finalized_at::text AS finalized_at,
+           COALESCE(${isBefore(scope, "o.updated_at")},false) AS state_known_before,
            COALESCE(${isBefore(scope, "o.loading_started_at")},false) AS loading_before,
            (verify_event.recorded_at IS NOT NULL OR
              (COALESCE(${isBefore(scope, "o.updated_at")},false) AND
@@ -279,6 +284,7 @@ async function getHistoricalOrders(
       verified: r.verified_before,
       invoiced: r.finalized_before,
       currentStatus: r.current_status,
+      currentStateKnown: r.state_known_before,
       loadingStartedAt: r.loading_started_at,
       verifiedAt: r.verified_at,
     });
