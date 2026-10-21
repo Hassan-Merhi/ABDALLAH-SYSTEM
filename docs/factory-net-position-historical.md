@@ -50,6 +50,7 @@ Run in a local, disposable PostgreSQL 16 built the way CI builds it (`drizzle-ki
   | Customer invoice entered Oct 21, dated Oct 19 | 0 / 0 / 300 |
   | Payroll payable | 300 / 300 / 200 |
   | Worker advance | 100 / 80 / 50 |
+  | Prepaid Rent (100 due Oct 1; 60 dated Oct 15, posted Oct 20) | 100 / 40 / 40 |
   | OTW (EUR rate entered Oct 21 ignored before then) | 6,400 / 1,100 / 1,200 |
   | Raw material | 0 / 1,875 / 4,875 |
   | Balance on Table | 0 / 125 / 75 |

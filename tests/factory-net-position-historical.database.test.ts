@@ -276,6 +276,20 @@ databaseDescribe("Factory Net Position historical date filter (database)", () =>
     ids.bale3 = await bale("B3-", "RESERVED_FOR_ORDER", 0, "2026-10-10 08:00", "2026-10-21 16:00"); // scanned Oct 21
     ids.bale4 = await bale("B4-", "SOLD", 0, "2026-10-10 08:00", "2026-10-21 17:00"); // scanned Oct 12, verified Oct 21
 
+    // ── Rent: a FACTORY shop contract from Oct 1 with 100 due on Oct 1; the
+    //    tenant's 60, dated Oct 15, was only entered and posted on Oct 20.
+    ids.unit =
+      await one(sql`INSERT INTO property_units (company_id, module, unit_type, location_group, unit_number, active, created_at)
+      VALUES (${companyId}, 'FACTORY', 'SHOP', 'Front', ${"U" + suffix}, true, '2026-10-01 00:00') RETURNING id`);
+    ids.contract =
+      await one(sql`INSERT INTO property_contracts (company_id, module, unit_id, tenant_name, rental_amount, start_date, status, created_at)
+      VALUES (${companyId}, 'FACTORY', ${ids.unit}, 'Tenant One', 100, '2026-10-01', 'ACTIVE', '2026-10-01 00:00') RETURNING id`);
+    await db.execute(sql`INSERT INTO property_monthly_ledger (company_id, module, contract_id, unit_id, year, month, expected_amount, created_at)
+      VALUES (${companyId}, 'FACTORY', ${ids.contract}, ${ids.unit}, 2026, 10, 100, '2026-10-01 00:00')`);
+    await db.execute(sql`INSERT INTO property_payments (company_id, module, contract_id, unit_id, amount, payment_date, for_year, for_month,
+        posting_status, posted_at, created_at)
+      VALUES (${companyId}, 'FACTORY', ${ids.contract}, ${ids.unit}, 60, '2026-10-15', 2026, 10, 'POSTED', '2026-10-20 08:00', '2026-10-20 08:00')`);
+
     ids.location = await one(
       sql`INSERT INTO locations (company_id, code, name) VALUES (${companyId}, ${"L" + suffix}, 'Warehouse') RETURNING id`
     );
@@ -330,6 +344,10 @@ databaseDescribe("Factory Net Position historical date filter (database)", () =>
       "ledger_accounts",
       "factory_fx_rates",
       "locations",
+      "property_payments",
+      "property_monthly_ledger",
+      "property_contracts",
+      "property_units",
       "company_settings",
     ]) {
       await db.execute(sql`DELETE FROM ${sql.raw(table)} WHERE company_id = ${companyId}`);
@@ -369,6 +387,13 @@ databaseDescribe("Factory Net Position historical date filter (database)", () =>
 
     // Payroll payable: 300 accrued Oct 18; 100 paid (entered Oct 21).
     expect([d19.payrollPayable, d20.payrollPayable, d21.payrollPayable]).toEqual([300, 300, 200]);
+
+    // Rent: |100 due - 60 posted|, the payment known from Oct 20.
+    expect([
+      row(d19, "forUs", "PREPAID_RENT"),
+      row(d20, "forUs", "PREPAID_RENT"),
+      row(d21, "forUs", "PREPAID_RENT"),
+    ]).toEqual([100, 40, 40]);
 
     // Worker advance 100 - 20 (Oct 20) - 30 (Oct 21).
     expect([
