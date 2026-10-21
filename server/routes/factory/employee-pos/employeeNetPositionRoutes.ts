@@ -82,6 +82,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       // Each category will adopt the effective+recorded predicate in Phases 3–6.
       const asOfContext = await resolveFactoryNetPositionAsOf(companyId, req.query.asOf);
       const asOf = asOfContext.asOf;
+      const employeeBalances = await loadFactoryNetPositionEmployees(companyId, asOfContext);
 
       const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
@@ -123,6 +124,18 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         .from(ledgerAccounts)
         .where(and(eq(ledgerAccounts.companyId, companyId), isNull(ledgerAccounts.deletedAt)));
 
+      // Ledger lines on legacy EMP-<code> accounts also mutate the employee
+      // cached balance. For historic snapshots their voucher movement belongs
+      // on the employee row exactly once; retain any ledger ACCOUNT OPENING.
+      const historicalEmployeeCodes = new Set(employeeBalances.map(e => `EMP-${e.code.toUpperCase()}`));
+      const legacyEmployeeLedgerIds = new Set(
+        asOfContext.isHistorical
+          ? factoryAccounts.filter(a => a.code && historicalEmployeeCodes.has(a.code.toUpperCase())).map(a => a.id)
+          : []
+      );
+      const countedAsEmployee = (e: { ledgerAccountId: number | null; employeeId: number | null }) =>
+        asOfContext.isHistorical && e.employeeId == null && e.ledgerAccountId != null && legacyEmployeeLedgerIds.has(e.ledgerAccountId);
+
       const factoryVouchers = await db
         .select({ id: vouchers.id })
         .from(vouchers)
@@ -154,7 +167,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
 
       const exactBalances = new Map<number, { debit: Decimal; credit: Decimal }>();
       for (const e of factoryEntries) {
-        if (!e.ledgerAccountId) continue;
+        if (!e.ledgerAccountId || countedAsEmployee(e)) continue;
         const cur = exactBalances.get(e.ledgerAccountId);
         exactBalances.set(e.ledgerAccountId, {
           debit: toMoney(e.debitAmount).plus(cur?.debit ?? 0),
@@ -216,7 +229,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       if (heldSnapshot.voucherIds.size > 0) {
         const netByAccount = new Map<number, { debit: Decimal; credit: Decimal }>();
         for (const entry of factoryEntries) {
-          if (!entry.ledgerAccountId || heldSnapshot.voucherIds.has(entry.voucherId)) continue;
+          if (!entry.ledgerAccountId || heldSnapshot.voucherIds.has(entry.voucherId) || countedAsEmployee(entry)) continue;
           const current = netByAccount.get(entry.ledgerAccountId);
           netByAccount.set(entry.ledgerAccountId, {
             debit: toMoney(entry.debitAmount).plus(current?.debit ?? 0),
@@ -569,7 +582,6 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       // One signed, dated Employee projection shared with payroll-breakdown.
       // Today preserves employees.current_balance; historical dates replay
       // opening + recorded vouchers and do not subtract from today's cache.
-      const employeeBalances = await loadFactoryNetPositionEmployees(companyId, asOfContext);
       let salariesPayableExact = new MoneyDecimal(0);
       let receivablesExact = new MoneyDecimal(0);
       const employeeReceivableItems: { name: string; balanceUsd: number }[] = [];
