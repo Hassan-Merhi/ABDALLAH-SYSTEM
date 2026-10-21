@@ -3,6 +3,7 @@ import { resolveFactoryNetPositionAsOf, netPositionKnownTransactionThrough, netP
 import { loadFactoryNetPositionEmployees } from "../../../services/factory/netPositionEmployees";
 import { loadHistoricalFactoryPipeline } from "../../../services/factory/netPositionHistoricalPipeline";
 import { computeHistoricalFactoryAssetLiabilityOperations } from "../../../services/factory/netPositionHistoricalAssets";
+import { reconcileHistoricalPosition } from "../../../services/factory/netPositionReportTotals";
 import { applyHistoricalOperationalCorrection } from "./netPositionHistoricalCorrection";
 import {
   fxAgentTablesExist,
@@ -850,9 +851,14 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       // Explicit, awaited operation rather than rewriting res.json in
       // middleware. Any failure MUST be an error, never today's figures
       // falsely presented under yesterday's heading.
-      const datedBody = asOfContext.isHistorical
+      const projectedBody = asOfContext.isHistorical
         ? await applyHistoricalOperationalCorrection(companyId, asOfContext, responseBody, valuationMode)
         : responseBody;
+      // A SINGLE dated response is authoritative for overview, details, custom
+      // subtotals and all expanded groups. The live/current response stays as-is.
+      const datedBody = asOfContext.isHistorical
+        ? reconcileHistoricalPosition(projectedBody)
+        : projectedBody;
       const inventoryHistoryWarnings: string[] = asOfContext.isHistorical
         ? ((datedBody as typeof responseBody & { inventoryHistoryWarnings?: string[] }).inventoryHistoryWarnings ?? [])
         : [];
