@@ -25,6 +25,7 @@ import type { AccountDisplayLayout } from "../accounts/DisplayAccountGroups";
 import { useAccountDisplayOrder } from "@/hooks/useAccountDisplayOrder";
 import { InlineOrderButtons, inlineDrag, type InlineOrderActions } from "@/components/accounts/InlineOrderButtons";
 import { useUserPreferences } from "@/hooks/use-user-preferences";
+import { getAppDate } from "@/lib/queryClient";
 
 interface AccountItem {
   id?: number;
@@ -40,6 +41,10 @@ interface BreakdownItem {
 }
 
 interface FactoryNetPositionData {
+  asOf?: string;
+  businessToday?: string;
+  historyCompleteness?: "current" | "partial" | "complete";
+  historyWarnings?: string[];
   forUsTotal: number;
   onUsTotal: number;
   netPosition: number;
@@ -329,9 +334,6 @@ function CollapsibleSection({
   );
 }
 
-function todayStr() {
-  return new Date().toISOString().slice(0, 10);
-}
 function shiftDate(date: string, days: number): string {
   const d = new Date(date + "T12:00:00Z");
   d.setUTCDate(d.getUTCDate() + days);
@@ -628,15 +630,18 @@ export default function FactoryNetPositionDetails() {
     swap: accountOrder.swap,
     move: accountOrder.move,
   };
-  const [asOf, setAsOf] = useState<string>(todayStr);
-  const isToday = asOf === todayStr();
+  // Empty selection means "company business today" resolved by the API.
+  // A browser in a different timezone must not pick the accounting cutoff.
+  const [asOf, setAsOf] = useState<string>("");
+  const isToday = !asOf;
   const { prefs, updatePref, isPending: isSavingValuationMode } = useUserPreferences();
   const valuationMode = prefs?.factoryNetPositionValuationMode === "selling" ? "selling" : "cost";
 
   const { data, isLoading, error, refetch, isFetching } = useQuery<FactoryNetPositionData>({
-    queryKey: ["/api/factory/net-position", asOf, valuationMode],
+    queryKey: ["/api/factory/net-position", asOf || "company-today", valuationMode],
     queryFn: async () => {
-      const params = new URLSearchParams({ asOf, valuationMode });
+      const params = new URLSearchParams({ valuationMode });
+      if (asOf) params.set("asOf", asOf);
       const res = await fetch(`/api/factory/net-position?${params.toString()}`, { credentials: "include" });
       if (!res.ok) {
         const text = await res.text();
@@ -651,13 +656,17 @@ export default function FactoryNetPositionDetails() {
       }
       return res.json();
     },
-    staleTime: isToday ? 60_000 : Infinity,
+    // Historical data can change after audited late entry/backfill.
+    staleTime: 60_000,
     refetchOnWindowFocus: false,
     // Auto-retry when the concurrency guard fires (max 3 attempts, 6 s apart)
     retry: (failureCount, err: unknown) =>
       (err as { code?: string } | null)?.code === "ENDPOINT_BUSY" ? failureCount < 3 : false,
     retryDelay: (_, err: unknown) => ((err as { code?: string } | null)?.code === "ENDPOINT_BUSY" ? 6_000 : 0),
   });
+
+  const displayAsOf = asOf || data?.asOf || getAppDate();
+  const companyToday = data?.businessToday || getAppDate();
 
   if (isLoading) {
     return (
@@ -715,7 +724,7 @@ export default function FactoryNetPositionDetails() {
             subtitle={
               isToday
                 ? "Current factory financial standing — what we have vs what we owe"
-                : `Historical snapshot — as of ${formatDateLabel(asOf)}`
+                : `Historical snapshot — as of ${formatDateLabel(displayAsOf)}`
             }
           />
         </div>
@@ -745,7 +754,7 @@ export default function FactoryNetPositionDetails() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setAsOf(shiftDate(asOf, -1))}
+              onClick={() => setAsOf(shiftDate(displayAsOf, -1))}
               data-testid="button-date-prev"
               title="Previous day"
             >
@@ -755,9 +764,9 @@ export default function FactoryNetPositionDetails() {
               <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
               <input
                 type="date"
-                value={asOf}
-                max={todayStr()}
-                onChange={(e) => e.target.value && setAsOf(e.target.value)}
+                value={displayAsOf}
+                max={companyToday}
+                onChange={(e) => e.target.value && setAsOf(e.target.value >= companyToday ? "" : e.target.value)}
                 className="text-sm bg-transparent border-none outline-hidden cursor-pointer w-[120px]"
                 data-testid="input-as-of-date"
               />
@@ -765,7 +774,10 @@ export default function FactoryNetPositionDetails() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setAsOf(shiftDate(asOf, 1))}
+              onClick={() => {
+                const next = shiftDate(displayAsOf, 1);
+                setAsOf(next >= companyToday ? "" : next);
+              }}
               disabled={isToday}
               data-testid="button-date-next"
               title="Next day"
@@ -774,7 +786,7 @@ export default function FactoryNetPositionDetails() {
             </Button>
           </div>
           {!isToday && (
-            <Button variant="outline" size="sm" onClick={() => setAsOf(todayStr())} data-testid="button-date-today">
+            <Button variant="outline" size="sm" onClick={() => setAsOf("")} data-testid="button-date-today">
               Today
             </Button>
           )}
@@ -793,6 +805,11 @@ export default function FactoryNetPositionDetails() {
         </div>
       </div>
 
+      {data?.historyCompleteness === "partial" && (
+        <div role="status" className="text-sm text-amber-700 dark:text-amber-300" data-testid="historical-data-warning">
+          {data.historyWarnings?.[0] || "Historical reconstruction is incomplete; some values may still reflect current state."}
+        </div>
+      )}
       <div className="text-xs text-muted-foreground -mt-2" data-testid="text-inventory-valuation-mode">
         Stock in Hand valued at {valuationMode === "selling" ? "Selling" : "Cost"} · Balance on Table stays at Cost
       </div>
@@ -886,7 +903,7 @@ export default function FactoryNetPositionDetails() {
         />
       </div>
 
-      {data && <CustomNetPositionView data={data} formatAmount={formatAmount} asOf={asOf} />}
+      {data && <CustomNetPositionView data={data} formatAmount={formatAmount} asOf={displayAsOf} />}
     </div>
   );
 }
