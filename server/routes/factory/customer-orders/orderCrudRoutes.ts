@@ -45,34 +45,51 @@ export function registerOrderCrudRoutes(app: Express) {
       }
       const orderId = parseId(req.params.id);
       const customerId = parseId(req.body?.customerId);
-      if (orderId === null || customerId === null) return res.status(400).json({ message: "Valid order and customer IDs required" });
+      if (orderId === null || customerId === null)
+        return res.status(400).json({ message: "Valid order and customer IDs required" });
       const updated = await db.transaction(async (tx) => {
-        const [order] = await tx.select().from(customerOrders)
+        const [order] = await tx
+          .select()
+          .from(customerOrders)
           .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)))
           .for("update");
         if (!order || order.deletedAt) throw new HttpError(404, "Loading not found");
-        if (order.status !== "LOADING") throw new HttpError(409, "Return the invoice to Loading before changing customer");
+        if (order.status !== "LOADING")
+          throw new HttpError(409, "Return the invoice to Loading before changing customer");
         if (order.customerId === customerId) return order;
-        const [target] = await tx.select({ id: customers.id }).from(customers)
+        const [target] = await tx
+          .select({ id: customers.id })
+          .from(customers)
           .where(and(eq(customers.id, customerId), eq(customers.companyId, companyId)));
         if (!target) throw new HttpError(404, "Target customer not found in this company");
-        await tx.execute(sql`DELETE FROM customer_order_expected_lines WHERE company_id = ${companyId} AND order_id = ${orderId}`);
-        const [written] = await tx.update(customerOrders).set({
-          customerId, proformaIdUsed: null, updatedAt: new Date(),
-        }).where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId))).returning();
-        await logAudit({
-          userId: req.session.userId!,
-          username: req.session.username || req.session.userId!,
-          companyId,
-          action: "update",
-          tableName: "factory_customer_orders",
-          recordId: orderId,
-          recordIdentifier: orderAuditIdentifier(order, orderId),
-          changes: {
-            customerId: { old: order.customerId, new: customerId },
-            proformaIdUsed: { old: order.proformaIdUsed, new: null },
+        await tx.execute(
+          sql`DELETE FROM customer_order_expected_lines WHERE company_id = ${companyId} AND order_id = ${orderId}`
+        );
+        const [written] = await tx
+          .update(customerOrders)
+          .set({
+            customerId,
+            proformaIdUsed: null,
+            updatedAt: new Date(),
+          })
+          .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)))
+          .returning();
+        await logAudit(
+          {
+            userId: req.session.userId!,
+            username: req.session.username || req.session.userId!,
+            companyId,
+            action: "update",
+            tableName: "factory_customer_orders",
+            recordId: orderId,
+            recordIdentifier: orderAuditIdentifier(order, orderId),
+            changes: {
+              customerId: { old: order.customerId, new: customerId },
+              proformaIdUsed: { old: order.proformaIdUsed, new: null },
+            },
           },
-        }, tx);
+          tx
+        );
         return written;
       });
       res.json(updated);
@@ -264,7 +281,7 @@ export function registerOrderCrudRoutes(app: Express) {
         invoiceNumber: r.invoice_number ?? null,
         orderDate: r.order_date,
         proformaIdUsed: r.proforma_id_used ?? null,
-        status: r.status ?? "DRAFT",
+        status: String(r.status ?? "DRAFT"),
         subtotalBales: r.subtotal_bales ?? "0",
         freightAmount: r.freight_amount ?? "0",
         otherChargesTotal: r.other_charges_total ?? "0",
@@ -280,7 +297,7 @@ export function registerOrderCrudRoutes(app: Express) {
         loadingStartedAt: r.loading_started_at ?? null,
         loadingFinalizedAt: r.loading_finalized_at ?? null,
         locationId: r.location_id ?? null,
-        createdAt: r.created_at,
+        createdAt: r.created_at as Date | string,
         updatedAt: r.updated_at ?? r.created_at,
         customerName: r.customer_name ?? null,
         customerCode: r.customer_code ?? null,
@@ -322,21 +339,21 @@ export function registerOrderCrudRoutes(app: Express) {
           ? await db.select().from(customerProformaLines).where(eq(customerProformaLines.proformaId, orderProformaId))
           : [];
         const savedProformaLines = currentExpectedLines.map((line) => {
-              const source =
-                originalProformaLines.find((original) => original.id === line.proformaLineId) ||
-                originalProformaLines.find(
-                  (original) => original.articleCode.trim().toLowerCase() === line.articleCode.trim().toLowerCase()
-                );
-              return {
-                id: line.id,
-                articleCode: line.articleCode,
-                productName: line.productName || source?.productName || line.articleCode,
-                quantity: line.expectedQty,
-                pricePerBale: source?.pricePerBale ?? "0",
-                pricingMode: source?.pricingMode ?? "per_bale",
-                pricePerKg: source?.pricePerKg ?? null,
-              };
-            });
+          const source =
+            originalProformaLines.find((original) => original.id === line.proformaLineId) ||
+            originalProformaLines.find(
+              (original) => original.articleCode.trim().toLowerCase() === line.articleCode.trim().toLowerCase()
+            );
+          return {
+            id: line.id,
+            articleCode: line.articleCode,
+            productName: line.productName || source?.productName || line.articleCode,
+            quantity: line.expectedQty,
+            pricePerBale: source?.pricePerBale ?? "0",
+            pricingMode: source?.pricingMode ?? "per_bale",
+            pricePerKg: source?.pricePerKg ?? null,
+          };
+        });
         const planKind = await getLoadingPlanKind(db, companyId, id);
         const proformaLines = usesLiveMasterProforma(order.status, planKind)
           ? originalProformaLines
@@ -837,7 +854,13 @@ export function registerOrderCrudRoutes(app: Express) {
         if (!order || order.deletedAt) throw new HttpError(404, "Loading not found");
 
         const changes: Record<string, { old: string | null; new: string | null }> = {};
-        const fieldNames = ["containerNumber", "shippingCompany", "containerNotes", "bookingInfo", "destination"] as const;
+        const fieldNames = [
+          "containerNumber",
+          "shippingCompany",
+          "containerNotes",
+          "bookingInfo",
+          "destination",
+        ] as const;
         for (const field of fieldNames) {
           if (updateData[field] !== undefined && updateData[field] !== (order[field] || null)) {
             changes[field] = { old: order[field] ?? null, new: updateData[field] as string | null };
@@ -849,16 +872,19 @@ export function registerOrderCrudRoutes(app: Express) {
           .set({ ...updateData, updatedAt: new Date() })
           .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)))
           .returning();
-        await logAudit({
-          userId: req.session.userId!,
-          username: req.session.username || req.session.userId!,
-          companyId,
-          action: "update",
-          tableName: "factory_customer_orders",
-          recordId: orderId,
-          recordIdentifier: orderAuditIdentifier(order, orderId),
-          changes,
-        }, tx);
+        await logAudit(
+          {
+            userId: req.session.userId!,
+            username: req.session.username || req.session.userId!,
+            companyId,
+            action: "update",
+            tableName: "factory_customer_orders",
+            recordId: orderId,
+            recordIdentifier: orderAuditIdentifier(order, orderId),
+            changes,
+          },
+          tx
+        );
         return written;
       });
       // Booking information is private even when the caller edits other fields.
