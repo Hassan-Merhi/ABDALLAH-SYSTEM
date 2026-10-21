@@ -174,10 +174,18 @@ export default function FactoryNetPosition() {
       {!isToday && (
         <div className="flex items-center gap-2 px-4 py-2 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-sm">
           <CalendarDays className="h-4 w-4 shrink-0" />
-          <span>
+          <div>
             Showing net position as of <strong>{formatDateLabel(displayAsOf)}</strong>.{" "}
             {data?.historyWarnings?.[0] || "Historical reconstruction is in progress; current-state values may remain."}
-          </span>
+            {!!data?.historyWarnings?.slice(1).length && (
+              <details className="mt-1">
+                <summary className="cursor-pointer">Historical data limitations ({data.historyWarnings.length - 1})</summary>
+                <ul className="list-disc pl-5 mt-1 space-y-1">
+                  {data.historyWarnings.slice(1).map((warning, index) => <li key={index}>{warning}</li>)}
+                </ul>
+              </details>
+            )}
+          </div>
         </div>
       )}
 
