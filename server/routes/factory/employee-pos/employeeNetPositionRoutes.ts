@@ -3,7 +3,7 @@ import { resolveFactoryNetPositionAsOf, netPositionKnownTransactionThrough, netP
 import { loadFactoryNetPositionEmployees } from "../../../services/factory/netPositionEmployees";
 import { loadHistoricalFactoryPipeline } from "../../../services/factory/netPositionHistoricalPipeline";
 import { computeHistoricalFactoryAssetLiabilityOperations } from "../../../services/factory/netPositionHistoricalAssets";
-import { reconcileHistoricalPosition } from "../../../services/factory/netPositionReportTotals";
+import { reconcileHistoricalPosition, sumPositionRows } from "../../../services/factory/netPositionReportTotals";
 import { loadFactoryHistoricalCoverage } from "../../../services/factory/netPositionHistoryCoverage";
 import { assertHistoricalReportIntegrity } from "../../../services/factory/netPositionHistoricalIntegrity";
 import { applyHistoricalOperationalCorrection } from "./netPositionHistoricalCorrection";
@@ -871,6 +871,14 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         ? reconcileHistoricalPosition(projectedBody)
         : projectedBody;
       if (asOfContext.isHistorical) {
+        // Financial summary fields must sum the same rounded currency rows as
+        // the displayed supplier subaccounts; no separate float accumulation.
+        datedBody.supplierLiabilities = sumPositionRows(
+          datedBody.onUs.accounts.filter(row => row.code === "SUPPLIER")
+        );
+        datedBody.supplierOverpayments = sumPositionRows(
+          datedBody.forUs.accounts.filter(row => row.code === "SUPPLIER_OVERPAID")
+        );
         assertHistoricalReportIntegrity(datedBody);
       }
       const inventoryHistoryWarnings: string[] = asOfContext.isHistorical
