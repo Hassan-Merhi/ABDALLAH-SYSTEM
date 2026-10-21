@@ -35,6 +35,11 @@ export interface OrderItem {
 }
 
 export interface NetPositionData {
+  asOf?: string;
+  businessToday?: string;
+  timeZone?: string;
+  historyCompleteness?: "current" | "partial" | "complete";
+  historyWarnings?: string[];
   fxAgentWalletWarnings?: string[];
   forUsTotal: number;
   onUsTotal: number;
