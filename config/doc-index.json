@@ -421,6 +421,16 @@
     "docs/use-cases.md": "reference",
     "docs/ux-consistency-program.md": "reference",
     "docs/vouchers-flow.md": "reference",
-    "docs/what-is-this.md": "reference"
+    "docs/what-is-this.md": "reference",
+    "docs/archive/factory-net-position-phase1-audit.md": "record",
+    "docs/archive/factory-net-position-phase2-date-engine.md": "record",
+    "docs/archive/factory-net-position-phase3-historical-parties.md": "record",
+    "docs/archive/factory-net-position-phase4-inventory-history.md": "record",
+    "docs/archive/factory-net-position-phase5-historical-pipeline.md": "record",
+    "docs/archive/factory-net-position-phase6-assets-liabilities.md": "record",
+    "docs/archive/factory-net-position-phase7-ui-reconciliation.md": "record",
+    "docs/archive/factory-net-position-phase8-history-integrity.md": "record",
+    "docs/archive/factory-net-position-phase9-handoff.md": "record",
+    "docs/factory-net-position-historical.md": "reference"
   }
 }

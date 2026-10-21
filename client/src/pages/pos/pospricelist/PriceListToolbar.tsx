@@ -145,7 +145,16 @@ export function PriceListLocationVisibility({ model }: { model: PosPriceListMode
 }
 
 export function PriceListSearchRow({ model }: { model: PosPriceListModel }) {
-  const { selectedLocationId, stockGroups, showUnpriced, canEdit, unpricedCount, hideZeroQty, showZeroQty, zeroQtyCount } = model;
+  const {
+    selectedLocationId,
+    stockGroups,
+    showUnpriced,
+    canEdit,
+    unpricedCount,
+    hideZeroQty,
+    showZeroQty,
+    zeroQtyCount,
+  } = model;
   if (!selectedLocationId) return null;
   return (
     <div className="flex flex-wrap items-center gap-2 px-4 py-2.5 border-b shrink-0">
@@ -174,7 +183,7 @@ export function PriceListSearchRow({ model }: { model: PosPriceListModel }) {
           </SelectContent>
         </Select>
       )}
-      {model.posUser && (
+      {Boolean(model.posUser) && (
         <button
           type="button"
           data-testid="button-show-zero-qty"

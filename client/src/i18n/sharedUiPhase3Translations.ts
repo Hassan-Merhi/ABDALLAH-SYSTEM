@@ -15,6 +15,7 @@ import { phase3RemainingTranslationsPart05 } from "./phase3RemainingTranslations
 import { phase3RemainingTranslationsPart06 } from "./phase3RemainingTranslations.part06";
 import { phase3RemainingTranslationsPart07 } from "./phase3RemainingTranslations.part07";
 import { phase3RemainingTranslationsPart08 } from "./phase3RemainingTranslations.part08";
+import { phase3RemainingTranslationsPart31 } from "./phase3RemainingTranslations.part31";
 import { phase3RemainingTranslationsPart09 } from "./phase3RemainingTranslations.part09";
 import { phase3RemainingTranslationsPart10 } from "./phase3RemainingTranslations.part10";
 import { phase3RemainingTranslationsPart11 } from "./phase3RemainingTranslations.part11";
@@ -55,6 +56,7 @@ export const phase3SharedUiTranslations: readonly Phase3SharedUiEntry[] = [
   ...phase3RemainingTranslationsPart06,
   ...phase3RemainingTranslationsPart07,
   ...phase3RemainingTranslationsPart08,
+  ...phase3RemainingTranslationsPart31,
   ...phase3RemainingTranslationsPart09,
   ...phase3RemainingTranslationsPart10,
   ...phase3RemainingTranslationsPart11,
