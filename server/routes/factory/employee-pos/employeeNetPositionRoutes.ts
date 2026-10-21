@@ -1,6 +1,7 @@
 import { FactoryNetPositionDateError } from "@shared/factoryNetPositionAsOf";
 import { resolveFactoryNetPositionAsOf, netPositionKnownTransactionThrough, netPositionRecordedThrough } from "../../../services/factory/netPositionAsOf";
 import { loadFactoryNetPositionEmployees } from "../../../services/factory/netPositionEmployees";
+import { loadHistoricalFactoryPipeline } from "../../../services/factory/netPositionHistoricalPipeline";
 import { applyHistoricalOperationalCorrection } from "./netPositionHistoricalCorrection";
 import {
   fxAgentTablesExist,
@@ -370,7 +371,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         inventorySellValue: computedInventorySellValue,
         inventorySellingValue,
         rawMaterialStockValue: computedRawMaterialStockValue,
-        stockOtwValue,
+        stockOtwValue: computedStockOtwValue,
         balanceOnTableValue: computedBalanceOnTableValue,
       } = await computeNetPositionInventory({
         companyId,
@@ -380,6 +381,14 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         supplierLockedRateMapNp,
         allContainersF,
       });
+
+      // Only the historical report reconstructs OTW and scan/verification
+      // lifecycle from dated events. The live/current Net Position keeps its
+      // existing accepted behavior; no source orders or containers are edited.
+      const historicalPipeline = asOfContext.isHistorical
+        ? await loadHistoricalFactoryPipeline(companyId, asOfContext, getConfigFx)
+        : null;
+      const stockOtwValue = historicalPipeline?.stockOtwValue ?? computedStockOtwValue;
 
       // From the cut-over the ledger's factory stock accounts replace the computed
       // values (the selling-price view keeps its bale value, in place of the
@@ -397,7 +406,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       // Allocated bales are excluded from Stock In Hand by
       // computeNetPositionInventory, including bales still marked IN_STOCK,
       // so an order's allocated stock is not also valued as available inventory.
-      const pendingVerifiedRows = await db
+      const pendingVerifiedRows = historicalPipeline ? [] : await db
         .select({
           id: customerOrders.id,
           status: customerOrders.status,
@@ -426,13 +435,19 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         totalQtyBales: r.totalQtyBales ?? 0,
       });
 
-      const pendingOrders = pendingVerifiedRows.filter((r) => r.status === "PENDING_VERIFICATION").map(mapOrder);
-      const verifiedOrders = pendingVerifiedRows.filter((r) => r.status === "VERIFIED").map(mapOrder);
-      const loadingOrders = pendingVerifiedRows.filter((r) => r.status === "LOADING").map(mapOrder);
+      const pendingOrders = historicalPipeline?.pendingOrders
+        ?? pendingVerifiedRows.filter((r) => r.status === "PENDING_VERIFICATION").map(mapOrder);
+      const verifiedOrders = historicalPipeline?.verifiedOrders
+        ?? pendingVerifiedRows.filter((r) => r.status === "VERIFIED").map(mapOrder);
+      const loadingOrders = historicalPipeline?.loadingOrders
+        ?? pendingVerifiedRows.filter((r) => r.status === "LOADING").map(mapOrder);
 
-      const pendingTotal = round2(pendingOrders.reduce((s, o) => s + o.grandTotal, 0));
-      const verifiedTotal = round2(verifiedOrders.reduce((s, o) => s + o.grandTotal, 0));
-      const loadingTotal = round2(loadingOrders.reduce((s, o) => s + o.grandTotal, 0));
+      const pendingTotal = historicalPipeline?.pendingTotal
+        ?? round2(pendingOrders.reduce((s, o) => s + o.grandTotal, 0));
+      const verifiedTotal = historicalPipeline?.verifiedTotal
+        ?? round2(verifiedOrders.reduce((s, o) => s + o.grandTotal, 0));
+      const loadingTotal = historicalPipeline?.loadingTotal
+        ?? round2(loadingOrders.reduce((s, o) => s + o.grandTotal, 0));
 
       // ── 5. Combine and return ────────────────────────────────────────────
       // Rename for clarity — these are the two factory-specific values.
@@ -838,6 +853,19 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         HISTORICAL_STOCK_REMOVAL_TIME_UNKNOWN: "Some removed/repacked bales have no reliable removal or repack time.",
         HISTORICAL_STOCK_SELLING_PRICE_UNVERSIONED: "Historical selling prices are not versioned; the selling-price view uses today's catalogue prices.",
         HISTORICAL_STOCK_COST_EDITS_NOT_VERSIONED: "Earlier bale costs may have been edited or re-costed without a retained historical price version.",
+        HISTORICAL_OTW_STATUS_HISTORY_MISSING: "Some containers have no dated cancellation or status history; their earlier eligibility requires review.",
+        HISTORICAL_OTW_LEGACY_OFFLOAD: "A container offload uses a legacy cumulative stock record because individual receipt events are missing.",
+        HISTORICAL_OTW_PLANNED_WEIGHT_MISSING: "Some containers have no reliable planned weight, so their historical OTW amount cannot be calculated.",
+        HISTORICAL_OTW_RECEIPTS_EXCEED_PLAN: "Dated receipts exceed their container's currently recorded planned weight.",
+        HISTORICAL_OTW_GOODS_RATE_UNVERSIONED: "A container lacks an original per-kg goods rate; its current final-payable amount was used provisionally.",
+        HISTORICAL_OTW_CHARGES_UNVERSIONED: "Older container freight/commission/charges are not versioned; outstanding amounts use a provisional proportional allocation.",
+        HISTORICAL_OTW_MASTER_VALUES_UNVERSIONED: "Historical container planned quantities and source price edits are not fully versioned.",
+        HISTORICAL_ORDER_LIFECYCLE_UNVERSIONED: "Some older orders lack dated loading/verification status transitions and cannot be included reliably.",
+        HISTORICAL_ORDER_FINALIZATION_MISSING: "Some finalized orders have no trustworthy finalization timestamp.",
+        HISTORICAL_ORDER_RESTORE_TIME_UNKNOWN: "Some bale scans were restored without a separately dated restoration event.",
+        HISTORICAL_ORDER_SCAN_TIME_MISSING: "Older bale scans with no timestamp cannot be assigned to a prior day.",
+        HISTORICAL_ORDER_CHARGES_UNVERSIONED: "Order freight and charges lack creation/version timestamps, so historical scan totals exclude these unproven charges.",
+        HISTORICAL_ORDER_SCAN_PRICE_EDITS_UNVERSIONED: "An earlier scanned bale's price may have been edited without retaining the original version.",
       };
       res.json({
         ...datedBody,
@@ -849,6 +877,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
           ? [
               "Historical category reconstruction remains partial until all operational and financial events are reconciled.",
               ...inventoryHistoryWarnings.map(code => inventoryWarningText[code] ?? code),
+              ...(historicalPipeline?.warnings ?? []).map(code => inventoryWarningText[code] ?? code),
             ]
           : [],
       });
