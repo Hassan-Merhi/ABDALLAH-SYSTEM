@@ -159,7 +159,7 @@ describe("Phase 33D employee/factory net position", () => {
     harness.applyHistoricProjection.mockImplementation(async (_company: number, _scope: any, body: any) => body);
     harness.resolveFactoryAsOf.mockImplementation(async (_company: number, requested: any) => {
       const today = harness.getClientDate();
-      if (requested !== undefined && (typeof requested !== "string" || !/^\\d{4}-\\d{2}-\\d{2}$/.test(requested))) {
+      if (requested !== undefined && (typeof requested !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(requested))) {
         const { FactoryNetPositionDateError } = await import("../shared/factoryNetPositionAsOf");
         throw new FactoryNetPositionDateError("INVALID_AS_OF_DATE");
       }
