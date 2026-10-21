@@ -68,7 +68,7 @@ function InsuranceSubGroup({
   formatAmount: (n: number) => string;
 }) {
   const [open, setOpen] = useState(false);
-  const total = accounts.reduce((s, a) => s + Math.abs(a.value), 0);
+  const total = accounts.reduce((s, a) => s + a.value, 0);
 
   return (
     <>
@@ -113,7 +113,7 @@ function InsuranceSubGroup({
               <span className="font-medium text-foreground">{acc.name.replace(/^Insurance\s*[-–]\s*/i, "")}</span>
             )}
             <span className={`shrink-0 whitespace-nowrap font-mono tabular-nums ${amountColor}`}>
-              {formatAmount(Math.abs(acc.value))}
+              {formatAmount(acc.value)}
             </span>
           </div>
         ))}
@@ -141,7 +141,7 @@ function CategoryGroup({
   actions?: InlineOrderActions;
 }) {
   const [open, setOpen] = useState(true);
-  const total = accounts.reduce((s, a) => s + Math.abs(a.value), 0);
+  const total = accounts.reduce((s, a) => s + a.value, 0);
 
   const insuranceAccounts = accounts.filter((a) => /^Insurance\s*[-–]/i.test(a.name));
   const otherAccounts = accounts.filter((a) => !/^Insurance\s*[-–]/i.test(a.name));
@@ -201,7 +201,7 @@ function CategoryGroup({
                   actions={actions}
                 />
                 <span className={`shrink-0 whitespace-nowrap font-mono tabular-nums ${amountColor}`}>
-                  {formatAmount(Math.abs(acc.value))}
+                  {formatAmount(acc.value)}
                 </span>
               </div>
             </div>
@@ -275,7 +275,7 @@ function CollapsibleSection({
       if (ai != null && bi != null) return ai - bi;
       if (ai != null) return -1;
       if (bi != null) return 1;
-      return b.reduce((s, x) => s + Math.abs(x.value), 0) - a.reduce((s, x) => s + Math.abs(x.value), 0);
+      return b.reduce((s, x) => s + x.value, 0) - a.reduce((s, x) => s + x.value, 0);
     });
 
   const groupKeys = sortedCategories.filter(([key]) => labels.has(key)).map(([key]) => key.slice("display:".length));
@@ -353,6 +353,13 @@ interface PayrollEmployee {
   balance: number;
 }
 
+/** Reuse name-based saved hide keys except where duplicate names need distinct controls. */
+function rowVisibilityKey(side: "forUs" | "onUs", account: AccountItem, index: number, rows: AccountItem[]) {
+  return rows.filter(row => row.name === account.name).length > 1
+    ? `${side}:${account.id != null ? `ledger:${account.id}` : `${account.code}:${account.name}:${index}`}`
+    : `${side}:${account.name}`;
+}
+
 function CustomNetPositionView({
   data,
   formatAmount,
@@ -372,7 +379,7 @@ function CustomNetPositionView({
   });
 
   // Fetch per-employee payroll breakdown
-  const { data: payrollData } = useQuery<{ employees: PayrollEmployee[] }>({
+  const { data: payrollData, isError: isPayrollError } = useQuery<{ employees: PayrollEmployee[]; asOf: string }>({
     queryKey: ["/api/factory/net-position/payroll-breakdown", asOf],
     queryFn: async () => {
       const res = await fetch(`/api/factory/net-position/payroll-breakdown?asOf=${asOf}`, { credentials: "include" });
@@ -382,7 +389,16 @@ function CustomNetPositionView({
     staleTime: 30_000,
   });
 
-  const payrollEmployees = useMemo(() => payrollData?.employees ?? [], [payrollData?.employees]);
+  const payrollRow = data.onUs.accounts.find(a => a.code === "EMPLOYEE_PAYROLL_PAYABLE");
+  const payrollMatchesReport = !!payrollData && payrollData.asOf === asOf &&
+    Math.abs((payrollData.employees ?? []).reduce((sum, employee) => sum + employee.balance, 0)
+      - (payrollRow?.value ?? 0)) <= 0.01;
+  // Never drop an aggregate Payroll Payable while its separate breakdown is
+  // loading, stale, or inconsistent with the same as-of main snapshot.
+  const payrollEmployees = useMemo(
+    () => payrollMatchesReport ? payrollData?.employees ?? [] : [],
+    [payrollMatchesReport, payrollData?.employees]
+  );
 
   const toggleKey = useCallback((key: string) => {
     setHiddenKeys((prev) => {
@@ -416,17 +432,17 @@ function CustomNetPositionView({
   const onUsAccounts = useMemo(
     () =>
       (data.onUs.accounts || [])
-        .filter((a) => a.name !== "Payroll Payable")
+        .filter((a) => !(payrollMatchesReport && a.code === "EMPLOYEE_PAYROLL_PAYABLE"))
         .map((a) => ({ ...a, side: "onUs" as const })),
-    [data]
+    [data, payrollMatchesReport]
   );
 
   const visibleForUs = useMemo(
-    () => forUsAccounts.filter((a) => !hiddenKeys.has(`forUs:${a.name}`)),
+    () => forUsAccounts.filter((a, index) => !hiddenKeys.has(rowVisibilityKey("forUs", a, index, forUsAccounts))),
     [forUsAccounts, hiddenKeys]
   );
   const visibleOnUs = useMemo(
-    () => onUsAccounts.filter((a) => !hiddenKeys.has(`onUs:${a.name}`)),
+    () => onUsAccounts.filter((a, index) => !hiddenKeys.has(rowVisibilityKey("onUs", a, index, onUsAccounts))),
     [onUsAccounts, hiddenKeys]
   );
   const visiblePayrollTotal = useMemo(
@@ -434,8 +450,8 @@ function CustomNetPositionView({
     [payrollEmployees, hiddenKeys]
   );
 
-  const visibleForUsTotal = visibleForUs.reduce((s, a) => s + Math.abs(a.value), 0);
-  const visibleOnUsTotal = visibleOnUs.reduce((s, a) => s + Math.abs(a.value), 0) + visiblePayrollTotal;
+  const visibleForUsTotal = visibleForUs.reduce((s, a) => s + a.value, 0);
+  const visibleOnUsTotal = visibleOnUs.reduce((s, a) => s + a.value, 0) + visiblePayrollTotal;
   const customNet = visibleForUsTotal - visibleOnUsTotal;
   const isPositive = customNet >= 0;
 
@@ -473,8 +489,8 @@ function CustomNetPositionView({
               <Plus className="h-3.5 w-3.5 text-green-600 shrink-0" />
               <span className="text-xs font-semibold text-green-600 uppercase tracking-wide">What We Have</span>
             </div>
-            {forUsAccounts.map((a) => {
-              const key = `forUs:${a.name}`;
+            {forUsAccounts.map((a, index) => {
+              const key = rowVisibilityKey("forUs", a, index, forUsAccounts);
               const hidden = hiddenKeys.has(key);
               return (
                 <button
@@ -527,9 +543,14 @@ function CustomNetPositionView({
               <span className="text-xs font-semibold text-red-600 uppercase tracking-wide">What We Owe</span>
             </div>
 
+            {payrollRow && !payrollMatchesReport && (isPayrollError || !!payrollData) && (
+              <p role="status" className="text-xs text-amber-700 dark:text-amber-300 px-3 py-1">
+                Employee breakdown unavailable or inconsistent for this date; Payroll Payable is shown as one reconciled account.
+              </p>
+            )}
             {/* Regular onUs account rows */}
-            {onUsAccounts.map((a) => {
-              const key = `onUs:${a.name}`;
+            {onUsAccounts.map((a, index) => {
+              const key = rowVisibilityKey("onUs", a, index, onUsAccounts);
               const hidden = hiddenKeys.has(key);
               return (
                 <button
