@@ -412,6 +412,16 @@
     "docs/shared-ui-phase-7.md": "reference",
     "docs/shared-ui-phase-8-claude-handoff.md": "reference",
     "docs/security/scorecard-review-and-exceptions.md": "reference",
-    "docs/factory-fx-agent-wallets.md": "reference"
+    "docs/factory-fx-agent-wallets.md": "reference",
+    "docs/archive/factory-net-position-phase1-audit.md": "record",
+    "docs/archive/factory-net-position-phase2-date-engine.md": "record",
+    "docs/archive/factory-net-position-phase3-historical-parties.md": "record",
+    "docs/archive/factory-net-position-phase4-inventory-history.md": "record",
+    "docs/archive/factory-net-position-phase5-historical-pipeline.md": "record",
+    "docs/archive/factory-net-position-phase6-assets-liabilities.md": "record",
+    "docs/archive/factory-net-position-phase7-ui-reconciliation.md": "record",
+    "docs/archive/factory-net-position-phase8-history-integrity.md": "record",
+    "docs/archive/factory-net-position-phase9-handoff.md": "record",
+    "docs/factory-net-position-historical.md": "reference"
   }
 }
