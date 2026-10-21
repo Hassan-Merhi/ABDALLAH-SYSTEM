@@ -26,6 +26,8 @@ import { useAccountDisplayOrder } from "@/hooks/useAccountDisplayOrder";
 import { InlineOrderButtons, inlineDrag, type InlineOrderActions } from "@/components/accounts/InlineOrderButtons";
 import { useUserPreferences } from "@/hooks/use-user-preferences";
 import { getAppDate } from "@/lib/queryClient";
+import { useCompany } from "@/contexts/CompanyContext";
+import { companyQueryKey } from "@/lib/companyQueryScope";
 
 interface AccountItem {
   id?: number;
@@ -41,6 +43,7 @@ interface BreakdownItem {
 }
 
 interface FactoryNetPositionData {
+  companyId?: number;
   asOf?: string;
   businessToday?: string;
   historyCompleteness?: "current" | "partial" | "complete";
@@ -380,7 +383,8 @@ function CustomNetPositionView({
 
   // Fetch per-employee payroll breakdown
   const { data: payrollData, isError: isPayrollError } = useQuery<{ employees: PayrollEmployee[]; asOf: string }>({
-    queryKey: ["/api/factory/net-position/payroll-breakdown", asOf],
+    queryKey: companyQueryKey("/api/factory/net-position/payroll-breakdown", data.companyId, asOf),
+    enabled: data.companyId != null,
     queryFn: async () => {
       const res = await fetch(`/api/factory/net-position/payroll-breakdown?asOf=${asOf}`, { credentials: "include" });
       if (!res.ok) throw new Error(await res.text());
@@ -642,6 +646,7 @@ function CustomNetPositionView({
 
 export default function FactoryNetPositionDetails() {
   const { formatAmount } = useCurrencyContext();
+  const { selectedCompany } = useCompany();
   const accountOrder = useAccountDisplayOrder();
   const displayLayout = accountOrder.layout;
   const orderActions: InlineOrderActions = {
@@ -659,7 +664,7 @@ export default function FactoryNetPositionDetails() {
   const valuationMode = prefs?.factoryNetPositionValuationMode === "selling" ? "selling" : "cost";
 
   const { data, isLoading, error, refetch, isFetching } = useQuery<FactoryNetPositionData>({
-    queryKey: ["/api/factory/net-position", asOf || "company-today", valuationMode],
+    queryKey: companyQueryKey("/api/factory/net-position", selectedCompany?.id, asOf || "company-today", valuationMode),
     queryFn: async () => {
       const params = new URLSearchParams({ valuationMode });
       if (asOf) params.set("asOf", asOf);
