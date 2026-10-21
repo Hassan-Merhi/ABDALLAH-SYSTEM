@@ -861,6 +861,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         HISTORICAL_OTW_CHARGES_UNVERSIONED: "Older container freight/commission/charges are not versioned; outstanding amounts use a provisional proportional allocation.",
         HISTORICAL_OTW_MASTER_VALUES_UNVERSIONED: "Historical container planned quantities and source price edits are not fully versioned.",
         HISTORICAL_ORDER_LIFECYCLE_UNVERSIONED: "Some older orders lack dated loading/verification status transitions and cannot be included reliably.",
+        HISTORICAL_ORDER_BACKDATED_VERIFICATION_UNPROVEN: "Some order verification dates were entered retrospectively, but no corresponding event recorded by the selected day remains.",
         HISTORICAL_ORDER_FINALIZATION_MISSING: "Some finalized orders have no trustworthy finalization timestamp.",
         HISTORICAL_ORDER_RESTORE_TIME_UNKNOWN: "Some bale scans were restored without a separately dated restoration event.",
         HISTORICAL_ORDER_SCAN_TIME_MISSING: "Older bale scans with no timestamp cannot be assigned to a prior day.",
