@@ -819,8 +819,7 @@ export default function FactoryNetPositionDetails() {
               Today
             </Button>
           )}
-          {isToday && (
-            <Button
+                      <Button
               variant="outline"
               size="default"
               onClick={() => refetch()}
