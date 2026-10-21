@@ -1,13 +1,10 @@
-import type { Express, Request, Response, NextFunction } from "express";
 import { sql } from "drizzle-orm";
 
-import { requireAuth } from "../../../auth";
 import { db } from "../../../db";
-import { getClientDate } from "../../../lib/dateUtils";
 import { resultRows } from "../../../lib/queryResult";
-import { logger } from "../../../lib/logger";
 import { MoneyDecimal, toMoney } from "../../../lib/money";
 import { getFactoryBalanceOnTableSnapshot } from "../../../services/factory/productionBalanceOnTable";
+import type { FactoryNetPositionAsOf } from "@shared/factoryNetPositionAsOf";
 
 type NetPositionAccount = {
   name: string;
@@ -139,56 +136,43 @@ export async function computeHistoricalOperationalValues(
   return { inventoryValue, rawMaterialValue, balanceOnTableValue };
 }
 
-export function registerNetPositionHistoricalCorrection(app: Express) {
-  app.get("/api/factory/net-position", requireAuth, (req: Request, res: Response, next: NextFunction) => {
-    const asOf =
-      typeof req.query.asOf === "string" && /^\d{4}-\d{2}-\d{2}$/.test(req.query.asOf) ? req.query.asOf : null;
-    if (!asOf || asOf === getClientDate(req)) return next();
+/**
+ * Transitional projection for the three production-valued rows until Phases
+ * 4–5 replace current-state inventory with dated movements. Kept within the
+ * main handler (rather than intercepting res.json), so a failed projection
+ * cannot silently return an incorrect success response.
+ */
+export async function applyHistoricalOperationalCorrection<T extends NetPositionResponse>(
+  companyId: number,
+  scope: FactoryNetPositionAsOf,
+  body: T,
+  valuationMode: "cost" | "selling",
+): Promise<T> {
+  if (!scope.isHistorical) return body;
+  if (!Array.isArray(body?.forUs?.accounts) || typeof body.rawMaterialValue !== "number") {
+    throw new Error("HISTORICAL_NET_POSITION_RESPONSE_INCOMPLETE");
+  }
+  const historical = await computeHistoricalOperationalValues(
+    companyId,
+    scope.asOf,
+    body.rawMaterialValue,
+    valuationMode,
+  );
+  const inventory = body.forUs.accounts.find((row) => row.code === "INVENTORY");
+  const rawMaterial = body.forUs.accounts.find((row) => row.code === "RAW_MATERIAL");
+  if (!inventory || !rawMaterial) throw new Error("HISTORICAL_STOCK_ROWS_MISSING");
 
-    const originalJson = res.json.bind(res);
-    res.json = ((body: NetPositionResponse) => {
-      void (async () => {
-        const session = req.session as typeof req.session & {
-          factoryCompanyId?: number;
-          currentCompanyId?: number;
-        };
-        const companyId = Number(session.factoryCompanyId || session.currentCompanyId || 0);
-        if (!companyId) return originalJson(body);
+  replaceAccountValue(body.forUs.accounts, "INVENTORY", historical.inventoryValue);
+  replaceAccountValue(body.forUs.accounts, "RAW_MATERIAL", historical.rawMaterialValue);
+  replaceAccountValue(body.forUs.accounts, "BALANCE_ON_TABLE", historical.balanceOnTableValue);
 
-        try {
-          if (!body?.forUs?.accounts || typeof body.rawMaterialValue !== "number") {
-            return originalJson(body);
-          }
-
-          const valuationMode = req.query.valuationMode === "selling" ? "selling" : "cost";
-          const historical = await computeHistoricalOperationalValues(
-            companyId,
-            asOf,
-            body.rawMaterialValue,
-            valuationMode
-          );
-          replaceAccountValue(body.forUs.accounts, "INVENTORY", historical.inventoryValue);
-          replaceAccountValue(body.forUs.accounts, "RAW_MATERIAL", historical.rawMaterialValue);
-          replaceAccountValue(body.forUs.accounts, "BALANCE_ON_TABLE", historical.balanceOnTableValue);
-
-          body.inventoryValue = historical.inventoryValue;
-          body.rawMaterialValue = historical.rawMaterialValue;
-          body.balanceOnTableValue = historical.balanceOnTableValue;
-          body.forUs.breakdown = recomputeBreakdown(body.forUs.accounts);
-          body.forUsTotal = round2(body.forUs.accounts.reduce((sum, account) => sum + Number(account.value || 0), 0));
-          body.forUs.total = body.forUsTotal;
-          body.netPosition = round2(body.forUsTotal - body.onUsTotal);
-          body.netPositionLabel = body.netPosition >= 0 ? "We have more than we owe" : "We owe more than we have";
-
-          return originalJson(body);
-        } catch (error) {
-          logger.error("Historical net-position correction failed", { error, companyId, asOf });
-          return originalJson(body);
-        }
-      })();
-      return res;
-    }) as Response["json"];
-
-    next();
-  });
+  body.inventoryValue = historical.inventoryValue;
+  body.rawMaterialValue = historical.rawMaterialValue;
+  body.balanceOnTableValue = historical.balanceOnTableValue;
+  body.forUs.breakdown = recomputeBreakdown(body.forUs.accounts);
+  body.forUsTotal = round2(body.forUs.accounts.reduce((sum, account) => sum + Number(account.value || 0), 0));
+  body.forUs.total = body.forUsTotal;
+  body.netPosition = round2(body.forUsTotal - body.onUsTotal);
+  body.netPositionLabel = body.netPosition >= 0 ? "We have more than we owe" : "We owe more than we have";
+  return body;
 }
