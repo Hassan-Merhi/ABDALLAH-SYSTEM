@@ -182,13 +182,23 @@ async function rawMaterialAt(companyId: number, scope: FactoryNetPositionAsOf) {
        AND (mb.deleted_at IS NULL OR NOT ${nextCutoff(scope, "mb.deleted_at")})
   `));
 
+  // A legacy cumulative raw-stock row has already had its received_kg
+  // reduced by a recorded DEDUCT. Reapplying that DEDUCT would remove it
+  // twice. The earlier quantity is not fully recoverable without an original
+  // receipt event, so do not invent it: retain the known cumulative amount
+  // and expose the explicit reconstruction limitation.
+  const fallbackKeys = new Set(receipts.filter(r => r.fallback).map(r => r.key));
+  const datedAdjustments = adjustments.filter(
+    r => !(r.type === "DEDUCT" && fallbackKeys.has(r.key))
+  );
+
   const events: Event[] = [
     ...receipts.map(r => ({
       key: r.key, kind: "RECEIPT" as const, day: r.day,
       recordedAt: r.recorded_at, stableId: Number(r.stable_id),
       kg: r.kg, usdRate: r.usd_rate,
     })),
-    ...adjustments.map(r => ({
+    ...datedAdjustments.map(r => ({
       key: r.key, kind: (r.type === "ADD" ? "ADD" : "DEDUCT") as "ADD" | "DEDUCT",
       day: r.day, recordedAt: r.recorded_at, stableId: Number(r.stable_id),
       kg: r.kg, usdRate: r.usd_rate, basis: r.basis,
@@ -203,7 +213,7 @@ async function rawMaterialAt(companyId: number, scope: FactoryNetPositionAsOf) {
   const warnings = new Set(replay.warnings);
   if (receipts.some(r => r.fallback)) warnings.add("HISTORICAL_RAW_LEGACY_RECEIPT_FALLBACK");
   if (sources.some(r => r.key == null)) warnings.add("HISTORICAL_RAW_SOURCE_OWNER_UNKNOWN");
-  if (adjustments.some(r => r.type === "DEDUCT") && receipts.some(r => r.fallback)) {
+  if (adjustments.some(r => r.type === "DEDUCT" && fallbackKeys.has(r.key))) {
     warnings.add("HISTORICAL_RAW_LEGACY_DEDUCT_MUTATED_RECEIPT");
   }
   return { value: replay.value, warnings: [...warnings] };
