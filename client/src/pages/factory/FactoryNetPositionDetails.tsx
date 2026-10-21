@@ -395,8 +395,8 @@ function CustomNetPositionView({
 
   const payrollRow = data.onUs.accounts.find(a => a.code === "EMPLOYEE_PAYROLL_PAYABLE");
   const payrollMatchesReport = !!payrollData && payrollData.asOf === asOf &&
-    Math.abs((payrollData.employees ?? []).reduce((sum, employee) => sum + employee.balance, 0)
-      - (payrollRow?.value ?? 0)) <= 0.01;
+    Math.round((payrollData.employees ?? []).reduce((sum, employee) => sum + employee.balance, 0) * 100)
+      === Math.round((payrollRow?.value ?? 0) * 100);
   // Never drop an aggregate Payroll Payable while its separate breakdown is
   // loading, stale, or inconsistent with the same as-of main snapshot.
   const payrollEmployees = useMemo(
@@ -527,7 +527,7 @@ function CustomNetPositionView({
                   <span
                     className={`shrink-0 whitespace-nowrap font-mono tabular-nums ${hidden ? "text-muted-foreground" : "text-green-600"}`}
                   >
-                    {formatAmount(Math.abs(a.value))}
+                    {formatAmount(a.value)}
                   </span>
                 </button>
               );
@@ -587,7 +587,7 @@ function CustomNetPositionView({
                   <span
                     className={`shrink-0 whitespace-nowrap font-mono tabular-nums ${hidden ? "text-muted-foreground" : "text-red-600"}`}
                   >
-                    {formatAmount(Math.abs(a.value))}
+                    {formatAmount(a.value)}
                   </span>
                 </button>
               );
