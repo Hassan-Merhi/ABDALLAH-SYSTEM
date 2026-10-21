@@ -2,6 +2,7 @@ import { FactoryNetPositionDateError } from "@shared/factoryNetPositionAsOf";
 import { resolveFactoryNetPositionAsOf, netPositionKnownTransactionThrough, netPositionRecordedThrough } from "../../../services/factory/netPositionAsOf";
 import { loadFactoryNetPositionEmployees } from "../../../services/factory/netPositionEmployees";
 import { loadHistoricalFactoryPipeline } from "../../../services/factory/netPositionHistoricalPipeline";
+import { computeHistoricalFactoryAssetLiabilityOperations } from "../../../services/factory/netPositionHistoricalAssets";
 import { applyHistoricalOperationalCorrection } from "./netPositionHistoricalCorrection";
 import {
   fxAgentTablesExist,
@@ -84,6 +85,9 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       const asOfContext = await resolveFactoryNetPositionAsOf(companyId, req.query.asOf);
       const asOf = asOfContext.asOf;
       const employeeBalances = await loadFactoryNetPositionEmployees(companyId, asOfContext);
+      const historicalAssets = asOfContext.isHistorical
+        ? await computeHistoricalFactoryAssetLiabilityOperations(companyId, asOfContext)
+        : null;
 
       const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
@@ -123,7 +127,15 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       const factoryAccounts = await db
         .select()
         .from(ledgerAccounts)
-        .where(and(eq(ledgerAccounts.companyId, companyId), isNull(ledgerAccounts.deletedAt)));
+        .where(and(
+          eq(ledgerAccounts.companyId, companyId),
+          asOfContext.isHistorical
+            ? sql`(${ledgerAccounts.deletedAt} IS NULL OR NOT ${netPositionRecordedThrough(sql`${ledgerAccounts.deletedAt}`, asOfContext, "utc-naive-timestamp")})`
+            : isNull(ledgerAccounts.deletedAt),
+          asOfContext.isHistorical
+            ? netPositionRecordedThrough(sql`${ledgerAccounts.createdAt}`, asOfContext, "utc-naive-timestamp")
+            : sql`TRUE`,
+        ));
 
       // Ledger lines on legacy EMP-<code> accounts also mutate the employee
       // cached balance. For historic snapshots their voucher movement belongs
@@ -487,14 +499,18 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       // WHERE remaining_balance > 0 (see GET /api/factory/workers), so the two figures
       // always match instead of drifting from the stale "Factory Worker Advances" ledger
       // account balance (advance repayments aren't always posted back to that account).
-      const workerAdvRes = await db.execute(sql`
-        SELECT COALESCE(SUM(remaining_balance::numeric), 0) AS total
-        FROM   factory_worker_advances
-        WHERE  company_id = ${companyId}
-          AND  remaining_balance > 0
-      `);
-      const workerAdvRow = resultRows(workerAdvRes)[0] ?? {};
-      const workerAdvancesValue = round2(toMoney(String(workerAdvRow.total ?? "0")).toNumber());
+      let workerAdvancesValue: number;
+      if (historicalAssets) {
+        workerAdvancesValue = historicalAssets.workerAdvancesValue;
+      } else {
+        const workerAdvRes = await db.execute(sql`
+          SELECT COALESCE(SUM(remaining_balance::numeric), 0) AS total
+          FROM factory_worker_advances
+          WHERE company_id = ${companyId} AND remaining_balance > 0
+        `);
+        const workerAdvRow = resultRows(workerAdvRes)[0] ?? {};
+        workerAdvancesValue = round2(toMoney(String(workerAdvRow.total ?? "0")).toNumber());
+      }
 
       // ── Split customer items into DR (asset) and CR (liability) ──────────────
       const customerDrItems = customerItems.filter((c) => c.balanceUsd > 0);
@@ -509,9 +525,9 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       // CREDIT  = tenants paid MORE than expected → advance money we hold (asset)
       // OUTSTANDING = tenants still OWE us → receivable (asset)
       // Prepaid Rent = CREDIT + OUTSTANDING  (both are "What We Have")
-      let prepaidRent = 0;
-      const rentPayable = 0;
-      {
+      let prepaidRent = historicalAssets?.prepaidRent ?? 0;
+      const rentPayable = historicalAssets?.rentPayable ?? 0;
+      if (!historicalAssets) {
         // All FACTORY units owned by this company
         const rentalUnitsRows = await db
           .select({ id: propertyUnits.id })
@@ -868,6 +884,14 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         HISTORICAL_ORDER_CHARGES_UNVERSIONED: "Order freight and charges lack creation/version timestamps, so historical scan totals exclude these unproven charges.",
         HISTORICAL_ORDER_SCAN_PRICE_EDITS_UNVERSIONED: "An earlier scanned bale's price may have been edited without retaining the original version.",
       };
+      Object.assign(inventoryWarningText, {
+        HISTORICAL_WORKER_ADVANCE_EDITS_UNVERSIONED: "Historical worker advances are reconstructed from original amounts and dated repayments; edits and deleted repayments may not be fully recoverable.",
+        HISTORICAL_RENT_EXPECTED_AMOUNTS_UNVERSIONED: "Historical rent expected amounts can have been edited without retaining original values.",
+        HISTORICAL_RENT_CONTRACT_STATUS_UNVERSIONED: "Contract status changes lack a full timeline; earlier activity of now-expired contracts is estimated from recorded dates.",
+        HISTORICAL_RENT_VOID_DATE_UNAVAILABLE: "Rental payment void times are unavailable; their previous posting history may be incomplete.",
+        HISTORICAL_RENT_POSTING_TIMESTAMP_MISSING: "Older posted rent payments lack posting timestamps; the creation date is used provisionally.",
+        HISTORICAL_LEDGER_OPENINGS_UNVERSIONED: "Historical asset, deposit and loan account opening balances/types lack full version history.",
+      });
       res.json({
         ...datedBody,
         businessToday: asOfContext.businessToday,
@@ -879,6 +903,8 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
               "Historical category reconstruction remains partial until all operational and financial events are reconciled.",
               ...inventoryHistoryWarnings.map(code => inventoryWarningText[code] ?? code),
               ...(historicalPipeline?.warnings ?? []).map(code => inventoryWarningText[code] ?? code),
+              ...(historicalAssets?.warnings ?? []).map(code => inventoryWarningText[code] ?? code),
+              inventoryWarningText.HISTORICAL_LEDGER_OPENINGS_UNVERSIONED,
             ]
           : [],
       });
