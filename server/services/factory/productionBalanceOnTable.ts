@@ -5,6 +5,8 @@
  */
 import { sql } from "drizzle-orm";
 import { db } from "../../db";
+import type { FactoryNetPositionAsOf } from "@shared/factoryNetPositionAsOf";
+import { netPositionRecordedThrough } from "./netPositionAsOf";
 import { resultRows } from "../../lib/queryResult";
 import {
   BatchRateDecimal,
@@ -12,7 +14,16 @@ import {
   resolveProductionBalanceWeight,
 } from "../../routes/factory/bale-exports/production-value-math";
 
-export async function getFactoryBalanceOnTableSnapshot(companyId: number, throughDate?: string | null) {
+export async function getFactoryBalanceOnTableSnapshot(
+  companyId: number,
+  throughDate?: string | null,
+  knownAt?: FactoryNetPositionAsOf,
+) {
+  const recorded = (column: string) =>
+    knownAt ? netPositionRecordedThrough(sql.raw(column), knownAt, "utc-naive-timestamp") : sql`TRUE`;
+  const notDeleted = (column: string) =>
+    knownAt ? sql`(${sql.raw(column)} IS NULL OR NOT ${recorded(column)})`
+      : sql`${sql.raw(column)} IS NULL`;
   const [mixResult, baleResult] = await Promise.all([
     db.execute(sql`
       SELECT
@@ -21,15 +32,18 @@ export async function getFactoryBalanceOnTableSnapshot(companyId: number, throug
       FROM factory_mix_batches
       WHERE company_id = ${companyId}
         AND carry_forward_from_id IS NULL
-        AND deleted_at IS NULL
+        AND ${notDeleted("factory_mix_batches.deleted_at")}
+        ${knownAt ? sql`AND ${recorded("factory_mix_batches.created_at")}` : sql``}
         ${throughDate ? sql`AND COALESCE(batch_date, DATE(created_at)) <= ${throughDate}` : sql``}
     `),
     db.execute(sql`
       SELECT COALESCE(SUM(b.weight_kg::numeric), 0) AS total_kg
       FROM factory_bales b
       WHERE b.company_id = ${companyId}
-        AND b.status NOT IN ('DELETED', 'REMOVED', 'REPACKED')
-        ${throughDate ? sql`AND COALESCE(DATE(b.stock_entry_date), DATE(b.created_at)) <= ${throughDate}` : sql``}
+        ${knownAt
+          ? sql`AND b.status <> 'PENDING_PRESSING' AND ${notDeleted("b.deleted_at")} AND ${recorded("b.created_at")}`
+          : sql`AND b.status NOT IN ('DELETED', 'REMOVED', 'REPACKED')`}
+        ${throughDate ? sql`AND COALESCE(DATE(b.stock_entry_date), DATE(b.pressed_at), DATE(b.created_at)) <= ${throughDate}` : sql``}
     `),
   ]);
 
