@@ -241,6 +241,15 @@ async function finishedStockAt(companyId: number, scope: FactoryNetPositionAsOf,
                   AND cob.scanned_at IS NOT NULL
                   AND ${netPositionRecordedThrough(sql`cob.scanned_at`, scope, "timestamptz")}
                   AND ${nextCutoff(scope, "co.created_at")}
+                  AND NOT EXISTS (
+                     -- A restored row may reuse the original scanned_at.
+                     -- If cancelled before cutoff but restoration was undated,
+                     -- it cannot be treated as a known allocation.
+                     SELECT 1 FROM customer_order_bales_history prior
+                      WHERE prior.order_id = cob.order_id
+                        AND prior.bale_id = cob.bale_id
+                        AND ${netPositionRecordedThrough(sql`prior.cancelled_at`, scope, "timestamptz")}
+                  )
              ) OR EXISTS (
                 -- A scan cancelled after the selected day was still allocated
                 -- on the selected day; archived history retains that interval.
