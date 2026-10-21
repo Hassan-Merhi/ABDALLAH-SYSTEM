@@ -510,4 +510,86 @@ export const phase3RemainingTranslationsPart31: readonly Phase3SharedUiEntry[] =
     ar: "فشل في جلب مخزون المصنع",
     fr: "Impossible de récupérer l'inventaire de l'usine",
   },
+  // Factory Net Position historical date filter.
+  { en: "Back to today", ar: "العودة إلى اليوم", fr: "Revenir à aujourd'hui" },
+  {
+    en: "The historical snapshot could not be constructed. No current-day balance was substituted.",
+    ar: "تعذّر إنشاء اللقطة التاريخية. لم يُستبدل بها رصيد اليوم الحالي.",
+    fr: "L'instantané historique n'a pas pu être construit. Aucun solde du jour n'a été substitué.",
+  },
+  {
+    en: "Invalid company business date",
+    ar: "تاريخ العمل الخاص بالشركة غير صالح",
+    fr: "Date d'activité de la société non valide",
+  },
+  {
+    en: "HISTORICAL_NET_POSITION_RESPONSE_INCOMPLETE",
+    ar: "صافي المركز التاريخي غير مكتمل",
+    fr: "Position nette historique incomplète",
+  },
+  {
+    en: "HISTORICAL_NET_POSITION_REPLAY_FAILED",
+    ar: "تعذّرت إعادة بناء صافي المركز التاريخي",
+    fr: "Échec de la reconstitution de la position nette historique",
+  },
+  {
+    en: "HISTORICAL_STOCK_ROWS_MISSING",
+    ar: "صفوف المخزون التاريخية مفقودة",
+    fr: "Lignes de stock historiques manquantes",
+  },
+  {
+    en: "HISTORICAL_NET_POSITION_ASSETS_FAILED",
+    ar: "تعذّر احتساب الأصول التاريخية لصافي المركز",
+    fr: "Échec du calcul des actifs historiques de la position nette",
+  },
+  {
+    en: "HISTORICAL_INTEGRITY_NONFINITE_ORDER",
+    ar: "قيمة طلب غير صالحة في صافي المركز التاريخي",
+    fr: "Montant de commande non valide dans la position nette historique",
+  },
+  {
+    en: "HISTORICAL_INTEGRITY_MISMATCH:${field}",
+    ar: "عدم تطابق في صافي المركز التاريخي:{{0}}",
+    fr: "Incohérence dans la position nette historique :{{0}}",
+  },
+  {
+    en: "HISTORICAL_NET_POSITION_PIPELINE_FAILED",
+    ar: "تعذّر احتساب البضائع في الطريق والطلبات التاريخية",
+    fr: "Échec du calcul historique du stock en transit et des commandes",
+  },
+  {
+    en: "HISTORICAL_SCAN_AUDIT_SCHEMA_MISSING",
+    ar: "أعمدة تدقيق وقت المسح غير موجودة",
+    fr: "Colonnes d'audit de l'heure de scan manquantes",
+  },
+  {
+    en: "HISTORICAL_COVERAGE_COUNT_INVALID",
+    ar: "عدد تغطية السجل التاريخي غير صالح",
+    fr: "Nombre de couverture historique non valide",
+  },
+  {
+    en: "HISTORICAL_COVERAGE_QUERY_FAILED",
+    ar: "تعذّر فحص تغطية السجل التاريخي",
+    fr: "Échec de la vérification de la couverture historique",
+  },
+  {
+    en: "HISTORICAL_COVERAGE_QUERY_EMPTY",
+    ar: "لم يُرجع فحص تغطية السجل التاريخي أي نتيجة",
+    fr: "La vérification de la couverture historique n'a renvoyé aucun résultat",
+  },
+  {
+    en: "HISTORICAL_NET_POSITION_NONFINITE_AMOUNT",
+    ar: "مبلغ غير صالح في صافي المركز التاريخي",
+    fr: "Montant non valide dans la position nette historique",
+  },
+  {
+    en: "Loading finalized — new loading opened",
+    ar: "تم إنهاء التحميل — فُتح تحميل جديد",
+    fr: "Chargement finalisé — nouveau chargement ouvert",
+  },
+  {
+    en: "Loading #${nextLoading.id} is ready with only ${nextLoading.remainingBales} remaining bales.",
+    ar: "التحميل رقم {{0}} جاهز مع {{1}} بالة متبقية فقط.",
+    fr: "Le chargement n° {{0}} est prêt avec seulement {{1}} balles restantes.",
+  },
 ];
