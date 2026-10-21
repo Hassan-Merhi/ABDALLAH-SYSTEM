@@ -103,7 +103,8 @@ async function rawMaterialAt(companyId: number, scope: FactoryNetPositionAsOf) {
     kg: string; usd_rate: string | null; fallback: boolean;
   }>(await db.execute(sql`
     WITH candidate AS (
-      SELECT 's' || fc.supplier_id::text AS key, cr.receipt_date::text AS day,
+      SELECT COALESCE('s' || fc.supplier_id::text, 'u' || fc.id::text) AS key,
+             cr.receipt_date::text AS day,
              cr.created_at::text AS recorded_at, cr.id AS stable_id,
              cr.received_kg::text AS kg,
              COALESCE(NULLIF(cr.fixed_cost_per_kg_usd, 0),
@@ -174,6 +175,7 @@ async function rawMaterialAt(companyId: number, scope: FactoryNetPositionAsOf) {
        AND mb.company_id = ${companyId}
       LEFT JOIN factory_containers fc ON fc.id = ms.container_id AND fc.company_id = ${companyId}
      WHERE ms.source_batch_id IS NULL
+       AND UPPER(COALESCE(ms.source_type,'')) <> 'BATCH'
        AND COALESCE(mb.batch_date, mb.created_at::date) <= ${scope.asOf}::date
        AND ${nextCutoff(scope, "ms.created_at")}
        AND ${nextCutoff(scope, "mb.created_at")}
@@ -221,19 +223,34 @@ async function finishedStockAt(companyId: number, scope: FactoryNetPositionAsOf,
       SELECT b.id, b.status, b.total_cost::numeric AS original_cost,
              COALESCE(p.selling_price::numeric, 0) AS current_catalog_selling,
              b.finalized_at, b.deleted_at,
-             EXISTS (
+             (EXISTS (
                 SELECT 1 FROM customer_order_bales cob
                 JOIN customer_orders co ON co.id = cob.order_id AND co.company_id = ${companyId}
                 WHERE cob.bale_id = b.id
                   AND cob.scanned_at IS NOT NULL
                   AND ${nextCutoff(scope, "cob.scanned_at")}
                   AND ${nextCutoff(scope, "co.created_at")}
-             ) AS scanned_before,
-             EXISTS (
+             ) OR EXISTS (
+                -- A scan cancelled after the selected day was still allocated
+                -- on the selected day; archived history retains that interval.
+                SELECT 1 FROM customer_order_bales_history coh
+                JOIN customer_orders co ON co.id = coh.order_id AND co.company_id = ${companyId}
+                WHERE coh.bale_id = b.id
+                  AND coh.scanned_at IS NOT NULL
+                  AND ${nextCutoff(scope, "coh.scanned_at")}
+                  AND NOT ${netPositionRecordedThrough(sql`coh.cancelled_at`, scope, "timestamptz")}
+                  AND ${nextCutoff(scope, "co.created_at")}
+             )) AS scanned_before,
+             (EXISTS (
                 SELECT 1 FROM customer_order_bales cob
                 JOIN customer_orders co ON co.id = cob.order_id AND co.company_id = ${companyId}
                 WHERE cob.bale_id = b.id AND cob.scanned_at IS NULL
-             ) AS missing_scan_time
+             ) OR EXISTS (
+                SELECT 1 FROM customer_order_bales_history coh
+                JOIN customer_orders co ON co.id = coh.order_id AND co.company_id = ${companyId}
+                WHERE coh.bale_id = b.id AND coh.scanned_at IS NULL
+                  AND NOT ${netPositionRecordedThrough(sql`coh.cancelled_at`, scope, "timestamptz")}
+             )) AS missing_scan_time
         FROM factory_bales b
         LEFT JOIN factory_bale_products p ON p.id = b.product_id AND p.company_id = ${companyId}
        WHERE b.company_id = ${companyId}
@@ -244,10 +261,10 @@ async function finishedStockAt(companyId: number, scope: FactoryNetPositionAsOf,
     )
     SELECT COALESCE(SUM(original_cost) FILTER (WHERE NOT scanned_before
         AND (finalized_at IS NULL OR NOT ${nextCutoff(scope, "finalized_at")})
-        AND status NOT IN ('REMOVED','REPACKED')),0)::text AS total_cost,
+        AND (status NOT IN ('REMOVED','REPACKED','DELETED') OR deleted_at IS NOT NULL)),0)::text AS total_cost,
            COALESCE(SUM(current_catalog_selling) FILTER (WHERE NOT scanned_before
         AND (finalized_at IS NULL OR NOT ${nextCutoff(scope, "finalized_at")})
-        AND status NOT IN ('REMOVED','REPACKED')),0)::text AS total_selling,
+        AND (status NOT IN ('REMOVED','REPACKED','DELETED') OR deleted_at IS NOT NULL)),0)::text AS total_selling,
            COUNT(*) FILTER (WHERE status IN ('FINALIZED','SOLD','DISPATCHED')
                AND finalized_at IS NULL)::text AS missing_finalization,
            COUNT(*) FILTER (WHERE missing_scan_time)::text AS missing_scan_time,
