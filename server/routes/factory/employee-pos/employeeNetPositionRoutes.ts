@@ -822,6 +822,9 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       const datedBody = asOfContext.isHistorical
         ? await applyHistoricalOperationalCorrection(companyId, asOfContext, responseBody, valuationMode)
         : responseBody;
+      const inventoryHistoryWarnings: string[] = asOfContext.isHistorical
+        ? ((datedBody as typeof responseBody & { inventoryHistoryWarnings?: string[] }).inventoryHistoryWarnings ?? [])
+        : [];
       res.json({
         ...datedBody,
         businessToday: asOfContext.businessToday,
@@ -829,7 +832,10 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         historyBasis: asOfContext.historyBasis,
         historyCompleteness: asOfContext.isHistorical ? "partial" : "current",
         historyWarnings: asOfContext.isHistorical
-          ? ["Historical category reconstruction is being implemented. Until Phases 3–8 are complete, some current-state amounts may remain in this report."]
+          ? [
+              "Historical category reconstruction remains partial until all operational and financial events are reconciled.",
+              ...inventoryHistoryWarnings,
+            ]
           : [],
       });
     } catch (error: unknown) {
