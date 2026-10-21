@@ -155,15 +155,20 @@ databaseDescribe("Factory Net Position historical date filter (database)", () =>
       createdAt: string,
       lines: Array<{ account?: number; employee?: number; dr?: number; cr?: number; createdAt?: string }>
     ) => {
-      const id = await one(sql`
-        INSERT INTO vouchers (company_id, voucher_number, voucher_type, voucher_date, total_amount, optional, created_at)
-        VALUES (${companyId}, ${n + suffix}, 'Journal', ${date}, ${lines.reduce((s, l) => s + (l.dr ?? 0), 0)}, false, ${createdAt})
-        RETURNING id`);
-      for (const l of lines) {
-        await db.execute(sql`INSERT INTO voucher_entries (voucher_id, company_id, ledger_account_id, employee_id, debit_amount, credit_amount, created_at)
-          VALUES (${id}, ${companyId}, ${l.account ?? null}, ${l.employee ?? null}, ${l.dr ?? 0}, ${l.cr ?? 0}, ${l.createdAt ?? createdAt})`);
-      }
-      return id;
+      // One transaction per voucher: the deferred balance guard checks the
+      // voucher once all its lines are in.
+      return db.transaction(async (tx) => {
+        const created: any = await tx.execute(sql`
+          INSERT INTO vouchers (company_id, voucher_number, voucher_type, voucher_date, total_amount, optional, created_at)
+          VALUES (${companyId}, ${n + suffix}, 'Journal', ${date}, ${lines.reduce((s, l) => s + (l.dr ?? 0), 0)}, false, ${createdAt})
+          RETURNING id`);
+        const id = Number(created.rows[0].id);
+        for (const l of lines) {
+          await tx.execute(sql`INSERT INTO voucher_entries (voucher_id, company_id, ledger_account_id, employee_id, debit_amount, credit_amount, created_at)
+            VALUES (${id}, ${companyId}, ${l.account ?? null}, ${l.employee ?? null}, ${l.dr ?? 0}, ${l.cr ?? 0}, ${l.createdAt ?? createdAt})`);
+        }
+        return id;
+      });
     };
     // Oct 18: borrowed 1,000 into cash.
     await voucher("V1-", "2026-10-18", "2026-10-18 09:00", [

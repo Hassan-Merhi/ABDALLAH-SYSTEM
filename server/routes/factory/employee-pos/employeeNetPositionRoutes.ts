@@ -8,10 +8,9 @@ import {
 import { loadFactoryNetPositionEmployees } from "../../../services/factory/netPositionEmployees";
 import { loadHistoricalFactoryPipeline } from "../../../services/factory/netPositionHistoricalPipeline";
 import { computeHistoricalFactoryAssetLiabilityOperations } from "../../../services/factory/netPositionHistoricalAssets";
-import { reconcileHistoricalPosition, sumPositionRows } from "../../../services/factory/netPositionReportTotals";
 import { loadFactoryHistoricalCoverage } from "../../../services/factory/netPositionHistoryCoverage";
-import { assertHistoricalReportIntegrity } from "../../../services/factory/netPositionHistoricalIntegrity";
-import { applyHistoricalOperationalCorrection } from "./netPositionHistoricalCorrection";
+import { finishFactoryNetPosition } from "./netPositionHistoricalResponse";
+import { computeLiveFactoryPrepaidRent } from "./netPositionLiveRent";
 import {
   fxAgentTablesExist,
   loadFxAgentWallets,
@@ -19,8 +18,6 @@ import {
 } from "../../../services/factory/fxAgentWalletDb";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
-import { getRentalBillingDay, getRentalPeriodDueDate } from "../../../services/rental/rentalPeriodService";
-import { pool } from "../../../db";
 import type { Express, Request, Response } from "express";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
@@ -31,17 +28,7 @@ import {
   type AccountLike,
 } from "../../../netPositionHelper";
 
-import {
-  customerOrders,
-  customers,
-  ledgerAccounts,
-  voucherEntries,
-  companies,
-  vouchers,
-  propertyContracts,
-  propertyMonthlyLedger,
-  propertyUnits,
-} from "@shared/schema";
+import { customerOrders, customers, ledgerAccounts, voucherEntries, companies, vouchers } from "@shared/schema";
 import { eq, and, desc, sql, inArray, isNull, lte } from "drizzle-orm";
 import { getCustomerLedgerAndMemo } from "../customers-core/customerLedgerSplit";
 import { loadHeldChargeSnapshot } from "../customers-core/heldUnfinalizedCustomerCharges";
@@ -582,90 +569,8 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       // CREDIT  = tenants paid MORE than expected → advance money we hold (asset)
       // OUTSTANDING = tenants still OWE us → receivable (asset)
       // Prepaid Rent = CREDIT + OUTSTANDING  (both are "What We Have")
-      let prepaidRent = historicalAssets?.prepaidRent ?? 0;
+      const prepaidRent = historicalAssets?.prepaidRent ?? (await computeLiveFactoryPrepaidRent(companyId, asOf));
       const rentPayable = historicalAssets?.rentPayable ?? 0;
-      if (!historicalAssets) {
-        // All FACTORY units owned by this company
-        const rentalUnitsRows = await db
-          .select({ id: propertyUnits.id })
-          .from(propertyUnits)
-          .where(
-            and(
-              eq(propertyUnits.companyId, companyId),
-              eq(propertyUnits.module, "FACTORY"),
-              eq(propertyUnits.active, true)
-            )
-          );
-
-        if (rentalUnitsRows.length > 0) {
-          const unitIds = rentalUnitsRows.map((u) => u.id);
-          const activeContracts = await db
-            .select()
-            .from(propertyContracts)
-            .where(
-              and(
-                eq(propertyContracts.companyId, companyId),
-                eq(propertyContracts.module, "FACTORY"),
-                inArray(propertyContracts.unitId, unitIds),
-                eq(propertyContracts.status, "ACTIVE")
-              )
-            );
-
-          if (activeContracts.length > 0) {
-            const contractIds = activeContracts.map((c) => c.id);
-
-            // Billing-day-aware expected (same logic as rentalUnitsContractsRoutes)
-            const ledgerRows = await db
-              .select({
-                contractId: propertyMonthlyLedger.contractId,
-                year: propertyMonthlyLedger.year,
-                month: propertyMonthlyLedger.month,
-                expectedAmount: propertyMonthlyLedger.expectedAmount,
-              })
-              .from(propertyMonthlyLedger)
-              .where(inArray(propertyMonthlyLedger.contractId, contractIds));
-
-            const ledgerByContract = new Map<number, typeof ledgerRows>();
-            for (const row of ledgerRows) {
-              const arr = ledgerByContract.get(row.contractId) ?? [];
-              arr.push(row);
-              ledgerByContract.set(row.contractId, arr);
-            }
-
-            const expectedAsOfByContract = new Map<number, Decimal>();
-            for (const c of activeContracts) {
-              const billingDay = getRentalBillingDay(c.startDate as string);
-              const rows = ledgerByContract.get(c.id) ?? [];
-              let expected = new MoneyDecimal(0);
-              for (const row of rows) {
-                const billingDate = getRentalPeriodDueDate(row.year, row.month, billingDay);
-                if (billingDate <= asOf) expected = expected.plus(toMoney(row.expectedAmount as string));
-              }
-              expectedAsOfByContract.set(c.id, expected);
-            }
-
-            // POSTED payments only — same authoritative source as the dashboard
-            const { rows: postedRows } = await pool.query<{ contract_id: string; paid: string }>(
-              `SELECT contract_id, COALESCE(SUM(amount::numeric), 0) AS paid
-               FROM property_payments
-               WHERE contract_id = ANY($1) AND posting_status = 'POSTED' AND payment_date <= $2
-               GROUP BY contract_id`,
-              [contractIds, asOf]
-            );
-            const paidAsOfByContract = new Map<number, Decimal>();
-            postedRows.forEach((r) => paidAsOfByContract.set(parseInt(r.contract_id), toMoney(r.paid)));
-
-            // Positive = tenant still owes (outstanding receivable); negative =
-            // tenant overpaid (advance credit we hold). Both count at their size.
-            let rentTotal = new MoneyDecimal(prepaidRent);
-            for (const c of activeContracts) {
-              const expected = expectedAsOfByContract.get(c.id) ?? new MoneyDecimal(0);
-              rentTotal = rentTotal.plus(expected.minus(paidAsOfByContract.get(c.id) ?? 0).abs());
-            }
-            prepaidRent = round2(rentTotal.toNumber());
-          }
-        }
-      }
 
       // One signed, dated Employee projection shared with payroll-breakdown.
       // Today preserves employees.current_balance; historical dates replay
@@ -907,115 +812,17 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         payrollPayable: employeeSalariesPayable,
       };
 
-      // Explicit, awaited operation rather than rewriting res.json in
-      // middleware. Any failure MUST be an error, never today's figures
-      // falsely presented under yesterday's heading.
-      const projectedBody = asOfContext.isHistorical
-        ? await applyHistoricalOperationalCorrection(companyId, asOfContext, responseBody, valuationMode)
-        : responseBody;
-      // A SINGLE dated response is authoritative for overview, details, custom
-      // subtotals and all expanded groups. The live/current response stays as-is.
-      const datedBody = asOfContext.isHistorical ? reconcileHistoricalPosition(projectedBody) : projectedBody;
-      if (asOfContext.isHistorical) {
-        // Financial summary fields must sum the same rounded currency rows as
-        // the displayed supplier subaccounts; no separate float accumulation.
-        datedBody.supplierLiabilities = sumPositionRows(
-          datedBody.onUs.accounts.filter((row) => row.code === "SUPPLIER")
-        );
-        datedBody.supplierOverpayments = sumPositionRows(
-          datedBody.forUs.accounts.filter((row) => row.code === "SUPPLIER_OVERPAID")
-        );
-        assertHistoricalReportIntegrity(datedBody);
-      }
-      const inventoryHistoryWarnings: string[] = asOfContext.isHistorical
-        ? ((datedBody as typeof responseBody & { inventoryHistoryWarnings?: string[] }).inventoryHistoryWarnings ?? [])
-        : [];
-      const inventoryWarningText: Record<string, string> = {
-        HISTORICAL_RAW_UNPRICED_RECEIPT: "Some older raw-material receipts have no confirmed historical USD unit cost.",
-        HISTORICAL_RAW_ADJUSTMENT_BASIS_MISSING: "Some older raw-material additions lack a recorded valuation basis.",
-        HISTORICAL_RAW_CONSUMPTION_EXCEEDS_RECEIPTS:
-          "Recorded material consumption exceeds available dated receipt history.",
-        HISTORICAL_RAW_LEGACY_RECEIPT_FALLBACK:
-          "Some material receipts use legacy cumulative records instead of individual receipt events.",
-        HISTORICAL_RAW_LEGACY_DEDUCT_MUTATED_RECEIPT:
-          "A legacy raw-material deduction changed a cumulative receipt; its earlier quantity needs audit reconstruction.",
-        HISTORICAL_RAW_SOURCE_OWNER_UNKNOWN:
-          "Some historic mix materials cannot be assigned reliably to their original supplier.",
-        HISTORICAL_RAW_LOCKED_RATE_UNVERSIONED:
-          "A supplier's locked raw-material rate changed after the selected date; its earlier stock is valued at the replayed moving-average cost.",
-        HISTORICAL_RAW_NEGATIVE_MOVEMENT: "An invalid negative material movement needs historical review.",
-        HISTORICAL_STOCK_SCAN_TIME_MISSING: "Some older bale scans have no reliable scan timestamp.",
-        HISTORICAL_STOCK_FINALIZATION_TIME_MISSING:
-          "Some older bales have no recorded stock-entry (finalization) time; their stock-entry, pressing or creation date is used instead.",
-        HISTORICAL_STOCK_REMOVAL_TIME_UNKNOWN: "Some removed/repacked bales have no reliable removal or repack time.",
-        HISTORICAL_STOCK_SELLING_PRICE_UNVERSIONED:
-          "Historical selling prices are not versioned; the selling-price view uses today's catalogue prices.",
-        HISTORICAL_STOCK_COST_EDITS_NOT_VERSIONED:
-          "Stock In Hand uses the current catalogue production prices, as today's report does; earlier catalogue price edits are not versioned.",
-        HISTORICAL_WIP_BALE_LIFECYCLE_UNVERSIONED:
-          "Balance on Table may include earlier baled weight whose subsequent removal/repacking cannot be timed from legacy status-only records.",
-        HISTORICAL_OTW_STATUS_HISTORY_MISSING:
-          "Some containers have no dated cancellation or status history; their earlier eligibility requires review.",
-        HISTORICAL_OTW_LEGACY_OFFLOAD:
-          "A container offload uses a legacy cumulative stock record because individual receipt events are missing.",
-        HISTORICAL_OTW_PLANNED_WEIGHT_MISSING:
-          "Some containers have no reliable planned weight, so their historical OTW amount cannot be calculated.",
-        HISTORICAL_OTW_RECEIPTS_EXCEED_PLAN:
-          "Dated receipts exceed their container's currently recorded planned weight.",
-        HISTORICAL_OTW_GOODS_RATE_UNVERSIONED:
-          "A container lacks an original per-kg goods rate; its current final-payable amount was used provisionally.",
-        HISTORICAL_OTW_CHARGES_UNVERSIONED:
-          "Older container freight/commission/charges are not versioned; outstanding amounts use a provisional proportional allocation.",
-        HISTORICAL_OTW_MASTER_VALUES_UNVERSIONED:
-          "Historical container planned quantities and source price edits are not fully versioned.",
-        HISTORICAL_ORDER_LIFECYCLE_UNVERSIONED:
-          "Some older orders lack dated loading/verification status transitions and cannot be included reliably.",
-        HISTORICAL_ORDER_BACKDATED_VERIFICATION_UNPROVEN:
-          "Some order verification dates were entered retrospectively, but no corresponding event recorded by the selected day remains.",
-        HISTORICAL_ORDER_FINALIZATION_MISSING: "Some finalized orders have no trustworthy finalization timestamp.",
-        HISTORICAL_ORDER_RESTORE_TIME_UNKNOWN:
-          "Some bale scans were restored without a separately dated restoration event.",
-        HISTORICAL_ORDER_SCAN_TIME_MISSING: "Older bale scans with no timestamp cannot be assigned to a prior day.",
-        HISTORICAL_ORDER_CHARGES_UNVERSIONED:
-          "Order freight and charges lack creation/version timestamps, so historical scan totals exclude these unproven charges.",
-        HISTORICAL_ORDER_SCAN_PRICE_EDITS_UNVERSIONED:
-          "An earlier scanned bale's price may have been edited without retaining the original version.",
-      };
-      Object.assign(inventoryWarningText, {
-        HISTORICAL_WORKER_ADVANCE_EDITS_UNVERSIONED:
-          "Historical worker advances are reconstructed from original amounts and dated repayments; edits and deleted repayments may not be fully recoverable.",
-        HISTORICAL_RENT_EXPECTED_AMOUNTS_UNVERSIONED:
-          "Historical rent expected amounts can have been edited without retaining original values.",
-        HISTORICAL_RENT_CONTRACT_STATUS_UNVERSIONED:
-          "Contract status changes lack a full timeline; earlier activity of now-expired contracts is estimated from recorded dates.",
-        HISTORICAL_RENT_VOID_DATE_UNAVAILABLE:
-          "Rental payment void times are unavailable; their previous posting history may be incomplete.",
-        HISTORICAL_RENT_POSTING_TIMESTAMP_MISSING:
-          "Older posted rent payments lack posting timestamps; the creation date is used provisionally.",
-        HISTORICAL_LEDGER_OPENINGS_UNVERSIONED:
-          "Historical asset, deposit and loan account opening balances/types lack full version history.",
-      });
-      res.json({
-        ...datedBody,
-        companyId,
-        businessToday: asOfContext.businessToday,
-        timeZone: asOfContext.timeZone,
-        historyBasis: asOfContext.historyBasis,
-        historyCoverage,
-        historyCompleteness: asOfContext.isHistorical ? "partial" : "current",
-        historyWarnings: asOfContext.isHistorical
-          ? [
-              "Historical category reconstruction remains partial until all operational and financial events are reconciled.",
-              ...inventoryHistoryWarnings.map((code) => inventoryWarningText[code] ?? code),
-              ...(historicalPipeline?.warnings ?? []).map((code) => inventoryWarningText[code] ?? code),
-              ...(historicalAssets?.warnings ?? []).map((code) => inventoryWarningText[code] ?? code),
-              inventoryWarningText.HISTORICAL_LEDGER_OPENINGS_UNVERSIONED,
-              ...(historyCoverage?.gaps ?? []).map(
-                (gap) => `${gap.category}: ${gap.explanation} (${gap.records} record${gap.records === 1 ? "" : "s"})`
-              ),
-            ]
-          : [],
-      });
+      res.json(
+        await finishFactoryNetPosition({
+          companyId,
+          scope: asOfContext,
+          body: responseBody,
+          valuationMode,
+          historyCoverage,
+          pipelineWarnings: historicalPipeline?.warnings ?? [],
+          assetWarnings: historicalAssets?.warnings ?? [],
+        })
+      );
     } catch (error: unknown) {
       if (error instanceof FactoryNetPositionDateError) {
         return res.status(error.status).json({ code: error.code, message: error.message });
