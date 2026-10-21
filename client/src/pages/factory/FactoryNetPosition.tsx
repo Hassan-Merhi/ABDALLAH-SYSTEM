@@ -119,6 +119,7 @@ export default function FactoryNetPosition() {
               variant="ghost"
               size="icon"
               onClick={() => setAsOf(shiftDate(displayAsOf, -1))}
+              disabled={!data?.businessToday}
               data-testid="button-date-prev"
               title="Previous day"
             >
@@ -130,6 +131,7 @@ export default function FactoryNetPosition() {
                 type="date"
                 value={displayAsOf}
                 max={companyToday}
+                disabled={!data?.businessToday}
                 onChange={(e) => e.target.value && setAsOf(e.target.value >= companyToday ? "" : e.target.value)}
                 className="text-sm bg-transparent border-none outline-hidden cursor-pointer w-[120px]"
                 data-testid="input-as-of-date"
@@ -142,7 +144,7 @@ export default function FactoryNetPosition() {
                 const next = shiftDate(displayAsOf, 1);
                 setAsOf(next >= companyToday ? "" : next);
               }}
-              disabled={isToday}
+              disabled={isToday || !data?.businessToday}
               data-testid="button-date-next"
               title="Next day"
             >
@@ -154,8 +156,7 @@ export default function FactoryNetPosition() {
               Today
             </Button>
           )}
-          {isToday && (
-            <Button
+                      <Button
               variant="outline"
               size="sm"
               onClick={() => refetch()}
