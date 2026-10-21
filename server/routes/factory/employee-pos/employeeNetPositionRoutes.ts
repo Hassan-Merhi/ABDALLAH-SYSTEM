@@ -1,4 +1,6 @@
-import { getClientDate } from "../../../lib/dateUtils";
+import { FactoryNetPositionDateError } from "@shared/factoryNetPositionAsOf";
+import { resolveFactoryNetPositionAsOf } from "../../../services/factory/netPositionAsOf";
+import { applyHistoricalOperationalCorrection } from "./netPositionHistoricalCorrection";
 import {
   fxAgentTablesExist,
   loadFxAgentWallets,
@@ -76,12 +78,10 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       // Pin it for subsequent requests this session
       req.session.factoryCompanyId = companyId;
 
-      // ── As-of date ────────────────────────────────────────────────────────────
-      // All date-sensitive queries are filtered to data created/dated on or before asOf.
-      const asOf: string =
-        typeof req.query.asOf === "string" && /^\d{4}-\d{2}-\d{2}$/.test(req.query.asOf)
-          ? req.query.asOf
-          : getClientDate(req);
+      // Resolve one company-local cutoff for ALL downstream components.
+      // Each category will adopt the effective+recorded predicate in Phases 3–6.
+      const asOfContext = await resolveFactoryNetPositionAsOf(companyId, req.query.asOf);
+      const asOf = asOfContext.asOf;
 
       const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
@@ -773,7 +773,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         ...(rentPayable > 0 ? [{ name: "Rent Payable", value: rentPayable }] : []),
       ];
 
-      res.json({
+      const responseBody = {
         asOf,
         fxAgentWallets,
         fxAgentWalletWarnings,
@@ -798,9 +798,35 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         loadingTotal,
         ledgerLiabilities: round2(ledgerOnUsTotal),
         payrollPayable: employeeSalariesPayable,
+      };
+
+      // Explicit, awaited operation rather than rewriting res.json in
+      // middleware. Any failure MUST be an error, never today's figures
+      // falsely presented under yesterday's heading.
+      const datedBody = asOfContext.isHistorical
+        ? await applyHistoricalOperationalCorrection(companyId, asOfContext, responseBody, valuationMode)
+        : responseBody;
+      res.json({
+        ...datedBody,
+        businessToday: asOfContext.businessToday,
+        timeZone: asOfContext.timeZone,
+        historyBasis: asOfContext.historyBasis,
+        historyCompleteness: asOfContext.isHistorical ? "partial" : "current",
+        historyWarnings: asOfContext.isHistorical
+          ? ["Historical category reconstruction is being implemented. Until Phases 3–8 are complete, some current-state amounts may remain in this report."]
+          : [],
       });
     } catch (error: unknown) {
+      if (error instanceof FactoryNetPositionDateError) {
+        return res.status(error.status).json({ code: error.code, message: error.message });
+      }
       logger.error("Factory net-position error:", { error: error });
+      if (error instanceof Error && error.message.startsWith("HISTORICAL_")) {
+        return res.status(503).json({
+          code: "HISTORICAL_NET_POSITION_UNAVAILABLE",
+          message: "The historical snapshot could not be constructed. No current-day balance was substituted.",
+        });
+      }
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });
