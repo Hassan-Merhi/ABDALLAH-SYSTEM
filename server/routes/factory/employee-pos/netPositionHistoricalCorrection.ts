@@ -80,7 +80,7 @@ export async function applyHistoricalOperationalCorrection<T extends NetPosition
   body.inventoryValue = historical.inventoryValue;
   body.rawMaterialValue = historical.rawMaterialValue;
   body.balanceOnTableValue = historical.balanceOnTableValue;
-  body.inventoryHistoryWarnings = historical.warnings;
+  (body as NetPositionResponse).inventoryHistoryWarnings = historical.warnings;
   body.forUs.breakdown = recomputeBreakdown(body.forUs.accounts);
   body.forUsTotal = round2(body.forUs.accounts.reduce((sum, account) => sum + Number(account.value || 0), 0));
   body.forUs.total = body.forUsTotal;
