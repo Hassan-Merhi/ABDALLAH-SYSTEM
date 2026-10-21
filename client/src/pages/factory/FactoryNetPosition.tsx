@@ -285,7 +285,7 @@ export default function FactoryNetPosition() {
       {!isLoading && <NotInLedgerCard section={data?.notInLedger} formatAmount={fmt} />}
 
       {/* Custom Net Position View — view-only, user-configurable account visibility */}
-      {!isLoading && data && <CustomNetPositionView data={data} />}
+      {!isLoading && data && <CustomNetPositionView key={data.companyId ?? "no-company"} data={data} />}
 
       {/* Broker Balance Breakdown */}
       {!isLoading && (data?.onUs.accounts ?? []).some((a) => a.code === "SUPPLIER" && a.breakdown?.length) && (
