@@ -174,11 +174,13 @@ async function getHistoricalOrders(
     WITH scan_events AS (
       SELECT cob.order_id, cob.bale_id, cob.scanned_at, cob.price_used, 0 AS archived
         FROM customer_order_bales cob
+        JOIN customer_orders co ON co.id = cob.order_id AND co.company_id = ${companyId}
        WHERE cob.scanned_at IS NOT NULL
          AND ${isBefore(scope, "cob.scanned_at", "timestamptz")}
       UNION ALL
       SELECT h.order_id, h.bale_id, h.scanned_at, h.price_used, 1 AS archived
         FROM customer_order_bales_history h
+        JOIN customer_orders co ON co.id = h.order_id AND co.company_id = ${companyId}
        WHERE h.scanned_at IS NOT NULL
          AND ${isBefore(scope, "h.scanned_at", "timestamptz")}
          AND NOT ${isBefore(scope, "h.cancelled_at", "timestamptz")}
