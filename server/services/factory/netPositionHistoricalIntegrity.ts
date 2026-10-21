@@ -13,6 +13,7 @@ type HistoricalResponse<R extends HistoricalPositionRow> = HistoricalPositionRep
   inventoryValue: number;
   rawMaterialValue: number;
   balanceOnTableValue: number;
+  stockOtwValue: number;
   supplierLiabilities: number;
   supplierOverpayments: number;
   payrollPayable: number;
@@ -64,8 +65,7 @@ export function assertHistoricalReportIntegrity<R extends HistoricalPositionRow>
   equal(sum(report.loadingOrders), report.loadingTotal, "loadingOrderDetails");
   equal(rowTotal(report.forUs.accounts, "VERIFIED_ORDERS"), report.verifiedTotal, "verifiedOrderAsset");
   equal(rowTotal(report.forUs.accounts, "LOADING_ORDERS"), report.loadingTotal, "loadingOrderAsset");
-  equal(rowTotal(report.forUs.accounts, "STOCK_OTW"), report.forUs.accounts
-    .filter(r => r.code === "STOCK_OTW").reduce((v, r) => v + r.value, 0), "otw");
+  equal(rowTotal(report.forUs.accounts, "STOCK_OTW"), report.stockOtwValue, "otw");
 
   equal(rowTotal(report.onUs.accounts, "SUPPLIER"), report.supplierLiabilities, "supplierPayables");
   equal(rowTotal(report.forUs.accounts, "SUPPLIER_OVERPAID"), report.supplierOverpayments, "supplierOverpayments");
