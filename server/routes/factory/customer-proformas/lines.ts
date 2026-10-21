@@ -64,7 +64,41 @@ export function registerFactoryCustomerProformaLineRoutes(app: Express) {
         }
       }
 
-      const [line] = await db.insert(customerProformaLines).values(parsed).returning();
+      // New proforma articles must also appear in the expected plan of
+      // unfinished linked loadings. The snapshot previously stayed frozen,
+      // so verification showed a scanned new article as "Not Requested".
+      // Preserve all existing per-loading quantities and finalized history.
+      const [line] = await db.transaction(async (tx) => {
+        const [inserted] = await tx.insert(customerProformaLines).values(parsed).returning();
+        await tx.execute(sql`
+          INSERT INTO customer_order_expected_lines
+            (company_id, order_id, proforma_id, proforma_line_id, article_code, product_name, expected_qty)
+          SELECT
+            ${companyId}, co.id, ${parsed.proformaId}, ${inserted.id},
+            ${inserted.articleCode}, ${inserted.productName}, ${inserted.quantity}
+          FROM customer_orders co
+          WHERE co.company_id = ${companyId}
+            AND co.proforma_id_used = ${parsed.proformaId}
+            AND co.status IN ('LOADING', 'PENDING_VERIFICATION')
+            AND co.deleted_at IS NULL
+            AND EXISTS (
+              SELECT 1 FROM factory_daybook_entries event
+              WHERE event.company_id = ${companyId}
+                AND event.reference_table = 'customer_orders'
+                AND event.reference_id = co.id
+                AND event.tx_type = 'LOADING_CREATED'
+                AND event.description LIKE 'Loading started for customer:%'
+            )
+            AND NOT EXISTS (
+              SELECT 1 FROM customer_order_expected_lines expected
+              WHERE expected.company_id = ${companyId}
+                AND expected.order_id = co.id
+                AND LOWER(TRIM(expected.article_code)) = LOWER(TRIM(${inserted.articleCode}))
+            )
+          ON CONFLICT (order_id, article_code) DO NOTHING
+        `);
+        return [inserted];
+      });
       // Sync — new line changes reservedNotYetLoaded for this proforma
       await syncProformaReservations(db, companyId, parsed.proformaId);
 
@@ -155,6 +189,36 @@ export function registerFactoryCustomerProformaLineRoutes(app: Express) {
         .returning();
 
       if (!updated) return res.status(404).json({ message: "Proforma line not found" });
+
+      // Keep ordinary open loading snapshots in step with edits to an
+      // EXISTING proforma line. Previously only newly inserted article codes
+      // were synchronized. Do not modify remaining-only continuation plans
+      // or verified/finalized historical quantities.
+      if (updateData.quantity !== undefined || updateData.productName !== undefined) {
+        await db.execute(sql`
+          UPDATE customer_order_expected_lines expected
+          SET expected_qty = ${updated.quantity},
+              product_name = ${updated.productName},
+              updated_at = NOW()
+          FROM customer_orders co
+          WHERE expected.order_id = co.id
+            AND expected.company_id = ${companyId}
+            AND expected.proforma_id = ${existingLine.proformaId}
+            AND LOWER(TRIM(expected.article_code)) = LOWER(TRIM(${existingLine.articleCode}))
+            AND co.company_id = ${companyId}
+            AND co.proforma_id_used = ${existingLine.proformaId}
+            AND co.status IN ('LOADING', 'PENDING_VERIFICATION')
+            AND co.deleted_at IS NULL
+            AND EXISTS (
+              SELECT 1 FROM factory_daybook_entries event
+              WHERE event.company_id = ${companyId}
+                AND event.reference_table = 'customer_orders'
+                AND event.reference_id = co.id
+                AND event.tx_type = 'LOADING_CREATED'
+                AND event.description LIKE 'Loading started for customer:%'
+            )
+        `);
+      }
       // Sync — quantity change alters reservedNotYetLoaded
       await syncProformaReservations(db, companyId, existingLine.proformaId);
 

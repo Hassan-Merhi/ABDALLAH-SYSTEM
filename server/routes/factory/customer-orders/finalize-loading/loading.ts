@@ -17,6 +17,7 @@ import { syncProformaReservations } from "../../_stockReservationHelper";
 import { acquireProformaCapacityTransactionLock } from "../proformaCapacityConcurrency";
 import { getProformaCapacitySnapshot } from "../proformaCapacity";
 import { buildRemainingLoadingPlan } from "../remainingLoadingPlan";
+import { mergeNewProformaArticles, getLoadingPlanKind, usesLiveMasterProforma } from "../proformaPlan";
 import { guardProformaOrderCreation } from "../proformaCapacityWriteGuards";
 import {
   factoryBales,
@@ -180,6 +181,33 @@ export function registerOrderLoadingRoutes(app: Express) {
         const bales = await tx.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
         if (bales.length === 0) throw new Error("Order has no bales scanned");
 
+        // Freeze the CURRENT master at finalization for an ordinary loading.
+        // A continuation retains its own persisted remaining-only quantities.
+        const planKind = order.proformaIdUsed
+          ? await getLoadingPlanKind(tx, companyId, orderId)
+          : "snapshot";
+        const usesLiveMaster = usesLiveMasterProforma(order.status, planKind);
+        if (usesLiveMaster && order.proformaIdUsed) {
+          const currentMaster = await tx.select().from(customerProformaLines)
+            .where(eq(customerProformaLines.proformaId, order.proformaIdUsed));
+          await tx.delete(customerOrderExpectedLines).where(and(
+            eq(customerOrderExpectedLines.companyId, companyId),
+            eq(customerOrderExpectedLines.orderId, orderId),
+            eq(customerOrderExpectedLines.proformaId, order.proformaIdUsed)
+          ));
+          if (currentMaster.length > 0) {
+            await tx.insert(customerOrderExpectedLines).values(currentMaster.map((line) => ({
+              companyId,
+              orderId,
+              proformaId: order.proformaIdUsed,
+              proformaLineId: line.id,
+              articleCode: line.articleCode,
+              productName: line.productName,
+              expectedQty: line.quantity,
+            })));
+          }
+        }
+
         // Use the current loading's own immutable expected plan, when present.
         // Otherwise this is the first container and the proforma is the plan.
         // In both cases only this container's bales are subtracted.
@@ -222,17 +250,16 @@ export function registerOrderLoadingRoutes(app: Express) {
                 eq(customerOrderExpectedLines.proformaId, proforma.id)
               )
             );
-          const proformaLines = existingPlan.length
-            ? []
-            : await tx
-                .select({
-                  id: customerProformaLines.id,
-                  articleCode: customerProformaLines.articleCode,
-                  productName: customerProformaLines.productName,
-                  quantity: customerProformaLines.quantity,
-                })
-                .from(customerProformaLines)
-                .where(eq(customerProformaLines.proformaId, proforma.id));
+          const proformaLines = await tx
+            .select({
+              id: customerProformaLines.id,
+              articleCode: customerProformaLines.articleCode,
+              productName: customerProformaLines.productName,
+              quantity: customerProformaLines.quantity,
+              createdAt: customerProformaLines.createdAt,
+            })
+            .from(customerProformaLines)
+            .where(eq(customerProformaLines.proformaId, proforma.id));
 
           // The shared capacity engine counts each distinct physical bale once,
           // including the article-code fallbacks used by the scan route.
@@ -245,15 +272,17 @@ export function registerOrderLoadingRoutes(app: Express) {
           const loadedByArticle = new Map(
             capacity.articles.map((article) => [article.normalizedArticleCode, article.currentOrderLoadedQty])
           );
+          const masterPlan = proformaLines.map((line) => ({
+            articleCode: line.articleCode,
+            productName: line.productName,
+            expectedQty: line.quantity,
+            proformaLineId: line.id,
+            createdAt: line.createdAt,
+          }));
           const plan = buildRemainingLoadingPlan(
-            existingPlan.length
-              ? existingPlan
-              : proformaLines.map((line) => ({
-                  articleCode: line.articleCode,
-                  productName: line.productName,
-                  expectedQty: line.quantity,
-                  proformaLineId: line.id,
-                })),
+            usesLiveMaster
+              ? masterPlan
+              : mergeNewProformaArticles(existingPlan, masterPlan, planKind === "continuation", order.createdAt),
             loadedByArticle
           );
           nextLoadingLines.push(...plan.lines);
