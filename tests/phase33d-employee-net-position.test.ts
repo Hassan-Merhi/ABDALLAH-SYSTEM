@@ -34,6 +34,9 @@ const harness = vi.hoisted(() => {
     resolveFactoryAsOf: vi.fn(),
     loadNetPositionEmployees: vi.fn(),
     applyHistoricProjection: vi.fn(),
+    loadHistoricalCoverage: vi.fn(),
+    loadHistoricalPipeline: vi.fn(),
+    computeHistoricalAssets: vi.fn(),
     loggerError: vi.fn(),
   };
 });
@@ -45,6 +48,17 @@ vi.mock("../server/services/factory/netPositionEmployees", () => ({
 }));
 vi.mock("../server/routes/factory/employee-pos/netPositionHistoricalCorrection", () => ({
   applyHistoricalOperationalCorrection: harness.applyHistoricProjection,
+}));
+// Historical dates use the dated coverage, pipeline and asset services; their
+// own tests cover the SQL. Here they return the dated figures directly.
+vi.mock("../server/services/factory/netPositionHistoryCoverage", () => ({
+  loadFactoryHistoricalCoverage: harness.loadHistoricalCoverage,
+}));
+vi.mock("../server/services/factory/netPositionHistoricalPipeline", () => ({
+  loadHistoricalFactoryPipeline: harness.loadHistoricalPipeline,
+}));
+vi.mock("../server/services/factory/netPositionHistoricalAssets", () => ({
+  computeHistoricalFactoryAssetLiabilityOperations: harness.computeHistoricalAssets,
 }));
 vi.mock("../server/services/factory/netPositionAsOf", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../server/services/factory/netPositionAsOf")>()),
@@ -157,6 +171,29 @@ describe("Phase 33D employee/factory net position", () => {
     harness.loadHeldChargeSnapshot.mockResolvedValue({ byCustomer: new Map(), voucherIds: new Set() });
     harness.loadNetPositionEmployees.mockResolvedValue([]);
     harness.applyHistoricProjection.mockImplementation(async (_company: number, _scope: any, body: any) => body);
+    harness.loadHistoricalCoverage.mockResolvedValue({
+      asOf: "",
+      basis: "known-at-cutoff",
+      certified: false,
+      status: "partial",
+      gaps: [],
+    });
+    harness.loadHistoricalPipeline.mockResolvedValue({
+      stockOtwValue: 0,
+      pendingOrders: [],
+      verifiedOrders: [],
+      loadingOrders: [],
+      pendingTotal: 0,
+      verifiedTotal: 0,
+      loadingTotal: 0,
+      warnings: [],
+    });
+    harness.computeHistoricalAssets.mockResolvedValue({
+      workerAdvancesValue: 0,
+      prepaidRent: 0,
+      rentPayable: 0,
+      warnings: [],
+    });
     harness.resolveFactoryAsOf.mockImplementation(async (_company: number, requested: any) => {
       const today = harness.getClientDate();
       if (requested !== undefined && (typeof requested !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(requested))) {
@@ -164,7 +201,13 @@ describe("Phase 33D employee/factory net position", () => {
         throw new FactoryNetPositionDateError("INVALID_AS_OF_DATE");
       }
       const asOf = requested || today;
-      return { asOf, businessToday: today, timeZone: "UTC", isHistorical: asOf < today, historyBasis: "known-at-cutoff" };
+      return {
+        asOf,
+        businessToday: today,
+        timeZone: "UTC",
+        isHistorical: asOf < today,
+        historyBasis: "known-at-cutoff",
+      };
     });
   });
 
@@ -265,10 +308,31 @@ describe("Phase 33D employee/factory net position", () => {
       ])
     );
 
-    harness.executeResults.push(
-      { rows: [{ currency_code: "CDF", rate_to_usd: "0.00035" }] },
-      { rows: [{ total: "15" }] }
-    );
+    harness.executeResults.push({ rows: [{ currency_code: "CDF", rate_to_usd: "0.00035" }] });
+    // A past date: OTW, the order pipeline and worker advances come from the
+    // dated services (recorded scans/transitions, dated repayments).
+    harness.loadHistoricalPipeline.mockResolvedValue({
+      stockOtwValue: 50,
+      pendingOrders: [
+        { id: 1, customerName: "Pending Customer", orderDate: "2026-09-10", grandTotal: 60, totalQtyBales: 1 },
+      ],
+      verifiedOrders: [
+        { id: 2, customerName: "Verified Customer", orderDate: "2026-09-11", grandTotal: 70, totalQtyBales: 2 },
+      ],
+      loadingOrders: [
+        { id: 3, customerName: "Loading Customer", orderDate: "2026-09-12", grandTotal: 80, totalQtyBales: 3 },
+      ],
+      pendingTotal: 60,
+      verifiedTotal: 70,
+      loadingTotal: 80,
+      warnings: [],
+    });
+    harness.computeHistoricalAssets.mockResolvedValue({
+      workerAdvancesValue: 15,
+      prepaidRent: 0,
+      rentPayable: 0,
+      warnings: [],
+    });
     harness.selectResults.push(
       // ledger accounts, vouchers
       [],
@@ -277,43 +341,6 @@ describe("Phase 33D employee/factory net position", () => {
       [
         { id: 5, legalName: "Customer Dr", ledgerAccountId: null },
         { id: 6, legalName: "Customer Cr", ledgerAccountId: 6 },
-      ],
-      // unfinalized orders
-      [
-        {
-          id: 1,
-          status: "PENDING_VERIFICATION",
-          orderDate: "2026-09-10",
-          grandTotal: "60",
-          totalQtyBales: 1,
-          customerId: 1,
-          customerName: "Pending Customer",
-        },
-        {
-          id: 2,
-          status: "VERIFIED",
-          orderDate: "2026-09-11",
-          grandTotal: "70",
-          totalQtyBales: 2,
-          customerId: 2,
-          customerName: "Verified Customer",
-        },
-        {
-          id: 3,
-          status: "LOADING",
-          orderDate: "2026-09-12",
-          grandTotal: "80",
-          totalQtyBales: 3,
-          customerId: 3,
-          customerName: "Loading Customer",
-        },
-      ],
-      // factory rental units
-      [],
-      // employees
-      [
-        { firstName: "Bob", lastName: "Owes", currentBalance: "-12" },
-        { firstName: "Pat", lastName: "Due", currentBalance: "20" },
       ]
     );
 
@@ -396,7 +423,12 @@ describe("Phase 33D employee/factory net position", () => {
     expect(supplierArgs.getConfigFx("USD")).toBe(1);
     // A currency with no confirmed manual rate is refused, never guessed (#2216).
     expect(() => supplierArgs.getConfigFx("EUR")).toThrow("Missing confirmed USD exchange rate for EUR");
-    expect(harness.getCustomerLedgerAndMemo).toHaveBeenCalledWith(7, [5, 6], "2026-09-15", expect.objectContaining({ asOf: "2026-09-15" }));
+    expect(harness.getCustomerLedgerAndMemo).toHaveBeenCalledWith(
+      7,
+      [5, 6],
+      "2026-09-15",
+      expect.objectContaining({ asOf: "2026-09-15" })
+    );
   });
 
   it("excludes both ledger sides of unfinalized charges before classifying net position", async () => {
