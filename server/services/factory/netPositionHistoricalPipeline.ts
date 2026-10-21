@@ -15,8 +15,11 @@ import { netPositionRecordedThrough } from "./netPositionAsOf";
 
 const decimal = (v: unknown): Decimal => toMoney(v as string | number | null | undefined);
 const cents = (v: Decimal): number => v.toDecimalPlaces(2, MoneyDecimal.ROUND_HALF_UP).toNumber();
-const isBefore = (scope: FactoryNetPositionAsOf, fragment: string, kind: "timestamptz" | "utc-naive-timestamp" = "utc-naive-timestamp") =>
-  netPositionRecordedThrough(sql.raw(fragment), scope, kind);
+const isBefore = (
+  scope: FactoryNetPositionAsOf,
+  fragment: string,
+  kind: "timestamptz" | "utc-naive-timestamp" = "utc-naive-timestamp"
+) => netPositionRecordedThrough(sql.raw(fragment), scope, kind);
 
 export type DatedPipelineOrder = {
   id: number;
@@ -40,7 +43,10 @@ export type HistoricalOrderStage = "PENDING_VERIFICATION" | "LOADING" | "VERIFIE
 
 /** Derive stage from recorded transitions, never the row's current status. */
 export function orderStageAt(events: {
-  created: boolean; loadingStarted: boolean; verified: boolean; invoiced: boolean;
+  created: boolean;
+  loadingStarted: boolean;
+  verified: boolean;
+  invoiced: boolean;
   currentStatus: string;
   currentStateKnown?: boolean;
   loadingStartedAt?: string | null;
@@ -50,9 +56,14 @@ export function orderStageAt(events: {
   if (events.invoiced) return "FINALIZED";
   // Reopened orders can move VERIFIED -> LOADING -> VERIFIED. The latest
   // recorded qualifying transition must win; current status is not history.
-  if (events.loadingStarted && events.verified &&
-      events.loadingStartedAt && events.verifiedAt &&
-      events.loadingStartedAt > events.verifiedAt) return "LOADING";
+  if (
+    events.loadingStarted &&
+    events.verified &&
+    events.loadingStartedAt &&
+    events.verifiedAt &&
+    events.loadingStartedAt > events.verifiedAt
+  )
+    return "LOADING";
   if (events.verified) return "VERIFIED";
   if (events.loadingStarted) return "LOADING";
   if (events.currentStatus === "PENDING_VERIFICATION" && events.currentStateKnown) {
@@ -61,133 +72,239 @@ export function orderStageAt(events: {
   return "UNKNOWN";
 }
 
-/** Retain precisely the not-yet-received share of each planned container. */
-export function historicalOtwRemaining(plannedKg: string, receivedKg: string) {
-  const planned = decimal(plannedKg);
-  const received = decimal(receivedKg);
-  if (planned.lte(0)) return { remainingKg: new MoneyDecimal(0), share: new MoneyDecimal(0), exceeded: false };
-  const remainingKg = MoneyDecimal.max(planned.minus(received), 0);
-  return {
-    remainingKg,
-    share: remainingKg.div(planned),
-    exceeded: received.gt(planned),
+/** Container statuses today's Net Position values as Factory Stock OTW. */
+export const OTW_CONTAINER_STATUSES = new Set(["PENDING", "IN_TRANSIT", "ARRIVED"]);
+const OFFLOADED_CONTAINER_STATUSES = new Set(["PARTIALLY_RECEIVED", "OFFLOADED", "RECEIVED"]);
+
+export type HistoricalOtwContainer = {
+  status: string;
+  preOffloadStatus: string | null;
+  /** A receipt (or legacy offload) with business date AND recorded time by the cutoff. */
+  receivedByCutoff: boolean;
+  updatedAfterCutoff: boolean;
+  currencyCode: string;
+  totalKg: string;
+  ratePerKg: string;
+  finalPayable: string;
+  freight: string;
+  freightCurrencyCode: string | null;
+  commission: string;
+  commissionCurrencyCode: string | null;
+  otherCharges: string;
+  preOffloadFreight: string | null;
+  preOffloadFreightCurrencyCode: string | null;
+  preOffloadCommission: string | null;
+  preOffloadCommissionCurrencyCode: string | null;
+  preOffloadOtherCharges: string | null;
+};
+
+/**
+ * Today's rule (netPositionInventory.ts): a container is Factory Stock OTW
+ * while its status is PENDING / IN_TRANSIT / ARRIVED, valued at its final
+ * payable (or rate x kg) plus freight, commission and other charges. The
+ * first receipt moves it to PARTIALLY_RECEIVED / OFFLOADED, after which it
+ * is raw stock and a supplier payable, never OTW again.
+ *
+ * The dated equivalent asks whether a qualifying receipt existed by the
+ * cutoff. A container offloaded later was still in transit; the offload
+ * overwrote its final payable and charges, so the pre-offload snapshot is
+ * used for those amounts. Returns native-currency amounts, or null when the
+ * container was not OTW on the selected day.
+ */
+export function historicalContainerOtw(c: HistoricalOtwContainer): {
+  amounts: Array<{ currency: string; amount: Decimal }>;
+  warnings: string[];
+} | null {
+  if (c.receivedByCutoff) return null;
+  const warnings: string[] = [];
+  const status = (c.status || "").toUpperCase();
+  const offloadedLater = OFFLOADED_CONTAINER_STATUSES.has(status);
+  if (!OTW_CONTAINER_STATUSES.has(status)) {
+    if (!offloadedLater) {
+      // OPENING_BALANCE or any other non-transit status is not OTW today.
+      // A later status edit has no dated history; say so rather than guess.
+      if (c.updatedAfterCutoff) warnings.push("HISTORICAL_OTW_STATUS_HISTORY_MISSING");
+      return warnings.length ? { amounts: [], warnings } : null;
+    }
+    const prior = (c.preOffloadStatus || "").toUpperCase();
+    if (prior && !OTW_CONTAINER_STATUSES.has(prior)) return null;
+    if (!prior) warnings.push("HISTORICAL_OTW_STATUS_HISTORY_MISSING");
+  }
+  if (c.updatedAfterCutoff) warnings.push("HISTORICAL_OTW_MASTER_VALUES_UNVERSIONED");
+
+  const containerCcy = (c.currencyCode || "USD").trim().toUpperCase();
+  const amounts: Array<{ currency: string; amount: Decimal }> = [];
+  const add = (currency: string | null | undefined, amount: Decimal) => {
+    if (amount.gt(0)) amounts.push({ currency: (currency || containerCcy).trim().toUpperCase(), amount });
   };
+  const rateGoods = decimal(c.ratePerKg).times(decimal(c.totalKg));
+  if (offloadedLater) {
+    // final_payable_amount now holds the RECEIVED value set at offload.
+    if (rateGoods.gt(0)) add(containerCcy, rateGoods);
+    else {
+      warnings.push("HISTORICAL_OTW_GOODS_RATE_UNVERSIONED");
+      add(containerCcy, decimal(c.finalPayable));
+    }
+    const snapshotMissing =
+      c.preOffloadFreight == null && c.preOffloadCommission == null && c.preOffloadOtherCharges == null;
+    if (snapshotMissing) {
+      warnings.push("HISTORICAL_OTW_CHARGES_UNVERSIONED");
+      add(c.freightCurrencyCode, decimal(c.freight));
+      add(c.commissionCurrencyCode || "USD", decimal(c.commission));
+      add(containerCcy, decimal(c.otherCharges));
+    } else {
+      add(c.preOffloadFreightCurrencyCode, decimal(c.preOffloadFreight));
+      add(c.preOffloadCommissionCurrencyCode || "USD", decimal(c.preOffloadCommission));
+      add(containerCcy, decimal(c.preOffloadOtherCharges));
+    }
+  } else {
+    const finalPayable = decimal(c.finalPayable);
+    add(containerCcy, finalPayable.gt(0) ? finalPayable : rateGoods);
+    add(c.freightCurrencyCode, decimal(c.freight));
+    add(c.commissionCurrencyCode || "USD", decimal(c.commission));
+    add(containerCcy, decimal(c.otherCharges));
+  }
+  return { amounts, warnings };
 }
 
 type ContainerRow = {
-  id: number; status: string; planned_kg: string; goods_rate: string;
-  final_payable: string; currency_code: string; freight: string;
-  freight_ccy: string; commission: string; commission_ccy: string;
-  other_charges: string; other_charges_ccy: string;
-  received_kg: string; history_count: string; legacy_kg: string;
-  legacy_count: string;
+  id: number;
+  status: string;
+  pre_offload_status: string | null;
+  currency_code: string | null;
+  total_kg: string;
+  rate_per_kg: string;
+  final_payable: string;
+  freight: string;
+  freight_ccy: string | null;
+  commission: string;
+  commission_ccy: string | null;
+  other_charges: string;
+  pre_freight: string | null;
+  pre_freight_ccy: string | null;
+  pre_commission: string | null;
+  pre_commission_ccy: string | null;
+  pre_other_charges: string | null;
+  received_by_cutoff: boolean;
+  updated_after_cutoff: boolean;
 };
 
 async function getHistoricalOtw(
   companyId: number,
   scope: FactoryNetPositionAsOf,
-  getConfigFx: (currency: string) => number,
+  getConfigFx: (currency: string) => number
 ): Promise<{ value: number; warnings: string[] }> {
-  const rows = resultRows<ContainerRow>(await db.execute(sql`
-    SELECT fc.id, fc.status,
-           COALESCE(fc.total_kg, 0)::text AS planned_kg,
-           COALESCE(fc.rate_per_kg, 0)::text AS goods_rate,
-           COALESCE(fc.final_payable_amount, 0)::text AS final_payable,
-           UPPER(COALESCE(fc.currency_code, 'USD')) AS currency_code,
-           COALESCE(fc.freight, 0)::text AS freight,
-           UPPER(COALESCE(fc.freight_currency_code, fc.currency_code, 'USD')) AS freight_ccy,
-           COALESCE(fc.commission_amount, 0)::text AS commission,
-           UPPER(COALESCE(fc.commission_currency_code, 'USD')) AS commission_ccy,
-           COALESCE(fc.other_charges, 0)::text AS other_charges,
-           UPPER(COALESCE(fc.other_charges_currency_code, fc.currency_code, 'USD')) AS other_charges_ccy,
-           COALESCE((
-             SELECT SUM(r.received_kg::numeric)
-               FROM factory_container_receipts r
-              WHERE r.company_id = fc.company_id AND r.container_id = fc.id
-                AND r.receipt_date <= ${scope.asOf}::date
+  const receiptKnown = sql`r.receipt_date <= ${scope.asOf}::date
                 AND ${isBefore(scope, "r.created_at")}
-                AND (r.deleted_at IS NULL OR NOT ${isBefore(scope, "r.deleted_at")})
-           ),0)::text AS received_kg,
-           (SELECT COUNT(*) FROM factory_container_receipts r
-              WHERE r.company_id = fc.company_id AND r.container_id = fc.id)::text AS history_count,
-           COALESCE((
-             SELECT SUM(rs.received_kg::numeric)
-               FROM factory_raw_stock rs
-              WHERE rs.company_id = fc.company_id AND rs.container_id = fc.id
-                AND rs.offloaded_at::date <= ${scope.asOf}::date
-                AND ${isBefore(scope, "rs.created_at")}
-                AND (rs.deleted_at IS NULL OR NOT ${isBefore(scope, "rs.deleted_at")})
-           ),0)::text AS legacy_kg,
-           (SELECT COUNT(*) FROM factory_raw_stock rs
-              WHERE rs.company_id = fc.company_id AND rs.container_id = fc.id)::text AS legacy_count
+                AND (r.deleted_at IS NULL OR NOT ${isBefore(scope, "r.deleted_at")})`;
+  const rows = resultRows<ContainerRow>(
+    await db.execute(sql`
+    SELECT fc.id, fc.status, fc.pre_offload_status, fc.currency_code,
+           COALESCE(fc.total_kg, 0)::text AS total_kg,
+           COALESCE(fc.rate_per_kg, 0)::text AS rate_per_kg,
+           COALESCE(fc.final_payable_amount, 0)::text AS final_payable,
+           COALESCE(fc.freight, 0)::text AS freight,
+           COALESCE(fc.freight_currency_code, fc.currency_code) AS freight_ccy,
+           COALESCE(fc.commission_amount, 0)::text AS commission,
+           fc.commission_currency_code AS commission_ccy,
+           COALESCE(fc.other_charges, 0)::text AS other_charges,
+           fc.pre_offload_freight::text AS pre_freight,
+           COALESCE(fc.pre_offload_freight_currency_code, fc.currency_code) AS pre_freight_ccy,
+           fc.pre_offload_commission_amount::text AS pre_commission,
+           fc.pre_offload_commission_currency_code AS pre_commission_ccy,
+           fc.pre_offload_other_charges::text AS pre_other_charges,
+           (EXISTS (
+              SELECT 1 FROM factory_container_receipts r
+               WHERE r.company_id = fc.company_id AND r.container_id = fc.id AND ${receiptKnown})
+            OR (
+              NOT EXISTS (SELECT 1 FROM factory_container_receipts r
+                           WHERE r.company_id = fc.company_id AND r.container_id = fc.id)
+              AND EXISTS (
+                SELECT 1 FROM factory_raw_stock rs
+                 WHERE rs.company_id = fc.company_id AND rs.container_id = fc.id
+                   AND COALESCE(rs.offloaded_at, rs.created_at)::date <= ${scope.asOf}::date
+                   AND ${isBefore(scope, "rs.created_at")}
+                   AND (rs.deleted_at IS NULL OR NOT ${isBefore(scope, "rs.deleted_at")})))
+           ) AS received_by_cutoff,
+           NOT ${isBefore(scope, "fc.updated_at")} AS updated_after_cutoff
       FROM factory_containers fc
      WHERE fc.company_id = ${companyId}
        AND ${isBefore(scope, "fc.created_at")}
        AND (fc.deleted_at IS NULL OR NOT ${isBefore(scope, "fc.deleted_at")})
-  `));
+  `)
+  );
   const warnings = new Set<string>();
-  let total: Decimal = new MoneyDecimal(0);
+  const buckets = new Map<string, Decimal>();
   for (const c of rows) {
-    // A container that existed by the cutoff is not removed because it is
-    // OFFLOADED now; receipt events decide its historical remaining stock.
-    if (["DELETED", "CANCELLED"].includes(c.status)) {
-      warnings.add("HISTORICAL_OTW_STATUS_HISTORY_MISSING");
+    const otw = historicalContainerOtw({
+      status: c.status,
+      preOffloadStatus: c.pre_offload_status,
+      receivedByCutoff: Boolean(c.received_by_cutoff),
+      updatedAfterCutoff: Boolean(c.updated_after_cutoff),
+      currencyCode: c.currency_code || "USD",
+      totalKg: c.total_kg,
+      ratePerKg: c.rate_per_kg,
+      finalPayable: c.final_payable,
+      freight: c.freight,
+      freightCurrencyCode: c.freight_ccy,
+      commission: c.commission,
+      commissionCurrencyCode: c.commission_ccy,
+      otherCharges: c.other_charges,
+      preOffloadFreight: c.pre_freight,
+      preOffloadFreightCurrencyCode: c.pre_freight_ccy,
+      preOffloadCommission: c.pre_commission,
+      preOffloadCommissionCurrencyCode: c.pre_commission_ccy,
+      preOffloadOtherCharges: c.pre_other_charges,
+    });
+    if (!otw) continue;
+    otw.warnings.forEach((w) => warnings.add(w));
+    for (const { currency, amount } of otw.amounts) {
+      buckets.set(currency, (buckets.get(currency) ?? new MoneyDecimal(0)).plus(amount));
     }
-    const planned = decimal(c.planned_kg);
-    // Current container quantity/rate/FX configuration can have been edited
-    // after cutoff. Without a versioned master snapshot this is provisional.
-    warnings.add("HISTORICAL_OTW_MASTER_VALUES_UNVERSIONED");
-    let received = decimal(c.received_kg);
-    if (Number(c.history_count) === 0 && Number(c.legacy_count) > 0) {
-      received = decimal(c.legacy_kg);
-      warnings.add("HISTORICAL_OTW_LEGACY_OFFLOAD");
-    }
-    if (planned.lte(0)) {
-      warnings.add("HISTORICAL_OTW_PLANNED_WEIGHT_MISSING");
-      continue;
-    }
-    const { remainingKg, share: ratio, exceeded } = historicalOtwRemaining(c.planned_kg, received.toFixed());
-    if (exceeded) warnings.add("HISTORICAL_OTW_RECEIPTS_EXCEED_PLAN");
-    if (remainingKg.isZero()) continue;
-    const nativeGoods = decimal(c.goods_rate).gt(0)
-      ? planned.times(decimal(c.goods_rate))
-      : decimal(c.final_payable);
-    if (decimal(c.goods_rate).lte(0)) warnings.add("HISTORICAL_OTW_GOODS_RATE_UNVERSIONED");
-    const add = (amount: Decimal, currency: string) => {
-      if (amount.lte(0)) return;
-      const cc = (currency || "USD").toUpperCase();
-      total = total.plus(amount.times(cc === "USD" ? 1 : getConfigFx(cc)).times(ratio));
-    };
-    add(nativeGoods, c.currency_code);
-    add(decimal(c.freight), c.freight_ccy);
-    add(decimal(c.commission), c.commission_ccy);
-    add(decimal(c.other_charges), c.other_charges_ccy);
-    if (decimal(c.freight).gt(0) || decimal(c.commission).gt(0) || decimal(c.other_charges).gt(0)) {
-      // The container has one mutable charge snapshot, not time-versioned
-      // charge amounts. Prorating is explicit, provisional and auditable.
-      warnings.add("HISTORICAL_OTW_CHARGES_UNVERSIONED");
-    }
+  }
+  // Same per-currency aggregation and manual-rate conversion as today's OTW.
+  let total: Decimal = new MoneyDecimal(0);
+  for (const [currency, amount] of buckets) {
+    total = total.plus(amount.times(currency === "USD" ? 1 : getConfigFx(currency)));
   }
   return { value: cents(total), warnings: [...warnings] };
 }
 
 type OrderRow = {
-  id: number; customer_name: string; order_date: string; current_status: string;
-  grand_total: string; total_qty_bales: number;
-  loading_started_at: string | null; verified_at: string | null;
-  finalized_at: string | null; updated_at: string;
-  loading_before: boolean; verified_before: boolean; finalized_before: boolean;
+  id: number;
+  customer_name: string;
+  order_date: string;
+  current_status: string;
+  grand_total: string;
+  total_qty_bales: number;
+  loading_started_at: string | null;
+  verified_at: string | null;
+  finalized_at: string | null;
+  updated_at: string;
+  loading_before: boolean;
+  verified_before: boolean;
+  finalized_before: boolean;
   state_known_before: boolean;
-  scanned_qty: string; scanned_value: string; unknown_scans: string;
-  had_charges: boolean; had_unknown_restores: boolean;
+  scanned_qty: string;
+  scanned_value: string;
+  unknown_scans: string;
+  had_charges: boolean;
+  had_unknown_restores: boolean;
   unproven_verification: boolean;
+  unchanged_since_cutoff: boolean;
 };
 
 async function getHistoricalOrders(
   companyId: number,
-  scope: FactoryNetPositionAsOf,
-): Promise<{ pendingOrders: DatedPipelineOrder[]; verifiedOrders: DatedPipelineOrder[]; loadingOrders: DatedPipelineOrder[]; warnings: string[] }> {
-  const rows = resultRows<OrderRow>(await db.execute(sql`
+  scope: FactoryNetPositionAsOf
+): Promise<{
+  pendingOrders: DatedPipelineOrder[];
+  verifiedOrders: DatedPipelineOrder[];
+  loadingOrders: DatedPipelineOrder[];
+  warnings: string[];
+}> {
+  const rows = resultRows<OrderRow>(
+    await db.execute(sql`
     WITH scan_events AS (
       SELECT cob.order_id, cob.bale_id, cob.scanned_at, cob.price_used, 0 AS archived
         FROM customer_order_bales cob
@@ -241,6 +358,16 @@ async function getHistoricalOrders(
                OR COALESCE(${isBefore(scope, "o.loading_finalized_at")},false))
              AND NOT COALESCE(${isBefore(scope, "o.updated_at")},false)) AS unproven_verification,
            COALESCE(${isBefore(scope, "o.finalized_at")},false) AS finalized_before,
+           -- The order row was last written before the cutoff and no scan was
+           -- added or cancelled since: its stored totals ARE its value that day.
+           (COALESCE(${isBefore(scope, "o.updated_at")},false)
+             AND NOT EXISTS (SELECT 1 FROM customer_order_bales cob
+                              WHERE cob.order_id = o.id
+                                AND (cob.scanned_at IS NULL OR NOT ${isBefore(scope, "cob.scanned_at", "timestamptz")}))
+             AND NOT EXISTS (SELECT 1 FROM customer_order_bales_history h
+                              WHERE h.order_id = o.id
+                                AND (h.cancelled_at IS NULL OR NOT ${isBefore(scope, "h.cancelled_at", "timestamptz")}))
+           ) AS unchanged_since_cutoff,
            COALESCE(t.qty, '0') AS scanned_qty,
            COALESCE(t.scanned_value, '0') AS scanned_value,
            (SELECT COUNT(*)::text FROM customer_order_bales cob
@@ -272,22 +399,30 @@ async function getHistoricalOrders(
        AND o.order_date <= ${scope.asOf}::date
        AND ${isBefore(scope, "o.created_at")}
        AND (o.deleted_at IS NULL OR NOT ${isBefore(scope, "o.deleted_at")})
-  `));
+  `)
+  );
   const pendingOrders: DatedPipelineOrder[] = [];
   const verifiedOrders: DatedPipelineOrder[] = [];
   const loadingOrders: DatedPipelineOrder[] = [];
   const warnings = new Set<string>();
   for (const r of rows) {
-    const stage = orderStageAt({
-      created: true,
-      loadingStarted: r.loading_before,
-      verified: r.verified_before,
-      invoiced: r.finalized_before,
-      currentStatus: r.current_status,
-      currentStateKnown: r.state_known_before,
-      loadingStartedAt: r.loading_started_at,
-      verifiedAt: r.verified_at,
-    });
+    // Every status change writes customer_orders.updated_at, so a row last
+    // updated before the cutoff still shows its status on that day (a
+    // CANCELLED or FINALIZED order is then never revived as LOADING).
+    const stage: HistoricalOrderStage = r.state_known_before
+      ? ["PENDING_VERIFICATION", "VERIFIED", "LOADING"].includes(r.current_status)
+        ? (r.current_status as HistoricalOrderStage)
+        : "FINALIZED"
+      : orderStageAt({
+          created: true,
+          loadingStarted: r.loading_before,
+          verified: r.verified_before,
+          invoiced: r.finalized_before,
+          currentStatus: r.current_status,
+          currentStateKnown: r.state_known_before,
+          loadingStartedAt: r.loading_started_at,
+          verifiedAt: r.verified_at,
+        });
     if (stage === "FINALIZED") continue;
     if (r.unproven_verification) warnings.add("HISTORICAL_ORDER_BACKDATED_VERIFICATION_UNPROVEN");
     if (stage === "UNKNOWN") {
@@ -299,17 +434,21 @@ async function getHistoricalOrders(
     }
     if (r.had_unknown_restores) warnings.add("HISTORICAL_ORDER_RESTORE_TIME_UNKNOWN");
     if (Number(r.unknown_scans) > 0) warnings.add("HISTORICAL_ORDER_SCAN_TIME_MISSING");
-    if (r.had_charges) warnings.add("HISTORICAL_ORDER_CHARGES_UNVERSIONED");
-    if (decimal(r.scanned_value).gt(0)) warnings.add("HISTORICAL_ORDER_SCAN_PRICE_EDITS_UNVERSIONED");
-    // Historic subtotal equals individually recorded bale scans, not the
-    // today's mutable grand_total / total_qty_bales. Never copy tomorrow's
-    // unscanned bales into yesterday's pipeline.
+    // An order untouched since the cutoff keeps today's valuation rule
+    // (grand_total incl. freight/charges and per-kg pricing). Otherwise the
+    // historic subtotal is the individually recorded bale scans, never
+    // today's mutable grand_total / total_qty_bales.
+    const exact = Boolean(r.unchanged_since_cutoff);
+    if (!exact) {
+      if (r.had_charges) warnings.add("HISTORICAL_ORDER_CHARGES_UNVERSIONED");
+      if (decimal(r.scanned_value).gt(0)) warnings.add("HISTORICAL_ORDER_SCAN_PRICE_EDITS_UNVERSIONED");
+    }
     const item: DatedPipelineOrder = {
       id: Number(r.id),
       customerName: r.customer_name,
       orderDate: r.order_date,
-      grandTotal: cents(decimal(r.scanned_value)),
-      totalQtyBales: Number(r.scanned_qty),
+      grandTotal: cents(decimal(exact ? r.grand_total : r.scanned_value)),
+      totalQtyBales: exact ? Number(r.total_qty_bales ?? 0) : Number(r.scanned_qty),
     };
     if (stage === "VERIFIED") verifiedOrders.push(item);
     else if (stage === "LOADING") loadingOrders.push(item);
@@ -321,7 +460,7 @@ async function getHistoricalOrders(
 export async function loadHistoricalFactoryPipeline(
   companyId: number,
   scope: FactoryNetPositionAsOf,
-  getConfigFx: (cc: string) => number,
+  getConfigFx: (cc: string) => number
 ): Promise<DatedPipelineSnapshot> {
   let otw: Awaited<ReturnType<typeof getHistoricalOtw>>;
   let orders: Awaited<ReturnType<typeof getHistoricalOrders>>;
@@ -334,9 +473,8 @@ export async function loadHistoricalFactoryPipeline(
     // Never substitute today's container or order totals for a failed date.
     throw new Error("HISTORICAL_NET_POSITION_PIPELINE_FAILED", { cause });
   }
-  const sum = (items: readonly DatedPipelineOrder[]) => cents(
-    items.reduce((acc, item) => acc.plus(decimal(item.grandTotal)), new MoneyDecimal(0))
-  );
+  const sum = (items: readonly DatedPipelineOrder[]) =>
+    cents(items.reduce((acc, item) => acc.plus(decimal(item.grandTotal)), new MoneyDecimal(0)));
   return {
     stockOtwValue: otw.value,
     ...orders,
