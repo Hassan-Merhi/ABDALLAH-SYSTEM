@@ -116,8 +116,9 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       }
       // Only use manually configured rates — no hardcoded fallbacks
       const getConfigFx = (cc: string): number => {
-        if (cc.toUpperCase() === "USD") return 1;
-        const rate = configFxRates[cc.trim().toUpperCase()];
+        const currency = cc.trim().toUpperCase();
+        if (currency === "USD") return 1;
+        const rate = configFxRates[currency];
         if (!rate || !Number.isFinite(rate) || rate <= 0)
           throw new Error(`Missing confirmed USD exchange rate for ${cc}`);
         return rate;
@@ -898,6 +899,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         HISTORICAL_STOCK_REMOVAL_TIME_UNKNOWN: "Some removed/repacked bales have no reliable removal or repack time.",
         HISTORICAL_STOCK_SELLING_PRICE_UNVERSIONED: "Historical selling prices are not versioned; the selling-price view uses today's catalogue prices.",
         HISTORICAL_STOCK_COST_EDITS_NOT_VERSIONED: "Earlier bale costs may have been edited or re-costed without a retained historical price version.",
+        HISTORICAL_WIP_BALE_LIFECYCLE_UNVERSIONED: "Balance on Table may include earlier baled weight whose subsequent removal/repacking cannot be timed from legacy status-only records.",
         HISTORICAL_OTW_STATUS_HISTORY_MISSING: "Some containers have no dated cancellation or status history; their earlier eligibility requires review.",
         HISTORICAL_OTW_LEGACY_OFFLOAD: "A container offload uses a legacy cumulative stock record because individual receipt events are missing.",
         HISTORICAL_OTW_PLANNED_WEIGHT_MISSING: "Some containers have no reliable planned weight, so their historical OTW amount cannot be calculated.",
