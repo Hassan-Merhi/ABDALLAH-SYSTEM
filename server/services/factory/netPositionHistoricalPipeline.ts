@@ -176,6 +176,7 @@ type OrderRow = {
   loading_before: boolean; verified_before: boolean; finalized_before: boolean;
   scanned_qty: string; scanned_value: string; unknown_scans: string;
   had_charges: boolean; had_unknown_restores: boolean;
+  unproven_verification: boolean;
 };
 
 async function getHistoricalOrders(
@@ -210,14 +211,21 @@ async function getHistoricalOrders(
            o.order_date::text AS order_date, o.status AS current_status,
            o.grand_total::text AS grand_total, o.total_qty_bales, o.updated_at::text,
            o.loading_started_at::text AS loading_started_at,
-           (CASE
-             WHEN ${isBefore(scope, "o.verified_at")} THEN o.verified_at
-             WHEN ${isBefore(scope, "o.loading_finalized_at")} THEN o.loading_finalized_at
-             ELSE NULL END)::text AS verified_at,
+           COALESCE(verify_event.recorded_at,
+             CASE WHEN ${isBefore(scope, "o.updated_at")}
+                   AND (COALESCE(${isBefore(scope, "o.verified_at")},false)
+                     OR COALESCE(${isBefore(scope, "o.loading_finalized_at")},false))
+                  THEN o.updated_at ELSE NULL END)::text AS verified_at,
            o.finalized_at::text AS finalized_at,
            COALESCE(${isBefore(scope, "o.loading_started_at")},false) AS loading_before,
-           (COALESCE(${isBefore(scope, "o.verified_at")},false)
-              OR COALESCE(${isBefore(scope, "o.loading_finalized_at")},false)) AS verified_before,
+           (verify_event.recorded_at IS NOT NULL OR
+             (COALESCE(${isBefore(scope, "o.updated_at")},false) AND
+               (COALESCE(${isBefore(scope, "o.verified_at")},false)
+                 OR COALESCE(${isBefore(scope, "o.loading_finalized_at")},false)))) AS verified_before,
+           (verify_event.recorded_at IS NULL
+             AND (COALESCE(${isBefore(scope, "o.verified_at")},false)
+               OR COALESCE(${isBefore(scope, "o.loading_finalized_at")},false))
+             AND NOT COALESCE(${isBefore(scope, "o.updated_at")},false)) AS unproven_verification,
            COALESCE(${isBefore(scope, "o.finalized_at")},false) AS finalized_before,
            COALESCE(t.qty, '0') AS scanned_qty,
            COALESCE(t.scanned_value, '0') AS scanned_value,
@@ -236,6 +244,15 @@ async function getHistoricalOrders(
            ) AS had_unknown_restores
       FROM customer_orders o
       JOIN customers c ON c.id = o.customer_id AND c.company_id = o.company_id
+      LEFT JOIN LATERAL (
+        SELECT MAX(d.created_at) AS recorded_at
+          FROM factory_daybook_entries d
+         WHERE d.company_id = o.company_id AND d.reference_table = 'customer_orders'
+           AND d.reference_id = o.id
+           AND d.tx_type IN ('ORDER_VERIFIED', 'LOADING_SUBMITTED')
+           AND d.tx_date <= ${scope.asOf}::date
+           AND ${isBefore(scope, "d.created_at")}
+      ) verify_event ON TRUE
       LEFT JOIN totals t ON t.order_id = o.id
      WHERE o.company_id = ${companyId}
        AND o.order_date <= ${scope.asOf}::date
@@ -257,6 +274,7 @@ async function getHistoricalOrders(
       verifiedAt: r.verified_at,
     });
     if (stage === "FINALIZED") continue;
+    if (r.unproven_verification) warnings.add("HISTORICAL_ORDER_BACKDATED_VERIFICATION_UNPROVEN");
     if (stage === "UNKNOWN") {
       warnings.add("HISTORICAL_ORDER_LIFECYCLE_UNVERSIONED");
       continue;
