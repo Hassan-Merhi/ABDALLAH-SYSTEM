@@ -323,6 +323,12 @@ export async function computeHistoricalFactoryInventory(
     inventoryValue: stock.value,
     rawMaterialValue: raw.value,
     balanceOnTableValue: workInProcess.value,
-    warnings: [...new Set([...raw.warnings, ...stock.warnings])],
+    // The cumulative WIP snapshot uses surviving bale status/weight records.
+    // Historic removal/repack timestamps are not complete for legacy bales.
+    warnings: [...new Set([
+      ...raw.warnings,
+      ...stock.warnings,
+      "HISTORICAL_WIP_BALE_LIFECYCLE_UNVERSIONED",
+    ])],
   };
 }
