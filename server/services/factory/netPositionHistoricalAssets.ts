@@ -163,10 +163,12 @@ async function factoryRentalAsOf(companyId: number, scope: FactoryNetPositionAsO
     const sumsRow = sums.get(payment.contractId);
     if (sumsRow) sumsRow.paid = sumsRow.paid.plus(value(payment.amount));
   }
-  const prepaidRent = cents([...sums.values()].reduce(
-    (sum, row) => sum.plus(row.expected.minus(row.paid).abs()),
-    new MoneyDecimal(0),
-  ));
+  const prepaidRent = sumRentalContractPositions(
+    [...sums.values()].map(row => ({
+      expected: row.expected.toFixed(),
+      paid: row.paid.toFixed(),
+    }))
+  );
   // Today's Factory report labels outstanding + tenant credits as a single
   // "Prepaid Rent" asset, with no extra Rent Payable liability.
   return { value: prepaidRent, warnings: [...warnings] };
