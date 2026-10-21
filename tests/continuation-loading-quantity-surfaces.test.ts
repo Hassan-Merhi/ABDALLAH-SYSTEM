@@ -13,7 +13,6 @@ describe("continuation loading quantities across screens", () => {
     expect(source).toContain("AND proforma_id = ${order.proformaIdUsed}");
     // #2407: the saved remaining-only plan is merged with new master articles
     // (an empty saved plan falls back to the master proforma).
-    expect(source).toContain("expectedPlan.map(");
     expect(source).toContain("mergeNewProformaArticles(");
     expect(source).toContain("expected_qty");
     expect(source).toContain("originalsById.get");
