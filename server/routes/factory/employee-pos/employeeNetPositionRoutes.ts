@@ -4,6 +4,7 @@ import { loadFactoryNetPositionEmployees } from "../../../services/factory/netPo
 import { loadHistoricalFactoryPipeline } from "../../../services/factory/netPositionHistoricalPipeline";
 import { computeHistoricalFactoryAssetLiabilityOperations } from "../../../services/factory/netPositionHistoricalAssets";
 import { reconcileHistoricalPosition } from "../../../services/factory/netPositionReportTotals";
+import { loadFactoryHistoricalCoverage } from "../../../services/factory/netPositionHistoryCoverage";
 import { applyHistoricalOperationalCorrection } from "./netPositionHistoricalCorrection";
 import {
   fxAgentTablesExist,
@@ -85,6 +86,11 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       // Each category will adopt the effective+recorded predicate in Phases 3–6.
       const asOfContext = await resolveFactoryNetPositionAsOf(companyId, req.query.asOf);
       const asOf = asOfContext.asOf;
+      // Perform a read-only prerequisite and evidence check BEFORE invoking
+      // any reconstruction query that refers to trigger-added scan timestamps.
+      const historyCoverage = asOfContext.isHistorical
+        ? await loadFactoryHistoricalCoverage(companyId, asOfContext)
+        : null;
       const employeeBalances = await loadFactoryNetPositionEmployees(companyId, asOfContext);
       const historicalAssets = asOfContext.isHistorical
         ? await computeHistoricalFactoryAssetLiabilityOperations(companyId, asOfContext)
@@ -907,6 +913,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         businessToday: asOfContext.businessToday,
         timeZone: asOfContext.timeZone,
         historyBasis: asOfContext.historyBasis,
+        historyCoverage,
         historyCompleteness: asOfContext.isHistorical ? "partial" : "current",
         historyWarnings: asOfContext.isHistorical
           ? [
@@ -915,6 +922,8 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
               ...(historicalPipeline?.warnings ?? []).map(code => inventoryWarningText[code] ?? code),
               ...(historicalAssets?.warnings ?? []).map(code => inventoryWarningText[code] ?? code),
               inventoryWarningText.HISTORICAL_LEDGER_OPENINGS_UNVERSIONED,
+              ...(historyCoverage?.gaps ?? []).map(gap =>
+                `${gap.category}: ${gap.explanation} (${gap.records} record${gap.records === 1 ? "" : "s"})`),
             ]
           : [],
       });
