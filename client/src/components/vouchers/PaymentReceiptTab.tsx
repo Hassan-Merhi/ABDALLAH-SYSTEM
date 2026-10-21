@@ -27,9 +27,13 @@ import AccountSidebar, { Account } from "@/components/AccountSidebar";
 import { VoucherEntriesTable, type VoucherEntry } from "@/components/vouchers/VoucherEntriesTable";
 import type { VoucherFormData } from "@/pages/vouchers/voucherTypes";
 import { VoucherSourceCard } from "@/components/vouchers/VoucherSourceCard";
-import { PaymentReceiptFxSection } from "@/components/vouchers/PaymentReceiptFxSection";
+import {
+  FxWalletPaymentSection,
+  FxWalletSourceCard,
+  type FxWalletSummary,
+} from "@/components/vouchers/FxWalletPayment";
+import { PayFromAccountSheet } from "@/components/vouchers/PayFromAccountSheet";
 import { PaymentReceiptHeaderActions } from "@/components/vouchers/PaymentReceiptHeaderActions";
-import { PayFromMobileSheet } from "@/components/vouchers/PayFromMobileSheet";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 
 export interface PaymentReceiptTabProps {
@@ -67,11 +71,7 @@ export interface PaymentReceiptTabProps {
   isEditMode?: boolean;
   originalTotal?: number;
   isPending?: boolean;
-  fxWallet?: {
-    wallet: { id: number; ledgerAccountId: number; accountName: string };
-    state: { eur: string; usd: string; totalBookUsd: string };
-    synchronized: boolean;
-  };
+  fxWallet?: FxWalletSummary;
   fxWalletsLoading?: boolean;
   fxPaymentRate?: string;
   onFxPaymentRateChange?: (value: string) => void;
@@ -447,22 +447,11 @@ export function PaymentReceiptTab({
                   )}
 
                   {isFxPayment && paymentAccountId > 0 && !editingSource && (
-                    <div className="rounded-lg border bg-muted/20 px-4 py-3 space-y-1" data-testid="fx-payment-source">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-semibold">Pay from {paymentAccountName} (EUR wallet)</p>
-                        <Button type="button" variant="outline" size="sm" onClick={() => setEditingSource(true)}>
-                          Change
-                        </Button>
-                      </div>
-                      <p className="font-mono text-sm">
-                        EUR{" "}
-                        {Number(fxWallet!.state.eur).toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}{" "}
-                        available
-                      </p>
-                    </div>
+                    <FxWalletSourceCard
+                      accountName={paymentAccountName}
+                      eurAvailable={fxWallet!.state.eur}
+                      onChange={() => setEditingSource(true)}
+                    />
                   )}
 
                   {/* Account picker — shown until an account is chosen, or on "Change" */}
@@ -568,20 +557,20 @@ export function PaymentReceiptTab({
                 />
 
                 {isFxPayment && (
-                  <PaymentReceiptFxSection
-                    entries={entries}
-                    total={total}
+                  <FxWalletPaymentSection
+                    fxWallet={fxWallet!}
                     directEurPayment={directEurPayment}
+                    showPayoutToggle={entries[0]?.accountType === "factorySupplier"}
+                    fxPayoutCurrency={fxPayoutCurrency}
+                    fxPaymentRate={fxPaymentRate}
                     fxRateValue={fxRateValue}
                     fxEurRequired={fxEurRequired}
-                    fxUnsupportedEntries={fxUnsupportedEntries}
-                    fxWallet={fxWallet}
-                    fxPaymentRate={fxPaymentRate}
-                    onFxPaymentRateChange={onFxPaymentRateChange}
-                    fxPayoutCurrency={fxPayoutCurrency}
-                    fxSupplierEurBalance={fxSupplierEurBalance}
+                    fxSupplierEurBalance={fxSupplierEurBalance ?? null}
                     fxSupplierEurBasis={fxSupplierEurBasis}
                     fxSupplierBalanceLoading={fxSupplierBalanceLoading}
+                    fxUnsupportedEntries={fxUnsupportedEntries}
+                    total={total}
+                    onFxPaymentRateChange={onFxPaymentRateChange}
                     onFxPayoutCurrencyChange={onFxPayoutCurrencyChange}
                   />
                 )}
@@ -819,20 +808,28 @@ export function PaymentReceiptTab({
       </Sheet>
 
       {/* ── Mobile Pay From / Receive Into Sheet ── */}
-      <PayFromMobileSheet
-        form={form}
-        payFromSheetOpen={payFromSheetOpen}
-        setPayFromSheetOpen={setPayFromSheetOpen}
+      <PayFromAccountSheet
+        open={payFromSheetOpen}
+        onOpenChange={(isOpen) => {
+          setPayFromSheetOpen(isOpen);
+          if (!isOpen) setPayFromSearch("");
+        }}
+        accountLabel={accountLabel}
         payFromSearch={payFromSearch}
         setPayFromSearch={setPayFromSearch}
-        accountLabel={accountLabel}
         sidebarAccounts={sidebarAccounts}
         payFromKeys={payFromKeys}
         paymentAccountId={paymentAccountId}
         paymentAccountType={paymentAccountType}
-        setEditingSource={setEditingSource}
-        setPayFromTouched={setPayFromTouched}
         formatAmount={formatAmount}
+        onSelect={(account) => {
+          form.setValue("paymentAccountType", account.type);
+          form.setValue("paymentAccountId", account.id);
+          form.setValue("paymentAccountName", account.name);
+          setEditingSource(false);
+          setPayFromTouched(true);
+          setPayFromSheetOpen(false);
+        }}
       />
     </div>
   );

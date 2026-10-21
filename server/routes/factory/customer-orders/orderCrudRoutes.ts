@@ -27,7 +27,7 @@ import { guardProformaOrderCreation } from "./proformaCapacityWriteGuards";
 import { acquireProformaCapacityTransactionLock } from "./proformaCapacityConcurrency";
 import { linkOrderProformaAtomically, LinkOrderProformaError } from "./linkProformaAtomic";
 import { canViewBookingInfo, isValidBookingInfo } from "./bookingInfo";
-import { registerOrderProfitabilityRoutes } from "./orderProfitabilityRoutes";
+import { registerOrderProfitabilityRoute } from "./orderProfitabilityRoute";
 
 export function registerOrderCrudRoutes(app: Express) {
   // Reassign an unfinalized loading without touching its bales or creating
@@ -359,7 +359,7 @@ export function registerOrderCrudRoutes(app: Express) {
               savedProformaLines,
               originalProformaLines,
               planKind === "continuation" && !["VERIFIED", "FINALIZED", "CANCELLED"].includes(order.status),
-              order.createdAt
+              order.createdAt as Date | string | null
             );
         const capacity = continuationProforma
           ? await getProformaCapacitySnapshot(db, {
@@ -439,7 +439,7 @@ export function registerOrderCrudRoutes(app: Express) {
     }
   });
 
-  registerOrderProfitabilityRoutes(app);
+  registerOrderProfitabilityRoute(app);
 
   app.post("/api/factory/customer-orders", requireAuth, async (req: Request, res: Response) => {
     try {

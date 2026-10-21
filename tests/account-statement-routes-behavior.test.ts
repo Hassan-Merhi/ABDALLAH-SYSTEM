@@ -28,10 +28,7 @@ const harness = vi.hoisted(() => {
     getCustomerByLedgerId: vi.fn(),
     getPartyBalance: vi.fn(),
     loadCustomerNotInLedger: vi.fn(),
-    projectCustomerStatementLines: vi.fn(async (_companyId: number, _customerId: number, rows: unknown[]) => ({
-      rows: [...rows],
-      heldBefore: 0,
-    })),
+    projectCustomerStatementLines: vi.fn(),
   };
 });
 
@@ -55,8 +52,6 @@ vi.mock("../server/services/accounting/balances/customerLedgerStatement", () => 
   loadCustomerNotInLedger: harness.loadCustomerNotInLedger,
   loadCustomerLedgerEntryRows: vi.fn(async () => []),
 }));
-// #2390 hides held pre-finalization freight from customer statements; this
-// fixture holds none, so the projection keeps every line and holds nothing back.
 vi.mock("../server/routes/factory/customers-core/heldUnfinalizedCustomerCharges", () => ({
   projectCustomerStatementLines: harness.projectCustomerStatementLines,
 }));
@@ -281,12 +276,14 @@ describe("account statement route behavior", () => {
     harness.getCustomerByLedgerId.mockResolvedValue({ id: 44, companyId: 4 });
     harness.getPartyBalance.mockResolvedValue({ opening: "150.00" });
     harness.loadCustomerNotInLedger.mockResolvedValue({ prePeriodTotal: "120.00", rows: [] });
+    // Held pre-finalization charges booked before the period leave the opening (#2415).
+    harness.projectCustomerStatementLines.mockResolvedValue({ rows: [], heldBefore: "25.00" });
     const res = responseHarness();
     await routes.get("GET /api/accounts/:type/:id/pre-period-balance")!(
       request({ params: { type: "ledger", id: "12" }, query: { endDate: "2026-08-01" } }),
       res
     );
-    expect(res.body).toEqual({ balance: 150, notInLedgerBefore: "120.00" });
+    expect(res.body).toEqual({ balance: 125, notInLedgerBefore: "120.00" });
     expect(harness.projectCustomerStatementLines).toHaveBeenCalledWith(4, 44, [], "2026-08-01", null);
     expect(harness.getPartyBalance).toHaveBeenCalledWith(harness.db, {
       companyId: 4,

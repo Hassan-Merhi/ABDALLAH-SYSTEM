@@ -5,6 +5,7 @@ import {
   FileText,
   Settings,
   Layers,
+  ListTree,
   BarChart3,
   FolderPlus,
   Wallet,
@@ -92,6 +93,7 @@ export const ERP_NAV_SECTIONS: NavSection[] = [
     color: NAV_COLOR.accounting,
     items: [
       { title: "Accounts", url: "/accounts", icon: Wallet },
+      { title: "Cost Centers", url: "/cost-centers", icon: ListTree },
       { title: "Parties", url: "/parties", icon: Handshake },
       { title: "Payroll", url: "/payroll", icon: UserCheck },
     ],
@@ -192,6 +194,8 @@ export function useErpVisibleSections(user?: SidebarUser): {
 
     if (selectedCompany?.companyType === "retail" && RETAIL_HIDDEN_ERP_ROUTES.has(item.url)) return false;
     if (item.url === "/tracking") return !isPOSUser;
+    if (item.url === "/cost-centers" && !["Admin", "Owner", "Developer", "Manager"].includes(effectiveRole))
+      return false;
     if (isPOSUser && item.url === "/pos-item-replacement") return false;
 
     if (

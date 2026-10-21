@@ -1,42 +1,78 @@
+/**
+ * FX agent EUR wallet presentation for the Payment voucher: the wallet source
+ * card that replaces the regular Pay From summary, and the payout section
+ * (USD exchange or direct EUR supplier payment). Extracted from
+ * PaymentReceiptTab.tsx; the parent owns all state and validation.
+ */
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { VoucherEntry } from "@/components/vouchers/VoucherEntriesTable";
-import type { PaymentReceiptTabProps } from "@/components/vouchers/PaymentReceiptTab";
 
-interface PaymentReceiptFxSectionProps {
-  entries: VoucherEntry[];
-  total: number;
-  directEurPayment: boolean;
-  fxRateValue: number;
-  fxEurRequired: number;
-  fxUnsupportedEntries: boolean;
-  fxWallet: PaymentReceiptTabProps["fxWallet"];
-  fxPaymentRate: string;
-  onFxPaymentRateChange?: (value: string) => void;
-  fxPayoutCurrency: "EUR" | "USD";
-  fxSupplierEurBalance: number | null;
-  fxSupplierEurBasis: "broker-statement" | "native-ledger" | null;
-  fxSupplierBalanceLoading: boolean;
-  onFxPayoutCurrencyChange?: (currency: "EUR" | "USD") => void;
+export type FxWalletSummary = {
+  wallet: { id: number; ledgerAccountId: number; accountName: string };
+  state: { eur: string; usd: string; totalBookUsd: string };
+  synchronized: boolean;
+};
+
+export function FxWalletSourceCard({
+  accountName,
+  eurAvailable,
+  onChange,
+}: {
+  accountName: string;
+  eurAvailable: string;
+  onChange: () => void;
+}) {
+  return (
+    <div className="rounded-lg border bg-muted/20 px-4 py-3 space-y-1" data-testid="fx-payment-source">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-semibold">Pay from {accountName} (EUR wallet)</p>
+        <Button type="button" variant="outline" size="sm" onClick={onChange}>
+          Change
+        </Button>
+      </div>
+      <p className="font-mono text-sm">
+        EUR{" "}
+        {Number(eurAvailable).toLocaleString(undefined, {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })}{" "}
+        available
+      </p>
+    </div>
+  );
 }
 
-/** FX agent payment panel shown inside the Payment voucher form when Pay From is an FX agent wallet. */
-export function PaymentReceiptFxSection({
-  entries,
-  total,
+export function FxWalletPaymentSection({
+  fxWallet,
   directEurPayment,
+  showPayoutToggle,
+  fxPayoutCurrency,
+  fxPaymentRate,
   fxRateValue,
   fxEurRequired,
-  fxUnsupportedEntries,
-  fxWallet,
-  fxPaymentRate,
-  onFxPaymentRateChange,
-  fxPayoutCurrency,
   fxSupplierEurBalance,
   fxSupplierEurBasis,
   fxSupplierBalanceLoading,
+  fxUnsupportedEntries,
+  total,
+  onFxPaymentRateChange,
   onFxPayoutCurrencyChange,
-}: PaymentReceiptFxSectionProps) {
+}: {
+  fxWallet: FxWalletSummary;
+  directEurPayment: boolean;
+  showPayoutToggle: boolean;
+  fxPayoutCurrency?: "EUR" | "USD";
+  fxPaymentRate?: string;
+  fxRateValue: number;
+  fxEurRequired: number;
+  fxSupplierEurBalance: number | null;
+  fxSupplierEurBasis?: "broker-statement" | "native-ledger" | null;
+  fxSupplierBalanceLoading?: boolean;
+  fxUnsupportedEntries: boolean;
+  total: number;
+  onFxPaymentRateChange?: (value: string) => void;
+  onFxPayoutCurrencyChange?: (currency: "EUR" | "USD") => void;
+}) {
   return (
     <section className="space-y-3 rounded-lg border border-primary/30 bg-muted/20 p-4" data-testid="fx-payment-voucher">
       <div>
@@ -44,7 +80,7 @@ export function PaymentReceiptFxSection({
           {directEurPayment ? "Direct EUR supplier payment" : "FX agent payment — recipient gets USD"}
         </h4>
       </div>
-      {entries[0]?.accountType === "factorySupplier" && (
+      {showPayoutToggle && (
         <div className="flex gap-2 flex-wrap">
           <Button
             type="button"
@@ -117,10 +153,10 @@ export function PaymentReceiptFxSection({
           </div>
         </div>
       )}
-      {!fxWallet?.synchronized && (
+      {!fxWallet.synchronized && (
         <p className="text-sm text-destructive">Ledger mismatch: reconcile the FX wallet before paying.</p>
       )}
-      {fxEurRequired > Number(fxWallet!.state.eur) && (
+      {fxEurRequired > Number(fxWallet.state.eur) && (
         <p className="text-sm text-destructive">Insufficient EUR held by this agent.</p>
       )}
       {directEurPayment && fxSupplierEurBalance !== null && total > fxSupplierEurBalance && (

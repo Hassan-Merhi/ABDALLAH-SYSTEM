@@ -1,21 +1,20 @@
 /**
- * Customer order profitability (GET /api/factory/customer-orders/:id/profitability).
- *
- * Registered by registerOrderCrudRoutes in ./orderCrudRoutes.ts at the
- * original position; Express resolves first-match, so that order is behaviour.
+ * GET /api/factory/customer-orders/:id/profitability: per-line selling value
+ * against the catalogue production price, gated by the user's cost visibility.
+ * Extracted from orderCrudRoutes.ts and registered from the same place.
  */
+import type { Express, Request, Response } from "express";
+import { and, eq, inArray } from "drizzle-orm";
+import { customerOrderLines, customerOrders, customers, factoryBaleProducts } from "@shared/schema";
+import { db } from "../../../db";
+import { requireAuth } from "../../../auth";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { parseId } from "../../../lib/parseId";
-import { getExportPriceVisibility } from "../../../helpers/exportVisibility";
-import type { Express, Request, Response } from "express";
-import { db } from "../../../db";
-import { requireAuth } from "../../../auth";
-import { factoryBaleProducts, customerOrders, customerOrderLines, customers } from "@shared/schema";
-import { eq, and, inArray } from "drizzle-orm";
 import { toMoney } from "../../../lib/money";
+import { getExportPriceVisibility } from "../../../helpers/exportVisibility";
 
-export function registerOrderProfitabilityRoutes(app: Express) {
+export function registerOrderProfitabilityRoute(app: Express): void {
   app.get("/api/factory/customer-orders/:id/profitability", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;

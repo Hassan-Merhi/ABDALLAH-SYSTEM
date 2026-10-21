@@ -55,14 +55,16 @@ vi.mock("../server/services/accounting/balances/unpostedMemo", async (importOrig
 vi.mock("../server/services/accounting/balances/ledgerBalanceEngine", () => ({
   getPartyBalance: vi.fn(async () => ({ opening: "200.00" })),
 }));
-// #2390 hides held pre-finalization freight from customer statements; this
-// fixture has none, so the projection passes the ledger lines through.
-vi.mock("../server/routes/factory/customers-core/heldUnfinalizedCustomerCharges", () => ({
-  projectCustomerStatementLines: vi.fn(async (_companyId: number, _customerId: number, rows: unknown[]) => ({
-    rows: [...rows],
-    heldBefore: 0,
-  })),
-}));
+// Held pre-finalization charges (#2415); none for these fixtures, so lines pass through.
+vi.mock("../server/routes/factory/customers-core/heldUnfinalizedCustomerCharges", async () => {
+  const { toMoney } = await import("../server/lib/money");
+  return {
+    projectCustomerStatementLines: vi.fn(async (_companyId: number, _customerId: number, rows: unknown[]) => ({
+      rows,
+      heldBefore: toMoney(0),
+    })),
+  };
+});
 vi.mock("../server/routes/helpers/supplierBalanceHelpers", () => ({
   isParentCompanyContext: vi.fn(async () => true),
 }));

@@ -40,12 +40,11 @@ import { StockAdjustmentForm } from "@/pages/vouchers/StockAdjustmentForm";
 import { JournalForm } from "@/pages/vouchers/JournalForm";
 import { VoucherMobileTabs, VoucherDesktopNav } from "@/pages/vouchers/VoucherTabNav";
 import { useVoucherQueries } from "@/pages/vouchers/useVoucherQueries";
+import { useVoucherFxWalletPayment } from "@/pages/vouchers/useVoucherFxWalletPayment";
 import { useVoucherHandlers } from "@/pages/vouchers/useVoucherHandlers";
 import { useSidebarSync } from "@/pages/vouchers/useSidebarSync";
 import { useAccountBalance } from "@/pages/vouchers/useAccountBalance";
 import { useVoucherHydration } from "@/pages/vouchers/useVoucherHydration";
-import { useFxAgentPayment } from "@/pages/vouchers/useFxAgentPayment";
-import { submitFxAgentPayment, confirmFxAgentPayment } from "@/pages/vouchers/fxAgentPaymentSubmit";
 import { PaymentDraftAndRateBar } from "@/pages/vouchers/PaymentDraftAndRateBar";
 import { buildVoucherSidebarGroups } from "@/pages/vouchers/voucherSidebarGroups";
 import type { VoucherSidebarGroup } from "@/pages/vouchers/voucherSidebarGroups";
@@ -96,12 +95,6 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const [transactionRate, setTransactionRate] = useState<number | null>(null);
   const exchangeRate = transactionRate || dailyExchangeRate;
   const [voucherEffectiveDate, setVoucherEffectiveDate] = useState<string>("");
-  const [fxPaymentRate, setFxPaymentRate] = useState("");
-  const [fxCurrencyOverride, setFxCurrencyOverride] = useState<{
-    beneficiary: string;
-    currency: "EUR" | "USD";
-  } | null>(null);
-  const fxPaymentRequestRef = useRef<{ fingerprint: string; key: string } | null>(null);
   const [, setLocation] = useLocation();
   const printRef = useRef<HTMLDivElement>(null);
   const isPOS = !!posUser;
@@ -320,14 +313,20 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const {
     fxWalletsLoading,
     selectedFxWallet,
+    isWalletPayment,
+    fxPaymentRate,
+    setFxPaymentRate,
+    fxPayoutCurrency,
     fxSupplierId,
     fxSupplierEurBalance,
     fxSupplierEurBasis,
-    fxPayoutCurrency,
     fxSupplierBalanceLoading,
     changeFxPayoutCurrency,
     paymentPayFromAccounts,
-  } = useFxAgentPayment({
+    postWalletPayment,
+    confirmWalletPayment,
+    resetWalletPayment,
+  } = useVoucherFxWalletPayment({
     selectedCompany,
     isFactoryMode,
     isFactoryCompany,
@@ -338,26 +337,13 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     paymentAccountId,
     entries,
     form,
-    fxCurrencyOverride,
-    setFxCurrencyOverride,
     payFromAccounts,
   });
 
   const saveMutation = useMutation({
     mutationFn: async (formData: VoucherFormData) => {
-      if (selectedFxWallet && activeTab === "payment" && !voucherIdToEdit) {
-        return submitFxAgentPayment({
-          formData,
-          selectedFxWallet,
-          fxSupplierBalanceLoading,
-          fxPayoutCurrency,
-          selectedCurrency,
-          fxPaymentRate,
-          fxSupplierEurBalance,
-          voucherEffectiveDate,
-          fxPaymentRequestRef,
-          modeApiRequest,
-        });
+      if (isWalletPayment) {
+        return postWalletPayment(formData, { selectedCurrency, voucherEffectiveDate, modeApiRequest });
       }
       const voucherType = activeTab === "payment" ? "Payment" : "Receipt";
       const isEditMode = !!voucherIdToEdit;
@@ -395,9 +381,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       const waPrompt = resolveWhatsAppPrompt(data);
       if (waPrompt) setWaPendingPrompt(waPrompt);
       discardPaymentDraft();
-      fxPaymentRequestRef.current = null;
-      setFxPaymentRate("");
-      setFxCurrencyOverride(null);
+      resetWalletPayment();
       queryClient.invalidateQueries({ queryKey: ["/api/factory/fx-agent-wallets"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/net-position"] });
@@ -561,18 +545,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       });
       return;
     }
-    if (selectedFxWallet && activeTab === "payment" && !voucherIdToEdit) {
-      const proceed = confirmFxAgentPayment({
-        validEntries,
-        selectedFxWallet,
-        fxSupplierBalanceLoading,
-        fxPayoutCurrency,
-        fxPaymentRate,
-        fxSupplierEurBalance,
-        toast,
-      });
-      if (!proceed) return;
-    }
+    if (isWalletPayment && !confirmWalletPayment(validEntries, toast)) return;
     saveMutation.mutate({ ...data, entries: validEntries });
   };
 

@@ -1,52 +1,41 @@
-import type { UseFormReturn } from "react-hook-form";
+/**
+ * Mobile Pay From / Receive Into account sheet for Payment and Receipt
+ * vouchers: searchable list of eligible cash, bank and loan accounts.
+ * Extracted from PaymentReceiptTab.tsx; selection is reported to the parent.
+ */
+import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Account } from "@/components/AccountSidebar";
-import type { VoucherFormData } from "@/pages/vouchers/voucherTypes";
-import type { useCurrencyContext } from "@/contexts/CurrencyContext";
 
-interface PayFromMobileSheetProps {
-  form: UseFormReturn<VoucherFormData>;
-  payFromSheetOpen: boolean;
-  setPayFromSheetOpen: (open: boolean) => void;
-  payFromSearch: string;
-  setPayFromSearch: (value: string) => void;
-  accountLabel: string;
-  sidebarAccounts: Account[];
-  payFromKeys: Set<string>;
-  paymentAccountId: number;
-  paymentAccountType: string;
-  setEditingSource: (editing: boolean) => void;
-  setPayFromTouched: (touched: boolean) => void;
-  formatAmount: ReturnType<typeof useCurrencyContext>["formatAmount"];
-}
-
-/** Mobile bottom sheet for choosing the Pay From / Receive Into account. */
-export function PayFromMobileSheet({
-  form,
-  payFromSheetOpen,
-  setPayFromSheetOpen,
+export function PayFromAccountSheet({
+  open,
+  onOpenChange,
+  accountLabel,
   payFromSearch,
   setPayFromSearch,
-  accountLabel,
   sidebarAccounts,
   payFromKeys,
   paymentAccountId,
   paymentAccountType,
-  setEditingSource,
-  setPayFromTouched,
   formatAmount,
-}: PayFromMobileSheetProps) {
+  onSelect,
+}: {
+  open: boolean;
+  onOpenChange: (isOpen: boolean) => void;
+  accountLabel: string;
+  payFromSearch: string;
+  setPayFromSearch: (value: string) => void;
+  sidebarAccounts: Account[];
+  payFromKeys: Set<string>;
+  paymentAccountId: number;
+  paymentAccountType: string;
+  formatAmount: (amount: number | string | null | undefined) => string;
+  onSelect: (account: Account) => void;
+}) {
   return (
-    <Sheet
-      open={payFromSheetOpen}
-      onOpenChange={(isOpen) => {
-        setPayFromSheetOpen(isOpen);
-        if (!isOpen) setPayFromSearch("");
-      }}
-    >
+    <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="flex flex-col p-0" style={{ height: "auto", maxHeight: "88vh" }}>
         <SheetHeader className="px-4 pt-4 pb-3 border-b shrink-0">
           <SheetTitle className="text-base">{accountLabel}</SheetTitle>
@@ -92,14 +81,7 @@ export function PayFromMobileSheet({
                     "w-full text-left px-4 py-3 border-b border-muted/40 flex items-center justify-between gap-3 active-elevate-2",
                     isSelected && "bg-accent"
                   )}
-                  onClick={() => {
-                    form.setValue("paymentAccountType", account.type);
-                    form.setValue("paymentAccountId", account.id);
-                    form.setValue("paymentAccountName", account.name);
-                    setEditingSource(false);
-                    setPayFromTouched(true);
-                    setPayFromSheetOpen(false);
-                  }}
+                  onClick={() => onSelect(account)}
                   data-testid={`pay-from-mobile-option-${account.id}`}
                 >
                   <div className="flex-1 min-w-0">
