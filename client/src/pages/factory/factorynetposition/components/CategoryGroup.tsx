@@ -75,7 +75,7 @@ export function CategoryGroup({
             <PrefixGroup key={prefix} prefix={prefix} accounts={accs} accentClass={accentClass} startIndex={gi * 100} />
           ))}
           {plainAccounts.map((acc, i) => (
-            <SupplierRow key={acc.name} acc={acc} accentClass={accentClass} index={i} />
+            <SupplierRow key={acc.id != null ? `ledger:${acc.id}` : `${acc.code}:${acc.name}:${i}`} acc={acc} accentClass={accentClass} index={i} />
           ))}
         </div>
       )}
