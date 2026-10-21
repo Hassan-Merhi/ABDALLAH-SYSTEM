@@ -1,5 +1,7 @@
 import { visibleTabInterval } from "@/lib/queryPolicies";
 import { getAppDate } from "@/lib/queryClient";
+import { useCompany } from "@/contexts/CompanyContext";
+import { companyQueryKey } from "@/lib/companyQueryScope";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useUserPreferences } from "@/hooks/use-user-preferences";
@@ -29,6 +31,7 @@ import { OrderGroup } from "./factorynetposition/components/OrderGroup";
 import { CustomNetPositionView } from "./factorynetposition/components/CustomNetPositionView";
 
 export default function FactoryNetPosition() {
+  const { selectedCompany } = useCompany();
   const [asOf, setAsOf] = useState<string>("");
   const isToday = !asOf;
   const { prefs, updatePref, isPending: isSavingValuationMode } = useUserPreferences();
@@ -41,7 +44,7 @@ export default function FactoryNetPosition() {
     refetch,
     isFetching,
   } = useQuery<NetPositionData>({
-    queryKey: ["/api/factory/net-position", asOf || "company-today", valuationMode],
+    queryKey: companyQueryKey("/api/factory/net-position", selectedCompany?.id, asOf || "company-today", valuationMode),
     queryFn: async () => {
       const params = new URLSearchParams({ valuationMode });
       if (asOf) params.set("asOf", asOf);
