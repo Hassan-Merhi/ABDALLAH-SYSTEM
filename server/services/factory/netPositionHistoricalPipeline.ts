@@ -190,6 +190,15 @@ async function getHistoricalOrders(
         JOIN customer_orders co ON co.id = cob.order_id AND co.company_id = ${companyId}
        WHERE cob.scanned_at IS NOT NULL
          AND ${isBefore(scope, "cob.scanned_at", "timestamptz")}
+         AND NOT EXISTS (
+           -- Restoration reuses the original scanned_at; once that scan
+           -- was cancelled, an undated later restoration must NOT magically
+           -- make it eligible again on the cancellation date.
+           SELECT 1 FROM customer_order_bales_history prior
+            WHERE prior.order_id = cob.order_id
+              AND prior.bale_id = cob.bale_id
+              AND ${isBefore(scope, "prior.cancelled_at", "timestamptz")}
+         )
       UNION ALL
       SELECT h.order_id, h.bale_id, h.scanned_at, h.price_used, 1 AS archived
         FROM customer_order_bales_history h
