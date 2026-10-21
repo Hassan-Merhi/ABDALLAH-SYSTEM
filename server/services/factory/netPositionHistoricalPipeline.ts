@@ -42,9 +42,16 @@ export type HistoricalOrderStage = "PENDING_VERIFICATION" | "LOADING" | "VERIFIE
 export function orderStageAt(events: {
   created: boolean; loadingStarted: boolean; verified: boolean; invoiced: boolean;
   currentStatus: string;
+  loadingStartedAt?: string | null;
+  verifiedAt?: string | null;
 }): HistoricalOrderStage {
   if (!events.created) return "UNKNOWN";
   if (events.invoiced) return "FINALIZED";
+  // Reopened orders can move VERIFIED -> LOADING -> VERIFIED. The latest
+  // recorded qualifying transition must win; current status is not history.
+  if (events.loadingStarted && events.verified &&
+      events.loadingStartedAt && events.verifiedAt &&
+      events.loadingStartedAt > events.verifiedAt) return "LOADING";
   if (events.verified) return "VERIFIED";
   if (events.loadingStarted) return "LOADING";
   if (events.currentStatus === "PENDING_VERIFICATION") return "PENDING_VERIFICATION";
@@ -111,6 +118,9 @@ async function getHistoricalOtw(
       warnings.add("HISTORICAL_OTW_STATUS_HISTORY_MISSING");
     }
     const planned = decimal(c.planned_kg);
+    // Current container quantity/rate/FX configuration can have been edited
+    // after cutoff. Without a versioned master snapshot this is provisional.
+    warnings.add("HISTORICAL_OTW_MASTER_VALUES_UNVERSIONED");
     let received = decimal(c.received_kg);
     if (Number(c.history_count) === 0 && Number(c.legacy_count) > 0) {
       received = decimal(c.legacy_kg);
@@ -186,9 +196,14 @@ async function getHistoricalOrders(
            o.order_date::text AS order_date, o.status AS current_status,
            o.grand_total::text AS grand_total, o.total_qty_bales, o.updated_at::text,
            o.loading_started_at::text AS loading_started_at,
-           o.verified_at::text AS verified_at, o.finalized_at::text AS finalized_at,
+           (CASE
+             WHEN ${isBefore(scope, "o.verified_at")} THEN o.verified_at
+             WHEN ${isBefore(scope, "o.loading_finalized_at")} THEN o.loading_finalized_at
+             ELSE NULL END)::text AS verified_at,
+           o.finalized_at::text AS finalized_at,
            COALESCE(${isBefore(scope, "o.loading_started_at")},false) AS loading_before,
-           COALESCE(${isBefore(scope, "o.verified_at")},false) AS verified_before,
+           (COALESCE(${isBefore(scope, "o.verified_at")},false)
+              OR COALESCE(${isBefore(scope, "o.loading_finalized_at")},false)) AS verified_before,
            COALESCE(${isBefore(scope, "o.finalized_at")},false) AS finalized_before,
            COALESCE(t.qty, '0') AS scanned_qty,
            COALESCE(t.scanned_value, '0') AS scanned_value,
@@ -224,6 +239,8 @@ async function getHistoricalOrders(
       verified: r.verified_before,
       invoiced: r.finalized_before,
       currentStatus: r.current_status,
+      loadingStartedAt: r.loading_started_at,
+      verifiedAt: r.verified_at,
     });
     if (stage === "FINALIZED") continue;
     if (stage === "UNKNOWN") {
