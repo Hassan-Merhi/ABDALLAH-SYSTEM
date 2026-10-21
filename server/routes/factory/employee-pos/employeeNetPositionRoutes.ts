@@ -1,5 +1,6 @@
 import { FactoryNetPositionDateError } from "@shared/factoryNetPositionAsOf";
-import { resolveFactoryNetPositionAsOf } from "../../../services/factory/netPositionAsOf";
+import { resolveFactoryNetPositionAsOf, netPositionKnownTransactionThrough, netPositionRecordedThrough } from "../../../services/factory/netPositionAsOf";
+import { loadFactoryNetPositionEmployees } from "../../../services/factory/netPositionEmployees";
 import { applyHistoricalOperationalCorrection } from "./netPositionHistoricalCorrection";
 import {
   fxAgentTablesExist,
@@ -26,7 +27,6 @@ import {
   ledgerAccounts,
   voucherEntries,
   companies,
-  employees,
   vouchers,
   propertyContracts,
   propertyMonthlyLedger,
@@ -115,7 +115,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         supplierItems,
         totalSupplierLiabilities,
         totalSupplierOverpayments,
-      } = await computeNetPositionSupplierBalances({ companyId, asOf, round2, getConfigFx });
+      } = await computeNetPositionSupplierBalances({ companyId, asOf, knownAt: asOfContext.isHistorical ? asOfContext : undefined, round2, getConfigFx });
 
       // ── 2. ERP ledger account balances for the factory company ──────────
       const factoryAccounts = await db
@@ -130,15 +130,26 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
           and(
             eq(vouchers.companyId, companyId),
             eq(vouchers.optional, false),
-            isNull(vouchers.deletedAt),
-            sql`COALESCE(${vouchers.effectiveDate}, ${vouchers.voucherDate}) <= ${asOf}`
+            asOfContext.isHistorical
+              ? sql`(${vouchers.deletedAt} IS NULL OR NOT ${netPositionRecordedThrough(sql`${vouchers.deletedAt}`, asOfContext, "utc-naive-timestamp")})`
+              : isNull(vouchers.deletedAt),
+            asOfContext.isHistorical
+              ? netPositionKnownTransactionThrough(
+                  sql`COALESCE(${vouchers.effectiveDate}, ${vouchers.voucherDate})`,
+                  sql`${vouchers.createdAt}`, asOfContext, "utc-naive-timestamp")
+              : sql`COALESCE(${vouchers.effectiveDate}, ${vouchers.voucherDate}) <= ${asOf}`
           )
         );
 
       const fVoucherIds = factoryVouchers.map((v) => v.id);
       const factoryEntries =
         fVoucherIds.length > 0
-          ? await db.select().from(voucherEntries).where(inArray(voucherEntries.voucherId, fVoucherIds))
+          ? await db.select().from(voucherEntries).where(and(
+              inArray(voucherEntries.voucherId, fVoucherIds),
+              asOfContext.isHistorical
+                ? netPositionRecordedThrough(sql`${voucherEntries.createdAt}`, asOfContext, "utc-naive-timestamp")
+                : sql`TRUE`
+            ))
           : [];
 
       const exactBalances = new Map<number, { debit: Decimal; credit: Decimal }>();
@@ -182,7 +193,14 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       const allCustomersForNP = await db
         .select()
         .from(customers)
-        .where(and(eq(customers.companyId, companyId), isNull(customers.deletedAt)));
+        .where(and(eq(customers.companyId, companyId),
+          asOfContext.isHistorical
+            ? sql`(${customers.deletedAt} IS NULL OR NOT ${netPositionRecordedThrough(sql`${customers.deletedAt}`, asOfContext, "utc-naive-timestamp")})`
+            : isNull(customers.deletedAt),
+          asOfContext.isHistorical
+            ? netPositionRecordedThrough(sql`${customers.createdAt}`, asOfContext, "utc-naive-timestamp")
+            : sql`TRUE`
+        ));
 
       // The previous code hid pre-finalization customer debits in the statement
       // while keeping them on Parties AND in the net-position account totals.
@@ -191,7 +209,8 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       const heldSnapshot = await loadHeldChargeSnapshot(
         companyId,
         allCustomersForNP.map((c) => c.id),
-        asOf
+        asOf,
+        asOfContext.isHistorical ? asOfContext : undefined
       );
       let projectedAccountBalances = accBalances;
       if (heldSnapshot.voucherIds.size > 0) {
@@ -314,7 +333,8 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         const figures = await getCustomerLedgerAndMemo(
           companyId,
           allCustomersForNP.map((c) => c.id),
-          asOf
+          asOf,
+          asOfContext.isHistorical ? asOfContext : undefined
         );
         for (const c of allCustomersForNP) {
           const f = figures.get(c.id);
@@ -546,37 +566,21 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         }
       }
 
-      // ── Employee Salaries Payable / Receivables — directly from employees.currentBalance ──
-      // Employee balances are tracked via employees.currentBalance (not through a
-      // "Payroll Payable" ledger account), so we inject them here explicitly.
-      // A negative currentBalance means the employee owes the company (e.g. an unpaid
-      // advance/FX debit) — that's a receivable and belongs in "What We Have", not a
-      // liability. Previously these were dropped entirely (only bal > 0 was summed).
-      const allEmployeesForNP = await db
-        .select({
-          firstName: employees.firstName,
-          lastName: employees.lastName,
-          currentBalance: employees.currentBalance,
-        })
-        .from(employees)
-        .where(
-          and(
-            eq(employees.companyId, companyId),
-            eq(employees.employeeType, "Employee"),
-            eq(employees.active, true),
-            isNull(employees.deletedAt)
-          )
-        );
+      // One signed, dated Employee projection shared with payroll-breakdown.
+      // Today preserves employees.current_balance; historical dates replay
+      // opening + recorded vouchers and do not subtract from today's cache.
+      const employeeBalances = await loadFactoryNetPositionEmployees(companyId, asOfContext);
       let salariesPayableExact = new MoneyDecimal(0);
       let receivablesExact = new MoneyDecimal(0);
       const employeeReceivableItems: { name: string; balanceUsd: number }[] = [];
-      for (const emp of allEmployeesForNP) {
-        const bal = toMoney(emp.currentBalance);
+      for (const employee of employeeBalances) {
+        const bal = toMoney(employee.balance);
         if (bal.greaterThan(0)) salariesPayableExact = salariesPayableExact.plus(bal);
         else if (bal.lessThan(0)) {
           receivablesExact = receivablesExact.plus(bal.abs());
-          const empName = [emp.firstName, emp.lastName].filter(Boolean).join(" ").trim();
-          if (empName) employeeReceivableItems.push({ name: empName, balanceUsd: bal.abs().toNumber() });
+          if (employee.name) employeeReceivableItems.push({
+            name: employee.name, balanceUsd: bal.abs().toNumber()
+          });
         }
       }
       const employeeSalariesPayable = round2(salariesPayableExact.toNumber());
