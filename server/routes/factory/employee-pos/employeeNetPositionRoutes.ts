@@ -111,12 +111,13 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       `);
       const configFxRates: Record<string, number> = {};
       for (const row of fxRateRows.rows) {
-        configFxRates[row.currency_code as string] = toMoney(row.rate_to_usd as string).toNumber();
+        const currency = String(row.currency_code ?? "").trim().toUpperCase();
+        if (currency) configFxRates[currency] = toMoney(row.rate_to_usd as string).toNumber();
       }
       // Only use manually configured rates — no hardcoded fallbacks
       const getConfigFx = (cc: string): number => {
         if (cc.toUpperCase() === "USD") return 1;
-        const rate = configFxRates[cc];
+        const rate = configFxRates[cc.trim().toUpperCase()];
         if (!rate || !Number.isFinite(rate) || rate <= 0)
           throw new Error(`Missing confirmed USD exchange rate for ${cc}`);
         return rate;
