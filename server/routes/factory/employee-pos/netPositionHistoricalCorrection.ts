@@ -75,7 +75,19 @@ export async function applyHistoricalOperationalCorrection<T extends NetPosition
 
   replaceAccountValue(body.forUs.accounts, "INVENTORY", historical.inventoryValue);
   replaceAccountValue(body.forUs.accounts, "RAW_MATERIAL", historical.rawMaterialValue);
-  replaceAccountValue(body.forUs.accounts, "BALANCE_ON_TABLE", historical.balanceOnTableValue);
+  const wipRow = body.forUs.accounts.find(row => row.code === "BALANCE_ON_TABLE");
+  if (wipRow) {
+    wipRow.value = round2(historical.balanceOnTableValue);
+  } else if (historical.balanceOnTableValue > 0) {
+    // The original/current snapshot omitted zero WIP; an earlier day can
+    // have a nonzero balance and still needs its own account row.
+    body.forUs.accounts.push({
+      name: "Balance on Table",
+      code: "BALANCE_ON_TABLE",
+      value: round2(historical.balanceOnTableValue),
+      category: "Production",
+    });
+  }
 
   body.inventoryValue = historical.inventoryValue;
   body.rawMaterialValue = historical.rawMaterialValue;
