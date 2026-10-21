@@ -152,12 +152,19 @@ export async function applyHistoricalOperationalCorrection<T extends NetPosition
   if (!Array.isArray(body?.forUs?.accounts) || typeof body.rawMaterialValue !== "number") {
     throw new Error("HISTORICAL_NET_POSITION_RESPONSE_INCOMPLETE");
   }
-  const historical = await computeHistoricalOperationalValues(
-    companyId,
-    scope.asOf,
-    body.rawMaterialValue,
-    valuationMode,
-  );
+  let historical: Awaited<ReturnType<typeof computeHistoricalOperationalValues>>;
+  try {
+    historical = await computeHistoricalOperationalValues(
+      companyId,
+      scope.asOf,
+      body.rawMaterialValue,
+      valuationMode,
+    );
+  } catch (cause) {
+    // The main route translates this to a structured 503 response. Never
+    // substitute the original (possibly live) figures for a dated snapshot.
+    throw new Error("HISTORICAL_NET_POSITION_REPLAY_FAILED", { cause });
+  }
   const inventory = body.forUs.accounts.find((row) => row.code === "INVENTORY");
   const rawMaterial = body.forUs.accounts.find((row) => row.code === "RAW_MATERIAL");
   if (!inventory || !rawMaterial) throw new Error("HISTORICAL_STOCK_ROWS_MISSING");
