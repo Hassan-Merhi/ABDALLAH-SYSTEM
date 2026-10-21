@@ -402,7 +402,7 @@ describe("FX agent EUR wallet lifecycle", () => {
     const posted = await agent.post(`/api/factory/fx-agent-wallets/${eurWalletId}/settle`).send(body);
     expect(posted.status, posted.text).toBe(201);
     expect(posted.body.quote).toMatchObject({
-      eur: "250.00", targetCurrency: "EUR", gainUsd: "0.000000",
+      eur: "250.000000", targetCurrency: "EUR", gainUsd: "0.000000",
     });
     const totals = await voucherTotals(posted.body.voucherId);
     expect(toMoney(totals.debit).eq(totals.credit)).toBe(true);
@@ -507,7 +507,7 @@ describe("FX agent EUR wallet lifecycle", () => {
     };
     const paid = await agent.post(`/api/factory/fx-agent-wallets/${agentWalletId}/settle`).send(payload);
     expect(paid.status, paid.text).toBe(201);
-    expect(paid.body.quote).toMatchObject({ eur: "200.00", targetCurrency: "EUR", gainUsd: "0.000000" });
+    expect(paid.body.quote).toMatchObject({ eur: "200.000000", targetCurrency: "EUR", gainUsd: "0.000000" });
     const after = await agent.get(`/api/factory/suppliers/${brokerId}/balance?fxEurPayout=true`);
     expect(after.body.fxEurPayable.balance).toBe("2800.00");
     const brokerStatement = await agent.get(`/api/factory/suppliers/${brokerId}/broker-statement?includeOtw=true`);

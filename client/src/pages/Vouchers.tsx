@@ -1,12 +1,10 @@
 import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useRef, useEffect, useMemo } from "react";
-import Decimal from "decimal.js";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { zodResolver } from "@/lib/form-resolver";
 import { format } from "date-fns";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
-import { ExchangeRateInput } from "@/components/ExchangeRateInput";
 import { useReactToPrint } from "react-to-print";
 import { useLocation } from "wouter";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -35,17 +33,6 @@ import type { WhatsAppPromptState } from "@/lib/whatsapp-prompt";
 import { getApiRequest } from "@/lib/factoryApi";
 import type { AuthMe, FactoryMyAccess } from "@shared/apiTypes";
 import { useFormDraft } from "@/hooks/useFormDraft";
-import { DraftRestorePrompt } from "@/components/DraftRestorePrompt";
-import {
-  ArrowDownCircle,
-  ArrowUpCircle,
-  BookOpen,
-  ArrowLeftRight,
-  SlidersHorizontal,
-  FileText,
-  ClipboardList,
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 import StockTransferOrder from "@/pages/StockTransferOrder.tsx";
 import { PrintTemplate } from "@/components/vouchers/PrintTemplate";
 import { StockTransferForm } from "@/pages/vouchers/StockTransferForm";
@@ -57,6 +44,11 @@ import { useVoucherHandlers } from "@/pages/vouchers/useVoucherHandlers";
 import { useSidebarSync } from "@/pages/vouchers/useSidebarSync";
 import { useAccountBalance } from "@/pages/vouchers/useAccountBalance";
 import { useVoucherHydration } from "@/pages/vouchers/useVoucherHydration";
+import { useFxAgentPayment } from "@/pages/vouchers/useFxAgentPayment";
+import { submitFxAgentPayment, confirmFxAgentPayment } from "@/pages/vouchers/fxAgentPaymentSubmit";
+import { PaymentDraftAndRateBar } from "@/pages/vouchers/PaymentDraftAndRateBar";
+import { buildVoucherSidebarGroups } from "@/pages/vouchers/voucherSidebarGroups";
+import type { VoucherSidebarGroup } from "@/pages/vouchers/voucherSidebarGroups";
 import { exportVoucherHelper } from "@/pages/vouchers/voucherActions";
 import { voucherFormSchema } from "@/pages/vouchers/voucherTypes";
 import type { VoucherFormData } from "@/pages/vouchers/voucherTypes";
@@ -106,7 +98,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const [voucherEffectiveDate, setVoucherEffectiveDate] = useState<string>("");
   const [fxPaymentRate, setFxPaymentRate] = useState("");
   const [fxCurrencyOverride, setFxCurrencyOverride] = useState<{
-    beneficiary: string; currency: "EUR" | "USD";
+    beneficiary: string;
+    currency: "EUR" | "USD";
   } | null>(null);
   const fxPaymentRequestRef = useRef<{ fingerprint: string; key: string } | null>(null);
   const [, setLocation] = useLocation();
@@ -114,27 +107,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const isPOS = !!posUser;
   const posLocationId = posUser?.assignedLocationId;
 
-  const sidebarGroups: { label: string; color: string; items: { key: string; label: string; icon: LucideIcon }[] }[] = [
-    {
-      label: "Financial",
-      color: "#3b82f6",
-      items: [
-        { key: "payment", label: "Payment", icon: ArrowDownCircle },
-        { key: "receipt", label: "Receipt", icon: ArrowUpCircle },
-        { key: "journal", label: "Journal", icon: BookOpen },
-      ],
-    },
-    {
-      label: "Adjustments",
-      color: "#f59e0b",
-      items: [
-        { key: "transfer", label: "Stock Transfer", icon: ArrowLeftRight },
-        { key: "transferorder", label: "Transfer Order", icon: ClipboardList },
-        { key: "adjustment", label: "Adjustment", icon: SlidersHorizontal },
-        { key: "creditnote", label: "Credit Note", icon: FileText },
-      ],
-    },
-  ];
+  const sidebarGroups: VoucherSidebarGroup[] = buildVoucherSidebarGroups();
 
   const searchParams = new URLSearchParams(window.location.search);
   const editParam = searchParams.get("edit");
@@ -344,172 +317,47 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     setSidebarHighlightedIndex,
   });
 
-  // Pay From can be an FX agent ledger. Wallet balances are native EUR,
-  // while regular account balances are only historical USD book values.
-  const { data: fxWallets, isLoading: fxWalletsLoading } = useQuery<{
-    wallets: Array<{
-      wallet: { id: number; ledgerAccountId: number; accountName: string };
-      state: { eur: string; usd: string; totalBookUsd: string };
-      synchronized: boolean;
-    }>;
-  }>({
-    queryKey: ["/api/factory/fx-agent-wallets", selectedCompany?.id, "payment"],
-    queryFn: async () => {
-      const res = await fetch("/api/factory/fx-agent-wallets", { credentials: "include" });
-      if (!res.ok) throw new Error("Unable to load FX agent wallet balances");
-      return res.json();
-    },
-    enabled: isFactoryMode && isFactoryCompany && !isPOS,
-    staleTime: 15_000,
-  });
-  const selectedFxWallet = activeTab === "payment" && !voucherIdToEdit &&
-    paymentAccountType === "ledger"
-    ? fxWallets?.wallets?.find((w) => w.wallet.ledgerAccountId === paymentAccountId)
-    : undefined;
-
-  // A broker's EUR payable is its Parties settlement pool, NOT its GL EUR lines.
-  // Other suppliers still use their posted native EUR ledger payable.
-  const fxSelectedBeneficiary = entries[0];
-  const fxSupplierId = selectedFxWallet && fxSelectedBeneficiary?.accountType === "factorySupplier"
-    ? fxSelectedBeneficiary.accountId : 0;
   const {
-    data: fxSupplierBalance,
-    isPending: fxSupplierBalancePending,
-    isError: fxSupplierBalanceError,
-  } = useQuery<{
-    fxEurPayable?: { balance: string; basis: "broker-statement" | "native-ledger"; includeOtw: boolean; eligible: boolean };
-  }>({
-    queryKey: ["/api/factory/suppliers", selectedCompany?.id, fxSupplierId, "balance", "fx-payment"],
-    queryFn: async () => {
-      const response = await fetch(`/api/factory/suppliers/${fxSupplierId}/balance?fxEurPayout=true`, { credentials: "include" });
-      if (!response.ok) throw new Error("Unable to load supplier currency balance");
-      return response.json();
-    },
-    enabled: !!fxSupplierId && isFactoryMode && !isPOS,
-    staleTime: 15_000,
+    fxWalletsLoading,
+    selectedFxWallet,
+    fxSupplierId,
+    fxSupplierEurBalance,
+    fxSupplierEurBasis,
+    fxPayoutCurrency,
+    fxSupplierBalanceLoading,
+    changeFxPayoutCurrency,
+    paymentPayFromAccounts,
+  } = useFxAgentPayment({
+    selectedCompany,
+    isFactoryMode,
+    isFactoryCompany,
+    isPOS,
+    activeTab,
+    voucherIdToEdit,
+    paymentAccountType,
+    paymentAccountId,
+    entries,
+    form,
+    fxCurrencyOverride,
+    setFxCurrencyOverride,
+    payFromAccounts,
   });
-  const fxSupplierEurBalance = fxSupplierBalance?.fxEurPayable?.eligible
-    ? Math.max(0, Number(fxSupplierBalance.fxEurPayable.balance))
-    : 0;
-  const fxSupplierEurBasis = fxSupplierBalance?.fxEurPayable?.basis ?? null;
-  const fxBeneficiaryKey = `${selectedCompany?.id}:${fxSelectedBeneficiary?.accountType}:${fxSelectedBeneficiary?.accountId}`;
-  const fxPayoutCurrency: "EUR" | "USD" =
-    fxCurrencyOverride?.beneficiary === fxBeneficiaryKey
-      ? fxCurrencyOverride.currency
-      : fxSupplierId && fxSupplierEurBalance > 0 ? "EUR" : "USD";
-  const fxSupplierBalanceLoading = !!fxSupplierId && (fxSupplierBalancePending || fxSupplierBalanceError);
-  // When an async currency lookup changes the payout from USD to EUR, never
-  // silently reinterpret an amount typed while the lookup was loading.
-  useEffect(() => {
-    if (!fxSupplierId || !fxSupplierBalance?.fxEurPayable ||
-        fxCurrencyOverride?.beneficiary === fxBeneficiaryKey) return;
-    if (Number(form.getValues("entries.0.amount") || 0) > 0) {
-      form.setValue("entries.0.amount", "");
-    }
-    setFxCurrencyOverride({
-      beneficiary: fxBeneficiaryKey,
-      currency: fxSupplierBalance.fxEurPayable.eligible ? "EUR" : "USD",
-    });
-  }, [fxSupplierId, fxSupplierBalance?.fxEurPayable, fxBeneficiaryKey, fxCurrencyOverride, form]);
-  const changeFxPayoutCurrency = (currency: "EUR" | "USD") => {
-    if (currency === fxPayoutCurrency) return;
-    setFxCurrencyOverride({ beneficiary: fxBeneficiaryKey, currency });
-    // Never reuse a USD number as EUR (or vice versa).
-    form.setValue("entries.0.amount", "");
-  };
-
-  // Most source pickers offer Cash/Bank only. Add active FX agent ledgers so
-  // they are selectable directly in Pay From without editing their account.
-  const paymentPayFromAccounts = useMemo(() => {
-    const walletAccounts = (fxWallets?.wallets || []).map((w) => ({
-      type: "ledger" as const, id: w.wallet.ledgerAccountId,
-      name: w.wallet.accountName + " (FX EUR)", code: "FX",
-    }));
-    const present = new Set(payFromAccounts.map((account) => account.type + ":" + account.id));
-    return [...payFromAccounts, ...walletAccounts.filter((a) => !present.has("ledger:" + a.id))]
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [payFromAccounts, fxWallets?.wallets]);
 
   const saveMutation = useMutation({
     mutationFn: async (formData: VoucherFormData) => {
-      // One atomic FX settlement creates a Payment voucher and a native EUR
-      // wallet movement. Do not also submit to the generic USD voucher path.
       if (selectedFxWallet && activeTab === "payment" && !voucherIdToEdit) {
-        if (!navigator.onLine) throw new Error("FX payments must be posted online");
-        if (!selectedFxWallet.synchronized) throw new Error("FX agent ledger needs reconciliation");
-        if (fxSupplierBalanceLoading) throw new Error("Wait until the supplier's currency balance has loaded");
-        if (fxPayoutCurrency === "USD" && selectedCurrency !== "USD") {
-          throw new Error("Select USD as the display currency before entering a USD payout");
-        }
-        if (formData.optional) throw new Error("FX payments cannot be optional vouchers");
-        if (fxPayoutCurrency === "USD" &&
-            (!/^\d+(?:\.\d{1,10})?$/.test(fxPaymentRate) || Number(fxPaymentRate) <= 0)) {
-          throw new Error("Enter the negotiated USD per EUR payment rate");
-        }
-        if (formData.entries.length !== 1) {
-          throw new Error("FX agent payment supports one beneficiary per voucher");
-        }
-        const [beneficiary] = formData.entries;
-        if (!["ledger", "factorySupplier"].includes(beneficiary.accountType)) {
-          throw new Error("Choose a factory supplier or ledger account as the beneficiary");
-        }
-        if (beneficiary.accountType === "ledger" && beneficiary.accountId === selectedFxWallet.wallet.ledgerAccountId) {
-          throw new Error("FX agent cannot pay itself");
-        }
-        if (!/^\d+(?:\.\d{1,2})?$/.test(beneficiary.amount)) {
-          throw new Error("Payment must be positive with at most 2 decimal places");
-        }
-        const amount = new Decimal(beneficiary.amount);
-        if (amount.lte(0)) throw new Error("Payment must be positive");
-        if (fxPayoutCurrency === "EUR" &&
-            (beneficiary.accountType !== "factorySupplier" || fxSupplierEurBalance <= 0 ||
-              amount.gt(fxSupplierEurBalance))) {
-          throw new Error("Choose a supplier with an outstanding EUR payable and do not exceed its EUR balance");
-        }
-        const eurNeeded = fxPayoutCurrency === "EUR"
-          ? amount
-          : amount.div(new Decimal(fxPaymentRate)).toDecimalPlaces(6);
-        if (eurNeeded.lte(0) || eurNeeded.gt(new Decimal(selectedFxWallet.state.eur))) {
-          throw new Error("FX agent has insufficient EUR for this USD payment");
-        }
-        if (fxPayoutCurrency === "USD" &&
-            !eurNeeded.times(new Decimal(fxPaymentRate)).toDecimalPlaces(2).eq(amount)) {
-          throw new Error("USD amount cannot be paid precisely at this rate; adjust the amount or rate");
-        }
-        const date = format(formData.voucherDate, "yyyy-MM-dd");
-        if (voucherEffectiveDate && voucherEffectiveDate !== date) {
-          throw new Error("FX agent Payment Voucher requires the effective date to match the voucher date");
-        }
-        const fingerprint = JSON.stringify({
-          walletId: selectedFxWallet.wallet.id, date, effectiveDate: voucherEffectiveDate || null,
-          beneficiary: beneficiary.accountType + ":" + beneficiary.accountId,
-          payoutCurrency: fxPayoutCurrency, amount: amount.toFixed(2),
-          rate: fxPayoutCurrency === "USD" ? fxPaymentRate : null,
-          notes: formData.notes, narration: beneficiary.narration,
-          paymentAccountNarration: formData.paymentAccountNarration,
+        return submitFxAgentPayment({
+          formData,
+          selectedFxWallet,
+          fxSupplierBalanceLoading,
+          fxPayoutCurrency,
+          selectedCurrency,
+          fxPaymentRate,
+          fxSupplierEurBalance,
+          voucherEffectiveDate,
+          fxPaymentRequestRef,
+          modeApiRequest,
         });
-        if (fxPaymentRequestRef.current?.fingerprint !== fingerprint) {
-          fxPaymentRequestRef.current = { fingerprint, key: crypto.randomUUID() };
-        }
-        const result = await modeApiRequest(
-          "POST",
-          "/api/factory/fx-agent-wallets/" + selectedFxWallet.wallet.id + "/settle",
-          {
-            paymentVoucher: true,
-            targetCurrency: fxPayoutCurrency,
-            ...(fxPayoutCurrency === "EUR"
-              ? { eurAmount: amount.toFixed(2) }
-              : { usdAmount: amount.toFixed(2), rateUsdPerEur: fxPaymentRate }),
-            targetKind: beneficiary.accountType,
-            targetId: beneficiary.accountId,
-            date,
-            requestKey: fxPaymentRequestRef.current.key,
-            narration: formData.notes || "",
-            paymentAccountNarration: formData.paymentAccountNarration || "",
-            beneficiaryNarration: beneficiary.narration || "",
-          }
-        );
-        return result.json();
       }
       const voucherType = activeTab === "payment" ? "Payment" : "Receipt";
       const isEditMode = !!voucherIdToEdit;
@@ -673,6 +521,16 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     }
   }, [watchedEntries, activeRowIndex]);
 
+  const restorePaymentDraft = () => {
+    if (paymentDraft?.data) {
+      const d = paymentDraft.data as unknown as object & { voucherDate: unknown } & {
+        voucherDate: string | number | Date;
+      };
+      form.reset({ ...d, voucherDate: d.voucherDate ? new Date(d.voucherDate) : new Date() });
+    }
+    discardPaymentDraft();
+  };
+
   const handlePrint = useReactToPrint({
     contentRef: printRef,
     documentTitle: `${activeTab === "payment" ? "Payment" : "Receipt"}-Voucher-${format(form.watch("voucherDate"), "yyyy-MM-dd")}`,
@@ -704,37 +562,16 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       return;
     }
     if (selectedFxWallet && activeTab === "payment" && !voucherIdToEdit) {
-      const rate = Number(fxPaymentRate);
-      const amount = Number(validEntries[0]?.amount || 0);
-      const directEur = fxPayoutCurrency === "EUR";
-      const eurAmount = directEur ? amount : rate > 0 ? amount / rate : 0;
-      if (fxSupplierBalanceLoading || !Number.isFinite(eurAmount) || eurAmount <= 0 ||
-          validEntries.length !== 1 || (!directEur && !fxPaymentRate) ||
-          !["ledger", "factorySupplier"].includes(validEntries[0].accountType) ||
-          (directEur && (validEntries[0].accountType !== "factorySupplier" ||
-            eurAmount > fxSupplierEurBalance))) {
-        toast({
-          title: "Payment details required",
-          description: directEur
-            ? "Choose a EUR supplier payable and enter an amount within its EUR balance."
-            : "Choose one USD recipient, amount, and agreed EUR rate.",
-          variant: "destructive",
-        });
-        return;
-      }
-      const paymentDetails = directEur
-        ? "Supplier receives: EUR " + amount.toFixed(2) + "\\n" +
-          "Agent EUR deducted: EUR " + amount.toFixed(2) + "\\n" +
-          "No currency exchange or rate entry is needed."
-        : "USD recipient receives: " + amount.toFixed(2) + "\\n" +
-          "Agreed USD/EUR rate: " + fxPaymentRate + "\\n" +
-          "EUR deducted (approx.): " + eurAmount.toFixed(6) + "\\n" +
-          "FX gain/loss is booked automatically.";
-      if (!window.confirm(
-        "Post Payment Voucher?\\n" +
-          "From: " + selectedFxWallet.wallet.accountName + "\\n" +
-          "To: " + validEntries[0].accountName + "\\n" + paymentDetails
-      )) return;
+      const proceed = confirmFxAgentPayment({
+        validEntries,
+        selectedFxWallet,
+        fxSupplierBalanceLoading,
+        fxPayoutCurrency,
+        fxPaymentRate,
+        fxSupplierEurBalance,
+        toast,
+      });
+      if (!proceed) return;
     }
     saveMutation.mutate({ ...data, entries: validEntries });
   };
@@ -809,32 +646,15 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           )}
           {!isPOS && canShowVoucherTab("payment") && activeTab === "payment" && (
             <div className="space-y-4">
-              {hasPaymentDraft && !voucherIdToEdit && paymentDraftAge && (
-                <DraftRestorePrompt
-                  draftAge={paymentDraftAge}
-                  label="Unsaved payment draft found"
-                  onRestore={() => {
-                    if (paymentDraft?.data) {
-                      const d = paymentDraft.data as unknown as object & { voucherDate: unknown } & {
-                        voucherDate: string | number | Date;
-                      };
-                      form.reset({ ...d, voucherDate: d.voucherDate ? new Date(d.voucherDate) : new Date() });
-                    }
-                    discardPaymentDraft();
-                  }}
-                  onDiscard={discardPaymentDraft}
-                />
-              )}
-              {selectedCurrency === "CFA" && (
-                <div className="flex flex-wrap items-center gap-2 sm:gap-4 p-3 bg-muted/30 rounded-md">
-                  <span className="text-sm text-muted-foreground">Transaction Rate:</span>
-                  <ExchangeRateInput
-                    value={transactionRate}
-                    onChange={setTransactionRate}
-                    selectedCurrency={selectedCurrency}
-                  />
-                </div>
-              )}
+              <PaymentDraftAndRateBar
+                draftAge={hasPaymentDraft && !voucherIdToEdit ? paymentDraftAge : null}
+                draftLabel="Unsaved payment draft found"
+                onRestoreDraft={restorePaymentDraft}
+                onDiscardDraft={discardPaymentDraft}
+                selectedCurrency={selectedCurrency}
+                transactionRate={transactionRate}
+                setTransactionRate={setTransactionRate}
+              />
               <PaymentVoucherTab
                 form={form}
                 fieldArray={fieldArray}
@@ -890,32 +710,15 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
           {!isPOS && canShowVoucherTab("receipt") && activeTab === "receipt" && (
             <div className="space-y-4">
-              {hasPaymentDraft && !voucherIdToEdit && paymentDraftAge && (
-                <DraftRestorePrompt
-                  draftAge={paymentDraftAge}
-                  label="Unsaved receipt draft found"
-                  onRestore={() => {
-                    if (paymentDraft?.data) {
-                      const d = paymentDraft.data as unknown as object & { voucherDate: unknown } & {
-                        voucherDate: string | number | Date;
-                      };
-                      form.reset({ ...d, voucherDate: d.voucherDate ? new Date(d.voucherDate) : new Date() });
-                    }
-                    discardPaymentDraft();
-                  }}
-                  onDiscard={discardPaymentDraft}
-                />
-              )}
-              {selectedCurrency === "CFA" && (
-                <div className="flex flex-wrap items-center gap-2 sm:gap-4 p-3 bg-muted/30 rounded-md">
-                  <span className="text-sm text-muted-foreground">Transaction Rate:</span>
-                  <ExchangeRateInput
-                    value={transactionRate}
-                    onChange={setTransactionRate}
-                    selectedCurrency={selectedCurrency}
-                  />
-                </div>
-              )}
+              <PaymentDraftAndRateBar
+                draftAge={hasPaymentDraft && !voucherIdToEdit ? paymentDraftAge : null}
+                draftLabel="Unsaved receipt draft found"
+                onRestoreDraft={restorePaymentDraft}
+                onDiscardDraft={discardPaymentDraft}
+                selectedCurrency={selectedCurrency}
+                transactionRate={transactionRate}
+                setTransactionRate={setTransactionRate}
+              />
               <ReceiptVoucherTab
                 form={form}
                 fieldArray={fieldArray}

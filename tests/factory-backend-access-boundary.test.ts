@@ -133,7 +133,6 @@ describe("Wave 4 Factory backend access ownership", () => {
     for (const path of [
       "/fx-agent-wallets",
       "/fx-agent-wallets/7/convert",
-      "/fx-agent-wallets/7/settle",
       "/fx-agent-wallets/7/reverse-conversion",
       "/fx-agent-wallets/7/conversions",
     ]) {
@@ -141,6 +140,18 @@ describe("Wave 4 Factory backend access ownership", () => {
         pageKey: "factory/accounts",
       });
     }
+    // A USD-beneficiary settlement and the Pay From wallet list are also open
+    // to users permitted on Vouchers > Payment (b0de355).
+    const accountsOrPaymentVouchers = {
+      alternatives: [
+        { pageKey: "factory/accounts" },
+        { pageKey: "factory/vouchers", tabs: ["hide_tab_vouchers_payment"] },
+      ],
+    };
+    expect(resolveFactoryBackendAccessRequirement(req("/fx-agent-wallets/7/settle", "POST"))).toEqual(
+      accountsOrPaymentVouchers
+    );
+    expect(resolveFactoryBackendAccessRequirement(req("/fx-agent-wallets"))).toEqual(accountsOrPaymentVouchers);
   });
 
   it("maps raw-stock adjustments and repair children to Raw Materials", () => {

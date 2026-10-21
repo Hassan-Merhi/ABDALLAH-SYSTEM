@@ -5,11 +5,13 @@ import { wave8ReleaseTranslationsPart1 } from "./wave8ReleaseTranslations.part1"
 import { wave8ReleaseTranslationsPart2 } from "./wave8ReleaseTranslations.part2";
 import { wave8ReleaseTranslationsPart3 } from "./wave8ReleaseTranslations.part3";
 import { wave8ReleaseTranslationsPart4 } from "./wave8ReleaseTranslations.part4";
+import { wave8ReleaseTranslationsPart5 } from "./wave8ReleaseTranslations.part5";
 
 export const wave8ReleaseTranslations: readonly Phase3SharedUiEntry[] = [
   ...wave8ReleaseTranslationsPart1,
   ...wave8ReleaseTranslationsPart2,
   ...wave8ReleaseTranslationsPart3,
+  ...wave8ReleaseTranslationsPart5,
   ...wave8ReleaseTranslationsPart4,
 ];
 

@@ -48,6 +48,7 @@ const compatibilityTranslationFiles = [
   "client/src/i18n/phase3RemainingTranslations.part27.ts",
   "client/src/i18n/phase3RemainingTranslations.part28.ts",
   "client/src/i18n/phase3RemainingTranslations.part29.ts",
+  "client/src/i18n/phase3RemainingTranslations.part30.ts",
   "client/src/i18n/supplierPartnerPhase4Translations.part1.ts",
   "client/src/i18n/supplierPartnerPhase4Translations.part2.ts",
   "client/src/i18n/supplierPartnerPhase4Translations.part3.ts",
@@ -93,6 +94,7 @@ const compatibilityTranslationFiles = [
   "client/src/i18n/wave8ReleaseTranslations.part2.ts",
   "client/src/i18n/wave8ReleaseTranslations.part3.ts",
   "client/src/i18n/wave8ReleaseTranslations.part4.ts",
+  "client/src/i18n/wave8ReleaseTranslations.part5.ts",
   "client/src/i18n/payrollUiTranslations.ts",
 ];
 

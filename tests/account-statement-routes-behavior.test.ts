@@ -28,6 +28,10 @@ const harness = vi.hoisted(() => {
     getCustomerByLedgerId: vi.fn(),
     getPartyBalance: vi.fn(),
     loadCustomerNotInLedger: vi.fn(),
+    projectCustomerStatementLines: vi.fn(async (_companyId: number, _customerId: number, rows: unknown[]) => ({
+      rows: [...rows],
+      heldBefore: 0,
+    })),
   };
 });
 
@@ -50,6 +54,11 @@ vi.mock("../server/services/accounting/balances/ledgerBalanceEngine", () => ({
 vi.mock("../server/services/accounting/balances/customerLedgerStatement", () => ({
   loadCustomerNotInLedger: harness.loadCustomerNotInLedger,
   loadCustomerLedgerEntryRows: vi.fn(async () => []),
+}));
+// #2390 hides held pre-finalization freight from customer statements; this
+// fixture holds none, so the projection keeps every line and holds nothing back.
+vi.mock("../server/routes/factory/customers-core/heldUnfinalizedCustomerCharges", () => ({
+  projectCustomerStatementLines: harness.projectCustomerStatementLines,
 }));
 vi.mock("../server/lib/httpHandlers", () => ({ getErrorMessage: (error: any) => error?.message || String(error) }));
 vi.mock("../server/lib/logger", () => ({ logger: { error: vi.fn() } }));
@@ -278,6 +287,7 @@ describe("account statement route behavior", () => {
       res
     );
     expect(res.body).toEqual({ balance: 150, notInLedgerBefore: "120.00" });
+    expect(harness.projectCustomerStatementLines).toHaveBeenCalledWith(4, 44, [], "2026-08-01", null);
     expect(harness.getPartyBalance).toHaveBeenCalledWith(harness.db, {
       companyId: 4,
       kind: "customer",

@@ -25,10 +25,20 @@ ALTER TABLE factory_fx_agent_wallet_operations
       AND target_kind IS NULL AND target_id IS NULL AND voucher_id IS NULL AND reverses_operation_id IS NOT NULL)
   );
 
--- This reviewed migration runs once; the new column has no FK on the existing tables.
-ALTER TABLE factory_fx_agent_wallet_operations
-  ADD CONSTRAINT fx_agent_reverses_operation_fkey
-  FOREIGN KEY (reverses_operation_id) REFERENCES factory_fx_agent_wallet_operations(id);
+-- Add the self-reference once. A schema already built from the Drizzle model
+-- (drizzle-kit push) carries this FK, so re-running must not fail on it.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+     WHERE conname = 'fx_agent_reverses_operation_fkey'
+       AND conrelid = 'factory_fx_agent_wallet_operations'::regclass
+  ) THEN
+    ALTER TABLE factory_fx_agent_wallet_operations
+      ADD CONSTRAINT fx_agent_reverses_operation_fkey
+      FOREIGN KEY (reverses_operation_id) REFERENCES factory_fx_agent_wallet_operations(id);
+  END IF;
+END $$;
 
 CREATE UNIQUE INDEX IF NOT EXISTS fx_agent_one_reversal_per_conversion
   ON factory_fx_agent_wallet_operations(company_id, reverses_operation_id);
