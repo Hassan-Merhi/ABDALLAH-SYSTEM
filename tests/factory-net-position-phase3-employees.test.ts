@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { PgDialect } from "drizzle-orm/pg-core";
 
 const fake = vi.hoisted(() => ({
   rows: [] as Record<string, unknown>[],
@@ -7,7 +6,8 @@ const fake = vi.hoisted(() => ({
   params: [] as unknown[],
 }));
 
-vi.mock("../server/db", () => {
+vi.mock("../server/db", async () => {
+  const { PgDialect } = await import("drizzle-orm/pg-core");
   const dialect = new PgDialect();
   return {
     db: {
