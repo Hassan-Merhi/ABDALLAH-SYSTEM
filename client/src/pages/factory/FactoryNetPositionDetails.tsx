@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -358,7 +358,7 @@ interface PayrollEmployee {
 
 /** Reuse name-based saved hide keys except where duplicate names need distinct controls. */
 function rowVisibilityKey(side: "forUs" | "onUs", account: AccountItem, index: number, rows: AccountItem[]) {
-  return rows.filter(row => row.name === account.name).length > 1
+  return rows.filter((row) => row.name === account.name).length > 1
     ? `${side}:${account.id != null ? `ledger:${account.id}` : `${account.code}:${account.name}:${index}`}`
     : `${side}:${account.name}`;
 }
@@ -375,7 +375,8 @@ function CustomNetPositionView({
   const storageKey = `${STORAGE_KEY}:${data.companyId ?? "no-company"}`;
   const [hiddenKeys, setHiddenKeys] = useState<Set<string>>(() => {
     try {
-      const saved = localStorage.getItem(storageKey);
+      // Fall back once to the pre-company key so existing choices survive.
+      const saved = localStorage.getItem(storageKey) ?? localStorage.getItem(STORAGE_KEY);
       return saved ? new Set(JSON.parse(saved)) : new Set();
     } catch {
       return new Set();
@@ -383,7 +384,11 @@ function CustomNetPositionView({
   });
 
   // Fetch per-employee payroll breakdown
-  const { data: payrollData, isError: isPayrollError } = useQuery<{ employees: PayrollEmployee[]; asOf: string }>({
+  const { data: payrollData, isError: isPayrollError } = useQuery<{
+    employees: PayrollEmployee[];
+    asOf: string;
+    companyId?: number;
+  }>({
     queryKey: companyQueryKey("/api/factory/net-position/payroll-breakdown", data.companyId, asOf),
     enabled: data.companyId != null,
     queryFn: async () => {
@@ -394,33 +399,39 @@ function CustomNetPositionView({
     staleTime: 30_000,
   });
 
-  const payrollRow = data.onUs.accounts.find(a => a.code === "EMPLOYEE_PAYROLL_PAYABLE");
-  const payrollMatchesReport = !!payrollData && payrollData.asOf === asOf &&
-    Math.round((payrollData.employees ?? []).reduce((sum, employee) => sum + employee.balance, 0) * 100)
-      === Math.round((payrollRow?.value ?? 0) * 100);
+  const payrollRow = data.onUs.accounts.find((a) => a.code === "EMPLOYEE_PAYROLL_PAYABLE");
+  const payrollMatchesReport =
+    !!payrollData &&
+    payrollData.asOf === asOf &&
+    payrollData.companyId === data.companyId &&
+    Math.round((payrollData.employees ?? []).reduce((sum, employee) => sum + employee.balance, 0) * 100) ===
+      Math.round((payrollRow?.value ?? 0) * 100);
   // Preserve an existing saved hide choice for the aggregate payable.
   // When hidden, keep the aggregate row hidden rather than exposing new
   // visible employee rows as soon as the breakdown finishes loading.
   const splitPayroll = payrollMatchesReport && !hiddenKeys.has("onUs:Payroll Payable");
   // Never drop the aggregate while the breakdown is loading or inconsistent.
   const payrollEmployees = useMemo(
-    () => splitPayroll ? payrollData?.employees ?? [] : [],
+    () => (splitPayroll ? (payrollData?.employees ?? []) : []),
     [splitPayroll, payrollData?.employees]
   );
 
-  const toggleKey = useCallback((key: string) => {
-    setHiddenKeys((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      try {
-        localStorage.setItem(storageKey, JSON.stringify([...next]));
-      } catch {
-        // Storage is unavailable in private mode and can throw on quota; the value is a convenience, not state we need.
-      }
-      return next;
-    });
-  }, [storageKey]);
+  const toggleKey = useCallback(
+    (key: string) => {
+      setHiddenKeys((prev) => {
+        const next = new Set(prev);
+        if (next.has(key)) next.delete(key);
+        else next.add(key);
+        try {
+          localStorage.setItem(storageKey, JSON.stringify([...next]));
+        } catch {
+          // Storage is unavailable in private mode and can throw on quota; the value is a convenience, not state we need.
+        }
+        return next;
+      });
+    },
+    [storageKey]
+  );
 
   const showAll = useCallback(() => {
     setHiddenKeys(new Set());
@@ -458,6 +469,16 @@ function CustomNetPositionView({
     [payrollEmployees, hiddenKeys]
   );
 
+  // Count only hidden keys that match a row on screen for this date.
+  const hiddenShownCount = useMemo(() => {
+    const keys = new Set([
+      ...forUsAccounts.map((a, index) => rowVisibilityKey("forUs", a, index, forUsAccounts)),
+      ...onUsAccounts.map((a, index) => rowVisibilityKey("onUs", a, index, onUsAccounts)),
+      ...payrollEmployees.map((e) => `payroll:${e.id}`),
+    ]);
+    return [...hiddenKeys].filter((key) => keys.has(key)).length;
+  }, [forUsAccounts, onUsAccounts, payrollEmployees, hiddenKeys]);
+
   const visibleForUsTotal = visibleForUs.reduce((s, a) => s + a.value, 0);
   const visibleOnUsTotal = visibleOnUs.reduce((s, a) => s + a.value, 0) + visiblePayrollTotal;
   const customNet = visibleForUsTotal - visibleOnUsTotal;
@@ -474,10 +495,10 @@ function CustomNetPositionView({
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {hiddenKeys.size > 0 && (
+            {hiddenShownCount > 0 && (
               <Button size="sm" variant="outline" onClick={showAll} data-testid="button-show-all-accounts">
                 <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
-                Show all ({hiddenKeys.size} hidden)
+                Show all ({hiddenShownCount} hidden)
               </Button>
             )}
             <div
@@ -553,7 +574,8 @@ function CustomNetPositionView({
 
             {payrollRow && !payrollMatchesReport && (isPayrollError || !!payrollData) && (
               <p role="status" className="text-xs text-amber-700 dark:text-amber-300 px-3 py-1">
-                Employee breakdown unavailable or inconsistent for this date; Payroll Payable is shown as one reconciled account.
+                Employee breakdown unavailable or inconsistent for this date; Payroll Payable is shown as one reconciled
+                account.
               </p>
             )}
             {/* Regular onUs account rows */}
@@ -663,6 +685,7 @@ export default function FactoryNetPositionDetails() {
   // Empty selection means "company business today" resolved by the API.
   // A browser in a different timezone must not pick the accounting cutoff.
   const [asOf, setAsOf] = useState<string>("");
+  const queryClient = useQueryClient();
   const isToday = !asOf;
   const { prefs, updatePref, isPending: isSavingValuationMode } = useUserPreferences();
   const valuationMode = prefs?.factoryNetPositionValuationMode === "selling" ? "selling" : "cost";
@@ -734,6 +757,15 @@ export default function FactoryNetPositionDetails() {
             {!isEndpointBusy && (
               <button className="mt-3 text-sm underline text-muted-foreground" onClick={() => refetch()}>
                 Try again
+              </button>
+            )}
+            {asOf && (
+              <button
+                className="mt-3 ml-4 text-sm underline text-muted-foreground"
+                onClick={() => setAsOf("")}
+                data-testid="button-error-back-today"
+              >
+                Back to today
               </button>
             )}
           </CardContent>
@@ -821,26 +853,37 @@ export default function FactoryNetPositionDetails() {
             </Button>
           )}
           <Button
-              variant="outline"
-              size="default"
-              onClick={() => refetch()}
-              disabled={isFetching}
-              data-testid="button-refresh"
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? "animate-spin" : ""}`} />
-              Refresh
-            </Button>
+            variant="outline"
+            size="default"
+            onClick={() => {
+              // The payroll breakdown must refresh with its parent total.
+              void queryClient.invalidateQueries({ queryKey: ["/api/factory/net-position/payroll-breakdown"] });
+              void refetch();
+            }}
+            disabled={isFetching}
+            data-testid="button-refresh"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
         </div>
       </div>
 
       {data?.historyCompleteness === "partial" && (
         <div role="status" className="text-sm text-amber-700 dark:text-amber-300" data-testid="historical-data-warning">
-          <p>{data.historyWarnings?.[0] || "Historical reconstruction is incomplete; some values may still reflect current state."}</p>
+          <p>
+            {data.historyWarnings?.[0] ||
+              "Historical reconstruction is incomplete; some values may still reflect current state."}
+          </p>
           {!!data.historyWarnings?.slice(1).length && (
             <details className="mt-1">
-              <summary className="cursor-pointer">Historical data limitations ({data.historyWarnings.length - 1})</summary>
+              <summary className="cursor-pointer">
+                Historical data limitations ({data.historyWarnings.length - 1})
+              </summary>
               <ul className="list-disc pl-5 mt-1 space-y-1">
-                {data.historyWarnings.slice(1).map((warning, index) => <li key={index}>{warning}</li>)}
+                {data.historyWarnings.slice(1).map((warning, index) => (
+                  <li key={index}>{warning}</li>
+                ))}
               </ul>
             </details>
           )}
@@ -939,7 +982,14 @@ export default function FactoryNetPositionDetails() {
         />
       </div>
 
-      {data && <CustomNetPositionView key={data.companyId ?? "no-company"} data={data} formatAmount={formatAmount} asOf={displayAsOf} />}
+      {data && (
+        <CustomNetPositionView
+          key={data.companyId ?? "no-company"}
+          data={data}
+          formatAmount={formatAmount}
+          asOf={displayAsOf}
+        />
+      )}
     </div>
   );
 }

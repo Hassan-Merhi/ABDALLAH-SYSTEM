@@ -32,7 +32,8 @@ const customHiddenKey = (companyId?: number) => `${NP_CUSTOM_VIEW_HIDDEN_KEY}:${
 
 export function loadCustomViewHidden(companyId?: number): Set<string> {
   try {
-    const raw = localStorage.getItem(customHiddenKey(companyId));
+    // Fall back once to the pre-company key so existing choices survive.
+    const raw = localStorage.getItem(customHiddenKey(companyId)) ?? localStorage.getItem(NP_CUSTOM_VIEW_HIDDEN_KEY);
     if (!raw) return new Set();
     return new Set(JSON.parse(raw) as string[]);
   } catch {

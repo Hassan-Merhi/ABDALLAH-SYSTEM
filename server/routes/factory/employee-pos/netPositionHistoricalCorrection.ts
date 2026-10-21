@@ -57,7 +57,7 @@ export async function applyHistoricalOperationalCorrection<T extends NetPosition
   companyId: number,
   scope: FactoryNetPositionAsOf,
   body: T,
-  valuationMode: "cost" | "selling",
+  valuationMode: "cost" | "selling"
 ): Promise<T> {
   if (!scope.isHistorical) return body;
   if (!Array.isArray(body?.forUs?.accounts) || typeof body.rawMaterialValue !== "number") {
@@ -75,7 +75,7 @@ export async function applyHistoricalOperationalCorrection<T extends NetPosition
 
   replaceAccountValue(body.forUs.accounts, "INVENTORY", historical.inventoryValue);
   replaceAccountValue(body.forUs.accounts, "RAW_MATERIAL", historical.rawMaterialValue);
-  const wipRow = body.forUs.accounts.find(row => row.code === "BALANCE_ON_TABLE");
+  const wipRow = body.forUs.accounts.find((row) => row.code === "BALANCE_ON_TABLE");
   if (wipRow) {
     wipRow.value = round2(historical.balanceOnTableValue);
   } else if (historical.balanceOnTableValue > 0) {

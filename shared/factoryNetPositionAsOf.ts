@@ -60,9 +60,11 @@ export function resolveFactoryNetPositionDay(input: unknown, businessToday: stri
 export class FactoryNetPositionDateError extends Error {
   readonly status = 400;
   constructor(readonly code: "INVALID_AS_OF_DATE" | "FUTURE_AS_OF_DATE") {
-    super(code === "FUTURE_AS_OF_DATE"
-      ? "The selected date cannot be later than the company business date."
-      : "Use a real calendar date in YYYY-MM-DD format.");
+    super(
+      code === "FUTURE_AS_OF_DATE"
+        ? "The selected date cannot be later than the company business date."
+        : "Use a real calendar date in YYYY-MM-DD format."
+    );
     this.name = "FactoryNetPositionDateError";
   }
 }

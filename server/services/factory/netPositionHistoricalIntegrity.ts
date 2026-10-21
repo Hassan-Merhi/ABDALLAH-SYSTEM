@@ -25,17 +25,20 @@ type HistoricalResponse<R extends HistoricalPositionRow> = HistoricalPositionRep
   loadingTotal: number;
 };
 
-const cents = (value: string | number) =>
-  toMoney(value).toDecimalPlaces(2, MoneyDecimal.ROUND_HALF_UP).toNumber();
+const cents = (value: string | number) => toMoney(value).toDecimalPlaces(2, MoneyDecimal.ROUND_HALF_UP).toNumber();
 
 const sum = (items: readonly { grandTotal: number }[]) =>
-  cents(items.reduce((amount, item) => {
-    if (!Number.isFinite(item.grandTotal)) throw new Error("HISTORICAL_INTEGRITY_NONFINITE_ORDER");
-    return amount.plus(toMoney(item.grandTotal));
-  }, new MoneyDecimal(0)).toFixed());
+  cents(
+    items
+      .reduce((amount, item) => {
+        if (!Number.isFinite(item.grandTotal)) throw new Error("HISTORICAL_INTEGRITY_NONFINITE_ORDER");
+        return amount.plus(toMoney(item.grandTotal));
+      }, new MoneyDecimal(0))
+      .toFixed()
+  );
 
 const rowTotal = (rows: readonly HistoricalPositionRow[], code: string) =>
-  sumPositionRows(rows.filter(row => row.code === code));
+  sumPositionRows(rows.filter((row) => row.code === code));
 
 const equal = (actual: number, expected: number, field: string) => {
   if (!Number.isFinite(actual) || !Number.isFinite(expected) || cents(actual) !== cents(expected)) {
@@ -44,16 +47,26 @@ const equal = (actual: number, expected: number, field: string) => {
 };
 
 /** Run only on a previously date-scoped and reconciled historical response. */
-export function assertHistoricalReportIntegrity<R extends HistoricalPositionRow>(
-  report: HistoricalResponse<R>,
-): void {
+export function assertHistoricalReportIntegrity<R extends HistoricalPositionRow>(report: HistoricalResponse<R>): void {
   equal(report.forUs.total, sumPositionRows(report.forUs.accounts), "forUsRows");
   equal(report.onUs.total, sumPositionRows(report.onUs.accounts), "onUsRows");
   equal(report.forUs.total, report.forUsTotal, "forUsHeader");
   equal(report.onUs.total, report.onUsTotal, "onUsHeader");
-  equal(report.netPosition, cents(toMoney(report.forUsTotal).minus(toMoney(report.onUsTotal)).toFixed()), "netPosition");
-  equal(report.forUs.breakdown.reduce((v, b) => v + b.value, 0), report.forUsTotal, "assetCategories");
-  equal(report.onUs.breakdown.reduce((v, b) => v + b.value, 0), report.onUsTotal, "liabilityCategories");
+  equal(
+    report.netPosition,
+    cents(toMoney(report.forUsTotal).minus(toMoney(report.onUsTotal)).toFixed()),
+    "netPosition"
+  );
+  equal(
+    report.forUs.breakdown.reduce((v, b) => v + b.value, 0),
+    report.forUsTotal,
+    "assetCategories"
+  );
+  equal(
+    report.onUs.breakdown.reduce((v, b) => v + b.value, 0),
+    report.onUsTotal,
+    "liabilityCategories"
+  );
 
   equal(rowTotal(report.forUs.accounts, "INVENTORY"), report.inventoryValue, "inventory");
   equal(rowTotal(report.forUs.accounts, "RAW_MATERIAL"), report.rawMaterialValue, "rawMaterial");

@@ -10,8 +10,7 @@ import {
   sumPositionRows,
 } from "../server/services/factory/netPositionReportTotals";
 
-const row = (name: string, value: number, category: string, code = "TEST") =>
-  ({ name, code, value, category });
+const row = (name: string, value: number, category: string, code = "TEST") => ({ name, code, value, category });
 
 describe("Factory historical net position: canonical dated rows", () => {
   it("recalculates header, both sides and every category from the same accounts", () => {
@@ -50,13 +49,15 @@ describe("Factory historical net position: canonical dated rows", () => {
     expect(report.netPosition).toBe(110);
     expect(report.forUs.total).toBe(report.forUsTotal);
     expect(report.onUs.total).toBe(report.onUsTotal);
-    expect(report.forUs.breakdown).toEqual([
-      { name: "Inventory", value: 250 },
-      { name: "Asset", value: 70 },
-      { name: "Uninvoiced Orders", value: 100 },
-      { name: "Raw Material", value: 110 },
-    ].sort((a, b) => b.value - a.value));
-    expect(report.onUs.breakdown.find(item => item.name === "Supplier")?.value).toBe(80);
+    expect(report.forUs.breakdown).toEqual(
+      [
+        { name: "Inventory", value: 250 },
+        { name: "Asset", value: 70 },
+        { name: "Uninvoiced Orders", value: 100 },
+        { name: "Raw Material", value: 110 },
+      ].sort((a, b) => b.value - a.value)
+    );
+    expect(report.onUs.breakdown.find((item) => item.name === "Suppliers")?.value).toBe(80);
     expect(report.onUs.breakdown.reduce((sum, item) => sum + item.value, 0)).toBe(report.onUsTotal);
   });
 
@@ -67,23 +68,23 @@ describe("Factory historical net position: canonical dated rows", () => {
   });
 
   it("sums rows with decimal precision at each displayed cent", () => {
-    const rows = [
-      row("A", 0.1, "Cash"),
-      row("B", 0.2, "Cash"),
-      row("C", -0.15, "Cash"),
-    ];
+    const rows = [row("A", 0.1, "Cash"), row("B", 0.2, "Cash"), row("C", -0.15, "Cash")];
     expect(sumPositionRows(rows)).toBe(0.15);
     expect(groupPositionRows(rows)).toEqual([{ name: "Cash", value: 0.15 }]);
   });
 
   it("refuses nonfinite historical amounts rather than returning a false total", () => {
-    expect(() => sumPositionRows([row("Unknown", Infinity, "Asset")]))
-      .toThrow("HISTORICAL_NET_POSITION_NONFINITE_AMOUNT");
+    expect(() => sumPositionRows([row("Unknown", Infinity, "Asset")])).toThrow(
+      "HISTORICAL_NET_POSITION_NONFINITE_AMOUNT"
+    );
   });
 
   it("remains consistent when inventory is worth more yesterday than today", () => {
     const report = {
-      forUsTotal: 0, onUsTotal: 0, netPosition: 0, netPositionLabel: "",
+      forUsTotal: 0,
+      onUsTotal: 0,
+      netPosition: 0,
+      netPositionLabel: "",
       forUs: { total: 0, breakdown: [], accounts: [row("Inventory", 1000, "Inventory")] },
       onUs: { total: 0, breakdown: [], accounts: [row("Supplier", 100, "Supplier")] },
     };

@@ -1,5 +1,10 @@
 import { FactoryNetPositionDateError } from "@shared/factoryNetPositionAsOf";
-import { resolveFactoryNetPositionAsOf, netPositionKnownTransactionThrough, netPositionRecordedThrough } from "../../../services/factory/netPositionAsOf";
+import {
+  resolveFactoryNetPositionAsOf,
+  netPositionKnownTransactionThrough,
+  netPositionRecordedThrough,
+  netPositionVoucherEntryKnown,
+} from "../../../services/factory/netPositionAsOf";
 import { loadFactoryNetPositionEmployees } from "../../../services/factory/netPositionEmployees";
 import { loadHistoricalFactoryPipeline } from "../../../services/factory/netPositionHistoricalPipeline";
 import { computeHistoricalFactoryAssetLiabilityOperations } from "../../../services/factory/netPositionHistoricalAssets";
@@ -49,6 +54,9 @@ import { ledgerCarriesStock } from "../../../services/accounting/perpetualInvent
 
 export function registerEmployeeNetPositionRoutes(app: Express) {
   app.get("/api/factory/net-position", requireAuth, async (req: Request, res: Response) => {
+    // Set once the date resolves: any later failure of a past date is a
+    // structured 503, never a partial or current-day figure.
+    let historicalRequest = false;
     try {
       // Resolve factory company ID the same way my-access does:
       // 1. pinned factoryCompanyId (if it's a factory-type company)
@@ -87,6 +95,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       // Each category will adopt the effective+recorded predicate in Phases 3–6.
       const asOfContext = await resolveFactoryNetPositionAsOf(companyId, req.query.asOf);
       const asOf = asOfContext.asOf;
+      historicalRequest = asOfContext.isHistorical;
       // Perform a read-only prerequisite and evidence check BEFORE invoking
       // any reconstruction query that refers to trigger-added scan timestamps.
       const historyCoverage = asOfContext.isHistorical
@@ -104,14 +113,18 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         SELECT DISTINCT ON (currency_code) currency_code, rate_to_usd
         FROM factory_fx_rates
         WHERE company_id = ${companyId} AND source = 'manual' AND effective_date <= ${asOf}::date
-          ${asOfContext.isHistorical
-            ? sql`AND ${netPositionRecordedThrough(sql`created_at`, asOfContext, "utc-naive-timestamp")}`
-            : sql``}
+          ${
+            asOfContext.isHistorical
+              ? sql`AND ${netPositionRecordedThrough(sql`created_at`, asOfContext, "utc-naive-timestamp")}`
+              : sql``
+          }
         ORDER BY currency_code, effective_date DESC, created_at DESC, id DESC
       `);
       const configFxRates: Record<string, number> = {};
       for (const row of fxRateRows.rows) {
-        const currency = String(row.currency_code ?? "").trim().toUpperCase();
+        const currency = String(row.currency_code ?? "")
+          .trim()
+          .toUpperCase();
         if (currency) configFxRates[currency] = toMoney(row.rate_to_usd as string).toNumber();
       }
       // Only use manually configured rates — no hardcoded fallbacks
@@ -134,33 +147,45 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         supplierItems,
         totalSupplierLiabilities,
         totalSupplierOverpayments,
-      } = await computeNetPositionSupplierBalances({ companyId, asOf, knownAt: asOfContext.isHistorical ? asOfContext : undefined, round2, getConfigFx });
+      } = await computeNetPositionSupplierBalances({
+        companyId,
+        asOf,
+        knownAt: asOfContext.isHistorical ? asOfContext : undefined,
+        round2,
+        getConfigFx,
+      });
 
       // ── 2. ERP ledger account balances for the factory company ──────────
       const factoryAccounts = await db
         .select()
         .from(ledgerAccounts)
-        .where(and(
-          eq(ledgerAccounts.companyId, companyId),
-          asOfContext.isHistorical
-            ? sql`(${ledgerAccounts.deletedAt} IS NULL OR NOT ${netPositionRecordedThrough(sql`${ledgerAccounts.deletedAt}`, asOfContext, "utc-naive-timestamp")})`
-            : isNull(ledgerAccounts.deletedAt),
-          asOfContext.isHistorical
-            ? netPositionRecordedThrough(sql`${ledgerAccounts.createdAt}`, asOfContext, "utc-naive-timestamp")
-            : sql`TRUE`,
-        ));
+        .where(
+          and(
+            eq(ledgerAccounts.companyId, companyId),
+            asOfContext.isHistorical
+              ? sql`(${ledgerAccounts.deletedAt} IS NULL OR NOT ${netPositionRecordedThrough(sql`${ledgerAccounts.deletedAt}`, asOfContext, "utc-naive-timestamp")})`
+              : isNull(ledgerAccounts.deletedAt),
+            asOfContext.isHistorical
+              ? netPositionRecordedThrough(sql`${ledgerAccounts.createdAt}`, asOfContext, "utc-naive-timestamp")
+              : sql`TRUE`
+          )
+        );
 
       // Ledger lines on legacy EMP-<code> accounts also mutate the employee
       // cached balance. For historic snapshots their voucher movement belongs
       // on the employee row exactly once; retain any ledger ACCOUNT OPENING.
-      const historicalEmployeeCodes = new Set(employeeBalances.map(e => `EMP-${e.code.toUpperCase()}`));
+      // Exact match, as netPositionEmployees and employeeBalancePosting map them.
+      const historicalEmployeeCodes = new Set(employeeBalances.map((e) => `EMP-${e.code}`));
       const legacyEmployeeLedgerIds = new Set(
         asOfContext.isHistorical
-          ? factoryAccounts.filter(a => a.code && historicalEmployeeCodes.has(a.code.toUpperCase())).map(a => a.id)
+          ? factoryAccounts.filter((a) => a.code && historicalEmployeeCodes.has(a.code)).map((a) => a.id)
           : []
       );
       const countedAsEmployee = (e: { ledgerAccountId: number | null; employeeId: number | null }) =>
-        asOfContext.isHistorical && e.employeeId == null && e.ledgerAccountId != null && legacyEmployeeLedgerIds.has(e.ledgerAccountId);
+        asOfContext.isHistorical &&
+        e.employeeId == null &&
+        e.ledgerAccountId != null &&
+        legacyEmployeeLedgerIds.has(e.ledgerAccountId);
 
       const factoryVouchers = await db
         .select({ id: vouchers.id })
@@ -175,7 +200,10 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
             asOfContext.isHistorical
               ? netPositionKnownTransactionThrough(
                   sql`COALESCE(${vouchers.effectiveDate}, ${vouchers.voucherDate})`,
-                  sql`${vouchers.createdAt}`, asOfContext, "utc-naive-timestamp")
+                  sql`${vouchers.createdAt}`,
+                  asOfContext,
+                  "utc-naive-timestamp"
+                )
               : sql`COALESCE(${vouchers.effectiveDate}, ${vouchers.voucherDate}) <= ${asOf}`
           )
         );
@@ -183,12 +211,21 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       const fVoucherIds = factoryVouchers.map((v) => v.id);
       const factoryEntries =
         fVoucherIds.length > 0
-          ? await db.select().from(voucherEntries).where(and(
-              inArray(voucherEntries.voucherId, fVoucherIds),
-              asOfContext.isHistorical
-                ? netPositionRecordedThrough(sql`${voucherEntries.createdAt}`, asOfContext, "utc-naive-timestamp")
-                : sql`TRUE`
-            ))
+          ? await db
+              .select()
+              .from(voucherEntries)
+              .where(
+                and(
+                  inArray(voucherEntries.voucherId, fVoucherIds),
+                  asOfContext.isHistorical
+                    ? netPositionVoucherEntryKnown(
+                        sql`${voucherEntries.createdAt}`,
+                        sql`${voucherEntries.voucherId}`,
+                        asOfContext
+                      )
+                    : sql`TRUE`
+                )
+              )
           : [];
 
       const exactBalances = new Map<number, { debit: Decimal; credit: Decimal }>();
@@ -232,14 +269,17 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       const allCustomersForNP = await db
         .select()
         .from(customers)
-        .where(and(eq(customers.companyId, companyId),
-          asOfContext.isHistorical
-            ? sql`(${customers.deletedAt} IS NULL OR NOT ${netPositionRecordedThrough(sql`${customers.deletedAt}`, asOfContext, "utc-naive-timestamp")})`
-            : isNull(customers.deletedAt),
-          asOfContext.isHistorical
-            ? netPositionRecordedThrough(sql`${customers.createdAt}`, asOfContext, "utc-naive-timestamp")
-            : sql`TRUE`
-        ));
+        .where(
+          and(
+            eq(customers.companyId, companyId),
+            asOfContext.isHistorical
+              ? sql`(${customers.deletedAt} IS NULL OR NOT ${netPositionRecordedThrough(sql`${customers.deletedAt}`, asOfContext, "utc-naive-timestamp")})`
+              : isNull(customers.deletedAt),
+            asOfContext.isHistorical
+              ? netPositionRecordedThrough(sql`${customers.createdAt}`, asOfContext, "utc-naive-timestamp")
+              : sql`TRUE`
+          )
+        );
 
       // The previous code hid pre-finalization customer debits in the statement
       // while keeping them on Parties AND in the net-position account totals.
@@ -255,7 +295,8 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       if (heldSnapshot.voucherIds.size > 0) {
         const netByAccount = new Map<number, { debit: Decimal; credit: Decimal }>();
         for (const entry of factoryEntries) {
-          if (!entry.ledgerAccountId || heldSnapshot.voucherIds.has(entry.voucherId) || countedAsEmployee(entry)) continue;
+          if (!entry.ledgerAccountId || heldSnapshot.voucherIds.has(entry.voucherId) || countedAsEmployee(entry))
+            continue;
           const current = netByAccount.get(entry.ledgerAccountId);
           netByAccount.set(entry.ledgerAccountId, {
             debit: toMoney(entry.debitAmount).plus(current?.debit ?? 0),
@@ -431,26 +472,28 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       // Allocated bales are excluded from Stock In Hand by
       // computeNetPositionInventory, including bales still marked IN_STOCK,
       // so an order's allocated stock is not also valued as available inventory.
-      const pendingVerifiedRows = historicalPipeline ? [] : await db
-        .select({
-          id: customerOrders.id,
-          status: customerOrders.status,
-          orderDate: customerOrders.orderDate,
-          grandTotal: customerOrders.grandTotal,
-          totalQtyBales: customerOrders.totalQtyBales,
-          customerId: customerOrders.customerId,
-          customerName: customers.legalName,
-        })
-        .from(customerOrders)
-        .innerJoin(customers, eq(customerOrders.customerId, customers.id))
-        .where(
-          and(
-            eq(customerOrders.companyId, companyId),
-            inArray(customerOrders.status, ["PENDING_VERIFICATION", "VERIFIED", "LOADING"]),
-            lte(customerOrders.orderDate, asOf)
-          )
-        )
-        .orderBy(desc(customerOrders.orderDate));
+      const pendingVerifiedRows = historicalPipeline
+        ? []
+        : await db
+            .select({
+              id: customerOrders.id,
+              status: customerOrders.status,
+              orderDate: customerOrders.orderDate,
+              grandTotal: customerOrders.grandTotal,
+              totalQtyBales: customerOrders.totalQtyBales,
+              customerId: customerOrders.customerId,
+              customerName: customers.legalName,
+            })
+            .from(customerOrders)
+            .innerJoin(customers, eq(customerOrders.customerId, customers.id))
+            .where(
+              and(
+                eq(customerOrders.companyId, companyId),
+                inArray(customerOrders.status, ["PENDING_VERIFICATION", "VERIFIED", "LOADING"]),
+                lte(customerOrders.orderDate, asOf)
+              )
+            )
+            .orderBy(desc(customerOrders.orderDate));
 
       const mapOrder = (r: (typeof pendingVerifiedRows)[number]) => ({
         id: r.id,
@@ -460,19 +503,20 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         totalQtyBales: r.totalQtyBales ?? 0,
       });
 
-      const pendingOrders = historicalPipeline?.pendingOrders
-        ?? pendingVerifiedRows.filter((r) => r.status === "PENDING_VERIFICATION").map(mapOrder);
-      const verifiedOrders = historicalPipeline?.verifiedOrders
-        ?? pendingVerifiedRows.filter((r) => r.status === "VERIFIED").map(mapOrder);
-      const loadingOrders = historicalPipeline?.loadingOrders
-        ?? pendingVerifiedRows.filter((r) => r.status === "LOADING").map(mapOrder);
+      const pendingOrders =
+        historicalPipeline?.pendingOrders ??
+        pendingVerifiedRows.filter((r) => r.status === "PENDING_VERIFICATION").map(mapOrder);
+      const verifiedOrders =
+        historicalPipeline?.verifiedOrders ?? pendingVerifiedRows.filter((r) => r.status === "VERIFIED").map(mapOrder);
+      const loadingOrders =
+        historicalPipeline?.loadingOrders ?? pendingVerifiedRows.filter((r) => r.status === "LOADING").map(mapOrder);
 
-      const pendingTotal = historicalPipeline?.pendingTotal
-        ?? round2(pendingOrders.reduce((s, o) => s + o.grandTotal, 0));
-      const verifiedTotal = historicalPipeline?.verifiedTotal
-        ?? round2(verifiedOrders.reduce((s, o) => s + o.grandTotal, 0));
-      const loadingTotal = historicalPipeline?.loadingTotal
-        ?? round2(loadingOrders.reduce((s, o) => s + o.grandTotal, 0));
+      const pendingTotal =
+        historicalPipeline?.pendingTotal ?? round2(pendingOrders.reduce((s, o) => s + o.grandTotal, 0));
+      const verifiedTotal =
+        historicalPipeline?.verifiedTotal ?? round2(verifiedOrders.reduce((s, o) => s + o.grandTotal, 0));
+      const loadingTotal =
+        historicalPipeline?.loadingTotal ?? round2(loadingOrders.reduce((s, o) => s + o.grandTotal, 0));
 
       // ── 5. Combine and return ────────────────────────────────────────────
       // Rename for clarity — these are the two factory-specific values.
@@ -634,9 +678,11 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         if (bal.greaterThan(0)) salariesPayableExact = salariesPayableExact.plus(bal);
         else if (bal.lessThan(0)) {
           receivablesExact = receivablesExact.plus(bal.abs());
-          if (employee.name) employeeReceivableItems.push({
-            name: employee.name, balanceUsd: bal.abs().toNumber()
-          });
+          if (employee.name)
+            employeeReceivableItems.push({
+              name: employee.name,
+              balanceUsd: bal.abs().toNumber(),
+            });
         }
       }
       const employeeSalariesPayable = round2(salariesPayableExact.toNumber());
@@ -869,17 +915,15 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         : responseBody;
       // A SINGLE dated response is authoritative for overview, details, custom
       // subtotals and all expanded groups. The live/current response stays as-is.
-      const datedBody = asOfContext.isHistorical
-        ? reconcileHistoricalPosition(projectedBody)
-        : projectedBody;
+      const datedBody = asOfContext.isHistorical ? reconcileHistoricalPosition(projectedBody) : projectedBody;
       if (asOfContext.isHistorical) {
         // Financial summary fields must sum the same rounded currency rows as
         // the displayed supplier subaccounts; no separate float accumulation.
         datedBody.supplierLiabilities = sumPositionRows(
-          datedBody.onUs.accounts.filter(row => row.code === "SUPPLIER")
+          datedBody.onUs.accounts.filter((row) => row.code === "SUPPLIER")
         );
         datedBody.supplierOverpayments = sumPositionRows(
-          datedBody.forUs.accounts.filter(row => row.code === "SUPPLIER_OVERPAID")
+          datedBody.forUs.accounts.filter((row) => row.code === "SUPPLIER_OVERPAID")
         );
         assertHistoricalReportIntegrity(datedBody);
       }
@@ -889,39 +933,67 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       const inventoryWarningText: Record<string, string> = {
         HISTORICAL_RAW_UNPRICED_RECEIPT: "Some older raw-material receipts have no confirmed historical USD unit cost.",
         HISTORICAL_RAW_ADJUSTMENT_BASIS_MISSING: "Some older raw-material additions lack a recorded valuation basis.",
-        HISTORICAL_RAW_CONSUMPTION_EXCEEDS_RECEIPTS: "Recorded material consumption exceeds available dated receipt history.",
-        HISTORICAL_RAW_LEGACY_RECEIPT_FALLBACK: "Some material receipts use legacy cumulative records instead of individual receipt events.",
-        HISTORICAL_RAW_LEGACY_DEDUCT_MUTATED_RECEIPT: "A legacy raw-material deduction changed a cumulative receipt; its earlier quantity needs audit reconstruction.",
-        HISTORICAL_RAW_SOURCE_OWNER_UNKNOWN: "Some historic mix materials cannot be assigned reliably to their original supplier.",
+        HISTORICAL_RAW_CONSUMPTION_EXCEEDS_RECEIPTS:
+          "Recorded material consumption exceeds available dated receipt history.",
+        HISTORICAL_RAW_LEGACY_RECEIPT_FALLBACK:
+          "Some material receipts use legacy cumulative records instead of individual receipt events.",
+        HISTORICAL_RAW_LEGACY_DEDUCT_MUTATED_RECEIPT:
+          "A legacy raw-material deduction changed a cumulative receipt; its earlier quantity needs audit reconstruction.",
+        HISTORICAL_RAW_SOURCE_OWNER_UNKNOWN:
+          "Some historic mix materials cannot be assigned reliably to their original supplier.",
+        HISTORICAL_RAW_LOCKED_RATE_UNVERSIONED:
+          "A supplier's locked raw-material rate changed after the selected date; its earlier stock is valued at the replayed moving-average cost.",
         HISTORICAL_RAW_NEGATIVE_MOVEMENT: "An invalid negative material movement needs historical review.",
         HISTORICAL_STOCK_SCAN_TIME_MISSING: "Some older bale scans have no reliable scan timestamp.",
-        HISTORICAL_STOCK_FINALIZATION_TIME_MISSING: "Some finalized/sold bales do not have a recorded finalization time.",
+        HISTORICAL_STOCK_FINALIZATION_TIME_MISSING:
+          "Some older bales have no recorded stock-entry (finalization) time; their stock-entry, pressing or creation date is used instead.",
         HISTORICAL_STOCK_REMOVAL_TIME_UNKNOWN: "Some removed/repacked bales have no reliable removal or repack time.",
-        HISTORICAL_STOCK_SELLING_PRICE_UNVERSIONED: "Historical selling prices are not versioned; the selling-price view uses today's catalogue prices.",
-        HISTORICAL_STOCK_COST_EDITS_NOT_VERSIONED: "Earlier bale costs may have been edited or re-costed without a retained historical price version.",
-        HISTORICAL_WIP_BALE_LIFECYCLE_UNVERSIONED: "Balance on Table may include earlier baled weight whose subsequent removal/repacking cannot be timed from legacy status-only records.",
-        HISTORICAL_OTW_STATUS_HISTORY_MISSING: "Some containers have no dated cancellation or status history; their earlier eligibility requires review.",
-        HISTORICAL_OTW_LEGACY_OFFLOAD: "A container offload uses a legacy cumulative stock record because individual receipt events are missing.",
-        HISTORICAL_OTW_PLANNED_WEIGHT_MISSING: "Some containers have no reliable planned weight, so their historical OTW amount cannot be calculated.",
-        HISTORICAL_OTW_RECEIPTS_EXCEED_PLAN: "Dated receipts exceed their container's currently recorded planned weight.",
-        HISTORICAL_OTW_GOODS_RATE_UNVERSIONED: "A container lacks an original per-kg goods rate; its current final-payable amount was used provisionally.",
-        HISTORICAL_OTW_CHARGES_UNVERSIONED: "Older container freight/commission/charges are not versioned; outstanding amounts use a provisional proportional allocation.",
-        HISTORICAL_OTW_MASTER_VALUES_UNVERSIONED: "Historical container planned quantities and source price edits are not fully versioned.",
-        HISTORICAL_ORDER_LIFECYCLE_UNVERSIONED: "Some older orders lack dated loading/verification status transitions and cannot be included reliably.",
-        HISTORICAL_ORDER_BACKDATED_VERIFICATION_UNPROVEN: "Some order verification dates were entered retrospectively, but no corresponding event recorded by the selected day remains.",
+        HISTORICAL_STOCK_SELLING_PRICE_UNVERSIONED:
+          "Historical selling prices are not versioned; the selling-price view uses today's catalogue prices.",
+        HISTORICAL_STOCK_COST_EDITS_NOT_VERSIONED:
+          "Stock In Hand uses the current catalogue production prices, as today's report does; earlier catalogue price edits are not versioned.",
+        HISTORICAL_WIP_BALE_LIFECYCLE_UNVERSIONED:
+          "Balance on Table may include earlier baled weight whose subsequent removal/repacking cannot be timed from legacy status-only records.",
+        HISTORICAL_OTW_STATUS_HISTORY_MISSING:
+          "Some containers have no dated cancellation or status history; their earlier eligibility requires review.",
+        HISTORICAL_OTW_LEGACY_OFFLOAD:
+          "A container offload uses a legacy cumulative stock record because individual receipt events are missing.",
+        HISTORICAL_OTW_PLANNED_WEIGHT_MISSING:
+          "Some containers have no reliable planned weight, so their historical OTW amount cannot be calculated.",
+        HISTORICAL_OTW_RECEIPTS_EXCEED_PLAN:
+          "Dated receipts exceed their container's currently recorded planned weight.",
+        HISTORICAL_OTW_GOODS_RATE_UNVERSIONED:
+          "A container lacks an original per-kg goods rate; its current final-payable amount was used provisionally.",
+        HISTORICAL_OTW_CHARGES_UNVERSIONED:
+          "Older container freight/commission/charges are not versioned; outstanding amounts use a provisional proportional allocation.",
+        HISTORICAL_OTW_MASTER_VALUES_UNVERSIONED:
+          "Historical container planned quantities and source price edits are not fully versioned.",
+        HISTORICAL_ORDER_LIFECYCLE_UNVERSIONED:
+          "Some older orders lack dated loading/verification status transitions and cannot be included reliably.",
+        HISTORICAL_ORDER_BACKDATED_VERIFICATION_UNPROVEN:
+          "Some order verification dates were entered retrospectively, but no corresponding event recorded by the selected day remains.",
         HISTORICAL_ORDER_FINALIZATION_MISSING: "Some finalized orders have no trustworthy finalization timestamp.",
-        HISTORICAL_ORDER_RESTORE_TIME_UNKNOWN: "Some bale scans were restored without a separately dated restoration event.",
+        HISTORICAL_ORDER_RESTORE_TIME_UNKNOWN:
+          "Some bale scans were restored without a separately dated restoration event.",
         HISTORICAL_ORDER_SCAN_TIME_MISSING: "Older bale scans with no timestamp cannot be assigned to a prior day.",
-        HISTORICAL_ORDER_CHARGES_UNVERSIONED: "Order freight and charges lack creation/version timestamps, so historical scan totals exclude these unproven charges.",
-        HISTORICAL_ORDER_SCAN_PRICE_EDITS_UNVERSIONED: "An earlier scanned bale's price may have been edited without retaining the original version.",
+        HISTORICAL_ORDER_CHARGES_UNVERSIONED:
+          "Order freight and charges lack creation/version timestamps, so historical scan totals exclude these unproven charges.",
+        HISTORICAL_ORDER_SCAN_PRICE_EDITS_UNVERSIONED:
+          "An earlier scanned bale's price may have been edited without retaining the original version.",
       };
       Object.assign(inventoryWarningText, {
-        HISTORICAL_WORKER_ADVANCE_EDITS_UNVERSIONED: "Historical worker advances are reconstructed from original amounts and dated repayments; edits and deleted repayments may not be fully recoverable.",
-        HISTORICAL_RENT_EXPECTED_AMOUNTS_UNVERSIONED: "Historical rent expected amounts can have been edited without retaining original values.",
-        HISTORICAL_RENT_CONTRACT_STATUS_UNVERSIONED: "Contract status changes lack a full timeline; earlier activity of now-expired contracts is estimated from recorded dates.",
-        HISTORICAL_RENT_VOID_DATE_UNAVAILABLE: "Rental payment void times are unavailable; their previous posting history may be incomplete.",
-        HISTORICAL_RENT_POSTING_TIMESTAMP_MISSING: "Older posted rent payments lack posting timestamps; the creation date is used provisionally.",
-        HISTORICAL_LEDGER_OPENINGS_UNVERSIONED: "Historical asset, deposit and loan account opening balances/types lack full version history.",
+        HISTORICAL_WORKER_ADVANCE_EDITS_UNVERSIONED:
+          "Historical worker advances are reconstructed from original amounts and dated repayments; edits and deleted repayments may not be fully recoverable.",
+        HISTORICAL_RENT_EXPECTED_AMOUNTS_UNVERSIONED:
+          "Historical rent expected amounts can have been edited without retaining original values.",
+        HISTORICAL_RENT_CONTRACT_STATUS_UNVERSIONED:
+          "Contract status changes lack a full timeline; earlier activity of now-expired contracts is estimated from recorded dates.",
+        HISTORICAL_RENT_VOID_DATE_UNAVAILABLE:
+          "Rental payment void times are unavailable; their previous posting history may be incomplete.",
+        HISTORICAL_RENT_POSTING_TIMESTAMP_MISSING:
+          "Older posted rent payments lack posting timestamps; the creation date is used provisionally.",
+        HISTORICAL_LEDGER_OPENINGS_UNVERSIONED:
+          "Historical asset, deposit and loan account opening balances/types lack full version history.",
       });
       res.json({
         ...datedBody,
@@ -934,12 +1006,13 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         historyWarnings: asOfContext.isHistorical
           ? [
               "Historical category reconstruction remains partial until all operational and financial events are reconciled.",
-              ...inventoryHistoryWarnings.map(code => inventoryWarningText[code] ?? code),
-              ...(historicalPipeline?.warnings ?? []).map(code => inventoryWarningText[code] ?? code),
-              ...(historicalAssets?.warnings ?? []).map(code => inventoryWarningText[code] ?? code),
+              ...inventoryHistoryWarnings.map((code) => inventoryWarningText[code] ?? code),
+              ...(historicalPipeline?.warnings ?? []).map((code) => inventoryWarningText[code] ?? code),
+              ...(historicalAssets?.warnings ?? []).map((code) => inventoryWarningText[code] ?? code),
               inventoryWarningText.HISTORICAL_LEDGER_OPENINGS_UNVERSIONED,
-              ...(historyCoverage?.gaps ?? []).map(gap =>
-                `${gap.category}: ${gap.explanation} (${gap.records} record${gap.records === 1 ? "" : "s"})`),
+              ...(historyCoverage?.gaps ?? []).map(
+                (gap) => `${gap.category}: ${gap.explanation} (${gap.records} record${gap.records === 1 ? "" : "s"})`
+              ),
             ]
           : [],
       });
@@ -948,10 +1021,13 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         return res.status(error.status).json({ code: error.code, message: error.message });
       }
       logger.error("Factory net-position error:", { error: error });
-      if (error instanceof Error && error.message.startsWith("HISTORICAL_")) {
+      if (historicalRequest || (error instanceof Error && error.message.startsWith("HISTORICAL_"))) {
+        const fxMissing = error instanceof Error && error.message.startsWith("Missing confirmed USD exchange rate");
         return res.status(503).json({
           code: "HISTORICAL_NET_POSITION_UNAVAILABLE",
-          message: "The historical snapshot could not be constructed. No current-day balance was substituted.",
+          message:
+            "The historical snapshot could not be constructed. No current-day balance was substituted." +
+            (fxMissing ? ` ${(error as Error).message} known by the selected date.` : ""),
         });
       }
       res.status(500).json({ message: getErrorMessage(error) });

@@ -8,7 +8,7 @@ import { resolveFactoryNetPositionAsOf } from "../../../services/factory/netPosi
 import { loadFactoryNetPositionEmployees } from "../../../services/factory/netPositionEmployees";
 
 import { factoryWorkers, employees } from "@shared/schema";
-import { eq, and, sql, isNull } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { sqlArray } from "../../../lib/sqlArray";
 import { resultRows } from "../../../lib/queryResult";
 import { MoneyDecimal, sumMoney, toMoney } from "../../../lib/money";
@@ -22,9 +22,19 @@ export function registerEmployeeAttendanceRoutes(app: Express) {
       const scope = await resolveFactoryNetPositionAsOf(Number(companyId), req.query.asOf);
       const rows = await loadFactoryNetPositionEmployees(Number(companyId), scope);
       const result = rows
-        .filter(employee => employee.balance > 0)
-        .map(employee => ({ id: employee.id, name: employee.name, code: employee.code, balance: employee.balance }));
-      res.json({ employees: result, asOf: scope.asOf, historyCompleteness: scope.isHistorical ? "partial" : "current" });
+        .filter((employee) => employee.balance > 0)
+        .map((employee) => ({
+          id: employee.id,
+          name: employee.name,
+          code: employee.code ?? "",
+          balance: employee.balance,
+        }));
+      res.json({
+        employees: result,
+        companyId: Number(companyId),
+        asOf: scope.asOf,
+        historyCompleteness: scope.isHistorical ? "partial" : "current",
+      });
     } catch (error: unknown) {
       if (error instanceof FactoryNetPositionDateError) {
         return res.status(error.status).json({ code: error.code, message: error.message });

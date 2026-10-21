@@ -72,8 +72,23 @@ export default function FactoryNetPosition() {
       <div className="p-6">
         <div className="flex items-center gap-2 text-destructive">
           <AlertCircle className="h-5 w-5" />
-          <p>Failed to load net position data.</p>
+          <p>
+            {isToday
+              ? "Failed to load net position data."
+              : `The snapshot for ${formatDateLabel(asOf)} could not be built. No current balance was substituted.`}
+          </p>
         </div>
+        {!isToday && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-3"
+            onClick={() => setAsOf("")}
+            data-testid="button-error-back-today"
+          >
+            Back to today
+          </Button>
+        )}
       </div>
     );
   }
@@ -157,15 +172,15 @@ export default function FactoryNetPosition() {
             </Button>
           )}
           <Button
-              variant="outline"
-              size="sm"
-              onClick={() => refetch()}
-              disabled={isFetching}
-              data-testid="button-refresh"
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? "animate-spin" : ""}`} />
-              Refresh
-            </Button>
+            variant="outline"
+            size="sm"
+            onClick={() => refetch()}
+            disabled={isFetching}
+            data-testid="button-refresh"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
         </div>
       </div>
 
@@ -182,9 +197,13 @@ export default function FactoryNetPosition() {
             {data?.historyWarnings?.[0] || "Historical reconstruction is in progress; current-state values may remain."}
             {!!data?.historyWarnings?.slice(1).length && (
               <details className="mt-1">
-                <summary className="cursor-pointer">Historical data limitations ({data.historyWarnings.length - 1})</summary>
+                <summary className="cursor-pointer">
+                  Historical data limitations ({data.historyWarnings.length - 1})
+                </summary>
                 <ul className="list-disc pl-5 mt-1 space-y-1">
-                  {data.historyWarnings.slice(1).map((warning, index) => <li key={index}>{warning}</li>)}
+                  {data.historyWarnings.slice(1).map((warning, index) => (
+                    <li key={index}>{warning}</li>
+                  ))}
                 </ul>
               </details>
             )}

@@ -17,8 +17,13 @@ export function CustomNetPositionView({ data }: { data: NetPositionData }) {
   const [hiddenKeys, setHiddenKeys] = useState<Set<string>>(() => loadCustomViewHidden(companyId));
 
   const allAccounts = useMemo<CustomViewAccount[]>(() => {
-    const accountKey = (side: "forUs" | "onUs", rows: typeof data.forUs.accounts, a: typeof rows[number], index: number) =>
-      rows.filter(row => row.name === a.name).length > 1
+    const accountKey = (
+      side: "forUs" | "onUs",
+      rows: NetPositionData["forUs"]["accounts"],
+      a: (typeof rows)[number],
+      index: number
+    ) =>
+      rows.filter((row) => row.name === a.name).length > 1
         ? `${side}:${a.id != null ? `ledger:${a.id}` : `${a.code}:${a.name}:${index}`}`
         : `${side}:${a.name}`;
     const forUsRows = data.forUs.accounts ?? [];
@@ -42,15 +47,18 @@ export function CustomNetPositionView({ data }: { data: NetPositionData }) {
     return [...forUs, ...onUs];
   }, [data.forUs.accounts, data.onUs.accounts]);
 
-  const toggle = useCallback((key: string) => {
-    setHiddenKeys((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      saveCustomViewHidden(next, companyId);
-      return next;
-    });
-  }, [companyId]);
+  const toggle = useCallback(
+    (key: string) => {
+      setHiddenKeys((prev) => {
+        const next = new Set(prev);
+        if (next.has(key)) next.delete(key);
+        else next.add(key);
+        saveCustomViewHidden(next, companyId);
+        return next;
+      });
+    },
+    [companyId]
+  );
 
   const resetAll = useCallback(() => {
     const empty = new Set<string>();
@@ -68,7 +76,7 @@ export function CustomNetPositionView({ data }: { data: NetPositionData }) {
   );
   const customNet = visibleForUsTotal - visibleOnUsTotal;
   const netPositive = customNet >= 0;
-  const hiddenCount = allAccounts.filter(a => hiddenKeys.has(a.key)).length;
+  const hiddenCount = allAccounts.filter((a) => hiddenKeys.has(a.key)).length;
   const visibleCount = allAccounts.filter((a) => !hiddenKeys.has(a.key)).length;
 
   return (
