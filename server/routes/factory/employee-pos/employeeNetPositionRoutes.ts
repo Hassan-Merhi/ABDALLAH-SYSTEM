@@ -825,6 +825,20 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       const inventoryHistoryWarnings: string[] = asOfContext.isHistorical
         ? ((datedBody as typeof responseBody & { inventoryHistoryWarnings?: string[] }).inventoryHistoryWarnings ?? [])
         : [];
+      const inventoryWarningText: Record<string, string> = {
+        HISTORICAL_RAW_UNPRICED_RECEIPT: "Some older raw-material receipts have no confirmed historical USD unit cost.",
+        HISTORICAL_RAW_ADJUSTMENT_BASIS_MISSING: "Some older raw-material additions lack a recorded valuation basis.",
+        HISTORICAL_RAW_CONSUMPTION_EXCEEDS_RECEIPTS: "Recorded material consumption exceeds available dated receipt history.",
+        HISTORICAL_RAW_LEGACY_RECEIPT_FALLBACK: "Some material receipts use legacy cumulative records instead of individual receipt events.",
+        HISTORICAL_RAW_LEGACY_DEDUCT_MUTATED_RECEIPT: "A legacy raw-material deduction changed a cumulative receipt; its earlier quantity needs audit reconstruction.",
+        HISTORICAL_RAW_SOURCE_OWNER_UNKNOWN: "Some historic mix materials cannot be assigned reliably to their original supplier.",
+        HISTORICAL_RAW_NEGATIVE_MOVEMENT: "An invalid negative material movement needs historical review.",
+        HISTORICAL_STOCK_SCAN_TIME_MISSING: "Some older bale scans have no reliable scan timestamp.",
+        HISTORICAL_STOCK_FINALIZATION_TIME_MISSING: "Some finalized/sold bales do not have a recorded finalization time.",
+        HISTORICAL_STOCK_REMOVAL_TIME_UNKNOWN: "Some removed/repacked bales have no reliable removal or repack time.",
+        HISTORICAL_STOCK_SELLING_PRICE_UNVERSIONED: "Historical selling prices are not versioned; the selling-price view uses today's catalogue prices.",
+        HISTORICAL_STOCK_COST_EDITS_NOT_VERSIONED: "Earlier bale costs may have been edited or re-costed without a retained historical price version.",
+      };
       res.json({
         ...datedBody,
         businessToday: asOfContext.businessToday,
@@ -834,7 +848,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         historyWarnings: asOfContext.isHistorical
           ? [
               "Historical category reconstruction remains partial until all operational and financial events are reconciled.",
-              ...inventoryHistoryWarnings,
+              ...inventoryHistoryWarnings.map(code => inventoryWarningText[code] ?? code),
             ]
           : [],
       });
