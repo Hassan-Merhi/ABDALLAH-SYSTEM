@@ -47,6 +47,19 @@ describe("Historical order status cutoffs", () => {
     })).toBe("VERIFIED");
   });
 
+  it("requires evidence that a pending status already existed on the selected date", () => {
+    expect(orderStageAt({
+      created: true, loadingStarted: false, verified: false,
+      invoiced: false, currentStatus: "PENDING_VERIFICATION",
+      currentStateKnown: false,
+    })).toBe("UNKNOWN");
+    expect(orderStageAt({
+      created: true, loadingStarted: false, verified: false,
+      invoiced: false, currentStatus: "PENDING_VERIFICATION",
+      currentStateKnown: true,
+    })).toBe("PENDING_VERIFICATION");
+  });
+
   it("refuses to infer missing transitions from today's verified status", () => {
     expect(orderStageAt({
       created: true, loadingStarted: false, verified: false,
