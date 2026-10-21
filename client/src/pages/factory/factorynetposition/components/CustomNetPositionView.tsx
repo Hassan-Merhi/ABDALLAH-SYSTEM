@@ -16,16 +16,22 @@ export function CustomNetPositionView({ data }: { data: NetPositionData }) {
   const [hiddenKeys, setHiddenKeys] = useState<Set<string>>(() => loadCustomViewHidden());
 
   const allAccounts = useMemo<CustomViewAccount[]>(() => {
-    const forUs = (data.forUs.accounts ?? []).map((a) => ({
-      key: `forUs:${a.name}`,
+    const accountKey = (side: "forUs" | "onUs", rows: typeof data.forUs.accounts, a: typeof rows[number], index: number) =>
+      rows.filter(row => row.name === a.name).length > 1
+        ? `${side}:${a.id != null ? `ledger:${a.id}` : `${a.code}:${a.name}:${index}`}`
+        : `${side}:${a.name}`;
+    const forUsRows = data.forUs.accounts ?? [];
+    const onUsRows = data.onUs.accounts ?? [];
+    const forUs = forUsRows.map((a, index) => ({
+      key: accountKey("forUs", forUsRows, a, index),
       name: a.name,
       code: a.code,
       category: a.category,
       value: a.value,
       side: "forUs" as const,
     }));
-    const onUs = (data.onUs.accounts ?? []).map((a) => ({
-      key: `onUs:${a.name}`,
+    const onUs = onUsRows.map((a, index) => ({
+      key: accountKey("onUs", onUsRows, a, index),
       name: a.name,
       code: a.code,
       category: a.category,
@@ -61,7 +67,7 @@ export function CustomNetPositionView({ data }: { data: NetPositionData }) {
   );
   const customNet = visibleForUsTotal - visibleOnUsTotal;
   const netPositive = customNet >= 0;
-  const hiddenCount = hiddenKeys.size;
+  const hiddenCount = allAccounts.filter(a => hiddenKeys.has(a.key)).length;
   const visibleCount = allAccounts.filter((a) => !hiddenKeys.has(a.key)).length;
 
   return (
