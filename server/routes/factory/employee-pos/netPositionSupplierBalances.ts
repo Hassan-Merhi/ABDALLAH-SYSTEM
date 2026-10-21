@@ -55,8 +55,14 @@ export async function computeNetPositionSupplierBalances(
   const suppliersList = await db
     .select()
     .from(factorySuppliers)
-    .where(and(eq(factorySuppliers.companyId, ctx.companyId),
-      ctx.knownAt ? netPositionRecordedThrough(sql`${factorySuppliers.createdAt}`, ctx.knownAt, "utc-naive-timestamp") : sql`TRUE`))
+    .where(
+      and(
+        eq(factorySuppliers.companyId, ctx.companyId),
+        ctx.knownAt
+          ? netPositionRecordedThrough(sql`${factorySuppliers.createdAt}`, ctx.knownAt, "utc-naive-timestamp")
+          : sql`TRUE`
+      )
+    )
     .orderBy(factorySuppliers.name);
 
   // Authoritative locked rate (USD) per supplier — same map rawStockReceiptRoutes.ts
@@ -80,8 +86,12 @@ export async function computeNetPositionSupplierBalances(
     .where(
       and(
         eq(factoryContainers.companyId, ctx.companyId),
-        ctx.knownAt ? sql`(${factoryContainers.deletedAt} IS NULL OR NOT ${netPositionRecordedThrough(sql`${factoryContainers.deletedAt}`, ctx.knownAt, "utc-naive-timestamp")})` : isNull(factoryContainers.deletedAt),
-        ctx.knownAt ? netPositionRecordedThrough(sql`${factoryContainers.createdAt}`, ctx.knownAt, "utc-naive-timestamp") : sql`DATE(${factoryContainers.createdAt}) <= ${ctx.asOf}::date`
+        ctx.knownAt
+          ? sql`(${factoryContainers.deletedAt} IS NULL OR NOT ${netPositionRecordedThrough(sql`${factoryContainers.deletedAt}`, ctx.knownAt, "utc-naive-timestamp")})`
+          : isNull(factoryContainers.deletedAt),
+        ctx.knownAt
+          ? netPositionRecordedThrough(sql`${factoryContainers.createdAt}`, ctx.knownAt, "utc-naive-timestamp")
+          : sql`DATE(${factoryContainers.createdAt}) <= ${ctx.asOf}::date`
       )
     );
 

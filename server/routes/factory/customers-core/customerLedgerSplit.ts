@@ -43,7 +43,7 @@ export async function getCustomerLedgerAndMemo(
   companyId: number,
   ids: readonly number[],
   asOf?: string | null,
-  knownAt?: FactoryNetPositionAsOf,
+  knownAt?: FactoryNetPositionAsOf
 ): Promise<Map<number, CustomerLedgerAndMemo>> {
   const out = new Map<number, CustomerLedgerAndMemo>();
   if (ids.length === 0) return out;

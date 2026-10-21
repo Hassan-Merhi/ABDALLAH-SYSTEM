@@ -51,7 +51,11 @@ import { MoneyDecimal, toMoney } from "../../../lib/money";
 import { defaultOpeningSide } from "./openingSide";
 import { customerLinksBody, intLiteral, noNonCustomerTarget } from "./partyLineRules";
 import type { FactoryNetPositionAsOf } from "@shared/factoryNetPositionAsOf";
-import { netPositionKnownTransactionThrough, netPositionRecordedThrough } from "../../factory/netPositionAsOf";
+import {
+  netPositionKnownTransactionThrough,
+  netPositionRecordedThrough,
+  netPositionVoucherEntryKnown,
+} from "../../factory/netPositionAsOf";
 import { loadPartyMemoLines, memoTotal, type PartyBalanceMemoLine, type MemoPartyKind } from "./unpostedMemo";
 import { notFiscalClosingVoucher } from "./periodReportRules";
 
@@ -179,7 +183,7 @@ async function loadLines(executor: DatabaseOrTransaction, scope: BalanceScope) {
   const postedCut = scope.knownAt
     ? sql`v.company_id = ${companyId} AND v.optional = false
            AND ${netPositionKnownTransactionThrough(VOUCHER_BOOKED_ON, sql`v.created_at`, scope.knownAt, "utc-naive-timestamp")}
-           AND ${netPositionRecordedThrough(sql`ve.created_at`, scope.knownAt, "utc-naive-timestamp")}
+           AND ${netPositionVoucherEntryKnown(sql`ve.created_at`, sql`ve.voucher_id`, scope.knownAt)}
            AND (v.deleted_at IS NULL OR NOT ${netPositionRecordedThrough(sql`v.deleted_at`, scope.knownAt, "utc-naive-timestamp")})`
     : liveVouchersOf(companyId, scope.asOf);
   const result = await executor.execute<RawLineRow & Record<string, unknown>>(sql`
@@ -258,8 +262,12 @@ async function loadOpenings(executor: DatabaseOrTransaction, scope: BalanceScope
       SELECT 'employee', e.id, e.code, TRIM(CONCAT(e.first_name, ' ', e.last_name)), 'Employee',
              (e.deleted_at IS NOT NULL), NULL, e.opening_balance::text, e.opening_balance_side::text
         FROM employees e WHERE e.company_id = ${companyId}
-          ${scope.knownAt ? sql`AND e.join_date <= ${scope.knownAt.asOf}::date
-          AND ${netPositionRecordedThrough(sql`e.created_at`, scope.knownAt, "utc-naive-timestamp")}` : sql``}
+          ${
+            scope.knownAt
+              ? sql`AND e.join_date <= ${scope.knownAt.asOf}::date
+          AND ${netPositionRecordedThrough(sql`e.created_at`, scope.knownAt, "utc-naive-timestamp")}`
+              : sql``
+          }
       UNION ALL
       SELECT 'factorySupplier', fs.id, NULL, fs.name, 'Factory Supplier', false, NULL, fs.opening_balance::text, NULL
         FROM factory_suppliers fs WHERE fs.company_id = ${companyId}
@@ -460,7 +468,13 @@ async function attachMemoLines(
   parties: PartyBalance[]
 ): Promise<void> {
   const ids = parties.map((party) => party.id).filter((id): id is number => id !== null);
-  const memo = await loadPartyMemoLines(executor, { companyId: query.companyId, kind, ids, asOf: query.asOf, knownAt: query.knownAt });
+  const memo = await loadPartyMemoLines(executor, {
+    companyId: query.companyId,
+    kind,
+    ids,
+    asOf: query.asOf,
+    knownAt: query.knownAt,
+  });
   for (const party of parties) {
     const lines = party.id === null ? [] : (memo.get(party.id) ?? []);
     party.memoLines = lines;

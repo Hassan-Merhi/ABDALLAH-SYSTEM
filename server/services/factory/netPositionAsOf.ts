@@ -17,7 +17,7 @@ export async function resolveFactoryNetPositionAsOf(
   companyId: number,
   requestedAsOf: unknown,
   executor: DatabaseOrTransaction = db,
-  now: Date = new Date(),
+  now: Date = new Date()
 ): Promise<FactoryNetPositionAsOf> {
   const [settings] = await executor
     .select({ timezone: companySettings.timezone })
@@ -53,7 +53,7 @@ export function netPositionEffectiveThrough(bookedOn: SQL, scope: FactoryNetPosi
 export function netPositionRecordedThrough(
   recordedAt: SQL,
   scope: FactoryNetPositionAsOf,
-  storedAs: "timestamptz" | "utc-naive-timestamp",
+  storedAs: "timestamptz" | "utc-naive-timestamp"
 ): SQL {
   const nextBusinessDayInstant = sql`((${scope.asOf}::date + INTERVAL '1 day') AT TIME ZONE ${scope.timeZone})`;
   return storedAs === "timestamptz"
@@ -66,7 +66,22 @@ export function netPositionKnownTransactionThrough(
   bookedOn: SQL,
   recordedAt: SQL,
   scope: FactoryNetPositionAsOf,
-  storedAs: "timestamptz" | "utc-naive-timestamp",
+  storedAs: "timestamptz" | "utc-naive-timestamp"
 ): SQL {
   return sql`(${netPositionEffectiveThrough(bookedOn, scope)} AND ${netPositionRecordedThrough(recordedAt, scope, storedAs)})`;
+}
+
+/**
+ * A voucher line counts when it was recorded by the cutoff, or when its
+ * voucher has NO line recorded by then: editing a voucher deletes and
+ * re-inserts every line, and the voucher (filtered separately on its own
+ * created_at) must not vanish from the dates between creation and edit.
+ * Lines appended to a voucher that already had lines stay excluded. The
+ * re-inserted lines carry the edited amounts; there is no prior version.
+ */
+export function netPositionVoucherEntryKnown(entryCreatedAt: SQL, voucherId: SQL, scope: FactoryNetPositionAsOf): SQL {
+  return sql`(${netPositionRecordedThrough(entryCreatedAt, scope, "utc-naive-timestamp")}
+    OR NOT EXISTS (SELECT 1 FROM voucher_entries known_ve
+                    WHERE known_ve.voucher_id = ${voucherId}
+                      AND ${netPositionRecordedThrough(sql`known_ve.created_at`, scope, "utc-naive-timestamp")}))`;
 }

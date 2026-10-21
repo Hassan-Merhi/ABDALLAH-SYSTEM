@@ -17,7 +17,11 @@ import type { FactoryNetPositionAsOf } from "@shared/factoryNetPositionAsOf";
 import { db } from "../../db";
 import { MoneyDecimal, toMoney } from "../../lib/money";
 import { resultRows } from "../../lib/queryResult";
-import { netPositionKnownTransactionThrough, netPositionRecordedThrough } from "./netPositionAsOf";
+import {
+  netPositionKnownTransactionThrough,
+  netPositionRecordedThrough,
+  netPositionVoucherEntryKnown,
+} from "./netPositionAsOf";
 
 export interface FactoryNetPositionEmployee {
   id: number;
@@ -28,19 +32,28 @@ export interface FactoryNetPositionEmployee {
 
 export async function loadFactoryNetPositionEmployees(
   companyId: number,
-  scope: FactoryNetPositionAsOf,
+  scope: FactoryNetPositionAsOf
 ): Promise<FactoryNetPositionEmployee[]> {
   if (!scope.isHistorical) {
-    const rows = await db.select({
-      id: employees.id, firstName: employees.firstName, lastName: employees.lastName,
-      code: employees.code, currentBalance: employees.currentBalance,
-    }).from(employees).where(and(
-      eq(employees.companyId, companyId),
-      eq(employees.employeeType, "Employee"),
-      eq(employees.active, true),
-      isNull(employees.deletedAt),
-    ));
-    return rows.map(e => ({
+    const rows = await db
+      .select({
+        id: employees.id,
+        firstName: employees.firstName,
+        lastName: employees.lastName,
+        code: employees.code,
+        currentBalance: employees.currentBalance,
+      })
+      .from(employees)
+      .where(
+        and(
+          eq(employees.companyId, companyId),
+          eq(employees.employeeType, "Employee"),
+          eq(employees.active, true),
+          isNull(employees.deletedAt)
+        )
+      )
+      .orderBy(employees.firstName, employees.lastName, employees.id);
+    return rows.map((e) => ({
       id: e.id,
       name: [e.firstName, e.lastName].filter(Boolean).join(" ").trim(),
       code: e.code,
@@ -50,16 +63,23 @@ export async function loadFactoryNetPositionEmployees(
 
   const voucherKnown = netPositionKnownTransactionThrough(
     sql`COALESCE(v.effective_date, v.voucher_date)`,
-    sql`v.created_at`, scope, "utc-naive-timestamp",
+    sql`v.created_at`,
+    scope,
+    "utc-naive-timestamp"
   );
-  const entryKnown = netPositionRecordedThrough(sql`ve.created_at`, scope, "utc-naive-timestamp");
+  const entryKnown = netPositionVoucherEntryKnown(sql`ve.created_at`, sql`ve.voucher_id`, scope);
   const employeeKnown = netPositionRecordedThrough(sql`e.created_at`, scope, "utc-naive-timestamp");
   const employeeNotYetDeleted = sql`(e.deleted_at IS NULL OR NOT ${netPositionRecordedThrough(sql`e.deleted_at`, scope, "utc-naive-timestamp")})`;
 
   const rows = resultRows<{
-    id: number; first_name: string; last_name: string; code: string;
-    opening: string; movement: string;
-  }>(await db.execute(sql`
+    id: number;
+    first_name: string;
+    last_name: string;
+    code: string;
+    opening: string;
+    movement: string;
+  }>(
+    await db.execute(sql`
     WITH eligible_entries AS (
       SELECT COALESCE(ve.employee_id, legacy_employee.id) AS employee_id,
              COALESCE(ve.credit_amount, 0)::numeric - COALESCE(ve.debit_amount, 0)::numeric AS movement
@@ -90,17 +110,19 @@ export async function loadFactoryNetPositionEmployees(
       LEFT JOIN sums ON sums.employee_id = e.id
      WHERE e.company_id = ${companyId}
        AND e.employee_type = 'Employee'
+       -- Same population as today: the active flag has no dated history.
+       AND e.active = true
        AND e.join_date <= ${scope.asOf}::date
        AND ${employeeKnown}
        AND ${employeeNotYetDeleted}
      ORDER BY e.first_name, e.last_name, e.id
-  `));
+  `)
+  );
 
-  return rows.map(e => ({
+  return rows.map((e) => ({
     id: Number(e.id),
     name: [e.first_name, e.last_name].filter(Boolean).join(" ").trim(),
     code: e.code,
-    balance: toMoney(e.opening).plus(toMoney(e.movement))
-      .toDecimalPlaces(2, MoneyDecimal.ROUND_HALF_UP).toNumber(),
+    balance: toMoney(e.opening).plus(toMoney(e.movement)).toDecimalPlaces(2, MoneyDecimal.ROUND_HALF_UP).toNumber(),
   }));
 }

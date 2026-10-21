@@ -3,12 +3,8 @@
  * Claude performs CI, runtime validation, and DB reconciliation in Phase 9.
  */
 import { describe, expect, it } from "vitest";
-import {
-  summarizeHistoricalEvidence,
-} from "../server/services/factory/netPositionHistoryCoverage";
-import {
-  assertHistoricalReportIntegrity,
-} from "../server/services/factory/netPositionHistoricalIntegrity";
+import { summarizeHistoricalEvidence } from "../server/services/factory/netPositionHistoryCoverage";
+import { assertHistoricalReportIntegrity } from "../server/services/factory/netPositionHistoricalIntegrity";
 import type { FactoryNetPositionAsOf } from "../shared/factoryNetPositionAsOf";
 
 const scope: FactoryNetPositionAsOf = {
@@ -20,15 +16,25 @@ const scope: FactoryNetPositionAsOf = {
 };
 
 const emptyEvidence = () => ({
-  legacy_raw: "0", missing_receipt_rate: "0",
-  missing_scan_time: "0", ambiguous_restoration: "0",
-  missing_bale_finalization: "0", edited_container_master: "0",
-  backdated_fx: "0", missing_rent_posted_at: "0",
-  mutable_ledger_opening: "0", unowned_mix_sources: "0",
+  legacy_raw: "0",
+  missing_receipt_rate: "0",
+  missing_scan_time: "0",
+  ambiguous_restoration: "0",
+  missing_bale_finalization: "0",
+  edited_container_master: "0",
+  backdated_fx: "0",
+  missing_rent_posted_at: "0",
+  mutable_ledger_opening: "0",
+  unowned_mix_sources: "0",
+  rewritten_vouchers: "0",
+  rewritten_mix_batches: "0",
 });
 
 const row = (code: string, value: number, category = "Asset") => ({
-  name: code, code, category, value,
+  name: code,
+  code,
+  category,
+  value,
 });
 
 const validReport = () => ({
@@ -47,10 +53,7 @@ const validReport = () => ({
   onUs: {
     total: 45,
     breakdown: [{ name: "Supplier", value: 45 }],
-    accounts: [
-      row("SUPPLIER", 20, "Supplier"),
-      row("EMPLOYEE_PAYROLL_PAYABLE", 25, "Supplier"),
-    ],
+    accounts: [row("SUPPLIER", 20, "Supplier"), row("EMPLOYEE_PAYROLL_PAYABLE", 25, "Supplier")],
   },
   forUsTotal: 125,
   onUsTotal: 45,
@@ -86,7 +89,7 @@ describe("Phase 8 historical source completeness", () => {
       missing_scan_time: "8",
       backdated_fx: "1",
     });
-    expect(result.gaps.map(g => [g.code, g.records])).toEqual([
+    expect(result.gaps.map((g) => [g.code, g.records])).toEqual([
       ["HISTORICAL_COVERAGE_LEGACY_RAW", 3],
       ["HISTORICAL_COVERAGE_UNDATED_SCANS", 8],
       ["HISTORICAL_COVERAGE_BACKDATED_FX", 1],
@@ -95,15 +98,24 @@ describe("Phase 8 historical source completeness", () => {
   });
 
   it("fails closed for a negative, null, or invalid count, never hiding them as zero", () => {
-    expect(() => summarizeHistoricalEvidence(scope, {
-      ...emptyEvidence(), legacy_raw: -1,
-    })).toThrow("HISTORICAL_COVERAGE_COUNT_INVALID");
-    expect(() => summarizeHistoricalEvidence(scope, {
-      ...emptyEvidence(), missing_scan_time: "not-a-number",
-    })).toThrow("HISTORICAL_COVERAGE_COUNT_INVALID");
-    expect(() => summarizeHistoricalEvidence(scope, {
-      ...emptyEvidence(), backdated_fx: null,
-    } as never)).toThrow("HISTORICAL_COVERAGE_COUNT_INVALID");
+    expect(() =>
+      summarizeHistoricalEvidence(scope, {
+        ...emptyEvidence(),
+        legacy_raw: -1,
+      })
+    ).toThrow("HISTORICAL_COVERAGE_COUNT_INVALID");
+    expect(() =>
+      summarizeHistoricalEvidence(scope, {
+        ...emptyEvidence(),
+        missing_scan_time: "not-a-number",
+      })
+    ).toThrow("HISTORICAL_COVERAGE_COUNT_INVALID");
+    expect(() =>
+      summarizeHistoricalEvidence(scope, {
+        ...emptyEvidence(),
+        backdated_fx: null,
+      } as never)
+    ).toThrow("HISTORICAL_COVERAGE_COUNT_INVALID");
   });
 });
 
@@ -121,26 +133,22 @@ describe("Phase 8 read-only historical report integrity", () => {
   it("requires the verified order account and independently scoped order detail to match", () => {
     const report = validReport();
     report.verifiedOrders = [{ grandTotal: 12 }];
-    expect(() => assertHistoricalReportIntegrity(report))
-      .toThrow("HISTORICAL_INTEGRITY_MISMATCH:verifiedOrderDetails");
+    expect(() => assertHistoricalReportIntegrity(report)).toThrow("HISTORICAL_INTEGRITY_MISMATCH:verifiedOrderDetails");
   });
 
   it("rejects silent historical supplier and payroll understatements", () => {
     const supplier = validReport();
     supplier.supplierLiabilities = 19;
-    expect(() => assertHistoricalReportIntegrity(supplier))
-      .toThrow("HISTORICAL_INTEGRITY_MISMATCH:supplierPayables");
+    expect(() => assertHistoricalReportIntegrity(supplier)).toThrow("HISTORICAL_INTEGRITY_MISMATCH:supplierPayables");
 
     const payroll = validReport();
     payroll.payrollPayable = 24;
-    expect(() => assertHistoricalReportIntegrity(payroll))
-      .toThrow("HISTORICAL_INTEGRITY_MISMATCH:payroll");
+    expect(() => assertHistoricalReportIntegrity(payroll)).toThrow("HISTORICAL_INTEGRITY_MISMATCH:payroll");
   });
 
   it("rejects category rows that do not reconcile to the top What We Have card", () => {
     const report = validReport();
     report.forUs.breakdown[0].value = 124;
-    expect(() => assertHistoricalReportIntegrity(report))
-      .toThrow("HISTORICAL_INTEGRITY_MISMATCH:assetCategories");
+    expect(() => assertHistoricalReportIntegrity(report)).toThrow("HISTORICAL_INTEGRITY_MISMATCH:assetCategories");
   });
 });

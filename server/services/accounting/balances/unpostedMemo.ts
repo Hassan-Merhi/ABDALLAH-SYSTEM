@@ -149,15 +149,14 @@ function dateCut(column: ReturnType<typeof sql>, asOf: string | null | undefined
  * before `asOf` — in the ledger at that date (wave 17 A). Without `asOf`,
  * every posted voucher counts.
  */
-function bookedBy(
-  alias: "mv" | "cv" | "rv",
-  asOf: string | null | undefined,
-  knownAt?: FactoryNetPositionAsOf,
-) {
-  if (knownAt) return sql` AND ${netPositionKnownTransactionThrough(
-    sql.raw(`COALESCE(${alias}.effective_date, ${alias}.voucher_date)`),
-    sql.raw(`${alias}.created_at`), knownAt, "utc-naive-timestamp"
-  )}`;
+function bookedBy(alias: "mv" | "cv" | "rv", asOf: string | null | undefined, knownAt?: FactoryNetPositionAsOf) {
+  if (knownAt)
+    return sql` AND ${netPositionKnownTransactionThrough(
+      sql.raw(`COALESCE(${alias}.effective_date, ${alias}.voucher_date)`),
+      sql.raw(`${alias}.created_at`),
+      knownAt,
+      "utc-naive-timestamp"
+    )}`;
   if (!asOf) return sql``;
   return sql` AND ${lte(sql.raw(`COALESCE(${alias}.effective_date, ${alias}.voucher_date)`), asOf)}`;
 }
@@ -197,8 +196,15 @@ interface CustomerMemoRow {
 
 async function customerMemoRows(executor: Executor, query: MemoQuery): Promise<CustomerMemoRow[]> {
   const { companyId, ids, asOf, knownAt } = query;
-  const invoiceCreated = knownAt ? sql`AND ${netPositionRecordedThrough(sql`co.created_at`, knownAt, "utc-naive-timestamp")}` : sql``;
-  const cacheCreated = knownAt ? sql`AND ${netPositionRecordedThrough(sql`cb.created_at`, knownAt, "utc-naive-timestamp")}` : sql``;
+  // The invoice exists from its finalization, by the company-local cutoff
+  // (the business-date cut below uses the UTC date of the same timestamp).
+  const invoiceCreated = knownAt
+    ? sql`AND ${netPositionRecordedThrough(sql`co.created_at`, knownAt, "utc-naive-timestamp")}
+          AND (co.finalized_at IS NULL OR ${netPositionRecordedThrough(sql`co.finalized_at`, knownAt, "utc-naive-timestamp")})`
+    : sql``;
+  const cacheCreated = knownAt
+    ? sql`AND ${netPositionRecordedThrough(sql`cb.created_at`, knownAt, "utc-naive-timestamp")}`
+    : sql``;
   const invoiceNotDeleted = knownAt
     ? sql`(co.deleted_at IS NULL OR NOT ${netPositionRecordedThrough(sql`co.deleted_at`, knownAt, "utc-naive-timestamp")})`
     : sql`co.deleted_at IS NULL`;

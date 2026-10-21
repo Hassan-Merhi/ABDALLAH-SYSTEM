@@ -5,7 +5,11 @@
  */
 import { db, type DatabaseOrTransaction } from "../../../../db";
 import type { FactoryNetPositionAsOf } from "@shared/factoryNetPositionAsOf";
-import { netPositionKnownTransactionThrough, netPositionRecordedThrough } from "../../../../services/factory/netPositionAsOf";
+import {
+  netPositionKnownTransactionThrough,
+  netPositionRecordedThrough,
+  netPositionVoucherEntryKnown,
+} from "../../../../services/factory/netPositionAsOf";
 import { sqlArray } from "../../../../lib/sqlArray";
 import { toMoney, sumMoney } from "../../../../lib/money";
 import type Decimal from "decimal.js";
@@ -39,23 +43,33 @@ export async function buildBrokerStatement(
   options: { asOf?: string | null; knownAt?: FactoryNetPositionAsOf; executor?: DatabaseOrTransaction } = {}
 ) {
   const { asOf, knownAt } = options;
-  const recorded = (column: ReturnType<typeof sql>) => knownAt
-    ? netPositionRecordedThrough(column, knownAt, "utc-naive-timestamp") : sql`TRUE`;
+  const recorded = (column: ReturnType<typeof sql>) =>
+    knownAt ? netPositionRecordedThrough(column, knownAt, "utc-naive-timestamp") : sql`TRUE`;
   const executor = options.executor ?? db;
   // Fetch broker
   const [broker] = await executor
     .select()
     .from(factorySuppliers)
-    .where(and(eq(factorySuppliers.id, brokerId), eq(factorySuppliers.companyId, companyId),
-      recorded(sql`${factorySuppliers.createdAt}`)));
+    .where(
+      and(
+        eq(factorySuppliers.id, brokerId),
+        eq(factorySuppliers.companyId, companyId),
+        recorded(sql`${factorySuppliers.createdAt}`)
+      )
+    );
   if (!broker) return null;
 
   // Linked suppliers
   const linkedRaw = await executor
     .select()
     .from(factorySuppliers)
-    .where(and(eq(factorySuppliers.parentId, brokerId), eq(factorySuppliers.companyId, companyId),
-      recorded(sql`${factorySuppliers.createdAt}`)));
+    .where(
+      and(
+        eq(factorySuppliers.parentId, brokerId),
+        eq(factorySuppliers.companyId, companyId),
+        recorded(sql`${factorySuppliers.createdAt}`)
+      )
+    );
 
   const allSuppliers = [broker, ...linkedRaw];
   const allSupplierIds = allSuppliers.map((s) => s.id);
@@ -69,17 +83,21 @@ export async function buildBrokerStatement(
     ? and(
         eq(factoryContainers.companyId, companyId),
         inArray(factoryContainers.supplierId, allSupplierIds),
-        knownAt ? sql`(${factoryContainers.deletedAt} IS NULL OR NOT ${recorded(sql`${factoryContainers.deletedAt}`)})` : isNull(factoryContainers.deletedAt),
+        knownAt
+          ? sql`(${factoryContainers.deletedAt} IS NULL OR NOT ${recorded(sql`${factoryContainers.deletedAt}`)})`
+          : isNull(factoryContainers.deletedAt),
         recorded(sql`${factoryContainers.createdAt}`),
-        asOf ? sql`DATE(${factoryContainers.createdAt}) <= ${asOf}::date` : undefined
+        !knownAt && asOf ? sql`DATE(${factoryContainers.createdAt}) <= ${asOf}::date` : undefined
       )
     : and(
         eq(factoryContainers.companyId, companyId),
         inArray(factoryContainers.supplierId, allSupplierIds),
-        knownAt ? sql`(${factoryContainers.deletedAt} IS NULL OR NOT ${recorded(sql`${factoryContainers.deletedAt}`)})` : isNull(factoryContainers.deletedAt),
+        knownAt
+          ? sql`(${factoryContainers.deletedAt} IS NULL OR NOT ${recorded(sql`${factoryContainers.deletedAt}`)})`
+          : isNull(factoryContainers.deletedAt),
         sql`${factoryContainers.status} NOT IN ('PENDING', 'IN_TRANSIT')`,
         recorded(sql`${factoryContainers.createdAt}`),
-        asOf ? sql`DATE(${factoryContainers.createdAt}) <= ${asOf}::date` : undefined
+        !knownAt && asOf ? sql`DATE(${factoryContainers.createdAt}) <= ${asOf}::date` : undefined
       );
   const allContainers =
     allSupplierIds.length > 0
@@ -131,7 +149,9 @@ export async function buildBrokerStatement(
               // vouchers never reach a balance (soft delete keeps the lines).
               eq(vouchers.companyId, companyId),
               eq(vouchers.optional, false),
-              knownAt ? sql`(${vouchers.deletedAt} IS NULL OR NOT ${recorded(sql`${vouchers.deletedAt}`)})` : isNull(vouchers.deletedAt),
+              knownAt
+                ? sql`(${vouchers.deletedAt} IS NULL OR NOT ${recorded(sql`${vouchers.deletedAt}`)})`
+                : isNull(vouchers.deletedAt),
               sql`${voucherEntries.debitAmount}::numeric > 0`,
               sql`${vouchers.voucherNumber} NOT LIKE 'FACTORY-PAY-%'`,
               // Financial supplier FX journals are already represented by the source
@@ -144,8 +164,23 @@ export async function buildBrokerStatement(
               sql`${vouchers.voucherNumber} NOT LIKE 'FACTORY-PAYABLE-RECLASS-%'`,
               // Posted freight/FX repair journals are non-payment ledger corrections.
               sql`${vouchers.voucherNumber} NOT LIKE 'FACTORY-CORRECTION-%'`,
-              knownAt ? netPositionKnownTransactionThrough(sql`COALESCE(${vouchers.effectiveDate}, ${vouchers.voucherDate})`, sql`${vouchers.createdAt}`, knownAt, "utc-naive-timestamp") : asOf ? sql`COALESCE(${vouchers.effectiveDate}, ${vouchers.voucherDate}) <= ${asOf}` : undefined,
-              recorded(sql`${voucherEntries.createdAt}`)
+              knownAt
+                ? netPositionKnownTransactionThrough(
+                    sql`COALESCE(${vouchers.effectiveDate}, ${vouchers.voucherDate})`,
+                    sql`${vouchers.createdAt}`,
+                    knownAt,
+                    "utc-naive-timestamp"
+                  )
+                : asOf
+                  ? sql`COALESCE(${vouchers.effectiveDate}, ${vouchers.voucherDate}) <= ${asOf}`
+                  : undefined,
+              knownAt
+                ? netPositionVoucherEntryKnown(
+                    sql`${voucherEntries.createdAt}`,
+                    sql`${voucherEntries.voucherId}`,
+                    knownAt
+                  )
+                : sql`TRUE`
             )
           )
           .orderBy(vouchers.voucherDate)
@@ -189,7 +224,7 @@ export async function buildBrokerStatement(
             and(
               eq(factoryOffloadAdditionalCharges.companyId, companyId),
               sql`${factoryOffloadAdditionalCharges.supplierId} = ANY(${sqlArray(allSupplierIds)})`,
-              asOf ? sql`DATE(${factoryOffloadAdditionalCharges.createdAt}) <= ${asOf}::date` : undefined,
+              !knownAt && asOf ? sql`DATE(${factoryOffloadAdditionalCharges.createdAt}) <= ${asOf}::date` : undefined,
               recorded(sql`${factoryOffloadAdditionalCharges.createdAt}`)
             )
           )
@@ -217,7 +252,7 @@ export async function buildBrokerStatement(
             and(
               eq(factoryContainerOtherCharges.companyId, companyId),
               inArray(factoryContainers.supplierId, allSupplierIds),
-              asOf ? sql`DATE(${factoryContainerOtherCharges.createdAt}) <= ${asOf}::date` : undefined,
+              !knownAt && asOf ? sql`DATE(${factoryContainerOtherCharges.createdAt}) <= ${asOf}::date` : undefined,
               recorded(sql`${factoryContainerOtherCharges.createdAt}`)
             )
           )

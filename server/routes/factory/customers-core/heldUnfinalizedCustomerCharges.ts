@@ -16,7 +16,11 @@ import type Decimal from "decimal.js";
 import { db } from "../../../db";
 import { MoneyDecimal, toMoney } from "../../../lib/money";
 import type { FactoryNetPositionAsOf } from "@shared/factoryNetPositionAsOf";
-import { netPositionKnownTransactionThrough, netPositionRecordedThrough } from "../../../services/factory/netPositionAsOf";
+import {
+  netPositionKnownTransactionThrough,
+  netPositionRecordedThrough,
+  netPositionVoucherEntryKnown,
+} from "../../../services/factory/netPositionAsOf";
 
 const ZERO = new MoneyDecimal(0);
 
@@ -29,17 +33,24 @@ export async function loadHeldChargeSnapshot(
   companyId: number,
   customerIds: readonly number[],
   asOf?: string | null,
-  knownAt?: FactoryNetPositionAsOf,
+  knownAt?: FactoryNetPositionAsOf
 ): Promise<HeldChargeSnapshot> {
   const ids = [...new Set(customerIds.filter((id) => Number.isSafeInteger(id) && id > 0))];
   if (!ids.length) return { byCustomer: new Map(), voucherIds: new Set() };
-  const idList = sql.join(ids.map((id) => sql`${id}`), sql`, `);
+  const idList = sql.join(
+    ids.map((id) => sql`${id}`),
+    sql`, `
+  );
   const dateCut = knownAt
     ? sql`AND ${netPositionKnownTransactionThrough(
         sql`COALESCE(v.effective_date, v.voucher_date)`,
-        sql`v.created_at`, knownAt, "utc-naive-timestamp"
+        sql`v.created_at`,
+        knownAt,
+        "utc-naive-timestamp"
       )}`
-    : asOf ? sql`AND COALESCE(v.effective_date, v.voucher_date) <= ${asOf}::date` : sql``;
+    : asOf
+      ? sql`AND COALESCE(v.effective_date, v.voucher_date) <= ${asOf}::date`
+      : sql``;
   const visibleVoucher = knownAt
     ? sql`(v.deleted_at IS NULL OR NOT ${netPositionRecordedThrough(sql`v.deleted_at`, knownAt, "utc-naive-timestamp")})`
     : sql`v.deleted_at IS NULL`;
@@ -50,7 +61,7 @@ export async function loadHeldChargeSnapshot(
     ? sql`(status <> 'FINALIZED' OR finalized_at IS NULL OR NOT ${netPositionRecordedThrough(sql`finalized_at`, knownAt, "utc-naive-timestamp")})`
     : sql`status <> 'FINALIZED'`;
   const entryRecorded = knownAt
-    ? sql`AND ${netPositionRecordedThrough(sql`ve.created_at`, knownAt, "utc-naive-timestamp")}`
+    ? sql`AND ${netPositionVoucherEntryKnown(sql`ve.created_at`, sql`ve.voucher_id`, knownAt)}`
     : sql``;
 
   const result = await db.execute(sql`
@@ -127,7 +138,11 @@ export async function loadHeldChargeSnapshot(
 
   const held = new Map<number, Decimal>();
   const voucherIds = new Set<number>();
-  for (const row of result.rows as Array<{ customer_id: number | string; voucher_id: number | string; amount: string }>) {
+  for (const row of result.rows as Array<{
+    customer_id: number | string;
+    voucher_id: number | string;
+    amount: string;
+  }>) {
     const customerId = Number(row.customer_id);
     const voucherId = Number(row.voucher_id);
     const value = toMoney(row.amount);
@@ -142,7 +157,7 @@ export async function heldUnfinalizedCustomerCharges(
   companyId: number,
   customerIds: readonly number[],
   asOf?: string | null,
-  knownAt?: FactoryNetPositionAsOf,
+  knownAt?: FactoryNetPositionAsOf
 ): Promise<Map<number, Decimal>> {
   return (await loadHeldChargeSnapshot(companyId, customerIds, asOf, knownAt)).byCustomer;
 }
