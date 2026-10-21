@@ -5,6 +5,7 @@ import { loadHistoricalFactoryPipeline } from "../../../services/factory/netPosi
 import { computeHistoricalFactoryAssetLiabilityOperations } from "../../../services/factory/netPositionHistoricalAssets";
 import { reconcileHistoricalPosition } from "../../../services/factory/netPositionReportTotals";
 import { loadFactoryHistoricalCoverage } from "../../../services/factory/netPositionHistoryCoverage";
+import { assertHistoricalReportIntegrity } from "../../../services/factory/netPositionHistoricalIntegrity";
 import { applyHistoricalOperationalCorrection } from "./netPositionHistoricalCorrection";
 import {
   fxAgentTablesExist,
@@ -842,6 +843,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         onUs: { total: onUsTotal, breakdown: onUsBreakdown, accounts: onUsAccounts },
         supplierLiabilities: round2(totalSupplierLiabilities),
         supplierOverpayments: round2(totalSupplierOverpayments),
+        stockOtwValue,
         inventoryValue: baleInventoryValue,
         rawMaterialValue: rawMaterialStockValue,
         balanceOnTableValue: selectedBalanceOnTableValue,
@@ -868,6 +870,9 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       const datedBody = asOfContext.isHistorical
         ? reconcileHistoricalPosition(projectedBody)
         : projectedBody;
+      if (asOfContext.isHistorical) {
+        assertHistoricalReportIntegrity(datedBody);
+      }
       const inventoryHistoryWarnings: string[] = asOfContext.isHistorical
         ? ((datedBody as typeof responseBody & { inventoryHistoryWarnings?: string[] }).inventoryHistoryWarnings ?? [])
         : [];
