@@ -285,7 +285,13 @@ export function requireRole(...roles: string[]) {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    if (req.user.role === "Developer" || roles.includes(req.user.role)) {
+    // ERP Tester can exercise Manager-level operational routes, but never Admin/Owner/Developer routes.
+    // Settings and administrative APIs are independently blocked by blockErpTesterSettings.
+    if (
+      req.user.role === "Developer" ||
+      roles.includes(req.user.role) ||
+      (req.user.role === "ERP Tester" && roles.includes("Manager"))
+    ) {
       return next();
     }
 
@@ -371,7 +377,7 @@ export function canModifyDate(dateField: string = "voucherDate") {
       return next();
     }
 
-    if (role === "Manager" || role === "Owner") {
+    if (role === "Manager" || role === "Owner" || role === "ERP Tester") {
       if (recordDate === today) return next();
       const editDays = req.session.daybookEditDays ?? 0;
       if (editDays === 0) {
@@ -491,7 +497,9 @@ function isViewOnlyPassiveLifecycleWrite(req: Request): boolean {
 export function blockErpTesterSettings(req: Request, res: Response, next: NextFunction) {
   if (req.session?.currentRole !== "ERP Tester" || !req.path.startsWith("/api/")) return next();
   if (isErpTesterForbiddenApiPath(req.path)) {
-    return res.status(403).json({ message: "ERP Tester accounts cannot access system settings or other modules" });
+    return res
+      .status(403)
+      .json({ message: "ERP Tester accounts cannot access system settings or user administration" });
   }
   return next();
 }
