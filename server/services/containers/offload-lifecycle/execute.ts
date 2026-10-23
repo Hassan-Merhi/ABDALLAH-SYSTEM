@@ -244,14 +244,32 @@ export async function executeContainerOffloadLifecycle(
     await assertOffloadCurrencyValuedTx(tx, input.companyId, input.offloadDate, purchaseOrders);
 
     const poIds = purchaseOrders.map((po: typeof schema.purchaseOrders.$inferSelect) => po.id);
-    const lineItems = await tx
+    const persistedLines = await tx
       .select({
+        poId: schema.poLineItems.poId,
         stockItemId: schema.poLineItems.stockItemId,
         quantity: schema.poLineItems.quantity,
         rate: schema.poLineItems.rate,
+        lineTotal: schema.poLineItems.lineTotal,
       })
       .from(schema.poLineItems)
       .where(inArray(schema.poLineItems.poId, poIds));
+    // For approved ZMW POs, the base unit rate is rounded to cents for the
+    // legacy price column, but lineTotal is the authoritative historical USD
+    // value (original native line total / locked FX, rounded once). Offloading
+    // qty * rounded unit rate would invent/destroy cents; derive a sufficiently
+    // precise effective USD rate from the stored base line amount instead.
+    const valuedZmwPoIds = new Set(purchaseOrders.filter(po =>
+      String(po.currency).toUpperCase() === "ZMW" &&
+      !!po.historicalExchangeRate && !!po.nativeItemsTotal
+    ).map(po => po.id));
+    const lineItems = persistedLines.map(row => ({
+      stockItemId: row.stockItemId,
+      quantity: row.quantity,
+      rate: valuedZmwPoIds.has(row.poId) && toMoney(row.quantity).gt(0)
+        ? toMoney(row.lineTotal).div(toMoney(row.quantity)).toFixed(18)
+        : row.rate,
+    }));
     if (lineItems.length === 0) {
       throw new ContainerOffloadLifecycleError(
         "Container purchase orders have no line items.",
