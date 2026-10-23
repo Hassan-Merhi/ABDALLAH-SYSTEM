@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
-import { retailProductVariants, retailStockOperations } from "@shared/schema";
+import { retailProductVariants, retailProducts, retailStockOperations } from "@shared/schema";
 import { requireAuth, requireNonPOS } from "../../auth";
 import { db } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
