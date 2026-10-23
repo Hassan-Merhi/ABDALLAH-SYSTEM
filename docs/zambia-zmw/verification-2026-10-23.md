@@ -1,0 +1,73 @@
+# Zambia ZMW integration — independent verification and completion (2026-10-23)
+
+**Status:** Phases 1–8 implementation-complete on `feature/zambia-zmw-multicurrency` and verified locally
+(typecheck, lint, changed-file formatting, migration registry, documentation index, targeted backend suites on a
+real PostgreSQL schema, full frontend suite). No hosted CI run, deployment, merge or production database change
+was made. Release still requires the items listed under **Remaining before production** below.
+
+## What the verification found and fixed
+
+| Area | Defect found on the branch | Fix |
+| --- | --- | --- |
+| Compile | JSX syntax error in `PaymentDraftAndRateBar.tsx`; dead `never`-typed spread in the chatbot PO confirm route; `HistoricalOpeningResolver` draft currency widened to `string` | Corrected; `tsc --noEmit` is clean |
+| Lint | `react-hooks/exhaustive-deps` warning in `ExchangeRateSettings.tsx` (ceiling is 0) | Dependency added; lint reports 0 errors / 0 warnings |
+| Formatting | 69 branch files had never been run through Prettier (CI "Format changed source files" would fail) | Formatted; changed-file check passes |
+| Excel PO import | A Kwacha invoice for a USD/ZMW company was only treated as ZMW when the sheet carried a `Currency` column; without it the Kwacha prices would have been posted as USD into inventory, goods in transit and the parent's supplier credit | `server/routes/import/poImportCurrency.ts`: a USD/ZMW company must state the invoice currency (`currency: "USD" \| "ZMW"`) on validate and import; it is stamped on every line and a contradicting sheet label is refused. `POImport.tsx` adds the required **Invoice Currency** selector and shows `K` in the preview. Mali and other companies keep the sheet-driven labels |
+| AI PO import | The chatbot draft defaults the currency to USD from the sheet; the review card did not let the operator confirm it | `confirm-po-import` returns 409 `PO_IMPORT_CURRENCY_UNCONFIRMED` for a USD/ZMW company unless the request carries an explicit USD/ZMW currency and `currencyConfirmed: true`; `POImportDraftCard.tsx` adds the confirmation selector |
+| AI PO import | Rate-date mismatch: a confirmation without `importDate` valued the Kwacha at today's rate but passed an undefined voucher date to the storage guard | One effective document date is used for the rate, the container, the PO and the vouchers |
+| Mali compatibility | Journal/payment PATCH ignored the caller's currency for USD/CFA vouchers (changed branch behaviour) | Only a posted **ZMW** voucher locks its currency and rate; the USD/CFA contract is unchanged |
+| Mali compatibility | `CurrencyContext.convertToUSD` stopped dividing by the pair rate when USD was selected, and the legacy `selectedCurrency` browser key was no longer written for CFA companies | Original contract restored for CFA; a Kwacha amount with no rate converts to `NaN`, never to USD |
+| POS edit | A Kwacha sale edit did not re-verify supplied original Kwacha prices against the locked voucher rate | `updateSaleService` runs the same original-price check as sale creation when `originalCurrencyRate` is supplied |
+| Account currency route | Importing the Zambia cash-conversion service at module load pulled the whole posting engine into a read-mostly route (its unit test mocks the module graph) | Service loaded on demand inside the handler |
+| Migration registry | `20261023_001_zambia_historical_purchase_cost.sql` was not registered in `migrations/meta/_journal.json`, so the versioned runner would never apply it | Registered as idx 40 |
+| Documentation index | The nine phase documents were unclassified (CI documentation audit fails) | Classified as references and linked from `docs/README.md` |
+| Legacy test | `tests/currency-amounts-behavior.test.ts` asserted that an unknown daybook currency bridges to a silent rate of `1` | Updated to expect the rejection (Phase 2 safety decision); ZMW bridges to `0.0400000000` at 25 per USD |
+
+## Accounting verification (local PostgreSQL schema, `tests/zambia-phase8-purchase-lifecycle.database.test.ts`)
+
+Illustrative approved rates: 25 ZMW per USD effective 2026-10-20 and 28 effective 2026-10-22 (not production rates).
+
+- A native Kwacha PO (K125 × 2, K1 × 1, K50 freight) stores `native_*` columns of K251.00 / K50.00 and historical USD
+  `items_total` 10.04 / `freight` 2.00 at the locked rate; each line keeps `native_rate` and `native_line_total`.
+- The subsidiary purchase voucher and the parent `INTERCO-PARENT-…` voucher both post 12.04 USD, balanced, with the
+  parent crediting the supplier 12.04 USD. No Kwacha amount reaches either ledger.
+- A Kwacha PO whose rate is 26 or 28 (not the approved rate of its date) and a bare `currency = ZMW` label without
+  native evidence are refused with HTTP 409 before any purchase, voucher or stock row is written.
+- Editing the PO (K150 × 2) re-prices at the **locked** 25 (12.00 USD), not the later 28; changing the currency or
+  the rate is refused; editing after offload is refused.
+- Offloading the container values the stock at the USD landed value (14.00 USD for 2 bales), never K300.
+- The Excel import route refuses an unstated currency, a missing or mismatched rate and a USD-labelled sheet
+  imported as Kwacha; a stated ZMW import converts K1000 + K100 freight once to 40.00 + 4.00 USD, posts 44.00 USD in
+  the subsidiary and the parent, and a replay of the same file is refused.
+- A plain USD purchase posts exactly as before with all native columns `NULL`.
+
+Unit coverage: `tests/zambia-phase8-purchase-costing.test.ts` (costing and explicit import currency),
+`tests/zambia-phase8-intercompany-boundary.test.ts` (ZMW intercompany legs, stable retry identities, legacy USD shape),
+`tests/currency-amounts-behavior.test.ts` and `tests/currencyAmounts.test.ts` (engine), `tests/ui/currency-context-behavior.test.tsx`
+(Mali CFA display contract).
+
+## Verification runs
+
+| Check | Result |
+| --- | --- |
+| `npm run check` (tsc) | pass |
+| `npm run lint` | pass, 0 warnings against ceiling 0 |
+| `node scripts/check-changed-file-formatting.mjs` | pass |
+| `node scripts/verify-migration-registry.mjs` | pass (41 registered) |
+| `node scripts/audit-doc-index.mjs` | pass |
+| Application startup migrations against a fresh local database | `/api/health/db` reports 0 failures |
+| Targeted backend suites (imports, purchasing, offload, rates, transfers, chatbot, opening balances, route guards) | pass after the fixes above |
+| Full frontend suite | 2246 passed; 6 failures in `tests/ui/barcode-lookup-page-behavior.test.tsx` are unrelated to this work (the branch carries main's pre-fix copy; `origin/main` already contains the fix) |
+| `npm run build` | see the final report for the result of the run performed at the end of verification |
+
+## Remaining before production
+
+1. Merge the current `main` into this branch (9 commits behind, including the barcode-lookup test fix) and re-run the
+   full backend suite in hosted CI; only targeted backend suites were run locally.
+2. Apply `20261023_001_zambia_historical_purchase_cost.sql` through the versioned runner
+   (`scripts/run-versioned-migrations.mjs --apply`) in a maintenance window; it is additive and `NOT VALID`.
+3. Activation is configuration, not code: set Zambia (company 19) display currency to ZMW, keep USD base, set the
+   Africa/Lusaka timezone, and record the business's own approved daily USD/ZMW rate before any Kwacha transaction.
+4. Permissioned before/after reconciliation of Zambia and Mali balances on production data (blocked by tenant
+   isolation in this environment, as recorded in Phase 1).
+5. Phases 9–11 (Factory, reporting, final integration) remain outside this verification.

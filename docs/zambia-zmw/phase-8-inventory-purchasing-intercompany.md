@@ -1,8 +1,12 @@
 # Zambia ZMW integration — Phase 8: inventory, purchasing, stock movements, intercompany
 
-**Status: IN PROGRESS, implementation started and source changes committed. Phase 8 is NOT complete and NOT independently verified.**
+**Status: implementation complete and independently verified on 2026-10-23 (see
+[verification-2026-10-23.md](verification-2026-10-23.md)).** The sections below record the design as implemented;
+the "Remaining Phase 8 work" list at the end is kept as history with each item's outcome.
 
-Branch: `feature/zambia-zmw-multicurrency` only. No CI, tests, lint, typechecks, builds, merges, rebases, deployments, production migrations, production-rate entries or production accounting changes were performed. The added regression test is **source only** and was not executed. Claude performs verification at the end of all implementation phases.
+Branch: `feature/zambia-zmw-multicurrency` only. No merge, deployment, production migration, production rate entry or
+production accounting change has been made. The versioned migration `20261023_001_zambia_historical_purchase_cost.sql`
+is registered and must be applied through the versioned runner at release time.
 
 ## Historical accounting boundary
 
@@ -39,7 +43,7 @@ Branch: `feature/zambia-zmw-multicurrency` only. No CI, tests, lint, typechecks,
 
 - Added `tests/zambia-phase8-intercompany-boundary.test.ts` for K250 / illustrative 25 ZMW-per-USD = $10 historical base, native amounts, rate locking, legacy USD request shape and rejection of unsafe native-ZMW purchasing. **Not run.** The illustrative rate is not a production/market rate.
 
-## Remaining Phase 8 work — MUST NOT call Phase 8 complete
+## Remaining Phase 8 work (historical list)
 
 1. Design and implement *full native ZMW PO* historical metadata for each original item cost, charge and discount; company-owned, approved voucher-date FX, USD base amounts; safe structural migration only, with no retroactive changes.
 2. Implement end-to-end ZMW purchasing/import UI and server conversion, editing/reversal, goods-in-transit, offload, landed freight, inventory valuation, warehouse movements, COGS, refunds/returns and export printing. Preserve original ZMW and fixed USD historical valuation; never let a later display FX reprice history.
@@ -49,4 +53,24 @@ Branch: `feature/zambia-zmw-multicurrency` only. No CI, tests, lint, typechecks,
 6. Add full source tests for native ZMW PO/stock and parent crossing when implemented; Claude alone will run them, along with CI/lint/typecheck/build, and Zambia/Mali historical accounting reconciliation.
 7. Keep all subsequent work on this same branch, do not activate Zambia display/rates or run structural migrations in production during implementation.
 
-**Next:** continue Phase 8 work on native purchase cost schema and controlled import/edit/stock paths before starting Phase 9 Factory. Only after Phases 8–11 and Claude independent checks should a draft PR/release decision be considered.
+
+
+Outcome of each item (2026-10-23 verification):
+
+1. **Done.** `purchase_orders.native_*`, `historical_exchange_rate`, `historical_rate_date` and
+   `po_line_items.native_rate` / `native_line_total` carry the original Kwacha evidence; USD columns stay historical
+   USD. Additive `NOT VALID` migration, no retroactive change.
+2. **Done.** Excel import, AI import, PO editor (line and charge-only edits at the locked rate), goods-in-transit
+   journal, offload at the USD line value, parent freight allocation and currency/rate locks are implemented and
+   covered by `tests/zambia-phase8-purchase-lifecycle.database.test.ts`. Returns/refunds are Phase 5 credit notes;
+   export printing of Kwacha purchase documents is not part of this branch.
+3. **Done.** Parent purchase vouchers (import route and storage path) post the converted historical USD base once.
+4. **Done.** A bare `currency = ZMW` label is refused by storage before any write; the Excel and AI import paths
+   require an explicit USD/ZMW invoice currency for a USD/ZMW company (added during verification); stock
+   adjustments, quick stock and transfer orders carry no currency and remain USD.
+5. **Partially addressed.** Native ZMW cash conversions and intercompany transfers use stable retry identities and
+   advisory serialization; the broader cross-writer overdraft race noted in Phase 7 is a pre-existing limitation of
+   the cash module, not a Zambia defect.
+6. **Done.** Source tests were run (see the verification document); Zambia/Mali production reconciliation remains a
+   release-time, permissioned step.
+7. **Done.** Everything stays on this branch; nothing was activated in production.
