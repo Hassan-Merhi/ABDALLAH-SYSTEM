@@ -207,7 +207,8 @@ export const retailPosReturnItems = pgTable(
   })
 );
 
-export const RETAIL_PAYMENT_METHODS = ["cash", "card", "bank", "mobile", "other"] as const;
+// "credit" is a receivable tender, not money collected: its journal targets the customer.
+export const RETAIL_PAYMENT_METHODS = ["cash", "card", "bank", "mobile", "other", "credit"] as const;
 export type RetailPaymentMethod = (typeof RETAIL_PAYMENT_METHODS)[number];
 
 export const retailPosPayments = pgTable(
