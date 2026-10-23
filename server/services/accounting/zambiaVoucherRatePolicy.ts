@@ -74,12 +74,28 @@ export function assertLockedZmwVoucherEdit(
   if (update.voucherDate != null && String(update.voucherDate).slice(0,10) !== String(original.voucherDate).slice(0,10)) {
     throw new ZambiaVoucherRateError("Changing the date of a ZMW voucher requires reversal and rebooking.");
   }
-  if (!original.exchangeRate || !companyRateValueSchema.safeParse(String(original.exchangeRate)).success) {
+  // Voucher storage can pad the approved 6dp company rate to 10 decimal
+  // places. Validate a stored positive numeric value without applying the
+  // *user-input* precision restriction to the database's string formatting.
+  const originalText = String(original.exchangeRate ?? "");
+  let lockedRate: Decimal;
+  try {
+    lockedRate = new Decimal(originalText);
+  } catch {
     throw new ZambiaVoucherRateError("Original ZMW voucher has no valid locked rate.");
   }
-  if (update.exchangeRate != null &&
-      (!companyRateValueSchema.safeParse(String(update.exchangeRate)).success ||
-       !new Decimal(String(update.exchangeRate)).eq(new Decimal(String(original.exchangeRate))))) {
-    throw new ZambiaVoucherRateError("Posted ZMW voucher exchange rate cannot be changed.");
+  if (!lockedRate.isFinite() || lockedRate.lte(0)) {
+    throw new ZambiaVoucherRateError("Original ZMW voucher has no valid locked rate.");
+  }
+  if (update.exchangeRate != null) {
+    let proposed: Decimal;
+    try {
+      proposed = new Decimal(String(update.exchangeRate));
+    } catch {
+      throw new ZambiaVoucherRateError("Posted ZMW voucher exchange rate cannot be changed.");
+    }
+    if (!proposed.isFinite() || !proposed.eq(lockedRate)) {
+      throw new ZambiaVoucherRateError("Posted ZMW voucher exchange rate cannot be changed.");
+    }
   }
 }
