@@ -97,12 +97,12 @@ export default function VoucherEdit() {
       voucher,
       voucherType,
       isPaymentOrReceipt,
-      selectedCurrency,
+      selectedCurrency: voucher?.currency === "ZMW" ? "ZMW" : selectedCurrency,
       ledgerAccounts,
       bankAccounts,
       suppliers,
       allAccountsData,
-      exchangeRate: exchangeRate ?? 1,
+      exchangeRate: voucher?.currency === "ZMW" ? Number(voucher.exchangeRate) : exchangeRate ?? 1,
       id,
     });
 
