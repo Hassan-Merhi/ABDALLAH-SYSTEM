@@ -435,9 +435,9 @@ async function buildPdf(d: InvoiceData): Promise<{ buffer: Buffer; pageCount: nu
     cellText(doc, isZmwInvoice ? "RATE (K)" : "RATE", X_RATE, COL_RATE_W, atY, THR_H, "center");
     cellText(doc, isZmwInvoice ? "AMT (K)" : "AMT", X_AMT, COL_AMT_W, atY, THR_H, "center");
     if (!hideProfitCols) {
-      cellText(doc, "CONFIG", X_CFG, COL_CFG_W, atY, THR_H, "center");
-      cellText(doc, "P/L BALE", X_PLB, COL_PLB_W, atY, THR_H, "center");
-      cellText(doc, "TOTAL P/L", X_TPL, COL_TPL_W, atY, THR_H, "center");
+      cellText(doc, isZmwInvoice ? "CONFIG $" : "CONFIG", X_CFG, COL_CFG_W, atY, THR_H, "center");
+      cellText(doc, isZmwInvoice ? "P/L BALE $" : "P/L BALE", X_PLB, COL_PLB_W, atY, THR_H, "center");
+      cellText(doc, isZmwInvoice ? "TOTAL P/L $" : "TOTAL P/L", X_TPL, COL_TPL_W, atY, THR_H, "center");
     }
     return atY + THR_H;
   }
