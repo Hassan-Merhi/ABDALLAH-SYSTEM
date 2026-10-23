@@ -158,7 +158,7 @@ function normalizePayments(total: Decimal, requested?: RetailPaymentInput[]): No
   let sum = new MoneyDecimal(0);
   const normalized: NormalizedPayment[] = [];
   for (const payment of payments) {
-    if (!["cash", "card", "bank", "mobile", "other"].includes(payment.method)) {
+    if (!["cash", "card", "bank", "mobile", "other", "credit"].includes(payment.method)) {
       throw new Error(`Unsupported Retail payment method: ${payment.method}`);
     }
     const amount = exactMoney(payment.amount, "Retail payment amount");
@@ -208,6 +208,9 @@ function paymentTarget(
   method: RetailPaymentMethod,
   shiftCashAccountId?: number | null
 ): { ledgerAccountId: number | null; bankAccountId: number | null } {
+  // Credit is not cash received: it is attributed directly to the selected
+  // customer in the canonical ERP balance engine, never to a clearing account.
+  if (method === "credit") return { ledgerAccountId: null, bankAccountId: null };
   if (method === "cash") {
     return { ledgerAccountId: shiftCashAccountId ?? settings.cashLedgerAccountId, bankAccountId: null };
   }
@@ -235,6 +238,7 @@ export async function settleRetailSaleTx(
     userId: string;
     username?: string | null;
     shiftId?: number | null;
+    customerId?: number | null;
     payments?: RetailPaymentInput[];
   }
 ): Promise<{ payments: RetailResolvedPayment[]; voucherId: number | null }> {
@@ -243,6 +247,9 @@ export async function settleRetailSaleTx(
   const saleTotal = exactMoney(input.totalAmount, "Retail sale total");
   const totalCost = exactMoney(input.totalCost, "Retail sale cost");
   const requested = normalizePayments(saleTotal, input.payments);
+  if (requested.some((payment) => payment.method === "credit") && !input.customerId) {
+    throw new Error("A selected customer is required for Retail credit sales");
+  }
   const resolved: RetailResolvedPayment[] = [];
 
   for (const [index, payment] of requested.entries()) {
@@ -293,12 +300,14 @@ export async function settleRetailSaleTx(
   const revenueAccountingAmount = saleAccountingAmount.minus(taxAccountingAmount);
   const entries = [
     ...allocatePaymentLines(resolved, saleAccountingAmount).map(({ payment, amount }) => ({
-      ...(payment.bankAccountId
-        ? { bankAccountId: payment.bankAccountId }
-        : { ledgerAccountId: payment.ledgerAccountId }),
+      ...(payment.method === "credit"
+        ? { customerId: input.customerId! }
+        : payment.bankAccountId
+          ? { bankAccountId: payment.bankAccountId }
+          : { ledgerAccountId: payment.ledgerAccountId }),
       debitAmount: amount.toFixed(2),
       creditAmount: "0",
-      narration: `Retail sale #${input.saleId} · ${payment.method}`,
+      narration: `Retail sale #${input.saleId} · ${payment.method === "credit" ? "customer receivable" : payment.method}`,
     })),
     ...(revenueAccountingAmount.isZero()
       ? []
@@ -446,6 +455,13 @@ export async function refundRetailPaymentsTx(
       .orderBy(asc(retailPosPayments.id));
   }
 
+  // Reverse unpaid receivables before returning any real cash/bank tender.
+  // An item returned on a partly paid invoice must never pay out more cash
+  // while an uncollected credit portion still exists on that sale.
+  payments = [...payments].sort((a, b) =>
+    Number(b.method === "credit") - Number(a.method === "credit") || a.id - b.id
+  );
+
   const refunds = await tx
     .select()
     .from(retailPosPayments)
@@ -532,7 +548,10 @@ export async function postRetailRefundAccountingTx(
   }
 ): Promise<number | null> {
   const [originalSale] = await tx
-    .select({ accountingVoucherId: retailPosSales.accountingVoucherId })
+    .select({
+      accountingVoucherId: retailPosSales.accountingVoucherId,
+      customerId: retailPosSales.customerId,
+    })
     .from(retailPosSales)
     .where(and(eq(retailPosSales.companyId, input.companyId), eq(retailPosSales.id, input.saleId)))
     .limit(1);
@@ -540,6 +559,9 @@ export async function postRetailRefundAccountingTx(
   // posting. Their synthetic legacy payment exists only to make the operational
   // refund safe; reconciliation continues to flag the missing historical journal.
   if (!originalSale?.accountingVoucherId) return null;
+  if (input.refunds.some((payment) => payment.method === "credit") && !originalSale.customerId) {
+    throw new Error("Cannot reverse a credit sale without its original customer");
+  }
 
   const refundTotal = exactMoney(input.refundAmount, "Retail refund amount");
   const restoredCost = exactMoney(input.restoredCost, "Retail restored cost");
@@ -574,12 +596,14 @@ export async function postRetailRefundAccountingTx(
                 },
               ]),
           ...allocatePaymentLines(input.refunds, refundAccountingAmount).map(({ payment, amount }) => ({
-            ...(payment.bankAccountId
-              ? { bankAccountId: payment.bankAccountId }
-              : { ledgerAccountId: payment.ledgerAccountId }),
+            ...(payment.method === "credit"
+              ? { customerId: originalSale.customerId! }
+              : payment.bankAccountId
+                ? { bankAccountId: payment.bankAccountId }
+                : { ledgerAccountId: payment.ledgerAccountId }),
             debitAmount: "0",
             creditAmount: amount.toFixed(2),
-            narration: `Retail sale #${input.saleId} · ${payment.method} refund`,
+            narration: `Retail sale #${input.saleId} · ${payment.method === "credit" ? "receivable reversal" : payment.method + " refund"}`,
           })),
         ]),
     ...(restoredCostAccountingAmount.isZero()
