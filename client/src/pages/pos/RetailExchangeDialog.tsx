@@ -13,6 +13,7 @@ import {
   lookupRetailBarcode,
   makeKey,
   money,
+  outstandingSaleCredit,
   type RetailPaymentDraft,
   type RetailPosItem,
   type RetailSale,
@@ -20,7 +21,10 @@ import {
 
 interface ExchangeResult {
   replayed: boolean;
+  /** Net tender movement at the counter (collected now minus paid back). */
   balanceDue: number;
+  receivableReversed?: number;
+  tenderRefund?: number;
   refundValue: number;
   newSaleTotal: number;
   sale: RetailSale;
@@ -83,20 +87,35 @@ export function RetailExchangeDialog({
     setPayments((current) => {
       if (current.length !== 1) return current;
       const payment = current[0];
-      return [{
-        ...payment,
-        amount,
-        tenderedAmount: payment.method === "cash"
-          ? Math.max(amount, Number(payment.tenderedAmount ?? 0))
-          : null,
-      }];
+      return [
+        {
+          ...payment,
+          amount,
+          tenderedAmount: payment.method === "cash" ? Math.max(amount, Number(payment.tenderedAmount ?? 0)) : null,
+        },
+      ];
     });
   }, [newTotal]);
 
   if (!sale) return null;
 
-  const refundValue = sale.items.reduce((sum, item) => sum + (returnQty[item.id] ?? 0) * (item.grossUnitPrice ?? item.unitPrice), 0);
-  const balance = newTotal - refundValue;
+  const refundValue = sale.items.reduce(
+    (sum, item) => sum + (returnQty[item.id] ?? 0) * (item.grossUnitPrice ?? item.unitPrice),
+    0
+  );
+  // Mirrors the server: unpaid receivable is reversed first, and only the rest
+  // is paid back to the original tenders. A reversal is not cash for the customer.
+  const receivableReversed = Math.min(refundValue, outstandingSaleCredit(sale));
+  const tenderRefund = Math.max(0, refundValue - receivableReversed);
+  const onAccount = payments.reduce(
+    (sum, payment) => (payment.method === "credit" ? sum + Number(payment.amount || 0) : sum),
+    0
+  );
+  const collectedNow = payments.reduce(
+    (sum, payment) => (payment.method === "credit" ? sum : sum + Number(payment.amount || 0)),
+    0
+  );
+  const balance = (newItems.length ? collectedNow : 0) - tenderRefund;
 
   const scan = async () => {
     const barcode = scanText.trim();
@@ -208,7 +227,8 @@ export function RetailExchangeDialog({
                   <div className="min-w-0 flex-1 text-sm" data-no-translate>
                     <div className="truncate font-medium">{item.name}</div>
                     <div className="text-xs text-muted-foreground">
-                      {item.color} · {item.size} · {money(item.grossUnitPrice ?? item.unitPrice)} · {remaining}/{item.quantity}
+                      {item.color} · {item.size} · {money(item.grossUnitPrice ?? item.unitPrice)} · {remaining}/
+                      {item.quantity}
                     </div>
                   </div>
                   <Button
@@ -236,7 +256,13 @@ export function RetailExchangeDialog({
                   </Button>
                   {canOverride && (
                     <label className="flex items-center gap-1 text-xs">
-                      <input type="checkbox" checked={!noRestock[item.id]} onChange={(event) => setNoRestock((current) => ({ ...current, [item.id]: !event.target.checked }))} />
+                      <input
+                        type="checkbox"
+                        checked={!noRestock[item.id]}
+                        onChange={(event) =>
+                          setNoRestock((current) => ({ ...current, [item.id]: !event.target.checked }))
+                        }
+                      />
                       Restock
                     </label>
                   )}
@@ -288,20 +314,63 @@ export function RetailExchangeDialog({
             ))}
           </section>
 
-          {newItems.length > 0 ? <RetailPaymentPanel total={newTotal} value={payments} onChange={setPayments} canUseCredit={Boolean(sale.customerId)} /> : null}
+          {newItems.length > 0 ? (
+            <RetailPaymentPanel
+              total={newTotal}
+              value={payments}
+              onChange={setPayments}
+              canUseCredit={Boolean(sale.customerId)}
+            />
+          ) : null}
 
-          <Input placeholder="Exchange / damaged item reason (optional except for no-restock)" value={reason} onChange={(event) => setReason(event.target.value)} maxLength={2000} />
+          <Input
+            placeholder="Exchange / damaged item reason (optional except for no-restock)"
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            maxLength={2000}
+          />
           <div className="space-y-1 rounded-md bg-muted/40 p-3 text-sm">
             <div className="flex justify-between">
               <span>Returned value</span>
               <span>-{money(refundValue)}</span>
             </div>
+            {receivableReversed > 0.005 && (
+              <div
+                className="flex justify-between text-xs text-muted-foreground"
+                data-testid="exchange-receivable-reversed"
+              >
+                <span>Reduces unpaid account balance</span>
+                <span>-{money(receivableReversed)}</span>
+              </div>
+            )}
+            {receivableReversed > 0.005 && (
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Paid back to original payments</span>
+                <span>-{money(tenderRefund)}</span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span>New items (including promotions / tax)</span>
               <span>{money(newTotal)}</span>
             </div>
-            {previewQuery.isError && <div className="text-xs text-destructive">Could not load replacement pricing.</div>}
-            {previewQuery.isFetching && <div className="text-xs text-muted-foreground">Updating replacement pricing…</div> 
+            {newItems.length > 0 && onAccount > 0.005 && (
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Charged to customer account</span>
+                <span>{money(onAccount)}</span>
+              </div>
+            )}
+            {receivableReversed > 0.005 && newItems.length > 0 && onAccount <= 0.005 && sale.customerId && (
+              <div className="text-xs text-amber-700 dark:text-amber-300">
+                The return reduced the customer's unpaid balance. Use Customer credit below if the customer is not
+                paying for the replacement now.
+              </div>
+            )}
+            {previewQuery.isError && (
+              <div className="text-xs text-destructive">Could not load replacement pricing.</div>
+            )}
+            {previewQuery.isFetching && (
+              <div className="text-xs text-muted-foreground">Updating replacement pricing…</div>
+            )}
             <div className="flex justify-between border-t pt-1 font-semibold">
               <span>{balance >= 0 ? "Customer pays" : "Refund to customer"}</span>
               <span data-testid="exchange-balance">{money(Math.abs(balance))}</span>

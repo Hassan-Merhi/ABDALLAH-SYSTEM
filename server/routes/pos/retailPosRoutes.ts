@@ -537,7 +537,10 @@ export function registerRetailPosRoutes(app: Express): void {
       // Uncollected credit must belong to a real company-owned ERP customer,
       // never an anonymous walk-in or a free-text customer name.
       if (body.payments?.some((payment) => payment.method === "credit") && !body.customerId) {
-        return res.status(400).json({ code: "RETAIL_CREDIT_CUSTOMER_REQUIRED", message: "Select a customer before recording a credit sale" });
+        return res.status(400).json({
+          code: "RETAIL_CREDIT_CUSTOMER_REQUIRED",
+          message: "Select a customer before recording a credit sale",
+        });
       }
       // The customer is optional for fully paid transactions.
       let customer: RetailSaleInput["customer"] = null;
@@ -623,11 +626,12 @@ export function registerRetailPosRoutes(app: Express): void {
       const body = returnSchema.parse(req.body);
       await ensureCompanyLocation(companyId, body.locationId);
       const userId = currentUserId(req);
-      if (req.user?.role === "POS" && !body.shiftId) {
-        return res.status(400).json({ message: "Open a cashier shift before refunding a sale" });
-      }
-      if (!["Admin", "Owner", "Manager", "Developer"].includes(req.user?.role ?? "") &&
-          (body.refundDestination === "customer_credit" || body.items.some((item) => !item.restock))) {
+      // A shift is optional, as for sales: a refund made without one stays off every
+      // drawer (see validateRetailShiftTx) rather than landing on a closed shift.
+      if (
+        !["Admin", "Owner", "Manager", "Developer"].includes(req.user?.role ?? "") &&
+        (body.refundDestination === "customer_credit" || body.items.some((item) => !item.restock))
+      ) {
         return res.status(403).json({
           code: "RETAIL_RETURN_MANAGER_REQUIRED",
           message: "Manager access is required for account credits and damaged/non-restock returns",
@@ -641,10 +645,11 @@ export function registerRetailPosRoutes(app: Express): void {
           .from(retailPosSales)
           .where(and(eq(retailPosSales.companyId, companyId), eq(retailPosSales.id, saleId)))
           .limit(1);
-        if (!original?.customerId) return res.status(400).json({
-          code: "RETAIL_RETURN_CUSTOMER_REQUIRED",
-          message: "Assign an ERP customer to the original sale before issuing account credit",
-        });
+        if (!original?.customerId)
+          return res.status(400).json({
+            code: "RETAIL_RETURN_CUSTOMER_REQUIRED",
+            message: "Assign an ERP customer to the original sale before issuing account credit",
+          });
       }
 
       const result = await db.transaction(async (tx) => {

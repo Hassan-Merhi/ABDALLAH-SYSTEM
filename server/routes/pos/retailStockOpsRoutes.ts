@@ -1,3 +1,4 @@
+import type Decimal from "decimal.js";
 import type { Express } from "express";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -15,7 +16,7 @@ import {
 import { requireAuth, requireNonPOS } from "../../auth";
 import { db } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
-import { lineAmount, moneyString, toMoney } from "../../lib/money";
+import { lineAmount, MoneyDecimal, moneyString, toMoney } from "../../lib/money";
 import { RETAIL_GRNI_ACCOUNT, trackRetailStockValueTx } from "../../services/retail/retailInventoryJournal";
 import { currentUserId, ensureCompanyLocation, requireRetailCompany } from "./retailPosContext";
 import {
@@ -70,7 +71,11 @@ export const retailExchangeSchema = z.object({
   notes: z.string().trim().max(2000).optional(),
   returnItems: z
     .array(
-      z.object({ saleItemId: z.coerce.number().int().positive(), quantity: z.coerce.number().finite().positive(), restock: z.boolean().default(true) })
+      z.object({
+        saleItemId: z.coerce.number().int().positive(),
+        quantity: z.coerce.number().finite().positive(),
+        restock: z.boolean().default(true),
+      })
     )
     .min(1)
     .max(100),
@@ -238,12 +243,15 @@ export function registerRetailStockOpsRoutes(app: Express): void {
       if (!companyId) return;
       const body = retailExchangeSchema.parse(req.body);
       const userId = currentUserId(req);
-      if (req.user?.role === "POS" && !body.shiftId) {
-        return res.status(400).json({ message: "Open a cashier shift before exchanging retail items" });
-      }
-      if (!["Admin", "Owner", "Manager", "Developer"].includes(req.user?.role ?? "") &&
-          body.returnItems.some((item) => !item.restock)) {
-        return res.status(403).json({ message: "Manager approval is required to exchange damaged items without restocking" });
+      // A shift is optional, as for sales: a refund made without one stays off every
+      // drawer (see validateRetailShiftTx) rather than landing on a closed shift.
+      if (
+        !["Admin", "Owner", "Manager", "Developer"].includes(req.user?.role ?? "") &&
+        body.returnItems.some((item) => !item.restock)
+      ) {
+        return res
+          .status(403)
+          .json({ message: "Manager approval is required to exchange damaged items without restocking" });
       }
       await ensureCompanyLocation(companyId, body.locationId);
       const canSellNegativeStock = Boolean(req.user?.canSellNegativeStock);
@@ -279,6 +287,9 @@ export function registerRetailStockOpsRoutes(app: Express): void {
             returnId: Number(meta.returnId ?? 0),
             newSaleId: Number(meta.newSaleId ?? 0),
             refundValue: toMoney(meta.refundValue as string | number | null | undefined),
+            receivableReversed:
+              meta.receivableReversed == null ? null : toMoney(meta.receivableReversed as string | number),
+            tenderRefund: meta.tenderRefund == null ? null : toMoney(meta.tenderRefund as string | number),
           };
         }
 
@@ -292,6 +303,10 @@ export function registerRetailStockOpsRoutes(app: Express): void {
           userId,
           metadata: { exchangeOperationId: operation.id },
         });
+        // Unpaid receivable reversed vs. value actually paid back to the customer.
+        // Only the latter offsets what the cashier collects for the replacement.
+        let receivableReversed = new MoneyDecimal(0);
+        let tenderRefund = new MoneyDecimal(0);
         if (!returned.replayed) {
           const shift = await validateRetailShiftTx(tx, {
             companyId,
@@ -308,6 +323,10 @@ export function registerRetailStockOpsRoutes(app: Express): void {
             idempotencyKey: `${body.idempotencyKey}:return`.slice(0, 191),
             userId,
           });
+          for (const refund of refunds) {
+            if (refund.method === "credit") receivableReversed = receivableReversed.plus(refund.amount);
+            else tenderRefund = tenderRefund.plus(refund.amount);
+          }
           const refundVoucherId = await postRetailRefundAccountingTx(tx, {
             companyId,
             locationId: body.locationId,
@@ -365,6 +384,8 @@ export function registerRetailStockOpsRoutes(app: Express): void {
               returnId: returned.returnId,
               newSaleId: sold.saleId,
               refundValue: refundValue.toFixed(),
+              receivableReversed: receivableReversed.toFixed(),
+              tenderRefund: tenderRefund.toFixed(),
             },
           })
           .where(eq(retailStockOperations.id, operation.id));
@@ -378,18 +399,30 @@ export function registerRetailStockOpsRoutes(app: Express): void {
           returnId: returned.returnId,
           newSaleId: sold.saleId,
           refundValue,
+          receivableReversed: receivableReversed as Decimal | null,
+          tenderRefund: tenderRefund as Decimal | null,
         };
       });
 
       const newSale = await loadSaleResponse(companyId, result.newSaleId);
       const newTotal = toNumber(newSale?.totalAmount);
+      // Money collected now excludes the replacement's on-account (credit) tender.
+      const collected = (newSale?.payments ?? [])
+        .filter((payment) => payment.paymentType === "payment" && payment.method !== "credit")
+        .reduce((sum, payment) => sum.plus(payment.amount), new MoneyDecimal(0));
+      // Exchanges recorded before the split was stored assume a full tender refund.
+      const tenderRefund = result.tenderRefund ?? result.refundValue;
       res.status(result.replayed ? 200 : 201).json({
         ...result,
         newSaleTotal: newTotal,
         sale: newSale,
-        // Positive: customer pays the difference. Negative: refund the difference.
         refundValue: result.refundValue.toNumber(),
-        balanceDue: Number(moneyString(toMoney(newSale?.totalAmount).minus(result.refundValue))),
+        receivableReversed: Number(moneyString(result.receivableReversed ?? new MoneyDecimal(0))),
+        tenderRefund: Number(moneyString(tenderRefund)),
+        // Net tender movement at the counter. Positive: customer pays the
+        // difference. Negative: refund the difference. An unpaid receivable
+        // reversal is a balance reduction, never cash handed to the customer.
+        balanceDue: Number(moneyString(collected.minus(tenderRefund))),
       });
     } catch (error) {
       const message = getErrorMessage(error);

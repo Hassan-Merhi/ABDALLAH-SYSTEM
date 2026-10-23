@@ -13,10 +13,7 @@ import { RetailErpPosSaleGrid, RetailErpPosItemPicker } from "./RetailErpPosWork
 import { RetailExchangeDialog } from "./RetailExchangeDialog";
 import { RetailReturnDialog } from "./RetailReturnDialog";
 import { RetailPaymentPanel } from "./RetailPaymentPanel";
-import {
-  RetailLastSaleSummary,
-  RetailVariantTransferCard,
-} from "./RetailPOSPanels";
+import { RetailLastSaleSummary, RetailVariantTransferCard } from "./RetailPOSPanels";
 import { RetailShiftPanel, type RetailShift } from "./RetailShiftPanel";
 import { useRetailReceiptPrinter } from "./retailReceipt";
 import { RetailApprovalDialog } from "./RetailApprovalDialog";
@@ -343,6 +340,8 @@ export default function RetailPOS() {
       setLastScan(null);
       setLastSale(data.sale);
       setCustomer(null);
+      // A credit or split tender belongs to the completed sale only.
+      setPayments([{ method: "cash", amount: 0, tenderedAmount: 0 }]);
       setOrderDiscount({ type: "none", value: 0, reason: "" });
       setOrderDiscountOpen(false);
       setApprovalToken(null);
@@ -439,19 +438,22 @@ export default function RetailPOS() {
     setPayments((current) => {
       if (current.length !== 1) return current;
       const payment = current[0];
-      return [{
-        ...payment,
-        amount,
-        tenderedAmount: payment.method === "cash"
-          ? Math.max(amount, Number(payment.tenderedAmount ?? 0))
-          : null,
-      }];
+      return [
+        {
+          ...payment,
+          amount,
+          tenderedAmount: payment.method === "cash" ? Math.max(amount, Number(payment.tenderedAmount ?? 0)) : null,
+        },
+      ];
     });
   }, [total]);
 
   const paymentTotal = payments.reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
   const hasCreditTender = payments.some((payment) => payment.method === "credit");
-  const creditAmount = payments.reduce((sum, payment) => payment.method === "credit" ? sum + Number(payment.amount || 0) : sum, 0);
+  const creditAmount = payments.reduce(
+    (sum, payment) => (payment.method === "credit" ? sum + Number(payment.amount || 0) : sum),
+    0
+  );
   const paymentsValid =
     (!hasCreditTender || Boolean(customer?.id)) &&
     Math.abs(paymentTotal - total) <= 0.005 &&
@@ -470,6 +472,19 @@ export default function RetailPOS() {
     paymentsValid &&
     (!isPosRole || currentShift)
   );
+
+  // Credit is owed by the selected customer; clearing the customer must never
+  // leave an on-account tender that the server would reject at checkout.
+  const selectCustomer = (next: RetailCustomerSummary | null) => {
+    if (!next?.id) {
+      setPayments((current) =>
+        current.map((payment) =>
+          payment.method === "credit" ? { ...payment, method: "cash", tenderedAmount: payment.amount } : payment
+        )
+      );
+    }
+    setCustomer(next);
+  };
 
   if (selectedCompany?.companyType !== "retail") return null;
 
@@ -500,7 +515,9 @@ export default function RetailPOS() {
 
       <div className="flex flex-wrap items-start gap-3 border-b bg-muted/10 px-1 py-2" aria-label="Retail sale details">
         <div className="space-y-1">
-          <label htmlFor="retail-pos-location" className="text-xs text-muted-foreground">Location</label>
+          <label htmlFor="retail-pos-location" className="text-xs text-muted-foreground">
+            Location
+          </label>
           <select
             id="retail-pos-location"
             disabled={isPosRole}
@@ -513,12 +530,16 @@ export default function RetailPOS() {
           >
             <option value="">Select location</option>
             {locations.map((location) => (
-              <option key={location.id} value={location.id}>{location.name}</option>
+              <option key={location.id} value={location.id}>
+                {location.name}
+              </option>
             ))}
           </select>
         </div>
         <div className="space-y-1">
-          <label htmlFor="retail-pos-date" className="text-xs text-muted-foreground">Date</label>
+          <label htmlFor="retail-pos-date" className="text-xs text-muted-foreground">
+            Date
+          </label>
           <input
             id="retail-pos-date"
             type="date"
@@ -530,20 +551,26 @@ export default function RetailPOS() {
           />
         </div>
         <div className="space-y-1">
-          <label htmlFor="retail-pos-method" className="text-xs text-muted-foreground">Payment</label>
+          <label htmlFor="retail-pos-method" className="text-xs text-muted-foreground">
+            Payment
+          </label>
           <select
             id="retail-pos-method"
             className="block h-9 min-w-28 rounded-md border bg-background px-3 text-sm"
             value={payments[0]?.method ?? "cash"}
             onChange={(event) => {
               const method = event.target.value as RetailPaymentDraft["method"];
-              setPayments((current) => current.map((payment, index) =>
-                index === 0 ? {
-                  ...payment,
-                  method,
-                  tenderedAmount: method === "cash" ? (payment.amount || 0) : null,
-                } : payment
-              ));
+              setPayments((current) =>
+                current.map((payment, index) =>
+                  index === 0
+                    ? {
+                        ...payment,
+                        method,
+                        tenderedAmount: method === "cash" ? payment.amount || 0 : null,
+                      }
+                    : payment
+                )
+              );
             }}
           >
             <option value="cash">Cash</option>
@@ -551,19 +578,27 @@ export default function RetailPOS() {
             <option value="bank">Bank</option>
             <option value="mobile">Mobile</option>
             <option value="other">Other</option>
-            <option value="credit" disabled={!customer?.id}>Customer Credit</option>
+            <option value="credit" disabled={!customer?.id}>
+              Customer Credit
+            </option>
           </select>
         </div>
-        <label className="flex items-center gap-2 pt-6 text-sm" title={!customer ? "Select a customer for credit sales" : "Charge the sale to the selected customer's ERP account"}>
+        <label
+          className="flex items-center gap-2 pt-6 text-sm"
+          title={
+            !customer ? "Select a customer for credit sales" : "Charge the sale to the selected customer's ERP account"
+          }
+        >
           <input
             type="checkbox"
             checked={hasCreditTender}
             disabled={!customer?.id && !hasCreditTender}
             onChange={(event) => {
               const amount = Number(total.toFixed(2));
-              setPayments(event.target.checked
-                ? [{ method: "credit", amount, tenderedAmount: null }]
-                : [{ method: "cash", amount, tenderedAmount: amount }]
+              setPayments(
+                event.target.checked
+                  ? [{ method: "credit", amount, tenderedAmount: null }]
+                  : [{ method: "cash", amount, tenderedAmount: amount }]
               );
             }}
             data-testid="toggle-retail-credit-sale"
@@ -572,10 +607,13 @@ export default function RetailPOS() {
           Credit
         </label>
         <div className="min-w-[190px] flex-1 xl:max-w-[350px]">
-          <RetailCustomerPicker customer={customer} onSelect={setCustomer} />
+          <RetailCustomerPicker customer={customer} onSelect={selectCustomer} />
         </div>
         {hasCreditTender && (
-          <span className="self-center text-xs font-medium text-amber-700 dark:text-amber-300" data-testid="retail-credit-amount">
+          <span
+            className="self-center text-xs font-medium text-amber-700 dark:text-amber-300"
+            data-testid="retail-credit-amount"
+          >
             {customer ? `On account: ${money(creditAmount)}` : "Choose a customer to post credit"}
           </span>
         )}
@@ -590,9 +628,13 @@ export default function RetailPOS() {
             pricingLines={ladder?.lines ?? []}
             units={units}
             total={total}
-            onDecrease={(variantId) => setCart((current) => current.map((line) =>
-              line.variantId === variantId ? { ...line, cartQuantity: Math.max(1, line.cartQuantity - 1) } : line
-            ))}
+            onDecrease={(variantId) =>
+              setCart((current) =>
+                current.map((line) =>
+                  line.variantId === variantId ? { ...line, cartQuantity: Math.max(1, line.cartQuantity - 1) } : line
+                )
+              )
+            }
             onIncrease={(line) => {
               const outcome = addItem(line);
               setLastScan(outcome);
@@ -832,7 +874,9 @@ export default function RetailPOS() {
         onOpenChange={setReturnDialogOpen}
         onExchange={setExchangeSale}
         onPrint={printReceipt}
-        onCompleted={async () => {
+        onCompleted={async (sale) => {
+          // Make the updated sale (with its refund lines) available for reprinting.
+          setLastSale(sale);
           await refreshRetailPos();
           focusScan();
         }}
