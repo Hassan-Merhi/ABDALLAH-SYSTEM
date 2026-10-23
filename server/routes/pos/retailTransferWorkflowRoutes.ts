@@ -94,8 +94,12 @@ export function registerRetailTransferWorkflowRoutes(app: Express): void {
       const actor = currentUserId(req);
       const result = await db.transaction(async (tx) => {
         const variant = await ensureRetailVariant(tx, companyId, body.variantId);
-        const [variantPhotos] = await tx.select({ imageUrls: retailProductVariants.imageUrls })
+        const [variantPhotos] = await tx.select({
+            imageUrls: retailProductVariants.imageUrls,
+            productImageUrls: retailProducts.imageUrls,
+          })
           .from(retailProductVariants)
+          .innerJoin(retailProducts, eq(retailProducts.id, retailProductVariants.productId))
           .where(and(eq(retailProductVariants.id, body.variantId), eq(retailProductVariants.companyId, companyId)))
           .limit(1);
         const [created] = await tx
@@ -136,7 +140,10 @@ export function registerRetailTransferWorkflowRoutes(app: Express): void {
           color: variant.color,
           size: variant.size,
           barcode: variant.barcode,
-          imageUrls: Array.isArray(variantPhotos?.imageUrls) ? variantPhotos.imageUrls : [],
+          imageUrls: [
+            ...(Array.isArray(variantPhotos?.imageUrls) ? variantPhotos.imageUrls : []),
+            ...(Array.isArray(variantPhotos?.productImageUrls) ? variantPhotos.productImageUrls : []),
+          ],
           fromLocationId: body.fromLocationId,
           toLocationId: body.toLocationId,
           quantity: body.quantity,
