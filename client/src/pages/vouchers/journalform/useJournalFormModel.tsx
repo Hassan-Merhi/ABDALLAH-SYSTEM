@@ -401,7 +401,11 @@ export function useJournalFormModel({ voucherIdToEdit, isPOS }: JournalFormProps
   };
 
   useEffect(() => {
-    const entries = voucherToEdit?.entries;
+    const entries = voucherToEdit?.currency === "ZMW"
+      ? voucherToEdit?.entries?.filter((entry) =>
+          !(entry.transactionCurrency === "USD" && entry.narration === "Base currency rounding difference")
+        )
+      : voucherToEdit?.entries;
     if (!voucherToEdit || voucherToEdit.voucherType !== "Journal" || !entries?.length) return;
     if (hydratedVoucherIdRef.current === voucherToEdit.id) return;
     if (!ledgerAccountsFetched || !bankAccountsFetched) return;
