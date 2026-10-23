@@ -21,7 +21,7 @@ ALTER TABLE po_line_items
 -- constraint on future inserts/updates, including ZMW relabel attempts.
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'purchase_orders_zmw_historical_rate_ck') THEN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'purchase_orders_zmw_historical_rate_ck' AND conrelid = 'purchase_orders'::regclass) THEN
     ALTER TABLE purchase_orders ADD CONSTRAINT purchase_orders_zmw_historical_rate_ck
       CHECK (upper(currency) <> 'ZMW' OR (
         historical_exchange_rate > 0
