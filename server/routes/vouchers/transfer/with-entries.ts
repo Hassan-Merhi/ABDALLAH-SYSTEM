@@ -166,7 +166,7 @@ export function registerVoucherWithEntriesRoutes(app: Express) {
       const baseEditRate = existingVoucher.currency === "ZMW"
         ? toMoney(existingVoucher.exchangeRate) : new MoneyDecimal(1);
       const newTotal = existingVoucher.currency === "ZMW"
-        ? MoneyDecimal.max(totalDebits, totalCredits).dividedBy(baseEditRate).toFixed(2)
+        ? MoneyDecimal.max(totalDebits, totalCredits).dividedBy(baseEditRate).toFixed(6)
         : MoneyDecimal.max(totalDebits, totalCredits).toFixed(2);
 
       let updatedVoucher!: typeof vouchers.$inferSelect;
@@ -266,6 +266,13 @@ export function registerVoucherWithEntriesRoutes(app: Express) {
         for (const [index, entry] of entries.entries()) {
           let dualCurrencyFields: Record<string, unknown> = {};
           if (editVoucherCurrency === "ZMW") {
+            // The old edit UI uses debitAmount/creditAmount as native entry
+            // amounts. Never let a request validate one amount, but post an
+            // unrelated transactionDebitAmount/transactionCreditAmount.
+            if ((entry.transactionDebitAmount != null && !toMoney(entry.transactionDebitAmount).eq(toMoney(entry.debitAmount))) ||
+                (entry.transactionCreditAmount != null && !toMoney(entry.transactionCreditAmount).eq(toMoney(entry.creditAmount)))) {
+              throw new Error("ZMW voucher base/transaction amount conflict; reload the original currency amounts.");
+            }
             if (entry.transactionCurrency && String(entry.transactionCurrency).toUpperCase() !== "ZMW") {
               throw new Error("ZMW voucher entry currency must match its original voucher currency.");
             }
@@ -274,8 +281,8 @@ export function registerVoucherWithEntriesRoutes(app: Express) {
             const norm = normalizeVoucherEntryAmounts({
               transactionCurrency: "ZMW",
               baseCurrency: "USD",
-              transactionDebitAmount: String(entry.transactionDebitAmount ?? entry.debitAmount ?? "0"),
-              transactionCreditAmount: String(entry.transactionCreditAmount ?? entry.creditAmount ?? "0"),
+              transactionDebitAmount: String(entry.debitAmount ?? "0"),
+              transactionCreditAmount: String(entry.creditAmount ?? "0"),
               historicalRate: editVoucherRate,
             });
             dualCurrencyFields = {
@@ -353,7 +360,10 @@ export function registerVoucherWithEntriesRoutes(app: Express) {
 
         await tx
           .update(fde)
-          .set({ amountCurrency: newTotal, amountUsd: newTotal })
+           .set({
+            amountCurrency: editVoucherCurrency === "ZMW" ? MoneyDecimal.max(totalDebits, totalCredits).toFixed(6) : newTotal,
+            amountUsd: newTotal,
+          })
           .where(and(eq(fde.referenceTable, "vouchers"), eq(fde.referenceId, id)));
 
         // Perpetual inventory (wave 8.3): a stock adjustment voucher carries its inventory line.
@@ -376,7 +386,8 @@ export function registerVoucherWithEntriesRoutes(app: Express) {
           companyId: existingVoucher.companyId,
           voucher: existingVoucher,
           description: updatedVoucher.description,
-          newAmount: MoneyDecimal.max(totalDebits, totalCredits),
+          newAmount: editVoucherCurrency === "ZMW"
+            ? new MoneyDecimal(newTotal) : MoneyDecimal.max(totalDebits, totalCredits),
         });
 
         // Wave 12 / phase 22 B: full before/after snapshot in this transaction; a
