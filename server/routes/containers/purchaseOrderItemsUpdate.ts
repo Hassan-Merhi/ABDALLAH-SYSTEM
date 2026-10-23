@@ -234,6 +234,7 @@ export async function applyPurchaseOrderItemsUpdate(
         .set({
           itemsTotal: cents(itemsTotal),
           ...(nativeCost ? {
+            nativeLineCount: nativeCost.nativeLineCount,
             nativeItemsTotal: nativeCost.nativeItemsTotal,
             nativeFreight: nativeCost.nativeFreight,
             nativeSurcharge: nativeCost.nativeSurcharge,
