@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Percent, ShoppingCart } from "lucide-react";
+import { Percent, ShoppingCart, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,10 +11,10 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { PosWorkspaceColumns } from "./pos-components/PosWorkspaceColumns";
 import { RetailErpPosSaleGrid, RetailErpPosItemPicker } from "./RetailErpPosWorkspace";
 import { RetailExchangeDialog } from "./RetailExchangeDialog";
+import { RetailReturnDialog } from "./RetailReturnDialog";
 import { RetailPaymentPanel } from "./RetailPaymentPanel";
 import {
   RetailLastSaleSummary,
-  RetailRecentSalesCard,
   RetailVariantTransferCard,
 } from "./RetailPOSPanels";
 import { RetailShiftPanel, type RetailShift } from "./RetailShiftPanel";
@@ -86,6 +86,7 @@ export default function RetailPOS() {
   const [lastScan, setLastScan] = useState<ScanOutcome | null>(null);
   const [lastSale, setLastSale] = useState<RetailSale | null>(null);
   const [exchangeSale, setExchangeSale] = useState<RetailSale | null>(null);
+  const [returnDialogOpen, setReturnDialogOpen] = useState(false);
   const [transferVariantId, setTransferVariantId] = useState<number | "">("");
   const [transferToLocationId, setTransferToLocationId] = useState<number | "">("");
   const [transferQuantity, setTransferQuantity] = useState(1);
@@ -147,6 +148,7 @@ export default function RetailPOS() {
     setSearch("");
     setLastScan(null);
     setLastSale(null);
+    setReturnDialogOpen(false);
     setTransferVariantId("");
     setTransferToLocationId("");
     setCustomer(null);
@@ -174,12 +176,6 @@ export default function RetailPOS() {
       readJson<RetailPosItem[]>(
         `/api/pos/retail/items?locationId=${selectedLocation!.id}&search=${encodeURIComponent(search)}&limit=60`
       ),
-    enabled: selectedCompany?.companyType === "retail" && Boolean(selectedLocation?.id),
-  });
-
-  const salesQuery = useQuery({
-    queryKey: ["retail-pos-sales", selectedCompany?.id, selectedLocation?.id],
-    queryFn: () => readJson<RetailSale[]>(`/api/pos/retail/sales?locationId=${selectedLocation!.id}&limit=12`),
     enabled: selectedCompany?.companyType === "retail" && Boolean(selectedLocation?.id),
   });
 
@@ -401,50 +397,6 @@ export default function RetailPOS() {
     onError: (error) => setApprovalRequest((current) => ({ ...current, pending: false, error: error.message })),
   });
 
-  const returnMutation = useMutation({
-    mutationFn: async ({
-      saleId,
-      saleItemId,
-      returnedQuantity,
-    }: {
-      saleId: number;
-      saleItemId: number;
-      returnedQuantity: number;
-    }) => {
-      if (!selectedLocation?.id) throw new Error("Select a location first");
-      const response = await apiRequest("POST", `/api/pos/retail/sales/${saleId}/returns`, {
-        locationId: selectedLocation.id,
-        idempotencyKey: `retail-return-${saleId}-${saleItemId}-${returnedQuantity}`,
-        shiftId: currentShift?.id ?? undefined,
-        items: [{ saleItemId, quantity: 1 }],
-      });
-      return response.json();
-    },
-    onSuccess: async () => {
-      await refreshRetailPos();
-      toast({ title: "Return completed", description: "The exact color and size were restored to this location." });
-      focusScan();
-    },
-    onError: (error) => toast({ title: "Return failed", description: error.message, variant: "destructive" }),
-  });
-
-  const cancelMutation = useMutation({
-    mutationFn: async (saleId: number) => {
-      if (!selectedLocation?.id) throw new Error("Select a location first");
-      const response = await apiRequest("POST", `/api/pos/retail/sales/${saleId}/cancel`, {
-        locationId: selectedLocation.id,
-        idempotencyKey: `retail-cancel-${saleId}`,
-        reason: "POS sale cancellation",
-      });
-      return response.json();
-    },
-    onSuccess: async () => {
-      await refreshRetailPos();
-      toast({ title: "Sale canceled", description: "Unreturned quantities were restored exactly once." });
-    },
-    onError: (error) => toast({ title: "Cancellation failed", description: error.message, variant: "destructive" }),
-  });
-
   const transferMutation = useMutation({
     mutationFn: async () => {
       if (!selectedLocation?.id || !transferVariantId || !transferToLocationId || transferQuantity <= 0) {
@@ -527,6 +479,15 @@ export default function RetailPOS() {
       {/* Retail uses the normal ERP POS arrangement; posting stays on variant-aware retail services. */}
       <header className="flex flex-wrap items-center justify-between gap-3 border-b py-2">
         <h1 className="border-l-2 border-primary pl-3 text-2xl font-semibold tracking-tight">Point of Sale</h1>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setReturnDialogOpen(true)}
+          disabled={!selectedLocation?.id}
+          data-testid="retail-open-returns"
+        >
+          <RotateCcw className="mr-2 h-4 w-4" /> Return / Exchange
+        </Button>
         <Button
           type="button"
           disabled={!canCompleteSale}
@@ -803,35 +764,20 @@ export default function RetailPOS() {
         />
       </PosWorkspaceColumns>
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        <RetailRecentSalesCard
-          sales={salesQuery.data ?? []}
-          isLoading={salesQuery.isLoading}
-          returnPending={returnMutation.isPending}
-          cancelPending={cancelMutation.isPending}
-          onPrint={printReceipt}
-          onReturnOne={(sale, item) =>
-            returnMutation.mutate({ saleId: sale.id, saleItemId: item.id, returnedQuantity: item.returnedQuantity })
-          }
-          onExchange={setExchangeSale}
-          onCancel={(sale) => cancelMutation.mutate(sale.id)}
+      {!isPosRole && (
+        <RetailVariantTransferCard
+          items={itemsQuery.data ?? []}
+          destinations={locations.filter((location) => location.id !== selectedLocation?.id)}
+          variantId={transferVariantId}
+          toLocationId={transferToLocationId}
+          quantity={transferQuantity}
+          pending={transferMutation.isPending}
+          onVariantChange={setTransferVariantId}
+          onDestinationChange={setTransferToLocationId}
+          onQuantityChange={setTransferQuantity}
+          onSubmit={() => transferMutation.mutate()}
         />
-
-        {!isPosRole && (
-          <RetailVariantTransferCard
-            items={itemsQuery.data ?? []}
-            destinations={locations.filter((location) => location.id !== selectedLocation?.id)}
-            variantId={transferVariantId}
-            toLocationId={transferToLocationId}
-            quantity={transferQuantity}
-            pending={transferMutation.isPending}
-            onVariantChange={setTransferVariantId}
-            onDestinationChange={setTransferToLocationId}
-            onQuantityChange={setTransferQuantity}
-            onSubmit={() => transferMutation.mutate()}
-          />
-        )}
-      </div>
+      )}
 
       {cart.length > 0 && (
         <div className="fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 p-3 backdrop-blur-sm xl:hidden">
@@ -878,6 +824,17 @@ export default function RetailPOS() {
         }}
       />
 
+      <RetailReturnDialog
+        open={returnDialogOpen}
+        locationId={selectedLocation?.id ?? null}
+        onOpenChange={setReturnDialogOpen}
+        onExchange={setExchangeSale}
+        onPrint={printReceipt}
+        onCompleted={async () => {
+          await refreshRetailPos();
+          focusScan();
+        }}
+      />
       <RetailExchangeDialog
         sale={exchangeSale}
         locationId={selectedLocation?.id ?? null}
