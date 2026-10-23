@@ -643,8 +643,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                 draftLabel="Unsaved payment draft found"
                 onRestoreDraft={restorePaymentDraft}
                 onDiscardDraft={discardPaymentDraft}
-                selectedCurrency={selectedCurrency}
-                transactionRate={transactionRate}
+                selectedCurrency={paymentPostingCurrency}
+                transactionRate={paymentPostingCurrency === "ZMW" ? paymentPostingRate : transactionRate}
                 setTransactionRate={setTransactionRate}
               />
               <PaymentVoucherTab
