@@ -828,7 +828,7 @@ export default function RetailPOS() {
         open={returnDialogOpen}
         locationId={selectedLocation?.id ?? null}
         shiftId={currentShift?.id ?? null}
-        canOverride={!isPosRole}
+        canOverride={["Admin", "Owner", "Manager", "Developer"].includes(selectedCompany?.role ?? "")}
         onOpenChange={setReturnDialogOpen}
         onExchange={setExchangeSale}
         onPrint={printReceipt}
@@ -841,7 +841,7 @@ export default function RetailPOS() {
         sale={exchangeSale}
         locationId={selectedLocation?.id ?? null}
         shiftId={currentShift?.id ?? null}
-        canOverride={!isPosRole}
+        canOverride={["Admin", "Owner", "Manager", "Developer"].includes(selectedCompany?.role ?? "")}
         onOpenChange={(open) => {
           if (!open) {
             setExchangeSale(null);
