@@ -1,3 +1,4 @@
+import { assertApprovedZmwVoucherRate } from "../../services/accounting/zambiaVoucherRatePolicy";
 import type { Express } from "express";
 import { getErrorMessage, errorStatus } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
@@ -101,7 +102,9 @@ export function registerVoucherPaymentRoutes(app: Express) {
       // transactionTotal is in the voucher's transaction currency (e.g. CFA).
       // baseTotal is the historical base-currency (USD) equivalent stored on the voucher.
       const vCurrency = (currency as string | undefined) || "USD";
-      const vRateRaw = (exchangeRate as string | number | undefined) || null;
+      const vRateRaw = await assertApprovedZmwVoucherRate(
+        req.session.currentCompanyId!, voucherDate, vCurrency, exchangeRate
+      );
       // For CFA vouchers: baseTotal = transactionTotal / cfaPerUsd (CFA ÷ rate = USD)
       // For USD vouchers: baseTotal = transactionTotal (no conversion)
       const totals = paymentVoucherTotals(entries, vCurrency, vRateRaw);
