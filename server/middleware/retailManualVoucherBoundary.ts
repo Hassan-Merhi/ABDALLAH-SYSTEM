@@ -12,20 +12,22 @@ import { db } from "../db";
  */
 const hiddenManualVoucherTypes = new Set([
   "journal",
-  "credit note",
-  "debit note",
+  "creditnote",
+  "debitnote",
   "adjustment",
-  "stock adjustment",
+  "stockadjustment",
   "consumption",
   "production",
   "mixed",
   "stocktransferorder",
-  "stock transfer order",
-  "transfer order",
+  "transferorder",
 ]);
 
 function blockedType(type: unknown): boolean {
-  return typeof type === "string" && hiddenManualVoucherTypes.has(type.trim().toLowerCase());
+  // The legacy API uses e.g. "Credit Note", "CreditNote" and "credit_note"
+  // in different routes. All aliases must share the same Retail refusal.
+  return typeof type === "string" &&
+    hiddenManualVoucherTypes.has(type.trim().toLowerCase().replace(/[\s_-]+/g, ""));
 }
 
 export function registerRetailManualVoucherBoundary(app: Express): void {
