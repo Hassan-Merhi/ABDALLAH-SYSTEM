@@ -11,6 +11,7 @@
 import Decimal from "decimal.js";
 import { storage } from "../../storage";
 import { companyBusinessDate } from "../accounting/companyBusinessDate";
+import { companyBusinessDate } from "../accounting/companyBusinessDate";
 import { companyRateDateSchema, companyRateValueSchema } from "@shared/companyRatePolicy";
 
 export class PosZmwRateError extends Error {
@@ -28,6 +29,12 @@ export async function resolveLockedZmwPosCurrency(
   suppliedRate: string | number | null | undefined
 ): Promise<LockedPosCurrency> {
   const code = String(currency || "USD").toUpperCase();
+  const company = await storage.getCompanyById(companyId);
+  // Preserve legacy other-company currency handling. Zambia only allows USD
+  // or its configured Kwacha pair, preventing cross-company CFA rate use.
+  if (company?.displayCurrency === "ZMW" && code !== "USD" && code !== "ZMW") {
+    throw new PosZmwRateError("Zambia POS accepts only USD and ZMW.");
+  }
   if (code !== "ZMW") return { currency: code, exchangeRate: suppliedRate == null ? null : String(suppliedRate) };
   if (!companyRateDateSchema.safeParse(voucherDate).success) {
     throw new PosZmwRateError("Enter a valid sale date before posting a Kwacha sale.");
@@ -38,9 +45,12 @@ export async function resolveLockedZmwPosCurrency(
   if (voucherDate > currentBusinessDate) {
     throw new PosZmwRateError("Future-dated Kwacha sales/refunds are not allowed. Select a business date on or before today.");
   }
-  const company = await storage.getCompanyById(companyId);
   if (!company || company.baseCurrency !== "USD" || company.displayCurrency !== "ZMW") {
     throw new PosZmwRateError("USD/ZMW must be configured for the active company before posting Kwacha sales.");
+  }
+  const today = await companyBusinessDate(companyId);
+  if (voucherDate > today) {
+    throw new PosZmwRateError("Cannot post a future-dated Kwacha sale or refund with a future exchange rate.");
   }
   const dated = await storage.getExchangeRateForDate(companyId, "USD", "ZMW", voucherDate);
   if (!dated || !companyRateValueSchema.safeParse(String(dated.rate)).success) {
