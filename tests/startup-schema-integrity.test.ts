@@ -350,12 +350,20 @@ describe("startup schema integrity", () => {
     expect(startupMigrations.slice(-zambiaHistoricalPurchaseCostSchema.length)).toEqual(
       zambiaHistoricalPurchaseCostSchema
     );
-    for (const statement of zambiaHistoricalPurchaseCostSchema.slice(0, 12)) {
-      expect(statement).toMatch(/^ALTER TABLE (purchase_orders|po_line_items) ADD COLUMN IF NOT EXISTS /);
-    }
-    expect(zambiaHistoricalPurchaseCostSchema[12]).toContain("purchase_orders_zmw_historical_rate_ck");
-    expect(zambiaHistoricalPurchaseCostSchema[12]).toContain("NOT VALID");
-    expect(zambiaHistoricalPurchaseCostSchema[12]).toContain("IF NOT EXISTS (SELECT 1 FROM pg_constraint");
+    // Every column statement is an idempotent ADD COLUMN IF NOT EXISTS on one
+    // of the two purchase tables, so a re-run against production is a no-op.
+    const idempotentColumnStatement = /^ALTER TABLE (purchase_orders|po_line_items) ADD COLUMN IF NOT EXISTS /;
+    expect(
+      zambiaHistoricalPurchaseCostSchema.slice(0, 12).filter((statement) => idempotentColumnStatement.test(statement))
+    ).toHaveLength(12);
+    // The check constraint is added once (guarded by a pg_constraint lookup)
+    // and NOT VALID, so no historical row is re-validated or rewritten.
+    const constraintStatement = zambiaHistoricalPurchaseCostSchema[12];
+    expect(
+      ["purchase_orders_zmw_historical_rate_ck", "NOT VALID", "IF NOT EXISTS (SELECT 1 FROM pg_constraint"].filter(
+        (fragment) => constraintStatement.includes(fragment)
+      )
+    ).toHaveLength(3);
   });
 
   it("contains only non-empty SQL strings", () => {
