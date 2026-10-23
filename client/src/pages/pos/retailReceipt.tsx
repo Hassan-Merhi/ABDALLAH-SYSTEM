@@ -31,6 +31,12 @@ export function RetailReceipt({
 }) {
   const taxEnabled = Boolean(sale.taxEnabled);
   const hasDiscount = Number(sale.discountTotal ?? 0) > 0;
+  const collected = (sale.payments ?? []).reduce((sum, payment) =>
+    payment.method === "credit" ? sum : sum + (payment.paymentType === "refund" ? -payment.amount : payment.amount), 0
+  );
+  const onAccount = (sale.payments ?? []).reduce((sum, payment) =>
+    payment.method !== "credit" ? sum : sum + (payment.paymentType === "refund" ? -payment.amount : payment.amount), 0
+  );
   return (
     <div data-no-translate>
       <div className="rr-center rr-title">{companyName ?? "Receipt"}</div>
@@ -119,9 +125,11 @@ export function RetailReceipt({
           {sale.payments.map((payment) => (
             <div className="rr-line" key={payment.id}>
               <span>
-                {payment.paymentType === "refund"
-                  ? `REFUND ${payment.method.toUpperCase()}`
-                  : payment.method.toUpperCase()}
+                {payment.method === "credit"
+                  ? payment.paymentType === "refund" ? "REVERSED CREDIT" : "ON ACCOUNT"
+                  : payment.paymentType === "refund"
+                    ? `REFUND ${payment.method.toUpperCase()}`
+                    : payment.method.toUpperCase()}
               </span>
               <span>
                 {payment.paymentType === "refund" ? "-" : ""}
@@ -129,6 +137,12 @@ export function RetailReceipt({
               </span>
             </div>
           ))}
+          {sale.payments.some((payment) => payment.method === "credit") && (
+            <>
+              <div className="rr-line"><span>NET COLLECTED</span><span>{money(collected)}</span></div>
+              <div className="rr-line"><strong>UNPAID ON ACCOUNT</strong><strong>{money(Math.max(0, onAccount))}</strong></div>
+            </>
+          )}
           {sale.payments
             .filter(
               (payment) => payment.paymentType === "payment" && payment.method === "cash" && payment.changeAmount > 0
