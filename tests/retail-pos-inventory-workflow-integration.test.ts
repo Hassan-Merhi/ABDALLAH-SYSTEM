@@ -543,6 +543,27 @@ describe("Two-stage transfers through RETAIL-IN-TRANSIT", () => {
     expect(await reconciliation()).toMatchObject({ difference: "0.00" });
   });
 
+  it("still receives goods dispatched from a location that has since been closed", async () => {
+    const dispatched = await agent.post("/api/pos/retail/transfers/dispatch").send({
+      idempotencyKey: "rpiw-dispatch-closed-src",
+      variantId: shirtId,
+      fromLocationId: ctx.locationId,
+      toLocationId: ctx.location2Id,
+      quantity: 1,
+    });
+    expect(dispatched.status).toBe(201);
+    await pool.query(`UPDATE locations SET active = false WHERE id = $1`, [ctx.locationId]);
+    try {
+      const received = await agent
+        .post(`/api/pos/retail/transfers/${dispatched.body.operationId}/receive`)
+        .send({ idempotencyKey: "rpiw-receive-closed-src" });
+      expect(received.status).toBe(201);
+    } finally {
+      await pool.query(`UPDATE locations SET active = true WHERE id = $1`, [ctx.locationId]);
+    }
+    expect(await ledgerBalance("RETAIL-IN-TRANSIT")).toBe("0.00");
+  });
+
   it("never books revenue or COGS for transfers", async () => {
     const { rows } = await pool.query(
       `SELECT COUNT(*)::int AS n FROM voucher_entries ve

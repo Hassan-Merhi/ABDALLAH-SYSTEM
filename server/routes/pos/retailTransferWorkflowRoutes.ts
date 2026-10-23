@@ -263,10 +263,9 @@ export function registerRetailTransferWorkflowRoutes(app: Express): void {
           details.inTransitValue == null
         )
           throw new Error("Transfer has incomplete dispatch evidence");
-        await Promise.all([
-          ensureCompanyLocation(companyId, details.fromLocationId),
-          ensureCompanyLocation(companyId, details.toLocationId),
-        ]);
+        // Only the receiving store must be open. Closing the source after
+        // dispatch must not strand the goods (and their value) in transit.
+        await ensureCompanyLocation(companyId, details.toLocationId);
         const dest = await lockInventoryRow(tx, companyId, details.variantId, details.toLocationId);
         const tracker = await trackRetailStockValueTx(tx, companyId, [
           { variantId: details.variantId, locationId: details.toLocationId },
