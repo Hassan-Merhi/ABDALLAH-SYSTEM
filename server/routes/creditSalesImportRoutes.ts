@@ -571,6 +571,9 @@ export function registerCreditSalesImportRoutes(app: Express) {
       }
     } catch (error: unknown) {
       if (sendBaleMirrorMovementRefusal(res, error)) return;
+      if (error instanceof PosZmwRateError) {
+        return res.status(error.statusCode).json({ code: error.code, message: error.message });
+      }
       logger.error("Credit Sales Import error:", { error: error });
       res.status(500).json({ message: getErrorMessage(error) });
     }
