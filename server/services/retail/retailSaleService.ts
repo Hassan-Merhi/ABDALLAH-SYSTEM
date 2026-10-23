@@ -445,6 +445,7 @@ export async function createRetailSaleInTx(
     username: input.username ?? null,
     shiftId: input.shiftId ?? null,
     payments: input.payments,
+    customerId: input.customer?.id ?? null,
   });
   return { saleId: createdSale.id, replayed: false };
 }
