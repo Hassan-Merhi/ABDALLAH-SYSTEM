@@ -113,7 +113,7 @@ export function registerVoucherCreateRoutes(app: Express) {
       // A standalone voucher's total_amount is always historical USD,
       // including when its user-facing header is entered in Kwacha.
       const historicalBaseTotal = headerCurrency === "ZMW"
-        ? new Decimal(totalAmount).div(new Decimal(approvedHeaderRate!)).toDecimalPlaces(2).toFixed(2)
+        ? new Decimal(totalAmount).div(new Decimal(approvedHeaderRate!)).toDecimalPlaces(6).toFixed(6)
         : totalAmount;
       const voucher = await storage.createVoucher({
         companyId,
