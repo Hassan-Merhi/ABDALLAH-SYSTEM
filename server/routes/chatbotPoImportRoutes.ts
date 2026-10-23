@@ -1,4 +1,4 @@
-import { ZMW_PURCHASE_REQUIRES_HISTORICAL_COST } from "../services/accounting/zambiaPurchaseCurrencyGuard";
+import { prepareZmwPurchaseCost } from "../services/accounting/zambiaPurchaseCosting";
 /**
  * Chatbot PO-import routes.
  *
@@ -379,14 +379,7 @@ export function registerChatbotPoImportRoutes(app: Express) {
       if (denied) return res.status(denied.code).json({ message: denied.message });
 
       const { poNumber, containerNumber, importDate, currency, supplierId, lines, charges } = req.body;
-      if (typeof currency === "string" && currency.trim().toUpperCase() === "ZMW") {
-        // The importer stores prices and landed costs in historical USD.
-        // Reject native ZMW before container, PO, ledger or intercompany writes.
-        return res.status(409).json({
-          code: "ZMW_PURCHASE_HISTORICAL_COST_REQUIRED",
-          message: ZMW_PURCHASE_REQUIRES_HISTORICAL_COST,
-        });
-      }
+      const nativeZmw = String(currency || "USD").toUpperCase() === "ZMW";
 
       if (!poNumber) return res.status(400).json({ message: "PO number is required" });
       if (!containerNumber) return res.status(400).json({ message: "Container number is required" });
@@ -407,6 +400,16 @@ export function registerChatbotPoImportRoutes(app: Express) {
       if (parsedLines.some((line) => !line.qty || !line.rate)) {
         return res.status(400).json({ message: "Invalid amount" });
       }
+
+      // Rate approval and ALL native line/charge normalization precede any
+      // container or accounting write. Existing USD import remains unchanged.
+      const zwmHistorical = nativeZmw ? await prepareZmwPurchaseCost({
+        companyId,
+        date: importDate || new Date().toISOString().split("T")[0],
+        exchangeRate: req.body.exchangeRate,
+        lines: parsedLines.map(line => ({ quantity: line.qty!.toFixed(), rate: line.rate!.toFixed() })),
+        charges: charges || {},
+      }) : null;
 
       const unresolved = lines.filter((l: { stockItemId?: unknown }) => !l.stockItemId);
       if (unresolved.length > 0) {
@@ -454,18 +457,21 @@ export function registerChatbotPoImportRoutes(app: Express) {
 
       // Each line total is qty x rate rounded half up to cents, and the PO's
       // items total is the sum of those line totals, so the two always agree.
-      const storedLines = parsedLines.map((line) => ({
+      const storedLines = parsedLines.map((line, index) => ({
         qty: line.qty!,
-        rate: line.rate!,
-        lineTotal: line.qty!.times(line.rate!).toDecimalPlaces(2),
+        rate: zwmHistorical ? new MoneyDecimal(zwmHistorical.lines[index].rate) : line.rate!,
+        lineTotal: zwmHistorical
+          ? new MoneyDecimal(zwmHistorical.lines[index].lineTotal)
+          : line.qty!.times(line.rate!).toDecimalPlaces(2),
       }));
       const itemsTotal = storedLines.reduce((sum, line) => sum.plus(line.lineTotal), new MoneyDecimal(0));
-      const freightAmt = amountOrZero(charges?.freight);
-      const surchargeAmt = amountOrZero(charges?.surcharge);
-      const fumigationAmt = amountOrZero(charges?.fumigation);
-      const docChargesAmt = amountOrZero(charges?.documentCharges);
-      const discountAmt = amountOrZero(charges?.discount);
-      const otherChargesAmt = amountOrZero(charges?.otherCharges);
+      const purchaseCharges = zwmHistorical ?? charges;
+      const freightAmt = amountOrZero(purchaseCharges?.freight);
+      const surchargeAmt = amountOrZero(purchaseCharges?.surcharge);
+      const fumigationAmt = amountOrZero(purchaseCharges?.fumigation);
+      const docChargesAmt = amountOrZero(purchaseCharges?.documentCharges);
+      const discountAmt = amountOrZero(purchaseCharges?.discount);
+      const otherChargesAmt = amountOrZero(purchaseCharges?.otherCharges);
       const grandTotal = itemsTotal
         .plus(freightAmt)
         .plus(surchargeAmt)
@@ -481,6 +487,17 @@ export function registerChatbotPoImportRoutes(app: Express) {
           containerId: container.id,
           supplierId: Number(supplierId),
           currency: currency || "USD",
+          ...(zwmHistorical ? {
+            historicalExchangeRate: zwmHistorical.historicalExchangeRate,
+            historicalRateDate: zwmHistorical.historicalRateDate,
+            nativeItemsTotal: zwmHistorical.nativeItemsTotal,
+            nativeFreight: zwmHistorical.nativeFreight,
+            nativeSurcharge: zwmHistorical.nativeSurcharge,
+            nativeFumigation: zwmHistorical.nativeFumigation,
+            nativeDocumentCharges: zwmHistorical.nativeDocumentCharges,
+            nativeDiscount: zwmHistorical.nativeDiscount,
+            nativeOtherCharges: zwmHistorical.nativeOtherCharges,
+          } : {}),
           itemsTotal: moneyString(itemsTotal),
           freight: moneyString(freightAmt),
           surcharge: moneyString(surchargeAmt),
@@ -505,6 +522,10 @@ export function registerChatbotPoImportRoutes(app: Express) {
           quantity: stored.qty.toFixed(3),
           rate: stored.rate.toFixed(2),
           lineTotal: stored.lineTotal.toFixed(2),
+          ...(zwmHistorical ? {
+            nativeRate: zwmHistorical.lines[index].nativeRate,
+            nativeLineTotal: zwmHistorical.lines[index].nativeLineTotal,
+          } : {}),
         });
       }
 
