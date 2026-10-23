@@ -31,6 +31,7 @@ import { resolvePoImportCreditTarget } from "../../services/accounting/poImportA
 import { supplierService } from "../suppliers/supplierService";
 import { collectPreviewItemErrors, findPreviewContainer, type PoImportPreviewItem } from "./po-import-preview";
 import { allocatePoCharges } from "./poChargeAllocation";
+import { applyExplicitImportCurrency } from "./poImportCurrency";
 import { isUnsupportedNativeZmwPurchase } from "../../services/accounting/zambiaPurchaseCurrencyGuard";
 import { prepareZmwPurchaseCost } from "../../services/accounting/zambiaPurchaseCosting";
 import { errorStatus } from "../../lib/httpHandlers";
@@ -91,8 +92,13 @@ export function registerPoImportRoutes(app: Express) {
         errors.push("Container data not found in preview");
       } else {
         const containerPreview = parsedPreview.container;
-        if (containerPreview.items.some(item => isUnsupportedNativeZmwPurchase(item.currency))) {
-          if (containerPreview.items.some(item => !isUnsupportedNativeZmwPurchase(item.currency))) {
+        // The stated invoice currency is applied to every line before the
+        // Kwacha checks below, so a sheet without a Currency column can never
+        // be read as USD for a Kwacha-enabled company.
+        const importCompany = await storage.getCompanyById(req.session.currentCompanyId!);
+        errors.push(...applyExplicitImportCurrency(containerPreview.items, req.body.currency, importCompany));
+        if (containerPreview.items.some((item) => isUnsupportedNativeZmwPurchase(item.currency))) {
+          if (containerPreview.items.some((item) => !isUnsupportedNativeZmwPurchase(item.currency))) {
             errors.push("Do not mix ZMW and other currencies in one container import.");
           } else {
             try {
@@ -100,7 +106,7 @@ export function registerPoImportRoutes(app: Express) {
                 companyId: req.session.currentCompanyId!,
                 date: req.body.importDate,
                 exchangeRate: req.body.exchangeRate,
-                lines: containerPreview.items.map(item => ({ quantity: item.quantity, rate: item.rate })),
+                lines: containerPreview.items.map((item) => ({ quantity: item.quantity, rate: item.rate })),
                 charges: containerPreview.charges,
               });
             } catch (error) {
@@ -216,6 +222,12 @@ export function registerPoImportRoutes(app: Express) {
         ...(await collectPreviewItemErrors(containerPreview.items, req.session.currentCompanyId!, allStockItems))
       );
 
+      // The explicitly selected invoice currency is stamped on every line (and
+      // checked against the sheet) before any Kwacha conversion or write.
+      validationErrors.push(
+        ...applyExplicitImportCurrency(containerPreview.items, req.body.currency, currentCompanyLink)
+      );
+
       // Reject import if validation fails
       if (validationErrors.length > 0) {
         return res.status(400).json({
@@ -226,17 +238,19 @@ export function registerPoImportRoutes(app: Express) {
 
       // Historical ZMW is converted once before container, subsidiary voucher,
       // parent credit or stock writes. Original money is preserved on each PO.
-      const isZmw = containerPreview.items.some(item => isUnsupportedNativeZmwPurchase(item.currency));
-      if (isZmw && containerPreview.items.some(item => !isUnsupportedNativeZmwPurchase(item.currency))) {
+      const isZmw = containerPreview.items.some((item) => isUnsupportedNativeZmwPurchase(item.currency));
+      if (isZmw && containerPreview.items.some((item) => !isUnsupportedNativeZmwPurchase(item.currency))) {
         return res.status(409).json({ message: "Mixed ZMW/USD purchase containers are not supported." });
       }
-      const zambiaNative = isZmw ? await prepareZmwPurchaseCost({
-        companyId: currentCompanyId,
-        date: importDate,
-        exchangeRate: req.body.exchangeRate,
-        lines: containerPreview.items.map(item => ({ quantity: item.quantity, rate: item.rate })),
-        charges: containerPreview.charges,
-      }) : null;
+      const zambiaNative = isZmw
+        ? await prepareZmwPurchaseCost({
+            companyId: currentCompanyId,
+            date: importDate,
+            exchangeRate: req.body.exchangeRate,
+            lines: containerPreview.items.map((item) => ({ quantity: item.quantity, rate: item.rate })),
+            charges: containerPreview.charges,
+          })
+        : null;
       if (zambiaNative) {
         containerPreview.items.forEach((item, index) => {
           const converted = zambiaNative.lines[index];
@@ -394,18 +408,20 @@ export function registerPoImportRoutes(app: Express) {
       // Split each container charge across the POs by item value, exact to the cent.
       const poEntries = Object.entries(poGroups);
       // Native and base charge splits share the PO grouping, but never mix units.
-      const nativeChargeSplits = zambiaNative ? allocatePoCharges(
-        poEntries.map(([, items]) => items.map(item => item.nativeLineTotal ?? "0")),
-        {
-          freight: zambiaNative.nativeFreight,
-          surcharge: zambiaNative.nativeSurcharge,
-          fumigation: zambiaNative.nativeFumigation,
-          documentCharges: zambiaNative.nativeDocumentCharges,
-          discount: zambiaNative.nativeDiscount,
-          otherCharges: zambiaNative.nativeOtherCharges,
-        },
-        resolvedFreightPaidBy === "parent"
-      ) : null;
+      const nativeChargeSplits = zambiaNative
+        ? allocatePoCharges(
+            poEntries.map(([, items]) => items.map((item) => item.nativeLineTotal ?? "0")),
+            {
+              freight: zambiaNative.nativeFreight,
+              surcharge: zambiaNative.nativeSurcharge,
+              fumigation: zambiaNative.nativeFumigation,
+              documentCharges: zambiaNative.nativeDocumentCharges,
+              discount: zambiaNative.nativeDiscount,
+              otherCharges: zambiaNative.nativeOtherCharges,
+            },
+            resolvedFreightPaidBy === "parent"
+          )
+        : null;
       const chargeSplits = allocatePoCharges(
         poEntries.map(([, items]) => items.map((item) => item.lineTotal)),
         {
@@ -822,18 +838,20 @@ export function registerPoImportRoutes(app: Express) {
             supplierId,
             voucherId: voucher.id,
             currency: poItems[0]?.currency,
-            ...(zambiaNative && nativeChargeSplits ? {
-              historicalExchangeRate: zambiaNative.historicalExchangeRate,
-              historicalRateDate: importDate,
-              nativeLineCount: poItems.length,
-              nativeItemsTotal: nativeChargeSplits[poIndex].itemsTotal.toFixed(2),
-              nativeFreight: nativeChargeSplits[poIndex].freight.toFixed(2),
-              nativeSurcharge: nativeChargeSplits[poIndex].surcharge.toFixed(2),
-              nativeFumigation: nativeChargeSplits[poIndex].fumigation.toFixed(2),
-              nativeDocumentCharges: nativeChargeSplits[poIndex].documentCharges.toFixed(2),
-              nativeDiscount: nativeChargeSplits[poIndex].discount.toFixed(2),
-              nativeOtherCharges: nativeChargeSplits[poIndex].otherCharges.toFixed(2),
-            } : {}),
+            ...(zambiaNative && nativeChargeSplits
+              ? {
+                  historicalExchangeRate: zambiaNative.historicalExchangeRate,
+                  historicalRateDate: importDate,
+                  nativeLineCount: poItems.length,
+                  nativeItemsTotal: nativeChargeSplits[poIndex].itemsTotal.toFixed(2),
+                  nativeFreight: nativeChargeSplits[poIndex].freight.toFixed(2),
+                  nativeSurcharge: nativeChargeSplits[poIndex].surcharge.toFixed(2),
+                  nativeFumigation: nativeChargeSplits[poIndex].fumigation.toFixed(2),
+                  nativeDocumentCharges: nativeChargeSplits[poIndex].documentCharges.toFixed(2),
+                  nativeDiscount: nativeChargeSplits[poIndex].discount.toFixed(2),
+                  nativeOtherCharges: nativeChargeSplits[poIndex].otherCharges.toFixed(2),
+                }
+              : {}),
             itemsTotal: poItemsTotal.toFixed(),
             freight: poFreight.toFixed(2),
             surcharge: poSurcharge.toFixed(2),
