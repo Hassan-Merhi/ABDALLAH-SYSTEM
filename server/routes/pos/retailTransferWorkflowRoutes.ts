@@ -63,16 +63,19 @@ export function registerRetailTransferWorkflowRoutes(app: Express): void {
       const rows = await db
         .select()
         .from(retailStockOperations)
-        .where(and(eq(retailStockOperations.companyId, companyId), eq(retailStockOperations.operationType, "transfer_dispatch")))
+        .where(and(
+          eq(retailStockOperations.companyId, companyId),
+          eq(retailStockOperations.operationType, "transfer_dispatch"),
+          requested === "all" ? undefined : sql`(${retailStockOperations.metadata}->>'status') = ${requested}`
+        ))
         .orderBy(desc(retailStockOperations.createdAt), desc(retailStockOperations.id))
         .limit(250);
-      const records = rows.map((row) => ({
+      res.json(rows.map((row) => ({
         id: row.id,
         createdAt: row.createdAt,
         createdBy: row.createdBy,
         ...metadata(row.metadata ?? {}),
-      }));
-      res.json(records.filter((item) => requested === "all" || item.status === requested));
+      })));
     } catch (error) {
       res.status(400).json({ message: getErrorMessage(error) });
     }
