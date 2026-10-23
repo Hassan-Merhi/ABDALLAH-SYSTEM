@@ -10,6 +10,7 @@
  */
 import Decimal from "decimal.js";
 import { storage } from "../../storage";
+import { companyBusinessDate } from "../accounting/companyBusinessDate";
 import { companyRateDateSchema, companyRateValueSchema } from "@shared/companyRatePolicy";
 
 export class PosZmwRateError extends Error {
@@ -30,6 +31,12 @@ export async function resolveLockedZmwPosCurrency(
   if (code !== "ZMW") return { currency: code, exchangeRate: suppliedRate == null ? null : String(suppliedRate) };
   if (!companyRateDateSchema.safeParse(voucherDate).success) {
     throw new PosZmwRateError("Enter a valid sale date before posting a Kwacha sale.");
+  }
+  // The effective-dated company rate may legitimately predate a sale, but
+  // tomorrow's sale must never be booked today against an earlier rate.
+  const currentBusinessDate = await companyBusinessDate(companyId);
+  if (voucherDate > currentBusinessDate) {
+    throw new PosZmwRateError("Future-dated Kwacha sales/refunds are not allowed. Select a business date on or before today.");
   }
   const company = await storage.getCompanyById(companyId);
   if (!company || company.baseCurrency !== "USD" || company.displayCurrency !== "ZMW") {
