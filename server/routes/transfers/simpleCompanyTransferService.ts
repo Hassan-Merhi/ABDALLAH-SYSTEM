@@ -6,7 +6,7 @@ import {
   type PostingActor,
 } from "../../services/accounting";
 import { requireCompanyAccess } from "./transferRequestContext";
-import { resolveZambiaIntercompanyAmount } from "../../services/accounting/zambiaIntercompanyTransfer";
+import { resolveZambiaIntercompanyAmount, zambiaTransferVoucherNumber } from "../../services/accounting/zambiaIntercompanyTransfer";
 import { TransferRouteError } from "./transferErrors";
 import { transferRepository } from "./transferRepository";
 import { parseSimpleTransferInput } from "./transferValidation";
@@ -123,7 +123,9 @@ export const simpleCompanyTransferService = {
       const fromNarration = `Transfer out to ${toCompany.name}`;
       const fromBuilt = buildCompanyTransferPostingRequest({
         companyId: parsed.fromCompanyId,
-        voucherNumber: `TR-OUT-${voucherTimestamp}`,
+        voucherNumber: fx.currency === "ZMW"
+          ? zambiaTransferVoucherNumber("TR-OUT", parsed.clientRequestId ?? "")
+          : `TR-OUT-${voucherTimestamp}`,
         voucherType: "Payment",
         voucherDate: parsed.transferDate,
         description: `${description} → ${toCompany.name}`,
@@ -143,7 +145,9 @@ export const simpleCompanyTransferService = {
       const toNarration = `Transfer in from ${fromCompany.name}`;
       const toBuilt = buildCompanyTransferPostingRequest({
         companyId: parsed.toCompanyId,
-        voucherNumber: `TR-IN-${voucherTimestamp}`,
+        voucherNumber: fx.currency === "ZMW"
+          ? zambiaTransferVoucherNumber("TR-IN", parsed.clientRequestId ?? "")
+          : `TR-IN-${voucherTimestamp}`,
         voucherType: "Receipt",
         voucherDate: parsed.transferDate,
         description: `Transfer from ${fromCompany.name}`,
