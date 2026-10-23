@@ -1,0 +1,52 @@
+/**
+ * Zambia POS exchange-rate protection.
+ *
+ * POS and sale_items store USD prices. The voucher has a foreign currency and
+ * per-entry original amount using the historically approved rate for the SALE
+ * DATE. Never use today's rate to post a backdated ZMW sale or edit.
+ *
+ * Existing Mali/CFA transactions are intentionally outside this Zambia-specific
+ * guard until their current legacy policies are migrated separately.
+ */
+import Decimal from "decimal.js";
+import { storage } from "../../storage";
+import { companyRateDateSchema, companyRateValueSchema } from "@shared/companyRatePolicy";
+
+export class PosZmwRateError extends Error {
+  readonly statusCode = 409;
+  readonly code = "POS_ZMW_RATE_REQUIRED";
+  constructor(message: string) { super(message); this.name = "PosZmwRateError"; }
+}
+
+export interface LockedPosCurrency { currency: string; exchangeRate: string | null; }
+
+export async function resolveLockedZmwPosCurrency(
+  companyId: number,
+  voucherDate: string,
+  currency: string | null | undefined,
+  suppliedRate: string | number | null | undefined
+): Promise<LockedPosCurrency> {
+  const code = String(currency || "USD").toUpperCase();
+  if (code !== "ZMW") return { currency: code, exchangeRate: suppliedRate == null ? null : String(suppliedRate) };
+  if (!companyRateDateSchema.safeParse(voucherDate).success) {
+    throw new PosZmwRateError("Enter a valid sale date before posting a Kwacha sale.");
+  }
+  const company = await storage.getCompanyById(companyId);
+  if (!company || company.baseCurrency !== "USD" || company.displayCurrency !== "ZMW") {
+    throw new PosZmwRateError("USD/ZMW must be configured for the active company before posting Kwacha sales.");
+  }
+  const dated = await storage.getExchangeRateForDate(companyId, "USD", "ZMW", voucherDate);
+  if (!dated || !companyRateValueSchema.safeParse(String(dated.rate)).success) {
+    throw new PosZmwRateError("No approved USD/ZMW exchange rate exists on or before the sale date.");
+  }
+  const locked = new Decimal(String(dated.rate));
+  const submitted = suppliedRate === undefined || suppliedRate === null || suppliedRate === ""
+    ? null : String(suppliedRate);
+  // An old browser tab or an intentionally backdated form must reload the rate
+  // instead of posting USD lines calculated using a mismatched current rate.
+  if (!submitted || !companyRateValueSchema.safeParse(submitted).success ||
+      !new Decimal(submitted).eq(locked)) {
+    throw new PosZmwRateError("The USD/ZMW rate for this sale date differs from the selected rate. Reload the date-specific rate and recalculate the prices.");
+  }
+  return { currency: "ZMW", exchangeRate: locked.toFixed() };
+}
