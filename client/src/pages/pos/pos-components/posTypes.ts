@@ -144,6 +144,8 @@ export type PosEditSalesItem = {
 };
 
 export type PosEditVoucher = {
+  currency?: string | null;
+  exchangeRate?: string | number | null;
   locationId?: number;
   description?: string | null;
   voucherDate?: string;
