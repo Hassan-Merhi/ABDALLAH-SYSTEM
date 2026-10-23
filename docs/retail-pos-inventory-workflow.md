@@ -75,6 +75,9 @@ No tests, CI, lint, typechecks or builds were executed for this phase.
 - Customer picker is in the top strip; whole-sale discounts, manager approval,
   split payments, existing receipts, returns/exchanges, shift requirement,
   location controls and back-office transfer widgets remain in place.
+- Sale notes now appear below the grid and are saved through the pre-existing
+  retail sale `notes` field. They participate in the checkout idempotency
+  fingerprint and clear only when a sale succeeds or the context changes.
 - The top payment method picker is bound to the existing first tender; when
   cart totals change, the selected payment method is no longer reset to cash.
 - The date reflects the local current day, for display only: Retail checkout
