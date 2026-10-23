@@ -463,6 +463,9 @@ export function registerPosImportRoutes(app: Express) {
       }
     } catch (error: unknown) {
       if (sendBaleMirrorMovementRefusal(res, error)) return;
+      if (error instanceof PosZmwRateError) {
+        return res.status(error.statusCode).json({ code: error.code, message: error.message });
+      }
       if (error instanceof HttpError && error.statusCode === 400) {
         return res.status(400).json({ message: getErrorMessage(error) });
       }
