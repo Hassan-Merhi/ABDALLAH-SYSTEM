@@ -55,7 +55,15 @@ export function RetailReturnDialog({
       if (/^(?:#|R-?)?\d+$/i.test(query)) params.set("receipt", query);
       else params.set("search", query);
       const response = await apiRequest("GET", `/api/pos/retail/sales/search?${params}`);
-      const data = (await response.json()) as RetailSale[];
+      let data = (await response.json()) as RetailSale[];
+      // Retail barcodes are often all digits. Check a receipt number first,
+      // then search the same numeric input as an item barcode if no receipt matched.
+      if (!data.length && params.has("receipt") && !query.startsWith("#")) {
+        params.delete("receipt");
+        params.set("barcode", query);
+        const fallback = await apiRequest("GET", `/api/pos/retail/sales/search?${params}`);
+        data = (await fallback.json()) as RetailSale[];
+      }
       setResults(data);
       setSale(null);
     } catch (error) {
