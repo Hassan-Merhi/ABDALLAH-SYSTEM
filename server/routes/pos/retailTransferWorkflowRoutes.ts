@@ -114,12 +114,26 @@ export function registerRetailTransferWorkflowRoutes(app: Express): void {
           .onConflictDoNothing({ target: [retailStockOperations.companyId, retailStockOperations.idempotencyKey] })
           .returning({ id: retailStockOperations.id });
         if (!created) {
-          const [existing] = await tx.select({ id: retailStockOperations.id, operationType: retailStockOperations.operationType })
+          const [existing] = await tx.select({
+            id: retailStockOperations.id,
+            operationType: retailStockOperations.operationType,
+            metadata: retailStockOperations.metadata,
+          })
             .from(retailStockOperations)
             .where(and(eq(retailStockOperations.companyId, companyId), eq(retailStockOperations.idempotencyKey, body.idempotencyKey)))
             .limit(1);
           if (existing?.operationType !== "transfer_dispatch") throw new Error("This operation key belongs to another stock transaction");
-          return { replayed: true, operationId: existing.id };
+          const prior = metadata(existing.metadata ?? {});
+          // An idempotent replay may not change the stock move while silently
+          // reporting success for the old request.
+          if (prior.variantId !== body.variantId ||
+              prior.fromLocationId !== body.fromLocationId ||
+              prior.toLocationId !== body.toLocationId ||
+              prior.quantity !== body.quantity ||
+              (prior.notes ?? "") !== (body.notes ?? "")) {
+            throw new Error("Transfer idempotency key belongs to a different dispatch");
+          }
+          return { replayed: true, operationId: existing.id, status: prior.status };
         }
         // All stock changes use row locks. Dispatch never permits negative source
         // stock, even if the cashier is otherwise permitted to oversell.
