@@ -48,7 +48,7 @@ export function RetailPaymentPanel({
           type="button"
           size="sm"
           variant="outline"
-          disabled={value.length >= 8}
+          disabled={value.length >= 8 || remaining <= 0.005}
           onClick={() =>
             onChange([
               ...value,
