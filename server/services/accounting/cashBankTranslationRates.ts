@@ -36,7 +36,15 @@ export async function getCashBankTranslationRates(companyId: number, asOf?: stri
     getLatestCfaPerUsd(companyId, asOf),
     isZambiaPair ? getLatestExchangeRate(companyId, "USD", "ZMW", asOf) : Promise.resolve(undefined),
   ]);
-  const raw = zmw?.rate == null ? null : new Decimal(String(zmw.rate));
+  let raw: Decimal | null = null;
+  if (zmw?.rate != null) {
+    try {
+      const parsed = new Decimal(String(zmw.rate));
+      if (parsed.isFinite() && parsed.gt(0)) raw = parsed;
+    } catch {
+      // Invalid stored rate is missing, never an implicit 1:1 conversion.
+    }
+  }
   return {
     CFA: cfa && cfa.isFinite() && cfa.gt(0) ? cfa : null,
     ZMW: raw && raw.isFinite() && raw.gt(0) ? raw : null,
