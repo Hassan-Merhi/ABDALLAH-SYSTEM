@@ -226,7 +226,9 @@ export function DailyRateModal({ companyId }: DailyRateModalProps) {
           </DialogTitle>
           <DialogDescription>
             No exchange rate has been set for today (
-            {format(todayRateCheck?.today ? new Date(`${todayRateCheck.today}T00:00:00`) : new Date("1970-01-01T00:00:00"), "MMM d, yyyy")}
+            {todayRateCheck?.today
+              ? format(new Date(`${todayRateCheck.today}T00:00:00`), "MMM d, yyyy")
+              : "business date unavailable"}
             ).
           </DialogDescription>
         </DialogHeader>
