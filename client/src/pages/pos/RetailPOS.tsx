@@ -1,22 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Percent, ScanLine, ShoppingCart } from "lucide-react";
+import { Percent, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useLocation as useLocationContext } from "@/contexts/LocationContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { RetailNav } from "@/pages/retail/RetailNav";
 import { PosWorkspaceColumns } from "./pos-components/PosWorkspaceColumns";
-import { RetailCameraScanner } from "./RetailCameraScanner";
+import { RetailErpPosSaleGrid, RetailErpPosItemPicker } from "./RetailErpPosWorkspace";
 import { RetailExchangeDialog } from "./RetailExchangeDialog";
-import { RetailItemImage, RetailScanFeedback } from "./RetailScanFeedback";
 import { RetailPaymentPanel } from "./RetailPaymentPanel";
 import {
-  RetailCartLineRow,
   RetailLastSaleSummary,
   RetailRecentSalesCard,
   RetailVariantTransferCard,
@@ -473,8 +469,6 @@ export default function RetailPOS() {
   const total = preview?.pricing.totalAmount ?? cart.reduce((sum, line) => sum + line.price * line.cartQuantity, 0);
   const units = cart.reduce((sum, line) => sum + line.cartQuantity, 0);
   const ladder = preview?.pricing ?? null;
-  const previewLineFor = (variantId: number) =>
-    preview?.pricing.lines.find((entry) => entry.variantId === variantId) ?? null;
   const settings = preview?.settings ?? null;
   const requiresApproval = Boolean(preview?.policy.requiresApproval) && !approvalToken;
 
@@ -508,15 +502,22 @@ export default function RetailPOS() {
     <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4 p-3 pb-24 md:p-5 xl:pb-5">
       {receiptPortal}
       {!isPosRole && <RetailNav />}
-      <div className="flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-xs md:flex-row md:items-end md:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Retail POS</h1>
-          <p className="text-sm text-muted-foreground">
-            Scan a barcode or search by name, SKU, barcode, brand, color, or size.
-          </p>
-        </div>
-        <div className="w-full md:w-72">
-          <Label htmlFor="retail-pos-location">Selling location</Label>
+      {/* Retail uses the normal ERP POS arrangement; posting stays on variant-aware retail services. */}
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b py-2">
+        <h1 className="border-l-2 border-primary pl-3 text-2xl font-semibold tracking-tight">Point of Sale</h1>
+        <Button
+          type="button"
+          disabled={!canCompleteSale}
+          onClick={() => saleMutation.mutate()}
+          data-testid="button-save-sale"
+        >
+          {saleMutation.isPending ? "Saving…" : "Save"}
+        </Button>
+      </header>
+
+      <div className="flex flex-wrap items-start gap-3 border-b bg-muted/10 px-1 py-2" aria-label="Retail sale details">
+        <div className="space-y-1">
+          <label htmlFor="retail-pos-location" className="text-xs text-muted-foreground">Location</label>
           <select
             id="retail-pos-location"
             disabled={isPosRole}
@@ -525,139 +526,81 @@ export default function RetailPOS() {
               const location = locations.find((entry) => entry.id === Number(event.target.value)) ?? null;
               setSelectedLocation(location);
             }}
-            className="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm"
+            className="block h-9 min-w-[154px] max-w-[220px] rounded-md border bg-background px-3 text-sm"
           >
             <option value="">Select location</option>
             {locations.map((location) => (
-              <option key={location.id} value={location.id}>
-                {location.name}
-              </option>
+              <option key={location.id} value={location.id}>{location.name}</option>
             ))}
           </select>
+        </div>
+        <div className="space-y-1">
+          <label htmlFor="retail-pos-date" className="text-xs text-muted-foreground">Date</label>
+          <input
+            id="retail-pos-date"
+            type="date"
+            className="block h-9 rounded-md border bg-muted/40 px-3 font-mono text-sm"
+            value={new Date().toLocaleDateString("en-CA").split("/").reverse().join("-")}
+            readOnly
+            aria-label="Sale date (set by server at checkout)"
+            title="Retail sales use the actual checkout date; backdated posting is not enabled"
+          />
+        </div>
+        <div className="space-y-1">
+          <label htmlFor="retail-pos-method" className="text-xs text-muted-foreground">Payment</label>
+          <select
+            id="retail-pos-method"
+            className="block h-9 min-w-28 rounded-md border bg-background px-3 text-sm"
+            value={payments[0]?.method ?? "cash"}
+            onChange={(event) => {
+              const method = event.target.value as RetailPaymentDraft["method"];
+              setPayments((current) => current.map((payment, index) =>
+                index === 0 ? {
+                  ...payment,
+                  method,
+                  tenderedAmount: method === "cash" ? (payment.amount || 0) : null,
+                } : payment
+              ));
+            }}
+          >
+            <option value="cash">Cash</option>
+            <option value="card">Card</option>
+            <option value="bank">Bank</option>
+            <option value="mobile">Mobile</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div className="flex items-center gap-2 pt-6" title="Credit-sale accounting is part of Phase 4">
+          <input type="checkbox" disabled checked={false} aria-label="Credit sales not yet available" className="h-4 w-4" />
+          <span className="text-sm text-muted-foreground">Credit (coming in Phase 4)</span>
+        </div>
+        <div className="min-w-[190px] flex-1 xl:max-w-[350px]">
+          <RetailCustomerPicker customer={customer} onSelect={setCustomer} />
         </div>
       </div>
 
       <RetailShiftPanel locationId={selectedLocation?.id ?? null} onShiftChange={setCurrentShift} />
 
       <PosWorkspaceColumns layout="retail">
-        <Card>
-          <CardHeader className="space-y-3 pb-3">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <ScanLine className="h-5 w-5" /> Scan or find item
-            </CardTitle>
-            <form
-              className="flex gap-2"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void scanBarcode(scanText);
-              }}
-            >
-              <div className="relative flex-1">
-                <ScanLine className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  ref={scanInputRef}
-                  autoFocus
-                  autoComplete="off"
-                  inputMode="search"
-                  enterKeyHint="go"
-                  value={scanText}
-                  onChange={(event) => setScanText(event.target.value)}
-                  placeholder="Scan barcode or search product / SKU / brand / color / size"
-                  className="h-12 pl-10 text-base"
-                  data-testid="retail-pos-scan"
-                />
-              </div>
-              <RetailCameraScanner onScan={(value) => void scanBarcode(value)} />
-            </form>
-            <RetailScanFeedback outcome={lastScan} />
-          </CardHeader>
-          <CardContent>
-            {!selectedLocation ? (
-              <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-                Select a location to load retail stock.
-              </div>
-            ) : itemsQuery.isLoading ? (
-              <div className="p-8 text-center text-sm text-muted-foreground">Loading variants…</div>
-            ) : (
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {(itemsQuery.data ?? []).map((item) => (
-                  <button
-                    type="button"
-                    key={item.variantId}
-                    onClick={() => {
-                      const outcome = addItem(item);
-                      setLastScan(outcome);
-                      if (outcome.status !== "added") scanBeep(false);
-                      focusScan();
-                    }}
-                    className="flex min-h-24 items-center gap-3 rounded-lg border p-3 text-left transition hover:border-primary hover:bg-muted/40"
-                  >
-                    <RetailItemImage item={item} />
-                    <span className="min-w-0 flex-1" data-no-translate>
-                      <span className="block truncate font-medium">{item.name}</span>
-                      <span className="block truncate text-xs text-muted-foreground">
-                        {item.brand} · {item.color} · Size {item.size}
-                      </span>
-                      <span className="mt-1 flex items-center justify-between text-sm">
-                        <strong data-no-translate>
-                          {item.promotion && (
-                            <span className="mr-1 text-xs font-normal text-muted-foreground line-through">
-                              {money(item.price)}
-                            </span>
-                          )}
-                          {money(item.promotion?.promotionPrice ?? item.price)}
-                        </strong>
-                        <span className={item.quantity <= 0 ? "font-medium text-destructive" : "text-muted-foreground"}>
-                          {item.quantity <= 0 ? "Sold out" : `Qty ${item.quantity}`}
-                        </span>
-                      </span>
-                    </span>
-                  </button>
-                ))}
-                {!itemsQuery.isLoading && !(itemsQuery.data ?? []).length && (
-                  <div className="col-span-full rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-                    No matching retail variants.
-                  </div>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="h-fit xl:sticky xl:top-3" id="retail-pos-cart">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <ShoppingCart className="h-5 w-5" /> Cart
-              {units > 0 && <span className="text-sm font-normal text-muted-foreground">· {units}</span>}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {cart.map((line) => (
-              <RetailCartLineRow
-                key={line.variantId}
-                line={line}
-                pricedLineTotal={previewLineFor(line.variantId)?.lineTotal ?? null}
-                onDecrease={() =>
-                  setCart((current) =>
-                    current.map((item) =>
-                      item.variantId === line.variantId
-                        ? { ...item, cartQuantity: Math.max(1, item.cartQuantity - 1) }
-                        : item
-                    )
-                  )
-                }
-                onIncrease={() => setLastScan(addItem(line))}
-                onAdjust={() => setAdjustLine(line)}
-                onRemove={() => setCart((current) => current.filter((item) => item.variantId !== line.variantId))}
-              />
+        <div className="flex min-w-0 flex-col gap-3">
+          <RetailErpPosSaleGrid
+            cart={cart}
+            pricingLines={ladder?.lines ?? []}
+            units={units}
+            total={total}
+            onDecrease={(variantId) => setCart((current) => current.map((line) =>
+              line.variantId === variantId ? { ...line, cartQuantity: Math.max(1, line.cartQuantity - 1) } : line
             ))}
-            {!cart.length && (
-              <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-                Scan or select an exact color and size to start a sale.
-              </div>
-            )}
+            onIncrease={(line) => {
+              const outcome = addItem(line);
+              setLastScan(outcome);
+              if (outcome.status !== "added") scanBeep(false);
+            }}
+            onAdjust={setAdjustLine}
+            onRemove={(variantId) => setCart((current) => current.filter((line) => line.variantId !== variantId))}
+          />
+          <div className="rounded-lg border p-3" aria-label="Retail checkout">
             <div className="space-y-2 border-t pt-3">
-              <RetailCustomerPicker customer={customer} onSelect={setCustomer} />
               <div className="rounded-lg border p-2">
                 <button
                   type="button"
@@ -766,23 +709,41 @@ export default function RetailPOS() {
                 </div>
               )}
             </div>
+
             {cart.length > 0 && <RetailPaymentPanel total={total} value={payments} onChange={setPayments} />}
-            {isPosRole && !currentShift && cart.length > 0 ? (
+            {isPosRole && !currentShift && cart.length > 0 && (
               <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-sm">
                 Open a cashier shift before completing this sale.
               </div>
-            ) : null}
+            )}
             <Button
-              className="h-12 w-full text-base"
+              type="button"
               size="lg"
+              className="mt-3 h-11 w-full"
               disabled={!canCompleteSale}
               onClick={() => saleMutation.mutate()}
             >
               {saleMutation.isPending ? "Completing sale…" : "Complete Sale"}
             </Button>
             {lastSale && <RetailLastSaleSummary sale={lastSale} onPrint={() => printReceipt(lastSale)} />}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
+        <RetailErpPosItemPicker
+          items={itemsQuery.data ?? []}
+          loading={itemsQuery.isLoading}
+          hasLocation={Boolean(selectedLocation?.id)}
+          searchText={scanText}
+          onSearchChange={setScanText}
+          onBarcodeSubmit={(barcode) => void scanBarcode(barcode)}
+          scanInputRef={scanInputRef}
+          lastScan={lastScan}
+          onPick={(item) => {
+            const outcome = addItem(item);
+            setLastScan(outcome);
+            if (outcome.status !== "added") scanBeep(false);
+            focusScan();
+          }}
+        />
       </PosWorkspaceColumns>
 
       <div className="grid gap-4 xl:grid-cols-2">
