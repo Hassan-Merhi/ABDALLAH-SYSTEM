@@ -8,7 +8,8 @@ import { storage } from "../../storage";
 import { logAudit } from "../_helpers";
 import { HttpError } from "../../lib/httpHandlers";
 import { syncIntercoParentVoucher } from "./containerHelpers";
-import { assertHistoricalUsdPurchaseCost } from "../../services/accounting/zambiaPurchaseCurrencyGuard";
+import { isUnsupportedNativeZmwPurchase } from "../../services/accounting/zambiaPurchaseCurrencyGuard";
+import { valueZmwPurchaseAtLockedRate } from "../../services/accounting/zambiaPurchaseCosting";
 import type Decimal from "decimal.js";
 import { MoneyDecimal, parseMoneyInput, sumMoney, toMoney } from "../../lib/money";
 import { syncPurchaseOrderGitTx } from "../../services/accounting/perpetualInventory/stockReceipts";
@@ -72,10 +73,14 @@ export async function applyPurchaseOrderItemsUpdate(
   ctx: PurchaseOrderItemsUpdateContext
 ): Promise<Record<string, unknown>> {
   const { id, existingPO } = ctx;
-  // A PO currency label does not change its USD line/landed cost basis.
-  // Guard both existing ZMW rows and attempts to relabel a USD-valued PO.
-  assertHistoricalUsdPurchaseCost(existingPO.currency);
-  assertHistoricalUsdPurchaseCost(req.body.currency);
+  const nativeZmw = isUnsupportedNativeZmwPurchase(existingPO.currency);
+  if ((nativeZmw || isUnsupportedNativeZmwPurchase(req.body.currency)) &&
+      String(req.body.currency ?? existingPO.currency).toUpperCase() !== String(existingPO.currency).toUpperCase()) {
+    throw new HttpError(409, "PO currency is locked after posting. Reverse and rebook instead.");
+  }
+  if (nativeZmw && (!existingPO.historicalExchangeRate || !existingPO.historicalRateDate)) {
+    throw new HttpError(409, "Native Kwacha PO has no recoverable locked rate; reconcile before editing.");
+  }
 
   // Get existing line items to preserve values when only name changes
   const existingLineItems = await storage.getLineItemsByPO(id);
@@ -98,7 +103,8 @@ export async function applyPurchaseOrderItemsUpdate(
     const rate =
       item.rate !== undefined && item.rate !== null && item.rate !== ""
         ? item.rate.toString()
-        : (existingItem?.rate ?? "0");
+        : (nativeZmw ? existingItem?.nativeRate ?? "" : existingItem?.rate ?? "0");
+    if (nativeZmw && !rate) throw new HttpError(409, "Missing original native PO line price");
     const lineTotal = amountInput(quantity).times(amountInput(rate));
     itemsTotal = itemsTotal.plus(lineTotal);
 
@@ -112,13 +118,37 @@ export async function applyPurchaseOrderItemsUpdate(
     };
   });
 
+  // Native ZMW is revalued at the ORIGINAL purchase rate, never a current rate.
+  const nativeCost = nativeZmw ? valueZmwPurchaseAtLockedRate({
+    date: existingPO.historicalRateDate!,
+    historicalRate: String(existingPO.historicalExchangeRate),
+    lines: newItems.map(item => ({ quantity: item.quantity, rate: item.rate })),
+    charges: {
+      freight: req.body.freight ?? existingPO.nativeFreight,
+      surcharge: req.body.surcharge ?? existingPO.nativeSurcharge,
+      fumigation: req.body.fumigation ?? existingPO.nativeFumigation,
+      documentCharges: req.body.documentCharges ?? existingPO.nativeDocumentCharges,
+      discount: req.body.discount ?? existingPO.nativeDiscount,
+      otherCharges: req.body.otherCharges ?? existingPO.nativeOtherCharges,
+    },
+  }) : null;
+  const valuedItems = nativeCost
+    ? newItems.map((item, index) => ({
+        ...item, rate: nativeCost.lines[index].rate,
+        lineTotal: nativeCost.lines[index].lineTotal,
+        nativeRate: nativeCost.lines[index].nativeRate,
+        nativeLineTotal: nativeCost.lines[index].nativeLineTotal,
+      }))
+    : newItems;
+  if (nativeCost) itemsTotal = new MoneyDecimal(nativeCost.itemsTotal);
+
   // Use ?? to correctly handle explicit zero values from the request
-  const freight = amountInput(req.body.freight ?? existingPO.freight ?? "0");
-  const surcharge = amountInput(req.body.surcharge ?? existingPO.surcharge ?? "0");
-  const fumigation = amountInput(req.body.fumigation ?? existingPO.fumigation ?? "0");
-  const documentCharges = amountInput(req.body.documentCharges ?? existingPO.documentCharges ?? "0");
-  const discount = amountInput(req.body.discount ?? existingPO.discount ?? "0");
-  const otherCharges = amountInput(req.body.otherCharges ?? existingPO.otherCharges ?? "0");
+  const freight = amountInput(nativeCost?.freight ?? req.body.freight ?? existingPO.freight ?? "0");
+  const surcharge = amountInput(nativeCost?.surcharge ?? req.body.surcharge ?? existingPO.surcharge ?? "0");
+  const fumigation = amountInput(nativeCost?.fumigation ?? req.body.fumigation ?? existingPO.fumigation ?? "0");
+  const documentCharges = amountInput(nativeCost?.documentCharges ?? req.body.documentCharges ?? existingPO.documentCharges ?? "0");
+  const discount = amountInput(nativeCost?.discount ?? req.body.discount ?? existingPO.discount ?? "0");
+  const otherCharges = amountInput(nativeCost?.otherCharges ?? req.body.otherCharges ?? existingPO.otherCharges ?? "0");
   // Every charge but the freight, net of the discount.
   const nonFreightCharges = sumMoney([surcharge, fumigation, documentCharges, otherCharges]).minus(discount);
 
@@ -161,7 +191,10 @@ export async function applyPurchaseOrderItemsUpdate(
       // The route performs a fast user-facing check before entering the transaction.
       // Re-check here after the container lock so an offload that won the race cannot
       // be followed by a stock-item swap against inventory that was already materialized.
-      if (lockedContainer?.status === "OFFLOADED") {
+      if (nativeZmw && lockedContainer?.status === "OFFLOADED") {
+          throw new HttpError(409, "Reverse the offload before editing native Kwacha purchase quantities or prices.");
+        }
+        if (lockedContainer?.status === "OFFLOADED") {
         const currentLineItems = await tx
           .select({ stockItemId: poLineItems.stockItemId })
           .from(poLineItems)
@@ -182,8 +215,8 @@ export async function applyPurchaseOrderItemsUpdate(
       await tx.delete(poLineItems).where(eq(poLineItems.poId, id));
 
       // Insert new line items
-      if (newItems.length > 0) {
-        await tx.insert(poLineItems).values(newItems);
+      if (valuedItems.length > 0) {
+        await tx.insert(poLineItems).values(valuedItems);
       }
 
       // Update PO with new items total and charges
@@ -200,6 +233,15 @@ export async function applyPurchaseOrderItemsUpdate(
         .update(purchaseOrders)
         .set({
           itemsTotal: cents(itemsTotal),
+          ...(nativeCost ? {
+            nativeItemsTotal: nativeCost.nativeItemsTotal,
+            nativeFreight: nativeCost.nativeFreight,
+            nativeSurcharge: nativeCost.nativeSurcharge,
+            nativeFumigation: nativeCost.nativeFumigation,
+            nativeDocumentCharges: nativeCost.nativeDocumentCharges,
+            nativeDiscount: nativeCost.nativeDiscount,
+            nativeOtherCharges: nativeCost.nativeOtherCharges,
+          } : {}),
           freight: cents(freight),
           surcharge: cents(surcharge),
           fumigation: cents(fumigation),
