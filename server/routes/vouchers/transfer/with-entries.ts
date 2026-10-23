@@ -1,4 +1,4 @@
-import { assertLockedZmwVoucherEdit } from "../../../services/accounting/zambiaVoucherRatePolicy";
+import { assertLockedZmwVoucherEdit, assertResolvedZmwVoucherEntriesTx } from "../../../services/accounting/zambiaVoucherRatePolicy";
 /**
  * voucherTransferRoutes: VoucherWithEntries endpoints.
  *
@@ -77,26 +77,10 @@ export function registerVoucherWithEntriesRoutes(app: Express) {
       // original currency, accounting date, or historical rate.
       assertLockedZmwVoucherEdit(existingVoucher, voucher);
       if (existingVoucher.currency === "ZMW") {
-        // Refuse replacements of older foreign vouchers whose original
-        // amounts were never resolved. Otherwise an edit could rebuild them
-        // from historical USD columns and corrupt the native ledger.
-        const originalLines = await db.select({
-          transactionCurrency: voucherEntries.transactionCurrency,
-          transactionDebitAmount: voucherEntries.transactionDebitAmount,
-          transactionCreditAmount: voucherEntries.transactionCreditAmount,
-          historicalExchangeRate: voucherEntries.historicalExchangeRate,
-        }).from(voucherEntries).where(eq(voucherEntries.voucherId, id));
-        if (!originalLines.length || originalLines.some((line) =>
-          line.transactionCurrency !== "ZMW" ||
-          line.transactionDebitAmount == null ||
-          line.transactionCreditAmount == null ||
-          line.historicalExchangeRate == null
-        )) {
-          return res.status(409).json({
-            code: "ZMW_HISTORICAL_ENTRY_UNRESOLVED",
-            message: "The original Kwacha entry amounts or rate are unresolved. Reconcile the historical voucher before editing.",
-          });
-        }
+        await db.transaction(async (tx) => {
+          const originalLines = await tx.select().from(voucherEntries).where(eq(voucherEntries.voucherId, id));
+          await assertResolvedZmwVoucherEntriesTx(tx, existingVoucher.companyId, originalLines);
+        });
       }
       // Phase 19 C (MC-2): an intercompany transfer leg is not edited here (409);
       // the transfer is deleted (both legs) and recorded again. This editor used
@@ -221,6 +205,12 @@ export function registerVoucherWithEntriesRoutes(app: Express) {
           companyId: existingVoucher.companyId,
           newVoucherDate: voucher.voucherDate ?? null,
         });
+        // Revalidate native lines under the edit transaction, including only
+        // recognized engine USD rounding entries as valid exceptions.
+        if (existingVoucher.currency === "ZMW") {
+          const originalLines = await tx.select().from(voucherEntries).where(eq(voucherEntries.voucherId, id));
+          await assertResolvedZmwVoucherEntriesTx(tx, existingVoucher.companyId, originalLines);
+        }
 
         const voucherUpdates: VoucherUpdate = {
           voucherType: voucher.voucherType,
