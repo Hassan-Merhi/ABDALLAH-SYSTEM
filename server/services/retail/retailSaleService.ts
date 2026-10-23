@@ -495,6 +495,7 @@ export async function createRetailReturnInTx(
     const [existing] = await tx
       .select({
         id: retailPosReturns.id,
+        saleId: retailPosReturns.saleId,
         refundAmount: retailPosReturns.refundAmount,
         refundTaxAmount: retailPosReturns.refundTaxAmount,
       })
@@ -502,6 +503,32 @@ export async function createRetailReturnInTx(
       .where(and(eq(retailPosReturns.companyId, companyId), eq(retailPosReturns.idempotencyKey, input.idempotencyKey)))
       .limit(1);
     if (!existing) throw new Error("Return retry could not be resolved");
+    if (existing.saleId !== saleId) {
+      throw new Error("Return idempotency key was already used for another sale");
+    }
+    const priorLines = await tx
+      .select({
+        saleItemId: retailPosReturnItems.saleItemId,
+        quantity: retailPosReturnItems.quantity,
+        restocked: retailPosReturnItems.restocked,
+      })
+      .from(retailPosReturnItems)
+      .where(and(eq(retailPosReturnItems.companyId, companyId), eq(retailPosReturnItems.returnId, existing.id)));
+    const expected = new Map<number, { quantity: number; restock: boolean }>();
+    for (const line of input.items) {
+      const restock = line.restock !== false;
+      const previous = expected.get(line.saleItemId);
+      if (previous && previous.restock !== restock) throw new Error("Conflicting restock disposition on return retry");
+      expected.set(line.saleItemId, { quantity: (previous?.quantity ?? 0) + line.quantity, restock });
+    }
+    if (priorLines.length !== expected.size ||
+        priorLines.some((line) => {
+          const requested = expected.get(line.saleItemId);
+          return !requested || Math.abs(toNumber(line.quantity) - requested.quantity) > 0.000001 ||
+            line.restocked !== requested.restock;
+        })) {
+      throw new Error("Return idempotency key was already used for different items or quantities");
+    }
     return {
       returnId: existing.id,
       replayed: true,
