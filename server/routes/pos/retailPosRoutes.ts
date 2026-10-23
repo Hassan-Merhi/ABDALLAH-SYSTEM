@@ -65,7 +65,8 @@ const positiveQuantitySchema = z.coerce.number().finite().positive();
 const paymentSchema = z.object({
   method: z.enum(["cash", "card", "bank", "mobile", "other", "credit"]),
   amount: z.coerce.number().finite().positive(),
-  tenderedAmount: z.coerce.number().finite().positive().optional(),
+  // Non-cash and customer-credit tenders do not have a cash-tendered amount.
+  tenderedAmount: z.coerce.number().finite().positive().nullable().optional(),
   reference: z.string().trim().max(191).optional(),
 });
 
