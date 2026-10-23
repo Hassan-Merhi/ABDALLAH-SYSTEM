@@ -195,7 +195,7 @@ export function InvoiceTemplate({
                   verticalAlign: "middle",
                 }}
               >
-                Rate
+                {hasLockedZmw ? "Rate (K)" : "Rate"}
               </th>
               <th
                 style={{
@@ -207,7 +207,7 @@ export function InvoiceTemplate({
                   verticalAlign: "middle",
                 }}
               >
-                Amt
+                {hasLockedZmw ? "Amt (K)" : "Amt"}
               </th>
               <th
                 style={{
@@ -219,7 +219,7 @@ export function InvoiceTemplate({
                   verticalAlign: "middle",
                 }}
               >
-                Config
+                {hasLockedZmw ? "Config (USD)" : "Config"}
               </th>
               <th
                 style={{
@@ -231,7 +231,7 @@ export function InvoiceTemplate({
                   verticalAlign: "middle",
                 }}
               >
-                P/L Bale
+                {hasLockedZmw ? "P/L Bale (USD)" : "P/L Bale"}
               </th>
               <th
                 style={{
@@ -243,7 +243,7 @@ export function InvoiceTemplate({
                   verticalAlign: "middle",
                 }}
               >
-                Total P/L
+                {hasLockedZmw ? "Total P/L (USD)" : "Total P/L"}
               </th>
             </tr>
           </thead>
