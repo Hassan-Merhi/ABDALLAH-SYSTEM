@@ -10,6 +10,7 @@ import { useLocation as useLocationContext } from "@/contexts/LocationContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { RetailNav } from "@/pages/retail/RetailNav";
+import { PosWorkspaceColumns } from "./pos-components/PosWorkspaceColumns";
 import { RetailCameraScanner } from "./RetailCameraScanner";
 import { RetailExchangeDialog } from "./RetailExchangeDialog";
 import { RetailItemImage, RetailScanFeedback } from "./RetailScanFeedback";
@@ -538,7 +539,7 @@ export default function RetailPOS() {
 
       <RetailShiftPanel locationId={selectedLocation?.id ?? null} onShiftChange={setCurrentShift} />
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(360px,0.7fr)]">
+      <PosWorkspaceColumns layout="retail">
         <Card>
           <CardHeader className="space-y-3 pb-3">
             <CardTitle className="flex items-center gap-2 text-lg">
@@ -782,7 +783,7 @@ export default function RetailPOS() {
             {lastSale && <RetailLastSaleSummary sale={lastSale} onPrint={() => printReceipt(lastSale)} />}
           </CardContent>
         </Card>
-      </div>
+      </PosWorkspaceColumns>
 
       <div className="grid gap-4 xl:grid-cols-2">
         <RetailRecentSalesCard
