@@ -110,6 +110,7 @@ export default function RetailStockOperations() {
     quantity: number;
     dispatchedAt: string;
     notes?: string | null;
+    imageUrls?: string[];
   }>>({
     queryKey: ["retail-transfer-workflow", companyKey],
     queryFn: () => getJson("/api/pos/retail/transfers/workflow?status=otw"),
@@ -371,6 +372,66 @@ export default function RetailStockOperations() {
         </label>
       )}
 
+      {mode === "transfer" && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Find an exact variant to transfer</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Search a style, SKU, color, size or barcode. Click an item to select it;
+              click its picture to browse the full gallery without selecting it.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label htmlFor="retail-transfer-source-select">From location</Label>
+                {locationSelect(locationId, setLocationId, "retail-transfer-source-select")}
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="retail-transfer-item-search">Find product / variant</Label>
+                <Input
+                  id="retail-transfer-item-search"
+                  value={transferSearch}
+                  onChange={(event) => setTransferSearch(event.target.value)}
+                  placeholder="Product, color, size, SKU or barcode"
+                  autoComplete="off"
+                />
+              </div>
+            </div>
+            <div className="max-h-72 overflow-y-auto rounded-md border" role="group" aria-label="Choose exact variant">
+              {transferOptions.map((item) => (
+                <div key={item.variantId} className={cn(
+                  "flex items-center gap-2 border-b p-2 last:border-0 hover:bg-muted/30",
+                  variant?.variantId === item.variantId && "bg-primary/5"
+                )}>
+                  <RetailPhotoGallery
+                    images={item.imageUrls}
+                    title={`${item.brand} · ${item.name} · ${item.color} / ${item.size}`}
+                    imageClassName="h-14 w-14 shrink-0 rounded-md border"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void loadVariant(`variantId=${item.variantId}`)}
+                    className="min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    aria-label={`Select ${item.name}, ${item.color}, size ${item.size}`}
+                  >
+                    <div className="truncate text-sm font-semibold">{item.brand} · {item.name}</div>
+                    <div className="text-xs">{item.color} / {item.size} · <span className="font-mono">{item.barcode}</span></div>
+                    <div className="text-xs text-muted-foreground">Available at source: {item.quantity}</div>
+                  </button>
+                  {variant?.variantId === item.variantId && <span className="text-xs font-semibold text-primary">Selected</span>}
+                </div>
+              ))}
+              {!transferOptions.length && (
+                <p className="p-3 text-sm text-muted-foreground">
+                  {!locationId ? "Select a source location" : transferOptionsLoading ? "Loading variants…" : "No variants match your search"}
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {notFound && (
         <div
           className="rounded-lg border-2 border-destructive/60 bg-red-50 p-3 text-sm dark:bg-red-950/30"
@@ -436,6 +497,25 @@ export default function RetailStockOperations() {
                 </div>
               )}
             </div>
+            {mode === "transfer" && (
+              <div className="space-y-2 rounded-md border p-3" role="group" aria-label="Transfer completion mode">
+                <p className="text-sm font-medium">Transfer method</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button type="button" variant={transferFlow === "immediate" ? "default" : "outline"} onClick={() => setTransferFlow("immediate")}>
+                    Immediate
+                  </Button>
+                  <Button type="button" variant={transferFlow === "dispatch" ? "default" : "outline"} onClick={() => setTransferFlow("dispatch")}>
+                    Dispatch / Receive
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {transferFlow === "immediate"
+                    ? "Moves stock to the destination in a single operation."
+                    : "Dispatch removes stock from the source. Destination stock increases only when receipt is confirmed; value remains in transit."}
+                </p>
+                <Input value={transferNotes} onChange={(event) => setTransferNotes(event.target.value)} placeholder="Transfer note (optional)" maxLength={1000} aria-label="Transfer note" />
+              </div>
+            )}
             {mode === "adjust" && (
               <div className="grid grid-cols-2 gap-2">
                 <Button type="button" variant={direction < 0 ? "default" : "outline"} onClick={() => setDirection(-1)}>
@@ -526,9 +606,56 @@ export default function RetailStockOperations() {
                 </strong>
               </p>
             )}
-            <Button className="h-12 w-full text-base" disabled={busy} onClick={() => void submit()}>
-              {busy ? "Saving…" : `Confirm ${MODES.find((entry) => entry.id === mode)?.label.toLowerCase()}`}
+            <Button className="h-12 w-full text-base"
+              disabled={busy || (mode === "transfer" && (
+                !locationId || !toLocationId || locationId === toLocationId ||
+                quantity <= 0 || stockAt(locationId) + 0.000001 < quantity
+              ))}
+              onClick={() => void submit()}>
+              {busy ? "Saving…" : mode === "transfer"
+                ? transferFlow === "dispatch" ? "Dispatch exact variant" : "Transfer immediately"
+                : `Confirm ${MODES.find((entry) => entry.id === mode)?.label.toLowerCase()}`}
             </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {mode === "transfer" && (
+        <Card data-testid="retail-transfers-awaiting-receipt">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Dispatched — awaiting receipt ({pendingTransfers.length})</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {transfersLoading && <p className="text-sm text-muted-foreground">Loading pending transfers…</p>}
+            {pendingTransfers.map((transfer) => (
+              <div key={transfer.id} className="flex flex-wrap items-center gap-3 rounded-md border p-3">
+                <RetailPhotoGallery
+                  images={transfer.imageUrls ?? []}
+                  title={`${transfer.productName} · ${transfer.color}/${transfer.size}`}
+                  imageClassName="h-12 w-12 rounded-md border"
+                />
+                <div className="min-w-44 flex-1 text-sm">
+                  <div className="font-semibold">Transfer #{transfer.id} · {transfer.productName}</div>
+                  <div>{transfer.color} / {transfer.size} · Qty {transfer.quantity}</div>
+                  <div className="text-xs text-muted-foreground font-mono">{transfer.barcode}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {activeLocations.find((item) => item.id === transfer.fromLocationId)?.name ?? transfer.fromLocationId}
+                    {" → "}
+                    {activeLocations.find((item) => item.id === transfer.toLocationId)?.name ?? transfer.toLocationId}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Dispatched {new Date(transfer.dispatchedAt).toLocaleString()}
+                    {transfer.notes ? ` · ${transfer.notes}` : ""}
+                  </div>
+                </div>
+                <Button type="button" variant="outline" disabled={busy} onClick={() => void confirmReceive(transfer.id)}>
+                  {busy ? "Working…" : "Confirm receipt"}
+                </Button>
+              </div>
+            ))}
+            {!transfersLoading && pendingTransfers.length === 0 && (
+              <p className="text-sm text-muted-foreground">No transfers waiting for receipt.</p>
+            )}
           </CardContent>
         </Card>
       )}
