@@ -386,8 +386,9 @@ export function registerRetailCustomerRoutes(app: Express): void {
         .where(and(eq(retailPosSales.id, saleId), eq(retailPosSales.companyId, companyId)))
         .limit(1);
       if (!sale) return res.status(404).json({ message: "Retail sale not found" });
-      // Customer receivable journal entries are immutable. A customer edit on a
-      // credit sale must use a supervised reversal/repost workflow, not a name update.
+      // Customer receivable journal entries are immutable. Once a sale has posted to the
+      // customer's ledger (an on-account tender, or a refund credited to their account),
+      // changing its customer needs a supervised reversal/repost, not a name update.
       if (body.customerId !== sale.customerId) {
         const [creditTender] = await db
           .select({ id: retailPosPayments.id })
@@ -396,8 +397,7 @@ export function registerRetailCustomerRoutes(app: Express): void {
             and(
               eq(retailPosPayments.companyId, companyId),
               eq(retailPosPayments.saleId, saleId),
-              eq(retailPosPayments.method, "credit"),
-              eq(retailPosPayments.paymentType, "payment")
+              inArray(retailPosPayments.method, ["credit", "store_credit"])
             )
           )
           .limit(1);

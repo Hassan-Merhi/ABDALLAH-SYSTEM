@@ -78,6 +78,19 @@ async function targetedVoucherTypes(req: Request, path: string, companyId: numbe
     return voucherTypesById(companyId, ids);
   }
 
+  // Admin bulk reclassification moves existing lines to another ledger account.
+  if (/^\/api\/voucher-entries\/transfer-account\/?$/i.test(path)) {
+    const raw: unknown[] = Array.isArray(req.body?.entryIds) ? req.body.entryIds : [];
+    const ids = raw.map(positiveId).filter((id): id is number => id !== null);
+    if (!ids.length) return [];
+    const rows = await db
+      .select({ voucherType: vouchers.voucherType })
+      .from(voucherEntries)
+      .innerJoin(vouchers, eq(vouchers.id, voucherEntries.voucherId))
+      .where(and(inArray(voucherEntries.id, ids), eq(vouchers.companyId, companyId)));
+    return rows.map((row) => row.voucherType);
+  }
+
   if (/^\/api\/voucher-entries\/?$/i.test(path)) {
     const voucherId = positiveId(req.body?.voucherId);
     return voucherId ? voucherTypesById(companyId, [voucherId]) : [];

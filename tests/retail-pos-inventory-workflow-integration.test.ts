@@ -398,6 +398,10 @@ describe("Damaged returns and customer-account credit refunds", () => {
     });
     expect(returned.status).toBe(201);
     expect(await refundsOf(saleId)).toEqual([{ method: "store_credit", amount: "30.00" }]);
+    // The customer ledger now holds this credit, so the sale's customer is locked.
+    const reassigned = await agent.post(`/api/pos/retail/sales/${saleId}/customer`).send({ customerId: null });
+    expect(reassigned.status).toBe(409);
+    expect(reassigned.body.code).toBe("RETAIL_CREDIT_CUSTOMER_LOCKED");
     expect(Number(await customerLedger())).toBeCloseTo(before - 30, 2);
     expect(await voucherLines(`RETAIL-RETURN-${returned.body.returnId}`)).toEqual(
       expect.arrayContaining([{ code: "customer", d: "0.00", c: "30.00" }])
@@ -717,6 +721,11 @@ describe("Retail manual voucher boundary", () => {
     ).rows;
     const entryEdit = await agent.patch(`/api/voucher-entries/${entry.id}`).send({});
     expect(entryEdit.status).toBe(403);
+    const reclassified = await agent
+      .post("/api/voucher-entries/transfer-account")
+      .send({ entryIds: [Number(entry.id)], toAccountId: ctx.cashAccountId });
+    expect(reclassified.status).toBe(403);
+    expect(reclassified.body.code).toBe("RETAIL_SYSTEM_VOUCHER_READ_ONLY");
     const intact = await pool.query(`SELECT deleted_at FROM vouchers WHERE id = $1`, [saleVoucherId]);
     expect(intact.rows[0].deleted_at).toBeNull();
   });
