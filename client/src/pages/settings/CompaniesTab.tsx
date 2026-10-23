@@ -319,7 +319,8 @@ export function CompaniesTab() {
                 {selectedDisplayCurrency === "ZMW" && (
                   <p className="text-xs text-muted-foreground" data-testid="zambia-zmw-currency-note">
                     Kwacha pricing uses a USD accounting base. After saving, set the company's daily USD/ZMW rate
-                    in Exchange Rates before entering ZMW transactions. Existing voucher balances are not converted.
+                    in Exchange Rates before entering ZMW transactions. In Company Timezone, select Africa/Lusaka
+                    for Zambia's correct business day. Existing voucher balances are not converted.
                   </p>
                 )}
                 <FormField
