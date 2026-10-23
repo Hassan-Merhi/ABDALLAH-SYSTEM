@@ -125,6 +125,17 @@ export async function applyPosSaleUpdateTx(
   if (!lockedVoucher || lockedVoucher.deletedAt) {
     return { error: { status: 404, body: { message: "Voucher not found" } } };
   }
+  if (lockedVoucher.currency === "ZMW") {
+    // Preserve the original sale's currency and historical rate. A re-date
+    // could otherwise make a new financial date silently reuse the old rate.
+    if (typeof voucherDate === "string" && voucherDate !== String(lockedVoucher.voucherDate)) {
+      return { error: { status: 409, body: { code: "POS_ZMW_REDATE_REQUIRES_REVERSAL", message: "Reverse and rebook a Kwacha sale to change its date and rate." } } };
+    }
+    const requestedCurrency = (body as { currency?: unknown }).currency;
+    if (requestedCurrency !== undefined && requestedCurrency !== "ZMW") {
+      return { error: { status: 409, body: { code: "POS_ZMW_CURRENCY_LOCKED", message: "The original ZMW sale currency cannot be changed during an edit." } } };
+    }
+  }
   if (lockedVoucher.voucherType !== "Sales") {
     return {
       error: {
