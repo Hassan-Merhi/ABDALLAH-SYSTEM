@@ -40,6 +40,7 @@ interface POImportItem {
   quantity: string | number;
   rate: string | number;
   lineTotal: string | number;
+  currency?: string;
 }
 
 interface POImportCharges {
@@ -74,6 +75,7 @@ type POImportPayload = POImportPreview & {
   containerNumber: string;
   supplierId: number;
   importDate: string;
+  exchangeRate?: string;
   freightPaidBy: "supplier" | "parent";
   freightParentAccountId: number | null;
 };
@@ -287,6 +289,20 @@ function ErpPOImport() {
   };
 
   const selectedContainer = preview?.preview?.find((c: POImportContainer) => c.containerNumber === containerNumber);
+  const isNativeZmw = Boolean(selectedContainer?.items.some(item => item.currency?.toUpperCase() === "ZMW"));
+  const { data: approvedRate, isLoading: rateLoading } = useQuery<{ rate: string } | null>({
+    queryKey: ["/api/exchange-rates/latest", selectedCompany?.id, "USD", "ZMW", importDate],
+    enabled: isNativeZmw && Boolean(selectedCompany?.id) && Boolean(importDate),
+    queryFn: async () => {
+      const response = await fetch(`/api/exchange-rates/latest?fromCurrency=USD&toCurrency=ZMW&asOf=${importDate}`, {
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Unable to load the approved historical USD/ZMW rate");
+      return response.json();
+    },
+  });
+  useEffect(() => setValidationResult(null), [approvedRate?.rate, isNativeZmw]);
+  const lockedRate = isNativeZmw ? approvedRate?.rate ?? "" : undefined;
   const hasValidationErrors = Boolean(validationResult?.errors?.length);
   const isValidated = validationResult !== null;
 
@@ -297,11 +313,12 @@ function ErpPOImport() {
       containerNumber,
       supplierId: Number.parseInt(selectedSupplier, 10),
       importDate,
+      exchangeRate: lockedRate,
       preview: preview!.preview,
       freightPaidBy,
       freightParentAccountId: freightParentAccountId ? Number.parseInt(freightParentAccountId, 10) : null,
     }),
-    [preview, containerNumber, selectedSupplier, importDate, freightPaidBy, freightParentAccountId]
+    [preview, containerNumber, selectedSupplier, importDate, lockedRate, freightPaidBy, freightParentAccountId]
   );
 
   useEffect(() => {
@@ -320,6 +337,10 @@ function ErpPOImport() {
   }, [preview, validationResult, stockItemsUpdatedAt, validatedAgainstStockItemsAt, validateMutation, buildPayload]);
 
   const checkRequiredFields = () => {
+    if (isNativeZmw && !lockedRate) {
+      toast({ title: "Historical rate required", description: "Approve the USD/ZMW company rate for the import date before validating.", variant: "destructive" });
+      return false;
+    }
     if (!selectedCompany?.id) {
       toast({ title: "Company required", description: "Please select a company first", variant: "destructive" });
       return false;
@@ -475,10 +496,20 @@ function ErpPOImport() {
                     id="import-date"
                     type="date"
                     value={importDate}
-                    onChange={(e) => setImportDate(e.target.value)}
+                    onChange={(e) => { setImportDate(e.target.value); setValidationResult(null); }}
                     data-testid="input-import-date"
                   />
                 </div>
+                {isNativeZmw && (
+                  <div className="space-y-2">
+                    <Label>Historical USD/ZMW rate (ZMW per USD)</Label>
+                    <Input readOnly value={rateLoading ? "Loading approved rate..." : lockedRate || "No approved rate"} />
+                    <p className="text-xs text-muted-foreground">
+                      Original invoice prices remain ZMW; inventory, freight, goods-in-transit and parent postings use the locked USD base.
+                      { !lockedRate && !rateLoading ? " An approved company rate for the import date is required." : "" }
+                    </p>
+                  </div>
+                )}
               </div>
 
               {Number(selectedContainer?.charges?.freight || 0) > 0 && parentFreightAccounts.length > 0 && (
