@@ -3,6 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { Percent, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useLocation as useLocationContext } from "@/contexts/LocationContext";
 import { useToast } from "@/hooks/use-toast";
@@ -81,6 +82,7 @@ export default function RetailPOS() {
   const [scanText, setScanText] = useState("");
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState<CartLine[]>([]);
+  const [notes, setNotes] = useState("");
   const [lastScan, setLastScan] = useState<ScanOutcome | null>(null);
   const [lastSale, setLastSale] = useState<RetailSale | null>(null);
   const [exchangeSale, setExchangeSale] = useState<RetailSale | null>(null);
@@ -139,6 +141,7 @@ export default function RetailPOS() {
 
   useEffect(() => {
     setCart([]);
+    setNotes("");
     setScanText("");
     setSearch("");
     setLastScan(null);
@@ -300,6 +303,7 @@ export default function RetailPOS() {
         shiftId: currentShift?.id ?? null,
         previewSignature,
         customerId: customer?.id ?? null,
+        notes: notes.trim(),
         payments,
       });
       const paymentTotal = payments.reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
@@ -322,6 +326,7 @@ export default function RetailPOS() {
       const response = await apiRequest("POST", "/api/pos/retail/sales", {
         locationId: selectedLocation.id,
         idempotencyKey: saleAttemptRef.current.key,
+        notes: notes.trim() || undefined,
         customerId: customer?.id ?? null,
         customerName: customer?.legalName ?? null,
         shiftId: currentShift?.id ?? undefined,
@@ -335,6 +340,7 @@ export default function RetailPOS() {
     onSuccess: async (data) => {
       saleAttemptRef.current = null;
       setCart([]);
+      setNotes("");
       setLastScan(null);
       setLastSale(data.sale);
       setCustomer(null);
@@ -608,6 +614,15 @@ export default function RetailPOS() {
             }}
             onAdjust={setAdjustLine}
             onRemove={(variantId) => setCart((current) => current.filter((line) => line.variantId !== variantId))}
+          />
+          <Textarea
+            placeholder="Notes (optional)"
+            value={notes}
+            maxLength={2000}
+            onChange={(event) => setNotes(event.target.value)}
+            className="min-h-12 resize-y text-sm"
+            aria-label="Sale notes"
+            data-testid="retail-pos-notes"
           />
           <div className="rounded-lg border p-3" aria-label="Retail checkout">
             <div className="space-y-2 border-t pt-3">
