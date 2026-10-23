@@ -1,4 +1,4 @@
-import { assertApprovedZmwVoucherRate, assertLockedZmwVoucherEdit, ZambiaVoucherRateError } from "../../services/accounting/zambiaVoucherRatePolicy";
+import { assertApprovedZmwVoucherRate, assertLockedZmwVoucherEdit, assertResolvedZmwVoucherEntriesTx } from "../../services/accounting/zambiaVoucherRatePolicy";
 import type { Express } from "express";
 import { getErrorMessage, errorStatus } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
@@ -535,17 +535,8 @@ export function registerVoucherPaymentRoutes(app: Express) {
         assertLockedZmwVoucherEdit(existingVoucher, { voucherDate, currency, exchangeRate });
         // Get existing entries before deleting (for balance sync)
         const oldEntries = await tx.select().from(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
-        if (existingVoucher.currency === "ZMW" && (
-          !oldEntries.length || oldEntries.some(entry =>
-            entry.transactionCurrency !== "ZMW" ||
-            entry.transactionDebitAmount == null ||
-            entry.transactionCreditAmount == null ||
-            entry.historicalExchangeRate == null
-          )
-        )) {
-          throw new ZambiaVoucherRateError(
-            "The existing Kwacha voucher has unresolved native entries. Reconcile the original currency amounts before editing."
-          );
+        if (existingVoucher.currency === "ZMW") {
+          await assertResolvedZmwVoucherEntriesTx(tx, existingVoucher.companyId, oldEntries);
         }
 
         // Update voucher — store historical base (USD) total
