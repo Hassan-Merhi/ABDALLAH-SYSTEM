@@ -13,6 +13,7 @@ import {
 } from "../lib/inventoryMath";
 import { db, type DatabaseOrTransaction } from "../db";
 import { normalizeVoucherEntryAmounts } from "../services/accounting/currencyAmounts";
+import { PosZmwRateError, resolveLockedZmwPosCurrency, assertZmwImportPrices, type LockedPosCurrency } from "../services/pos/posZmwRatePolicy";
 import { getOrCreateInventoryControlAccount } from "../services/accounting/inventoryControlAccount";
 import { storage } from "../storage";
 import { requireAuth, requireNonPOS } from "../auth";
@@ -89,16 +90,22 @@ async function getOrCreateSalesReturnsAccount(
   return created?.id ?? null;
 }
 
-function normEntryAmounts(debit: Decimal.Value, credit: Decimal.Value): Record<string, string> {
+function normEntryAmounts(
+  debit: Decimal.Value,
+  credit: Decimal.Value,
+  nativeRefund?: LockedPosCurrency
+): Record<string, string> {
   const dStr = toInventoryDecimal(debit).toFixed(6);
   const cStr = toInventoryDecimal(credit).toFixed(6);
+  const foreign = nativeRefund?.currency === "ZMW";
+  const rate = foreign ? nativeRefund!.exchangeRate! : "1";
   try {
     const norm = normalizeVoucherEntryAmounts({
-      transactionCurrency: "USD",
+      transactionCurrency: foreign ? "ZMW" : "USD",
       baseCurrency: "USD",
-      transactionDebitAmount: dStr,
-      transactionCreditAmount: cStr,
-      historicalRate: "1",
+      transactionDebitAmount: foreign ? toInventoryDecimal(dStr).mul(rate).toFixed(6) : dStr,
+      transactionCreditAmount: foreign ? toInventoryDecimal(cStr).mul(rate).toFixed(6) : cStr,
+      historicalRate: rate,
     });
     return {
       debitAmount: norm.debitAmount,
@@ -111,7 +118,10 @@ function normEntryAmounts(debit: Decimal.Value, credit: Decimal.Value): Record<s
       historicalExchangeRate: norm.historicalExchangeRate,
       rateConvention: norm.rateConvention,
     };
-  } catch {
+  } catch (error) {
+    // Existing USD legacy fallback stays unchanged. A ZMW refund must NEVER
+    // silently lose its original currency or lock rate on a failed conversion.
+    if (foreign) throw error;
     return { debitAmount: inventoryMoney(debit), creditAmount: inventoryMoney(credit) };
   }
 }
@@ -124,7 +134,7 @@ export function registerCreditNoteRoutes(app: Express) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const { noteType, voucherDate, cashAccountId, cashAccountType, description, items } = req.body;
+      const { noteType, voucherDate, cashAccountId, cashAccountType, description, items, currency, exchangeRate } = req.body;
       if (!noteType || !["Credit Note", "Debit Note"].includes(noteType)) {
         return res.status(400).json({ message: "Invalid note type. Must be 'Credit Note' or 'Debit Note'" });
       }
@@ -148,6 +158,11 @@ export function registerCreditNoteRoutes(app: Express) {
           return res.status(400).json({ message: `Invalid quantity for item ${item.stockItemId}: ${item.quantity}` });
         }
       }
+
+      const lockedPosCurrency = await resolveLockedZmwPosCurrency(companyId, voucherDate, currency, exchangeRate);
+      assertZmwImportPrices(items.map((item: { refundRate: unknown; originalCurrencyRate?: unknown }) => ({
+        rate: item.refundRate, originalCurrencyRate: item.originalCurrencyRate,
+      })), lockedPosCurrency);
 
       let totalRefundAmount = toInventoryDecimal(0);
       let totalInventoryValue = toInventoryDecimal(0);
@@ -176,6 +191,8 @@ export function registerCreditNoteRoutes(app: Express) {
             voucherDate,
             description: description || `${noteType} for customer return`,
             totalAmount: inventoryMoney(totalRefundAmount),
+            currency: lockedPosCurrency.currency,
+            exchangeRate: lockedPosCurrency.exchangeRate,
           })
           .returning();
 
@@ -185,7 +202,7 @@ export function registerCreditNoteRoutes(app: Express) {
           await tx.insert(voucherEntries).values({
             voucherId: createdVoucher.id,
             bankAccountId: cashAccountId,
-            ...normEntryAmounts(cashDebit, cashCredit),
+            ...normEntryAmounts(cashDebit, cashCredit, lockedPosCurrency),
             narration: `${noteType} - cash ${noteType === "Credit Note" ? "refund" : "receipt"}`,
           });
         } else {
@@ -480,6 +497,8 @@ export function registerCreditNoteRoutes(app: Express) {
           voucherDate: voucher.voucherDate,
           description: voucher.description,
           totalAmount: voucher.totalAmount,
+          currency: voucher.currency,
+          exchangeRate: voucher.exchangeRate,
         },
         cashAccountId,
         cashAccountType,
