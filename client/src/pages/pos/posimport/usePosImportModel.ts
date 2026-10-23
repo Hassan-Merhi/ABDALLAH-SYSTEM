@@ -46,7 +46,7 @@ export function usePosImportModel() {
   const [isCreditSale, setIsCreditSale] = useState(false);
   const [saleDate, setSaleDate] = useState<string>(new Date().toLocaleDateString("en-CA"));
   const [showWarningDialog, setShowWarningDialog] = useState(false);
-  const [saleCurrency, setSaleCurrency] = useState<"USD" | "CFA">("USD");
+  const [saleCurrency, setSaleCurrency] = useState<"USD" | "CFA" | "ZMW">("USD");
   const [showPrintDialog, setShowPrintDialog] = useState(false);
   const [importedSale, setImportedSale] = useState<ImportedSale | null>(null);
   const [printTime, setPrintTime] = useState<string>("");
@@ -90,20 +90,42 @@ export function usePosImportModel() {
   });
   const printUserName = authUser?.fullName || authUser?.name || authUser?.username || authUser?.email || "Import";
 
-  // Show currency selector when company has displayCurrency = "CFA" and data has loaded
-  const showCurrencySelector = !isLoadingCompany && displayCurrency === "CFA";
+  const showCurrencySelector = !isLoadingCompany && (displayCurrency === "CFA" || displayCurrency === "ZMW");
 
-  // Default to CFA when company has displayCurrency = CFA
+  // Changing company must clear the previous company's native-currency choice
+  // and validation; otherwise the same Excel upload could be imported as CFA
+  // on Zambia or as ZMW on Mali.
   useEffect(() => {
-    if (displayCurrency === "CFA") {
-      setSaleCurrency("CFA");
-    }
-  }, [displayCurrency]);
+    setSaleCurrency(displayCurrency === "CFA" || displayCurrency === "ZMW" ? displayCurrency : "USD");
+    setValidationResult(null);
+  }, [selectedCompany?.id, displayCurrency]);
 
-  /** Excel rates arrive in the sale currency; the backend always stores USD. */
+  const { data: datedZmwRate, isFetching: isFetchingZmwRate } = useQuery<{ rate: string } | null>({
+    queryKey: ["/api/exchange-rates/latest", selectedCompany?.id, "USD", "ZMW", saleDate, "pos-import"],
+    queryFn: async () => {
+      const query = new URLSearchParams({
+        companyId: String(selectedCompany!.id), fromCurrency: "USD", toCurrency: "ZMW", asOf: saleDate,
+      });
+      const response = await fetch("/api/exchange-rates/latest?" + query, { credentials: "include" });
+      if (!response.ok) return null;
+      return response.json();
+    },
+    enabled: !!selectedCompany?.id && displayCurrency === "ZMW" && !!saleDate,
+    staleTime: 0,
+  });
+  const datedZmwNumber = Number(datedZmwRate?.rate);
+  const applicableExchangeRate = saleCurrency === "ZMW"
+    ? !isFetchingZmwRate && datedZmwRate && Number.isFinite(datedZmwNumber) && datedZmwNumber > 0 ? datedZmwNumber : null
+    : exchangeRate;
+
+  /** Import payload USD rates and the original typed ZMW rate for audit/reconciliation. */
   const toUsdItems = (items: PosImportItem[]): PosImportItem[] =>
-    saleCurrency === "CFA" && exchangeRate
-      ? items.map((item) => ({ ...item, rate: (parseFloat(String(item.rate)) / exchangeRate).toFixed(2) }))
+    saleCurrency !== "USD" && applicableExchangeRate
+      ? items.map((item) => ({
+          ...item,
+          originalCurrencyRate: saleCurrency === "ZMW" ? String(item.rate) : undefined,
+          rate: (Number(item.rate) / applicableExchangeRate).toFixed(saleCurrency === "ZMW" ? 6 : 2),
+        }))
       : items;
 
   const parseMutation = useMutation({
@@ -326,7 +348,12 @@ export function usePosImportModel() {
   const doImport = () => {
     if (!validationResult) return;
 
-    // Convert CFA rates to USD if needed
+    // Both normal and credit imports post USD sale prices, with the approved
+    // dated foreign amount and locked rate recorded on the voucher entries.
+    if (saleCurrency !== "USD" && (!applicableExchangeRate || !Number.isFinite(applicableExchangeRate))) {
+      warn("Exchange rate required", "A valid rate for the sale date is required before importing.");
+      return;
+    }
     const itemsToImport = toUsdItems(validationResult.validatedItems);
     const requestIdentity = {
       importBatchId: importBatchIdRef.current,
@@ -338,6 +365,8 @@ export function usePosImportModel() {
         locationId: parseInt(selectedLocation),
         customerId: parseInt(selectedCustomer),
         saleDate,
+        currency: saleCurrency,
+        exchangeRate: saleCurrency === "USD" ? undefined : String(applicableExchangeRate),
         items: itemsToImport,
         ...requestIdentity,
       });
@@ -358,8 +387,8 @@ export function usePosImportModel() {
   const handleImport = () => {
     if (!hasRequiredTargets()) return;
 
-    if (saleCurrency === "CFA" && !exchangeRate) {
-      warn("Exchange rate required", "Please set an exchange rate in Settings before importing CFA sales");
+    if (saleCurrency !== "USD" && (!applicableExchangeRate || !Number.isFinite(applicableExchangeRate))) {
+      warn("Exchange rate required", `Set an approved USD/${saleCurrency} rate for the selected sale date before importing.`);
       return;
     }
 
@@ -412,7 +441,8 @@ export function usePosImportModel() {
   return {
     // context
     selectedCompany,
-    exchangeRate,
+    exchangeRate: applicableExchangeRate,
+    displayCurrency,
     showCurrencySelector,
     // form state
     file,
