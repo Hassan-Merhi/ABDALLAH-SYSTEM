@@ -13,10 +13,12 @@ type Destination = "original" | "customer_credit";
 type ReturnLine = { quantity: number; restock: boolean };
 
 export function RetailReturnDialog({
-  open, locationId, busy, onOpenChange, onExchange, onPrint, onCompleted,
+  open, locationId, shiftId, canOverride = false, busy, onOpenChange, onExchange, onPrint, onCompleted,
 }: {
   open: boolean;
   locationId: number | null;
+  shiftId: number | null;
+  canOverride?: boolean;
   busy?: boolean;
   onOpenChange: (open: boolean) => void;
   onExchange: (sale: RetailSale) => void;
@@ -106,6 +108,7 @@ export function RetailReturnDialog({
     try {
       const response = await apiRequest("POST", `/api/pos/retail/sales/${sale.id}/returns`, {
         locationId,
+        shiftId: shiftId ?? undefined,
         idempotencyKey: attempt.current.key,
         items: returned,
         refundDestination: destination,
@@ -179,7 +182,7 @@ export function RetailReturnDialog({
                       <Button type="button" size="icon" variant="outline" className="h-8 w-8" disabled={chosen.quantity >= available} onClick={() => updateLine(line.id, { quantity: chosen.quantity + 1 })}><Plus className="h-3.5 w-3.5" /></Button>
                     </div>
                     <label className="flex items-center gap-2 text-xs">
-                      <input type="checkbox" checked={chosen.restock} onChange={(event) => updateLine(line.id, { restock: event.target.checked })} />
+                      <input type="checkbox" checked={chosen.restock} disabled={!canOverride} onChange={(event) => updateLine(line.id, { restock: event.target.checked })} />
                       Restock
                     </label>
                     {chosen.quantity > 0 && !chosen.restock && <span className="text-xs text-amber-700 dark:text-amber-300">Damaged / not sellable</span>}
@@ -191,7 +194,7 @@ export function RetailReturnDialog({
               <label htmlFor="retail-refund-destination" className="text-sm font-medium">Refund destination</label>
               <select id="retail-refund-destination" value={destination} onChange={(event) => setDestination(event.target.value as Destination)} className="h-9 w-full rounded-md border bg-background px-3 text-sm">
                 <option value="original">Original tenders (reverse unpaid credit first)</option>
-                <option value="customer_credit" disabled={!sale.customerId}>Customer account credit</option>
+                <option value="customer_credit" disabled={!sale.customerId || !canOverride}>Customer account credit (manager)</option>
               </select>
             </div>
             <Textarea placeholder="Return reason / damaged item explanation" value={reason} onChange={(event) => setReason(event.target.value)} maxLength={2000} aria-label="Return reason" />
