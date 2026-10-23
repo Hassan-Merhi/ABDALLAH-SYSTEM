@@ -109,6 +109,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   const scope = companyId && authenticatedId !== undefined && authenticatedId !== null
     ? currencyPreferenceScope(companyId, String(authenticatedId)) : null;
   const [choice, setChoice] = useState<{ scope: string; currency: Currency } | null>(null);
+  const activeChoiceScope = scope ?? (companyId ? "unpersisted-company:" + companyId : null);
 
   const allowed = (value: string | null | undefined): value is Currency =>
     !!value && companyCurrency(value) && allowedCompanyCurrency(value, baseCurrency, displayCurrency);
@@ -119,7 +120,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   const legacyPreference = displayCurrency === "CFA" || baseCurrency === "CFA"
     ? legacyCfaCurrencyPreference(userPrefs?.preferredCurrency) : null;
   const selectedCurrency: Currency =
-    scope && choice?.scope === scope && allowed(choice.currency) ? choice.currency
+    activeChoiceScope && choice?.scope === activeChoiceScope && allowed(choice.currency) ? choice.currency
     : allowed(savedChoice) ? savedChoice
     : allowed(legacyPreference) ? legacyPreference
     : defaultCurrency;
@@ -130,7 +131,10 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!scope) return;
     const onStorage = (event: StorageEvent) => {
-      if (event.key === scope) setStorageRevision((n) => n + 1);
+      if (event.key === scope) {
+        setChoice((previous) => previous?.scope === scope ? null : previous);
+        setStorageRevision((n) => n + 1);
+      }
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
@@ -166,7 +170,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
 
   const setCurrency = (currency: Currency) => {
     if (isLoadingCompany || !allowed(currency)) return;
-    setChoice(scope ? { scope, currency } : null);
+    if (activeChoiceScope) setChoice({ scope: activeChoiceScope, currency });
     if (scope) saveScopedCurrencyPreference(scope, currency);
     // Keep the original CFA-only global preference API behavior; ZMW never
     // writes a global preference that could overwrite Mali's selection.
@@ -216,7 +220,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     native(amount, currency);
 
   const formatHistoricalBaseAmount = (amount: number | string | null | undefined): string =>
-    native(amount, baseCurrency);
+    native(amount, "USD");
 
   const formatAmount = (amount: number | string | null | undefined, currency?: Currency): string => {
     if (amount === null || amount === undefined) return "";
@@ -238,6 +242,10 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     if (!Number.isFinite(value)) return "";
     if (selectedCurrency === baseCurrency) return native(value, baseCurrency);
     if (!exchangeRate || !displayCurrency) return native(value, baseCurrency);
+    if (baseCurrency === "USD") return native(value * exchangeRate, displayCurrency);
+    // Backward compatibility: historic non-USD-base companies stored their
+    // foreign-per-USD rate, so displaying USD uses division, not multiplication.
+    if (displayCurrency === "USD") return native(value / exchangeRate, "USD");
     return native(value * exchangeRate, displayCurrency);
   };
 
