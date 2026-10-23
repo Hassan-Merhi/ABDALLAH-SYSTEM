@@ -128,7 +128,7 @@ export function FxRatesCard() {
                           if (window.confirm(`Remove ${r.currencyCode} rate ${parseFloat(r.rateToUsd).toFixed(4)} dated ${r.effectiveDate}? Historical document rates will be preserved, but new FX calculations may use a different rate.`)) {
                             deleteMutation.mutate(r.id);
                           }
-                        }
+                        }}
                         disabled={deleteMutation.isPending}
                         aria-label={`Remove ${r.currencyCode} rate dated ${r.effectiveDate}`}
                         data-testid={`button-delete-fxrate-${r.id}`}
