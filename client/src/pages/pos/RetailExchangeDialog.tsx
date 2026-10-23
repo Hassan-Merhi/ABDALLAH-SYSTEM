@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Minus, Plus, ScanLine, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { fetchRetailCartPreview } from "./retailWave2Api";
 import { RetailItemImage } from "./RetailScanFeedback";
 import { RetailPaymentPanel } from "./RetailPaymentPanel";
 import {
@@ -65,15 +67,35 @@ export function RetailExchangeDialog({
   }, [sale?.id]);
 
   const replacementTotal = newItems.reduce((sum, item) => sum + item.exchangeQuantity * item.price, 0);
+  // Exact exchange replacement price includes promotions and tax, just like
+  // ordinary retail checkout. Never charge the customer's old catalogue price.
+  const replacementLines = newItems.map((item) => ({ variantId: item.variantId, quantity: item.exchangeQuantity }));
+  const replacementSignature = JSON.stringify({ locationId, replacementLines });
+  const previewQuery = useQuery({
+    queryKey: ["retail-exchange-preview", replacementSignature],
+    queryFn: () => fetchRetailCartPreview(replacementLines, null, locationId ?? undefined),
+    enabled: Boolean(sale && locationId && replacementLines.length),
+    staleTime: 0,
+  });
+  const newTotal = previewQuery.data?.pricing.totalAmount ?? replacementTotal;
   useEffect(() => {
-    const amount = Number(replacementTotal.toFixed(2));
-    setPayments([{ method: "cash", amount, tenderedAmount: amount }]);
-  }, [replacementTotal]);
+    const amount = Number(newTotal.toFixed(2));
+    setPayments((current) => {
+      if (current.length !== 1) return current;
+      const payment = current[0];
+      return [{
+        ...payment,
+        amount,
+        tenderedAmount: payment.method === "cash"
+          ? Math.max(amount, Number(payment.tenderedAmount ?? 0))
+          : null,
+      }];
+    });
+  }, [newTotal]);
 
   if (!sale) return null;
 
   const refundValue = sale.items.reduce((sum, item) => sum + (returnQty[item.id] ?? 0) * (item.grossUnitPrice ?? item.unitPrice), 0);
-  const newTotal = replacementTotal;
   const balance = newTotal - refundValue;
 
   const scan = async () => {
@@ -115,6 +137,14 @@ export function RetailExchangeDialog({
     const items = newItems.map((item) => ({ variantId: item.variantId, quantity: item.exchangeQuantity }));
     if (!returnItems.length || !items.length) {
       toast({ title: "Choose what is returned and what the customer takes", variant: "destructive" });
+      return;
+    }
+    if (!previewQuery.data || previewQuery.isFetching) {
+      toast({ title: "Replacement price is still loading", variant: "destructive" });
+      return;
+    }
+    if (Math.abs(payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0) - newTotal) > 0.005) {
+      toast({ title: "Replacement payments must equal the server-priced replacement total", variant: "destructive" });
       return;
     }
     if (returnItems.some((line) => !line.restock) && !reason.trim()) {
@@ -267,9 +297,11 @@ export function RetailExchangeDialog({
               <span>-{money(refundValue)}</span>
             </div>
             <div className="flex justify-between">
-              <span>New items</span>
+              <span>New items (including promotions / tax)</span>
               <span>{money(newTotal)}</span>
             </div>
+            {previewQuery.isError && <div className="text-xs text-destructive">Could not load replacement pricing.</div>}
+            {previewQuery.isFetching && <div className="text-xs text-muted-foreground">Updating replacement pricing…</div> 
             <div className="flex justify-between border-t pt-1 font-semibold">
               <span>{balance >= 0 ? "Customer pays" : "Refund to customer"}</span>
               <span data-testid="exchange-balance">{money(Math.abs(balance))}</span>
@@ -279,7 +311,7 @@ export function RetailExchangeDialog({
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button onClick={() => void submit()} disabled={busy}>
+            <Button onClick={() => void submit()} disabled={busy || previewQuery.isFetching || !previewQuery.data}>
               {busy ? "Saving…" : "Complete exchange"}
             </Button>
           </div>
