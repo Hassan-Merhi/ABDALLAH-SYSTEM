@@ -244,11 +244,11 @@ Every assertion reads the posted vouchers:
 | Prettier on every file the branch changes | Pass |
 | `npm run build` (client + server bundle verification) | Pass |
 | `drizzle-kit push` + application startup migrations + `verify:startup-migrations` | Pass, 0 failures; `restocked` column present; migration SQL idempotent |
-| Retail suites (`tests/retail-*`, wave 17c/17d) incl. the new reconciliation test | 19 files, 130 tests pass |
+| Retail suites (`tests/retail-*`, wave 17c/17d) incl. the new reconciliation test | 19 files, 132 tests pass |
 | Full frontend suite | 244 files, 2,265 tests pass (+ 2 new Retail UI test files) |
-| Full backend suite | 1,086 of 1,089 files pass (7,494 tests); the 3 failing files fail identically on `main` (Node-version toolchain checks; `wave17c-rates` factory FX) |
-| Repository audits (doc index, write routes, write evidence, type escapes, god files, route manifest, source-text ratchet) | Pass, except `audit:toolchain` (pre-existing on `main`) |
-| GitHub CI (`workflow_dispatch`, no PR opened) | Type-check, Build and Frontend Tests pass. Remaining reds trace to `main`: the Node-version toolchain check, and on a dispatch the changed-file format step diffs the merge commit's first parent, which checks files `main` left unformatted |
+| Full backend suite | Pass in GitHub CI (run 39984585928); locally 1,086/1,089 before `main`'s toolchain/FX fixes, all three now pass |
+| Repository audits (doc index, write routes, write evidence, type escapes, god files, route manifest, source-text ratchet, toolchain) | Pass |
+| GitHub CI (`workflow_dispatch` on `47b72fb`, no PR opened) | **All jobs pass**: Repository Audits, Type-check, Lint / Format, Build, Backend / Database Tests, Frontend Tests, Coverage Ratchet and the CI gate |
 
 ### Browser device check (built app, Chromium, isolated database)
 
