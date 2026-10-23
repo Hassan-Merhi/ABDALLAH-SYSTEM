@@ -237,9 +237,11 @@ describe("Retail Wave 2 — client UI", () => {
       expect(routes).toContain(page);
     }
     const nav = read("client/src/pages/retail/RetailNav.tsx");
-    for (const href of ["/retail/stock-count", "/retail/selling", "/retail/history"]) {
+    for (const href of ["/retail/inventory", "/retail/quick-add", "/retail/stock", "/retail/selling"]) {
       expect(nav).toContain(href);
     }
+    // The exact pill list (legacy pages hidden) is checked behaviourally in
+    // tests/ui/retail-navigation-behavior.test.ts.
     const stockCount = read("client/src/pages/retail/RetailStockCount.tsx");
     for (const marker of [
       "stock-count-scan",

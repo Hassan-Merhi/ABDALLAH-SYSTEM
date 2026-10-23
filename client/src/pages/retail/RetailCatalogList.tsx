@@ -2,9 +2,8 @@ import { Archive, ArchiveRestore, ArrowRightLeft, History, Pencil, Printer, Slid
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent } from "@/components/ui/card";
-import { normalizeRetailImageUrls } from "@/lib/retailImageUrl";
 import { cn } from "@/lib/utils";
-import { ProductImageGallery, RetailImage } from "./RetailProductImage";
+import { ProductImageGallery, RetailPhotoGallery } from "./RetailProductImage";
 import { money, sortRetailVariants, type RetailProduct, type RetailVariant } from "./retailInventoryTypes";
 
 export type RetailVariantAction = "print" | "transfer" | "adjust" | "history" | "archive" | "restore";
@@ -99,13 +98,10 @@ export function RetailCatalogList({
               <Card key={product.id} className={cn(!product.active && "opacity-70")} data-testid="style-card">
                 <CardContent className="space-y-3 p-3 sm:p-4">
                   <div className="flex items-start gap-3">
-                    <button type="button" onClick={() => onOpenProduct(product)} className="shrink-0">
-                      <ProductImageGallery
-                        product={product}
-                        maxImages={3}
-                        imageClassName="h-16 w-16 rounded-md border"
-                      />
-                    </button>
+                    <ProductImageGallery
+                      product={product}
+                      imageClassName="h-20 w-20 rounded-md border sm:h-24 sm:w-24"
+                    />
                     <div className="min-w-0 flex-1">
                       <button
                         type="button"
@@ -163,9 +159,9 @@ export function RetailCatalogList({
                       </label>
                       {rows.map((variant) => {
                         const quantity = variantQuantity(variant, filters.locationId);
-                        const images = normalizeRetailImageUrls(
-                          variant.imageUrls.length ? variant.imageUrls : product.imageUrls
-                        );
+                        // Exact-variant photos come first; generic style photos follow.
+                        // Never add photos from other color/size variants here.
+                        const images = [...(variant.imageUrls ?? []), ...(product.imageUrls ?? [])];
                         return (
                           <div
                             key={variant.id}
@@ -180,25 +176,11 @@ export function RetailCatalogList({
                               checked={selected.has(variant.id)}
                               onCheckedChange={() => onToggle(variant.id)}
                             />
-                            <div className="flex shrink-0 -space-x-2">
-                              {(images.length ? images.slice(0, 3) : [""]).map((src, imageIndex) => (
-                                <RetailImage
-                                  key={src || `empty-${variant.id}`}
-                                  src={src}
-                                  alt={
-                                    src
-                                      ? `${product.name} · ${variant.color} · ${variant.size} photo ${imageIndex + 1}`
-                                      : ""
-                                  }
-                                  className="h-10 w-10 rounded-sm border-2 border-background"
-                                />
-                              ))}
-                              {images.length > 3 && (
-                                <span className="flex h-10 w-10 items-center justify-center rounded-sm border-2 border-background bg-muted text-[11px] font-bold">
-                                  +{images.length - 3}
-                                </span>
-                              )}
-                            </div>
+                            <RetailPhotoGallery
+                              images={images}
+                              title={`${product.name} · ${variant.color} / ${variant.size}`}
+                              imageClassName="h-12 w-12 rounded-md border"
+                            />
                             <div className="min-w-28 flex-1" data-no-translate>
                               <div className="font-semibold">
                                 {variant.color} / {variant.size}
