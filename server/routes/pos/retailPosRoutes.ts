@@ -63,7 +63,7 @@ const idempotencyKeySchema = z.string().trim().min(8).max(191);
 const positiveQuantitySchema = z.coerce.number().finite().positive();
 
 const paymentSchema = z.object({
-  method: z.enum(["cash", "card", "bank", "mobile", "other"]),
+  method: z.enum(["cash", "card", "bank", "mobile", "other", "credit"]),
   amount: z.coerce.number().finite().positive(),
   tenderedAmount: z.coerce.number().finite().positive().optional(),
   reference: z.string().trim().max(191).optional(),
@@ -531,7 +531,12 @@ export function registerRetailPosRoutes(app: Express): void {
         };
       }
 
-      // The customer is optional: walk-in stays the default and costs no extra query.
+      // Uncollected credit must belong to a real company-owned ERP customer,
+      // never an anonymous walk-in or a free-text customer name.
+      if (body.payments?.some((payment) => payment.method === "credit") && !body.customerId) {
+        return res.status(400).json({ code: "RETAIL_CREDIT_CUSTOMER_REQUIRED", message: "Select a customer before recording a credit sale" });
+      }
+      // The customer is optional for fully paid transactions.
       let customer: RetailSaleInput["customer"] = null;
       if (body.customerId) {
         const [row] = await db
