@@ -1,5 +1,6 @@
 import { getErrorDetails } from "@shared/errorUtils";
 import { useEffect, useMemo, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useLocation as useLocationContext } from "@/contexts/LocationContext";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useLocation } from "wouter";
@@ -110,8 +111,21 @@ export default function POS({ posUser, editVoucherId }: { posUser?: AuthMe; edit
   } = usePosState();
 
   const activeLocation = posUser ? posSelectedLocation : selectedLocation;
-  const activeCurrency: Currency = displayCurrency ? selectedCurrency : "USD";
-  const exchangeRate = dailyExchangeRate;
+  // Zambia posting uses a date-specific approved rate, never the browser's
+  // current rate for an earlier sale date. Cash and credit use the same path.
+  const { data: datedZmwRate, isFetching: isFetchingDatedZmwRate } = useQuery<{ rate: string } | null>({
+    queryKey: ["/api/exchange-rates/latest", selectedCompany?.id, "USD", "ZMW", saleDate],
+    queryFn: async () => {
+      const query = new URLSearchParams({
+        companyId: String(selectedCompany!.id), fromCurrency: "USD", toCurrency: "ZMW", asOf: saleDate,
+      });
+      const response = await fetch("/api/exchange-rates/latest?" + query, { credentials: "include" });
+      if (!response.ok) return null;
+      return response.json();
+    },
+    enabled: !!selectedCompany?.id && displayCurrency === "ZMW" && !!saleDate && !editVoucherId,
+    staleTime: 0,
+  });
   // Supplier Partner companies share this exact POS UI but sell from SP stock
   // (sp_stock_movements) and post through the SP-specific accounting endpoint.
   const isSpCompany = selectedCompany?.companyType === "supplier_partner";
@@ -153,6 +167,21 @@ export default function POS({ posUser, editVoucherId }: { posUser?: AuthMe; edit
     showStockPrompt,
     isSpCompany,
   });
+
+  const editedCurrency = editVoucherId && editVoucher?.currency;
+  const activeCurrency: Currency = displayCurrency
+    ? (editedCurrency === displayCurrency || editedCurrency === "USD" ? editedCurrency : selectedCurrency)
+    : "USD";
+  const editLockedRate = editVoucherId && editVoucher?.exchangeRate
+    ? Number(editVoucher.exchangeRate) : null;
+  const approvedZmwRate = displayCurrency === "ZMW" && !editVoucherId
+    ? Number(datedZmwRate?.rate) : null;
+  const exchangeRate = displayCurrency === "ZMW"
+    ? editVoucherId
+      ? (editLockedRate && editLockedRate > 0 ? editLockedRate : null)
+      : !isFetchingDatedZmwRate && approvedZmwRate && Number.isFinite(approvedZmwRate) && approvedZmwRate > 0
+        ? approvedZmwRate : null
+    : dailyExchangeRate;
 
   // POS view-only is a real write boundary, not just a server-side fallback.
   // Keep every client mutation path quiet so expected denials do not become
@@ -263,7 +292,9 @@ export default function POS({ posUser, editVoucherId }: { posUser?: AuthMe; edit
       stockItemId: item.stockItemId ? Number(item.stockItemId) : undefined,
       salesItemId: item.id,
       quantity: parseFloat(String(item.quantity)),
-      rate: parseFloat(String(item.sellingPrice)),
+      rate: editVoucher?.currency === "ZMW" && editVoucher.exchangeRate
+        ? Number((Number(item.sellingPrice) * Number(editVoucher.exchangeRate)).toFixed(2))
+        : parseFloat(String(item.sellingPrice)),
       rateUSD: parseFloat(String(item.sellingPrice)),
       amount: parseFloat(String(item.totalSales)),
       configuredPrice: parseFloat(String(item.configuredPrice || "0")) || undefined,
@@ -450,7 +481,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: AuthMe; edit
     clientSaleIdRef,
     activeCurrency,
     exchangeRate,
-    dailyExchangeRate,
+    dailyExchangeRate: exchangeRate,
     activeLocation,
     editVoucherId,
     editVoucher,
