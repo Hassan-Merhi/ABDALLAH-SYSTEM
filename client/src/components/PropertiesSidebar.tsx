@@ -47,6 +47,14 @@ export const PROPERTIES_NAV_SECTIONS: NavSection[] = [
     color: NAV_COLOR.accounting,
     items: [
       { title: "Accounts", url: "/properties/accounts", icon: Landmark },
+      { title: "Vouchers", url: "/properties/vouchers", icon: FileText },
+      { title: "Analytics", url: "/properties/analytics", icon: BarChart2 },
+    ],
+  },
+  {
+    label: "Accounting Reconciliation",
+    color: NAV_COLOR.accounting,
+    items: [
       { title: "Open Items", url: "/properties/accounting/open-items", icon: ClipboardList },
       { title: "Bank & Cash Reconciliation", url: "/properties/accounting/cash-bank", icon: Landmark },
       { title: "Multi-Currency Accounting", url: "/properties/accounting/monetary-fx", icon: Landmark },
@@ -57,8 +65,6 @@ export const PROPERTIES_NAV_SECTIONS: NavSection[] = [
       { title: "Fiscal Closing & Audit", url: "/properties/accounting/fiscal-review", icon: Landmark },
       { title: "Unified Accounting Dashboard", url: "/properties/accounting/dashboard", icon: Landmark },
       { title: "Unified Accounting Rollout", url: "/properties/accounting/rollout", icon: Landmark },
-      { title: "Vouchers", url: "/properties/vouchers", icon: FileText },
-      { title: "Analytics", url: "/properties/analytics", icon: BarChart2 },
     ],
   },
 ];
