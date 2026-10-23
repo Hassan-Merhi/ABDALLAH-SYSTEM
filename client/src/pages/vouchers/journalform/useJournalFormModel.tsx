@@ -152,8 +152,9 @@ export function useJournalFormModel({ voucherIdToEdit, isPOS }: JournalFormProps
     },
   });
 
-  const selectedCurrency = voucherIdToEdit && voucherToEdit?.currency === "ZMW"
-    ? "ZMW" : preferredCurrency;
+  const selectedCurrency = voucherIdToEdit &&
+    (voucherToEdit?.currency === "ZMW" || voucherToEdit?.currency === "CFA" || voucherToEdit?.currency === "USD")
+      ? voucherToEdit.currency : preferredCurrency;
 
   useEffect(() => {
     if (voucherIdToEdit) setAccountPickersNeeded(true);
