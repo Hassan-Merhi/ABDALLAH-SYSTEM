@@ -1,4 +1,4 @@
-import { assertApprovedZmwVoucherRate } from "../../services/accounting/zambiaVoucherRatePolicy";
+import { assertApprovedZmwVoucherRate, assertLockedZmwVoucherEdit } from "../../services/accounting/zambiaVoucherRatePolicy";
 import type { Express } from "express";
 import { getErrorMessage, errorStatus } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
@@ -492,8 +492,15 @@ export function registerVoucherPaymentRoutes(app: Express) {
       }
 
       // Determine currency/rate for the PATCH (may preserve existing if not re-sent).
-      const pCurrency = (currency as string | undefined) || "USD";
-      const pRateRaw = (exchangeRate as string | number | undefined) || null;
+      const [priorVoucher] = await db.select().from(vouchers)
+        .where(and(eq(vouchers.id, voucherId), eq(vouchers.companyId, req.session.currentCompanyId!)))
+        .limit(1);
+      if (!priorVoucher) return res.status(404).json({ message: "Voucher not found" });
+      assertLockedZmwVoucherEdit(priorVoucher, { voucherDate, currency, exchangeRate });
+      const pCurrency = String(priorVoucher.currency || currency || "USD").toUpperCase();
+      const pRateRaw = pCurrency === "ZMW"
+        ? String(priorVoucher.exchangeRate)
+        : ((exchangeRate as string | number | undefined) || null);
       // Base total (historical USD) — stored in vouchers.totalAmount
       const pTotals = paymentVoucherTotals(entries, pCurrency, pRateRaw);
       if (!pTotals) return res.status(400).json({ message: "Invalid amount" });
