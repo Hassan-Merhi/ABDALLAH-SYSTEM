@@ -1,15 +1,11 @@
 import { useLocation } from "wouter";
-import { BarChart3, Boxes, Camera, ClipboardList, History, ScanLine, Settings2, ShoppingCart } from "lucide-react";
+import { Boxes, Camera, ScanLine, Settings2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const LINKS = [
   { href: "/retail/inventory", label: "Inventory", icon: Boxes },
   { href: "/retail/quick-add", label: "Quick add", icon: Camera },
   { href: "/retail/stock", label: "Stock operations", icon: ScanLine },
-  { href: "/retail/pos", label: "Retail POS", icon: ShoppingCart },
-  { href: "/retail/reports", label: "Reports", icon: BarChart3 },
-  { href: "/retail/stock-count", label: "Stock count", icon: ClipboardList },
-  { href: "/retail/history", label: "Sales history", icon: History },
   { href: "/retail/selling", label: "Selling settings", icon: Settings2 },
 ] as const;
 
