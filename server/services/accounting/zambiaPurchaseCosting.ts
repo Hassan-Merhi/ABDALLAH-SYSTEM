@@ -121,6 +121,7 @@ export function valueZmwPurchaseAtLockedRate(input: {
     historicalExchangeRate: historicalRate,
     historicalRateDate: input.date,
     nativeItemsTotal: cents(nativeItemsTotal),
+    nativeLineCount: lines.length,
     nativeFreight: originalCharges.freight,
     nativeSurcharge: originalCharges.surcharge,
     nativeFumigation: originalCharges.fumigation,
@@ -151,6 +152,7 @@ export async function assertPreparedZmwPurchaseCost(input: {
   historicalExchangeRate?: string | null;
   historicalRateDate?: string | null;
   nativeItemsTotal?: string | null;
+  nativeLineCount?: number | null;
   itemsTotal?: string | null;
   [key: string]: unknown;
 }, voucherDate?: string): Promise<void> {
@@ -163,6 +165,9 @@ export async function assertPreparedZmwPurchaseCost(input: {
     input.companyId, input.historicalRateDate, "ZMW", input.historicalExchangeRate,
   );
   if (!rate) throw new HttpError(409, "Historical ZMW PO rate is unavailable");
+  if (!Number.isSafeInteger(input.nativeLineCount) || Number(input.nativeLineCount) <= 0 || Number(input.nativeLineCount) > 10000) {
+    throw new HttpError(409, "Original native purchase line count is missing");
+  }
   const required = ["nativeFreight", "nativeSurcharge", "nativeFumigation",
     "nativeDocumentCharges", "nativeDiscount", "nativeOtherCharges"];
   if (required.some(key => input[key] == null)) {
@@ -173,7 +178,21 @@ export async function assertPreparedZmwPurchaseCost(input: {
   const original = nonNegative(input.nativeItemsTotal, "Original items total");
   const base = nonNegative(input.itemsTotal, "USD items total");
   const expected = original.div(new Decimal(rate));
-  const tolerance = new Decimal("0.01").times(100); // upper bound for 100 independently rounded lines
+  const tolerance = new Decimal("0.005").times(input.nativeLineCount!).plus("0.005");
+  // Every USD line is rounded independently to cents; any larger variance
+  // indicates an incorrect conversion or a Kwacha-as-USD financial value.
+  const linkedCharges: Array<[string, string]> = [
+    ["nativeFreight", "freight"], ["nativeSurcharge", "surcharge"],
+    ["nativeFumigation", "fumigation"], ["nativeDocumentCharges", "documentCharges"],
+    ["nativeDiscount", "discount"], ["nativeOtherCharges", "otherCharges"],
+  ];
+  for (const [nativeField, baseField] of linkedCharges) {
+    const originalCharge = nonNegative(input[nativeField], nativeField);
+    const usdCharge = nonNegative(input[baseField], baseField);
+    if (usdCharge.minus(originalCharge.div(rate)).abs().gt("0.05")) {
+      throw new HttpError(409, "Historical USD charge is inconsistent with the native Kwacha amount");
+    }
+  }
   if (base.minus(expected).abs().gt(tolerance)) {
     throw new HttpError(409, "USD inventory cost does not reconcile to original Kwacha purchase amount");
   }
