@@ -250,6 +250,30 @@ Every assertion reads the posted vouchers:
 | Repository audits (doc index, write routes, write evidence, type escapes, god files, route manifest, source-text ratchet) | Pass, except `audit:toolchain` (pre-existing on `main`) |
 | GitHub CI (`workflow_dispatch`, no PR opened) | Type-check, Build and Frontend Tests pass. Remaining reds trace to `main`: the Node-version toolchain check, and on a dispatch the changed-file format step diffs the merge commit's first parent, which checks files `main` left unformatted |
 
+### Browser device check (built app, Chromium, isolated database)
+
+Run against `npm run build` output with a seeded Retail company, at 1440×900 and
+a 390×844 touch phone viewport:
+
+- Keyboard-wedge scan with focus outside any field adds the exact Red / L variant;
+  field scan adds Blue / S; an unknown barcode shows feedback and leaves the cart alone.
+- Totals come from the server preview (40.00 → 70.00).
+- Gallery: thumbnail opens it without adding to the cart; arrow keys browse and wrap;
+  Zoom toggles; Escape closes and returns focus to the thumbnail; a variant gallery
+  contains only that variant's photos; the Inventory product gallery shows the style
+  photo plus every variant photo, and a broken photo becomes a placeholder.
+- Existing customer picked from the POS; Split turns $70 into 35 + 35; one row switched
+  to customer credit shows "On account: 35.00"; the sale completes, the tender resets to
+  cash, and the receipt print runs with the on-account line.
+- Return by receipt number completes.
+- Phone: no horizontal scroll on POS, Inventory or Stock operations; sticky cart bar
+  shows the total and Complete Sale; the gallery fits the screen and works by touch.
+- Stock operations: dispatch through the UI moves Main 20 → 19 with Mall unchanged and
+  one shipment pending; Confirm receipt moves Mall 3 → 4 and clears the queue.
+- Not covered: a physical camera scanner and a physical receipt printer. Noted, not
+  changed: the global draggable "My Notes" button (30% opacity, also on `main`) can
+  sit over the phone cart bar's total; it does not cover Complete Sale.
+
 ### Open items (not fixed — need an owner decision)
 
 - ~~Per-location authorization~~ — resolved: non-manager roles may only ship from,
@@ -258,11 +282,9 @@ Every assertion reads the posted vouchers:
   credit tender first even if the customer has since paid their account through an ERP
   Receipt voucher; the customer then holds an account credit rather than receiving cash.
   Accounting stays correct; a cashier may still need to pay cash manually.
-- **Repository-wide, pre-existing on `main`:** `audit:toolchain` fails (render.yaml pins
-  Node 24.22.0 while `.node-version` is 24.22.1). Not changed here because `render.yaml`
-  is deployment configuration.
-- Manual device checks (camera scanning, touch gallery, printers) were not possible in
-  this environment.
+- ~~Repository-wide toolchain and `wave17c-rates` failures~~ — resolved by merging
+  `main`, which aligned `render.yaml` on Node 24.22.1; both now pass on this branch.
+- A physical camera scanner and receipt printer still need a check on real hardware.
 
 ## Release and handoff rules
 
