@@ -174,7 +174,12 @@ export function buildCompanyTransferPostingRequest(
       source: {
         sourceType: input.sourceType,
         sourceId: `${clientRequestId}:${input.sourceSide}`,
-        idempotencyKey: `${input.sourceType}:${clientRequestId}:${input.sourceSide}:${payloadFingerprint.slice(0, 32)}`,
+        // ZMW retries reuse one stable key; a changed amount/rate is then
+        // a fingerprint conflict, never a second intercompany posting.
+        // Legacy USD/CFA identities retain their exact original format.
+        idempotencyKey: isZmw
+          ? `${input.sourceType}:${clientRequestId}:${input.sourceSide}:ZMW`
+          : `${input.sourceType}:${clientRequestId}:${input.sourceSide}:${payloadFingerprint.slice(0, 32)}`,
       },
       actor: input.actor,
     },
