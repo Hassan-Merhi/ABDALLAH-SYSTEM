@@ -38,9 +38,14 @@ export const useFormInitialization = (
     const isConsumption = voucherType === "Consumption" || voucherType === "Production" || voucherType === "Mixed";
     const isStockTransfer = voucherType === "Stock Transfer";
 
+    const originalEntries = voucher.currency === "ZMW"
+      ? voucher.entries.filter((entry) =>
+          !(entry.transactionCurrency === "USD" && entry.narration === "Base currency rounding difference")
+        )
+      : voucher.entries;
     if (isPaymentOrReceipt) {
-      const mainEntry = voucher.entries[0];
-      const contraEntries = voucher.entries.slice(1);
+      const mainEntry = originalEntries[0];
+      const contraEntries = originalEntries.slice(1);
       const accountType = mainEntry.ledgerAccountId
         ? "ledger"
         : mainEntry.bankAccountId
@@ -112,7 +117,7 @@ export const useFormInitialization = (
         voucherDate: parseISO(voucher.voucherDate),
         currency: (voucher.currency as "USD" | "CFA" | "ZMW") || selectedCurrency,
         notes: voucher.description || "",
-        entries: voucher.entries.map((e) => {
+        entries: originalEntries.map((e) => {
           const type = parseFloat(e.debitAmount) > 0 ? "DR" : "CR";
           const accountType = e.ledgerAccountId
             ? "ledger"
