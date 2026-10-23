@@ -99,7 +99,9 @@ export const useFormInitialization = (
             accountType: eAccountType,
             accountId: eAccountId,
             accountName: eAccountName,
-            amount: parseFloat(e.debitAmount) > 0 ? e.debitAmount : e.creditAmount,
+            amount: voucher.currency === "ZMW"
+              ? String(Number(e.transactionDebitAmount || "0") > 0 ? e.transactionDebitAmount : e.transactionCreditAmount || "0")
+              : parseFloat(e.debitAmount) > 0 ? e.debitAmount : e.creditAmount,
             narration: e.narration || "",
           };
         }),
@@ -132,7 +134,9 @@ export const useFormInitialization = (
             accountType: accountType,
             accountId,
             accountName,
-            amount: type === "DR" ? e.debitAmount : e.creditAmount,
+            amount: voucher.currency === "ZMW"
+              ? String(type === "DR" ? e.transactionDebitAmount ?? "0" : e.transactionCreditAmount ?? "0")
+              : type === "DR" ? e.debitAmount : e.creditAmount,
             narration: e.narration || "",
           };
         }),
