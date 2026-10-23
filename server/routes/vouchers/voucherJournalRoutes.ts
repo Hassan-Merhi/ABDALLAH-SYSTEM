@@ -476,8 +476,15 @@ export function registerVoucherJournalRoutes(app: Express) {
 
       // Determine voucher currency and rate for the PATCH handler.
       // currency/exchangeRate may not be sent on a PATCH (preserve existing values).
-      const vCurrencyPatch = (currency as string | undefined) || "USD";
-      const vRateRawPatch = (exchangeRate as string | number | undefined) || null;
+      const [priorVoucher] = await db.select().from(vouchers)
+        .where(and(eq(vouchers.id, voucherId), eq(vouchers.companyId, req.session.currentCompanyId!)))
+        .limit(1);
+      if (!priorVoucher) return res.status(404).json({ message: "Voucher not found" });
+      assertLockedZmwVoucherEdit(priorVoucher, { voucherDate, currency, exchangeRate });
+      const vCurrencyPatch = String(priorVoucher.currency || currency || "USD").toUpperCase();
+      const vRateRawPatch = vCurrencyPatch === "ZMW"
+        ? String(priorVoucher.exchangeRate)
+        : ((exchangeRate as string | number | undefined) || null);
       const cfaPerUsdPatch = journalRate(vCurrencyPatch, vRateRawPatch);
 
       // Calculate total debits and credits in transaction currency
