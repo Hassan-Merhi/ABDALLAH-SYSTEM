@@ -65,6 +65,11 @@ export const interCompanyTransferService = {
     // Resolve both companies before creating any accounts or financial rows.
     const fromIsZmw = fx.currency === "ZMW" && fx.zambiaCompanyId === parsed.fromCompanyId;
     const toIsZmw = fx.currency === "ZMW" && fx.zambiaCompanyId === parsed.toCompanyId;
+    // Validate retry identity before any clearing-account creation.
+    const zmwFromVoucherNumber = fx.currency === "ZMW"
+      ? zambiaTransferVoucherNumber("ICT-FROM", parsed.clientRequestId ?? "") : null;
+    const zmwToVoucherNumber = fx.currency === "ZMW"
+      ? zambiaTransferVoucherNumber("ICT-TO", parsed.clientRequestId ?? "") : null;
 
     const fromInterCompanyAccount = await getOrCreateInterCompanyAccount({
       companyId: parsed.fromCompanyId,
@@ -81,12 +86,8 @@ export const interCompanyTransferService = {
       accounts: toAccounts,
     });
     const voucherTimestamp = Date.now();
-    const fromVoucherNumber = fx.currency === "ZMW"
-      ? zambiaTransferVoucherNumber("ICT-FROM", parsed.clientRequestId ?? "")
-      : `ICT-FROM-${voucherTimestamp}`;
-    const toVoucherNumber = fx.currency === "ZMW"
-      ? zambiaTransferVoucherNumber("ICT-TO", parsed.clientRequestId ?? "")
-      : `ICT-TO-${voucherTimestamp}`;
+    const fromVoucherNumber = zmwFromVoucherNumber ?? `ICT-FROM-${voucherTimestamp}`;
+    const toVoucherNumber = zmwToVoucherNumber ?? `ICT-TO-${voucherTimestamp}`;
     const description = parsed.description || `Inter-company transfer to ${toCompany.name}`;
 
     return transferRepository.transaction(async (tx) => {
