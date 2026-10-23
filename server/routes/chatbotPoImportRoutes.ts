@@ -490,6 +490,7 @@ export function registerChatbotPoImportRoutes(app: Express) {
           ...(zwmHistorical ? {
             historicalExchangeRate: zwmHistorical.historicalExchangeRate,
             historicalRateDate: zwmHistorical.historicalRateDate,
+            nativeLineCount: zwmHistorical.nativeLineCount,
             nativeItemsTotal: zwmHistorical.nativeItemsTotal,
             nativeFreight: zwmHistorical.nativeFreight,
             nativeSurcharge: zwmHistorical.nativeSurcharge,
