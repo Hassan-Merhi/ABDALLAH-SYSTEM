@@ -1,3 +1,4 @@
+import { assertApprovedZmwVoucherRate, assertLockedZmwVoucherEdit } from "../../services/accounting/zambiaVoucherRatePolicy";
 import type { Express } from "express";
 import { getErrorMessage, errorStatus } from "../../lib/httpHandlers";
 import { db } from "../../db";
@@ -238,7 +239,7 @@ export function registerVoucherJournalRoutes(app: Express) {
       // Determine voucher currency and rate (CFA per USD convention for non-USD).
       // totalDebits/totalCredits below are in the voucher's transaction currency (e.g. CFA).
       const vCurrency = (currency as string | undefined) || "USD";
-      const vRateRaw = (exchangeRate as string | number | undefined) || null;
+      const vRateRaw = await assertApprovedZmwVoucherRate(req.session.currentCompanyId!, voucherDate, vCurrency, exchangeRate);
       const cfaPerUsd = journalRate(vCurrency, vRateRaw);
 
       // Calculate total debits and credits in transaction currency
