@@ -93,25 +93,30 @@ export default function RetailStockOperations() {
   const activeLocations = locations.filter((location) => location.id > 0 && location.active !== false);
   const { data: transferOptions = [], isFetching: transferOptionsLoading } = useQuery<RetailPosItem[]>({
     queryKey: ["retail-transfer-options", companyKey, locationId, transferSearch.trim()],
-    queryFn: () => getJson<RetailPosItem[]>(`/api/pos/retail/items?locationId=${locationId}&search=${encodeURIComponent(transferSearch.trim())}&limit=40`),
+    queryFn: () =>
+      getJson<RetailPosItem[]>(
+        `/api/pos/retail/items?locationId=${locationId}&search=${encodeURIComponent(transferSearch.trim())}&limit=40`
+      ),
     enabled: retailEnabled && mode === "transfer" && Boolean(locationId),
     staleTime: 15_000,
   });
-  const { data: pendingTransfers = [], isFetching: transfersLoading } = useQuery<Array<{
-    id: number;
-    status: "otw" | "received";
-    variantId: number;
-    productName: string;
-    color: string;
-    size: string;
-    barcode: string;
-    fromLocationId: number;
-    toLocationId: number;
-    quantity: number;
-    dispatchedAt: string;
-    notes?: string | null;
-    imageUrls?: string[];
-  }>>({
+  const { data: pendingTransfers = [], isFetching: transfersLoading } = useQuery<
+    Array<{
+      id: number;
+      status: "otw" | "received";
+      variantId: number;
+      productName: string;
+      color: string;
+      size: string;
+      barcode: string;
+      fromLocationId: number;
+      toLocationId: number;
+      quantity: number;
+      dispatchedAt: string;
+      notes?: string | null;
+      imageUrls?: string[];
+    }>
+  >({
     queryKey: ["retail-transfer-workflow", companyKey],
     queryFn: () => getJson("/api/pos/retail/transfers/workflow?status=otw"),
     enabled: retailEnabled && mode === "transfer",
@@ -218,9 +223,7 @@ export default function RetailStockOperations() {
         return;
       }
       const ok = await post(
-        transferFlow === "dispatch"
-          ? "/api/pos/retail/transfers/dispatch"
-          : "/api/pos/retail/transfers",
+        transferFlow === "dispatch" ? "/api/pos/retail/transfers/dispatch" : "/api/pos/retail/transfers",
         {
           variantId: variant.variantId,
           fromLocationId: Number(locationId),
@@ -232,7 +235,10 @@ export default function RetailStockOperations() {
           ? `Dispatched ${quantity} × ${variant.color} / ${variant.size}; awaiting receipt`
           : `Transferred ${quantity} × ${variant.color} / ${variant.size}`
       );
-      if (ok) { setQuantity(1); setTransferNotes(""); }
+      if (ok) {
+        setQuantity(1);
+        setTransferNotes("");
+      }
     } else if (mode === "adjust") {
       const fullReason =
         reason === "Other" ? reasonNote.trim() : `${reason}${reasonNote.trim() ? ` · ${reasonNote.trim()}` : ""}`;
@@ -263,10 +269,15 @@ export default function RetailStockOperations() {
     receiveKeys.current[transferId] = key;
     setBusy(true);
     try {
-      const response = await apiRequest("POST", `/api/pos/retail/transfers/${transferId}/receive`, { idempotencyKey: key });
+      const response = await apiRequest("POST", `/api/pos/retail/transfers/${transferId}/receive`, {
+        idempotencyKey: key,
+      });
       const result = await response.json();
       delete receiveKeys.current[transferId];
-      toast({ title: result.replayed ? "Receipt already recorded" : "Transfer received", description: "Exact variant is now available at the destination." });
+      toast({
+        title: result.replayed ? "Receipt already recorded" : "Transfer received",
+        description: "Exact variant is now available at the destination.",
+      });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["retail-transfer-workflow"] }),
         queryClient.invalidateQueries({ queryKey: ["retail-transfer-options"] }),
@@ -276,7 +287,11 @@ export default function RetailStockOperations() {
       ]);
       if (variant) await loadVariant(`variantId=${variant.variantId}`);
     } catch (error) {
-      toast({ title: "Receive transfer failed", description: error instanceof Error ? error.message : String(error), variant: "destructive" });
+      toast({
+        title: "Receive transfer failed",
+        description: error instanceof Error ? error.message : String(error),
+        variant: "destructive",
+      });
     } finally {
       setBusy(false);
       focusScan();
@@ -377,8 +392,8 @@ export default function RetailStockOperations() {
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Find an exact variant to transfer</CardTitle>
             <p className="text-xs text-muted-foreground">
-              Search a style, SKU, color, size or barcode. Click an item to select it;
-              click its picture to browse the full gallery without selecting it.
+              Search a style, SKU, color, size or barcode. Click an item to select it; click its picture to browse the
+              full gallery without selecting it.
             </p>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -400,10 +415,13 @@ export default function RetailStockOperations() {
             </div>
             <div className="max-h-72 overflow-y-auto rounded-md border" role="group" aria-label="Choose exact variant">
               {transferOptions.map((item) => (
-                <div key={item.variantId} className={cn(
-                  "flex items-center gap-2 border-b p-2 last:border-0 hover:bg-muted/30",
-                  variant?.variantId === item.variantId && "bg-primary/5"
-                )}>
+                <div
+                  key={item.variantId}
+                  className={cn(
+                    "flex items-center gap-2 border-b p-2 last:border-0 hover:bg-muted/30",
+                    variant?.variantId === item.variantId && "bg-primary/5"
+                  )}
+                >
                   <RetailPhotoGallery
                     images={item.imageUrls}
                     title={`${item.brand} · ${item.name} · ${item.color} / ${item.size}`}
@@ -415,16 +433,26 @@ export default function RetailStockOperations() {
                     className="min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     aria-label={`Select ${item.name}, ${item.color}, size ${item.size}`}
                   >
-                    <div className="truncate text-sm font-semibold">{item.brand} · {item.name}</div>
-                    <div className="text-xs">{item.color} / {item.size} · <span className="font-mono">{item.barcode}</span></div>
+                    <div className="truncate text-sm font-semibold">
+                      {item.brand} · {item.name}
+                    </div>
+                    <div className="text-xs">
+                      {item.color} / {item.size} · <span className="font-mono">{item.barcode}</span>
+                    </div>
                     <div className="text-xs text-muted-foreground">Available at source: {item.quantity}</div>
                   </button>
-                  {variant?.variantId === item.variantId && <span className="text-xs font-semibold text-primary">Selected</span>}
+                  {variant?.variantId === item.variantId && (
+                    <span className="text-xs font-semibold text-primary">Selected</span>
+                  )}
                 </div>
               ))}
               {!transferOptions.length && (
                 <p className="p-3 text-sm text-muted-foreground">
-                  {!locationId ? "Select a source location" : transferOptionsLoading ? "Loading variants…" : "No variants match your search"}
+                  {!locationId
+                    ? "Select a source location"
+                    : transferOptionsLoading
+                      ? "Loading variants…"
+                      : "No variants match your search"}
                 </p>
               )}
             </div>
@@ -501,10 +529,18 @@ export default function RetailStockOperations() {
               <div className="space-y-2 rounded-md border p-3" role="group" aria-label="Transfer completion mode">
                 <p className="text-sm font-medium">Transfer method</p>
                 <div className="grid grid-cols-2 gap-2">
-                  <Button type="button" variant={transferFlow === "immediate" ? "default" : "outline"} onClick={() => setTransferFlow("immediate")}>
+                  <Button
+                    type="button"
+                    variant={transferFlow === "immediate" ? "default" : "outline"}
+                    onClick={() => setTransferFlow("immediate")}
+                  >
                     Immediate
                   </Button>
-                  <Button type="button" variant={transferFlow === "dispatch" ? "default" : "outline"} onClick={() => setTransferFlow("dispatch")}>
+                  <Button
+                    type="button"
+                    variant={transferFlow === "dispatch" ? "default" : "outline"}
+                    onClick={() => setTransferFlow("dispatch")}
+                  >
                     Dispatch / Receive
                   </Button>
                 </div>
@@ -513,7 +549,13 @@ export default function RetailStockOperations() {
                     ? "Moves stock to the destination in a single operation."
                     : "Dispatch removes stock from the source. Destination stock increases only when receipt is confirmed; value remains in transit."}
                 </p>
-                <Input value={transferNotes} onChange={(event) => setTransferNotes(event.target.value)} placeholder="Transfer note (optional)" maxLength={1000} aria-label="Transfer note" />
+                <Input
+                  value={transferNotes}
+                  onChange={(event) => setTransferNotes(event.target.value)}
+                  placeholder="Transfer note (optional)"
+                  maxLength={1000}
+                  aria-label="Transfer note"
+                />
               </div>
             )}
             {mode === "adjust" && (
@@ -606,15 +648,26 @@ export default function RetailStockOperations() {
                 </strong>
               </p>
             )}
-            <Button className="h-12 w-full text-base"
-              disabled={busy || (mode === "transfer" && (
-                !locationId || !toLocationId || locationId === toLocationId ||
-                quantity <= 0 || stockAt(locationId) + 0.000001 < quantity
-              ))}
-              onClick={() => void submit()}>
-              {busy ? "Saving…" : mode === "transfer"
-                ? transferFlow === "dispatch" ? "Dispatch exact variant" : "Transfer immediately"
-                : `Confirm ${MODES.find((entry) => entry.id === mode)?.label.toLowerCase()}`}
+            <Button
+              className="h-12 w-full text-base"
+              disabled={
+                busy ||
+                (mode === "transfer" &&
+                  (!locationId ||
+                    !toLocationId ||
+                    locationId === toLocationId ||
+                    quantity <= 0 ||
+                    stockAt(locationId) + 0.000001 < quantity))
+              }
+              onClick={() => void submit()}
+            >
+              {busy
+                ? "Saving…"
+                : mode === "transfer"
+                  ? transferFlow === "dispatch"
+                    ? "Dispatch exact variant"
+                    : "Transfer immediately"
+                  : `Confirm ${MODES.find((entry) => entry.id === mode)?.label.toLowerCase()}`}
             </Button>
           </CardContent>
         </Card>
@@ -635,11 +688,16 @@ export default function RetailStockOperations() {
                   imageClassName="h-12 w-12 rounded-md border"
                 />
                 <div className="min-w-44 flex-1 text-sm">
-                  <div className="font-semibold">Transfer #{transfer.id} · {transfer.productName}</div>
-                  <div>{transfer.color} / {transfer.size} · Qty {transfer.quantity}</div>
+                  <div className="font-semibold">
+                    Transfer #{transfer.id} · {transfer.productName}
+                  </div>
+                  <div>
+                    {transfer.color} / {transfer.size} · Qty {transfer.quantity}
+                  </div>
                   <div className="text-xs text-muted-foreground font-mono">{transfer.barcode}</div>
                   <div className="text-xs text-muted-foreground">
-                    {activeLocations.find((item) => item.id === transfer.fromLocationId)?.name ?? transfer.fromLocationId}
+                    {activeLocations.find((item) => item.id === transfer.fromLocationId)?.name ??
+                      transfer.fromLocationId}
                     {" → "}
                     {activeLocations.find((item) => item.id === transfer.toLocationId)?.name ?? transfer.toLocationId}
                   </div>
@@ -648,7 +706,12 @@ export default function RetailStockOperations() {
                     {transfer.notes ? ` · ${transfer.notes}` : ""}
                   </div>
                 </div>
-                <Button type="button" variant="outline" disabled={busy} onClick={() => void confirmReceive(transfer.id)}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => void confirmReceive(transfer.id)}
+                >
                   {busy ? "Working…" : "Confirm receipt"}
                 </Button>
               </div>

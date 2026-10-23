@@ -5,12 +5,7 @@
  * statements, erases posted vouchers, or blocks the server's transaction-owned
  * Retail sales/returns journals and credit-note reversals.
  */
-export const RETAIL_HIDDEN_MANUAL_VOUCHER_TABS = [
-  "journal",
-  "transferorder",
-  "adjustment",
-  "creditnote",
-] as const;
+export const RETAIL_HIDDEN_MANUAL_VOUCHER_TABS = ["journal", "transferorder", "adjustment", "creditnote"] as const;
 
 const hiddenTabs: ReadonlySet<string> = new Set(RETAIL_HIDDEN_MANUAL_VOUCHER_TABS);
 

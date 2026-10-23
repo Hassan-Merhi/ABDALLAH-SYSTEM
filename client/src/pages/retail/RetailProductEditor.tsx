@@ -389,7 +389,11 @@ export function ProductEditor({
                     key={`${src}-${index}`}
                     className="group relative h-28 w-28 overflow-hidden rounded-lg border bg-muted"
                   >
-                    <img src={normalizeRetailImageUrl(src)} alt={`Product photo ${index + 1}`} className="h-full w-full object-cover" />
+                    <img
+                      src={normalizeRetailImageUrl(src)}
+                      alt={`Product photo ${index + 1}`}
+                      className="h-full w-full object-cover"
+                    />
                     <Button
                       type="button"
                       size="icon"
@@ -413,10 +417,12 @@ export function ProductEditor({
                       <button
                         type="button"
                         className="absolute bottom-1 left-1 rounded bg-background/95 px-1.5 py-1 text-[10px] font-semibold text-foreground shadow hover:bg-background"
-                        onClick={() => setDraft((current) => ({
-                          ...current,
-                          imageUrls: putPhotoFirst(current.imageUrls, index),
-                        }))}
+                        onClick={() =>
+                          setDraft((current) => ({
+                            ...current,
+                            imageUrls: putPhotoFirst(current.imageUrls, index),
+                          }))
+                        }
                         aria-label={`Set product photo ${index + 1} as main image`}
                       >
                         Set main
@@ -531,8 +537,8 @@ export function ProductEditor({
                   <div>
                     <Label>Variant images</Label>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Optional photos for this exact color and size. Up to {MAX_VARIANT_IMAGES} images.
-                      The first is the variant cover photo.
+                      Optional photos for this exact color and size. Up to {MAX_VARIANT_IMAGES} images. The first is the
+                      variant cover photo.
                     </p>
                   </div>
                   <Input
@@ -582,9 +588,11 @@ export function ProductEditor({
                             <button
                               type="button"
                               className="absolute bottom-1 left-1 rounded bg-background/95 px-1 py-0.5 text-[10px] font-semibold shadow hover:bg-background"
-                              onClick={() => updateVariant(variantIndex, {
-                                imageUrls: putPhotoFirst(variant.imageUrls, imageIndex),
-                              })}
+                              onClick={() =>
+                                updateVariant(variantIndex, {
+                                  imageUrls: putPhotoFirst(variant.imageUrls, imageIndex),
+                                })
+                              }
                               aria-label={`Set variant photo ${imageIndex + 1} as main image`}
                             >
                               Set main

@@ -118,8 +118,7 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
       if (!voucherId) throw new Error("Voucher ID is required");
       if (
         selectedCompany?.companyType === "retail" &&
-        (isRetailManualVoucherTypeHidden(voucherData?.voucherType) ||
-          isRetailManualVoucherTypeHidden(data.voucherType))
+        (isRetailManualVoucherTypeHidden(voucherData?.voucherType) || isRetailManualVoucherTypeHidden(data.voucherType))
       ) {
         throw new Error("Retail system journals and adjustment vouchers are read-only");
       }
@@ -165,8 +164,8 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
   const entries = form.watch("entries");
   const { totalDebits, totalCredits, isBalanced } = computeEntryTotals(entries);
   const isOptional = form.watch("optional");
-  const retailReadOnly = selectedCompany?.companyType === "retail" &&
-    isRetailManualVoucherTypeHidden(voucherData?.voucherType);
+  const retailReadOnly =
+    selectedCompany?.companyType === "retail" && isRetailManualVoucherTypeHidden(voucherData?.voucherType);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -182,8 +181,13 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
           <div className="text-center py-8">Loading voucher data...</div>
         ) : retailReadOnly ? (
           <div className="space-y-3 rounded-md border p-4 text-sm">
-            <p>Retail does not permit manually editing this voucher type. Its posted accounting remains available in the Daybook and voucher detail view.</p>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
+            <p>
+              Retail does not permit manually editing this voucher type. Its posted accounting remains available in the
+              Daybook and voucher detail view.
+            </p>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Close
+            </Button>
           </div>
         ) : (
           <Form {...form}>
@@ -219,7 +223,9 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
                         <SelectContent>
                           <SelectItem value="Payment">Payment</SelectItem>
                           <SelectItem value="Receipt">Receipt</SelectItem>
-                          {selectedCompany?.companyType !== "retail" && <SelectItem value="Journal">Journal</SelectItem>}
+                          {selectedCompany?.companyType !== "retail" && (
+                            <SelectItem value="Journal">Journal</SelectItem>
+                          )}
                           <SelectItem value="Sales">Sales</SelectItem>
                           <SelectItem value="Purchase">Purchase</SelectItem>
                           <SelectItem value="Contra">Contra</SelectItem>

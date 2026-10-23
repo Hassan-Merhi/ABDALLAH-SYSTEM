@@ -682,56 +682,56 @@ export default function POS({ posUser, editVoucherId }: { posUser?: AuthMe; edit
 
       {/* ── Desktop layout ── */}
       <PosWorkspaceColumns layout="erp">
-          <div className="flex-1 flex flex-col overflow-y-auto min-w-0">
-            <div>
-              {inventoryLoading ? (
-                <div className="rounded-lg border p-8 text-center text-sm text-muted-foreground" aria-busy="true">
-                  Loading inventory…
-                </div>
-              ) : (
-                <SaleGrid
-                  rows={rows}
-                  columns={POS_COLUMNS}
-                  selectedCell={selectedCell}
-                  setSelectedCell={setSelectedCell}
-                  updateRow={updateRow}
-                  handleDeleteRow={(i) => setRows(rows.filter((_, idx) => idx !== i))}
-                  handleKeyDown={handleKeyDown}
-                  setActiveRow={setActiveRow}
-                  setSearchTerm={setSearchTerm}
-                  setHighlightedIndex={setHighlightedIndex}
-                  getStockWarning={() => null}
-                  formatDisplayAmount={fmtAmount}
-                  activeCurrency={activeCurrency}
-                  exchangeRate={exchangeRate}
-                  inputRefs={inputRefs}
-                  clearActiveRowTimerRef={clearActiveRowTimerRef}
-                  focusCell={focusCell}
-                  toast={toast}
-                  isEditMode={!!editVoucherId}
-                />
-              )}
-            </div>
-            <div className="mt-2 px-1 pb-2">
-              <Textarea
-                placeholder="Notes (optional)"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                className="resize-none h-12 min-h-[48px] text-sm"
-                data-testid="input-notes"
+        <div className="flex-1 flex flex-col overflow-y-auto min-w-0">
+          <div>
+            {inventoryLoading ? (
+              <div className="rounded-lg border p-8 text-center text-sm text-muted-foreground" aria-busy="true">
+                Loading inventory…
+              </div>
+            ) : (
+              <SaleGrid
+                rows={rows}
+                columns={POS_COLUMNS}
+                selectedCell={selectedCell}
+                setSelectedCell={setSelectedCell}
+                updateRow={updateRow}
+                handleDeleteRow={(i) => setRows(rows.filter((_, idx) => idx !== i))}
+                handleKeyDown={handleKeyDown}
+                setActiveRow={setActiveRow}
+                setSearchTerm={setSearchTerm}
+                setHighlightedIndex={setHighlightedIndex}
+                getStockWarning={() => null}
+                formatDisplayAmount={fmtAmount}
+                activeCurrency={activeCurrency}
+                exchangeRate={exchangeRate}
+                inputRefs={inputRefs}
+                clearActiveRowTimerRef={clearActiveRowTimerRef}
+                focusCell={focusCell}
+                toast={toast}
+                isEditMode={!!editVoucherId}
               />
-            </div>
+            )}
           </div>
-          <InventoryPicker
-            inventory={inventory}
-            // Preserve the row the cashier was typing into. The item-name input
-            // blurs when the sidebar is clicked, so activeRow can clear before
-            // the click completes; selectedCell is the stable row fallback.
-            selectItem={(item) => selectItem(item, activeRow ?? selectedCell.row)}
-            itemListRef={itemListRef}
-            highlightedIndex={highlightedIndex}
-            syncTerm={searchTerm}
-          />
+          <div className="mt-2 px-1 pb-2">
+            <Textarea
+              placeholder="Notes (optional)"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="resize-none h-12 min-h-[48px] text-sm"
+              data-testid="input-notes"
+            />
+          </div>
+        </div>
+        <InventoryPicker
+          inventory={inventory}
+          // Preserve the row the cashier was typing into. The item-name input
+          // blurs when the sidebar is clicked, so activeRow can clear before
+          // the click completes; selectedCell is the stable row fallback.
+          selectItem={(item) => selectItem(item, activeRow ?? selectedCell.row)}
+          itemListRef={itemListRef}
+          highlightedIndex={highlightedIndex}
+          syncTerm={searchTerm}
+        />
       </PosWorkspaceColumns>
 
       {/* ── Mobile layout ── */}

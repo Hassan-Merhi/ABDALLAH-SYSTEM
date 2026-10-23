@@ -102,11 +102,17 @@ export function RetailLastSaleSummary({ sale, onPrint }: { sale: RetailSale; onP
         <div className="mt-2 border-t pt-2 text-xs text-muted-foreground">
           {sale.payments.map((payment) => (
             <div key={payment.id} className="flex justify-between">
-              <span>{payment.method === "store_credit"
-                ? "Customer account credited"
-                : payment.method === "credit"
-                  ? payment.paymentType === "refund" ? "Credit reversed" : "On account (unpaid)"
-                  : payment.paymentType === "refund" ? "Refund" : payment.method}</span>
+              <span>
+                {payment.method === "store_credit"
+                  ? "Customer account credited"
+                  : payment.method === "credit"
+                    ? payment.paymentType === "refund"
+                      ? "Credit reversed"
+                      : "On account (unpaid)"
+                    : payment.paymentType === "refund"
+                      ? "Refund"
+                      : payment.method}
+              </span>
               <span>{money(payment.amount)}</span>
             </div>
           ))}
@@ -267,8 +273,12 @@ export function RetailVariantTransferCard({
                 imageClassName="h-16 w-16 rounded-md border"
               />
               <div className="min-w-0 text-sm">
-                <div className="font-semibold">{selected.brand} · {selected.name}</div>
-                <div>{selected.color} / {selected.size}</div>
+                <div className="font-semibold">
+                  {selected.brand} · {selected.name}
+                </div>
+                <div>
+                  {selected.color} / {selected.size}
+                </div>
                 <div className="font-mono text-xs text-muted-foreground">{selected.barcode}</div>
                 <div className="text-xs">Source stock: {selected.quantity}</div>
               </div>
@@ -309,7 +319,10 @@ export function RetailVariantTransferCard({
         >
           {pending ? "Transferring…" : "Transfer exact variant"}
         </Button>
-        <a href="/retail/stock?mode=transfer" className="block text-center text-sm font-medium text-primary underline-offset-4 hover:underline">
+        <a
+          href="/retail/stock?mode=transfer"
+          className="block text-center text-sm font-medium text-primary underline-offset-4 hover:underline"
+        >
           Open photo-based stock transfers, dispatch and receive
         </a>
       </CardContent>

@@ -125,15 +125,17 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const visibleSidebarGroups = sidebarGroups
     .map((group) => ({
       ...group,
-      items: group.items.filter((item) =>
-        (!isFactoryMode || !factoryHiddenTabs.includes(FACTORY_VOUCHER_HIDDEN_KEYS[item.key as VoucherTab])) &&
-        (!isRetailCompany || !isRetailManualVoucherTabHidden(item.key))
+      items: group.items.filter(
+        (item) =>
+          (!isFactoryMode || !factoryHiddenTabs.includes(FACTORY_VOUCHER_HIDDEN_KEYS[item.key as VoucherTab])) &&
+          (!isRetailCompany || !isRetailManualVoucherTabHidden(item.key))
       ),
     }))
     .filter((group) => group.items.length > 0);
   const visibleVoucherTabs = visibleSidebarGroups.flatMap((group) => group.items.map((item) => item.key as VoucherTab));
   const fallbackVoucherTab = visibleVoucherTabs[0] ?? null;
-  const canShowVoucherTab = (tab: VoucherTab) => isPOS || (!isFactoryMode && !isRetailCompany) || visibleVoucherTabs.includes(tab);
+  const canShowVoucherTab = (tab: VoucherTab) =>
+    isPOS || (!isFactoryMode && !isRetailCompany) || visibleVoucherTabs.includes(tab);
   const allowedVoucherTabs = (isFactoryMode || isRetailCompany) && !isPOS ? visibleVoucherTabs : ALL_VOUCHER_TABS;
   const [activeTab, setActiveTab] = useHubQueryState<VoucherTab>({
     key: "tab",

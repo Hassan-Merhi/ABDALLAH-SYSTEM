@@ -95,9 +95,7 @@ export function RetailCustomerPicker({
                   : "Account balance: 0.00"}
             </div>
           )}
-          {balanceQuery.isError && (
-            <div className="text-xs text-destructive">Could not load customer balance</div>
-          )}
+          {balanceQuery.isError && <div className="text-xs text-destructive">Could not load customer balance</div>}
         </div>
         <Button
           size="sm"

@@ -110,11 +110,7 @@ export function registerRetailCustomerRoutes(app: Express): void {
       const [owned] = await db
         .select({ id: customers.id })
         .from(customers)
-        .where(and(
-          eq(customers.id, customerId),
-          eq(customers.companyId, companyId),
-          isNull(customers.deletedAt)
-        ))
+        .where(and(eq(customers.id, customerId), eq(customers.companyId, companyId), isNull(customers.deletedAt)))
         .limit(1);
       if (!owned) return res.status(404).json({ message: "Customer not found" });
       res.json({ customerId, balance: await getCustomerBalance(customerId, companyId) });
@@ -396,17 +392,20 @@ export function registerRetailCustomerRoutes(app: Express): void {
         const [creditTender] = await db
           .select({ id: retailPosPayments.id })
           .from(retailPosPayments)
-          .where(and(
-            eq(retailPosPayments.companyId, companyId),
-            eq(retailPosPayments.saleId, saleId),
-            eq(retailPosPayments.method, "credit"),
-            eq(retailPosPayments.paymentType, "payment")
-          ))
+          .where(
+            and(
+              eq(retailPosPayments.companyId, companyId),
+              eq(retailPosPayments.saleId, saleId),
+              eq(retailPosPayments.method, "credit"),
+              eq(retailPosPayments.paymentType, "payment")
+            )
+          )
           .limit(1);
-        if (creditTender) return res.status(409).json({
-          code: "RETAIL_CREDIT_CUSTOMER_LOCKED",
-          message: "Cannot change the customer on a posted credit sale; use an accounting reversal instead",
-        });
+        if (creditTender)
+          return res.status(409).json({
+            code: "RETAIL_CREDIT_CUSTOMER_LOCKED",
+            message: "Cannot change the customer on a posted credit sale; use an accounting reversal instead",
+          });
       }
       let customerName = "Walk-in";
       if (body.customerId) {

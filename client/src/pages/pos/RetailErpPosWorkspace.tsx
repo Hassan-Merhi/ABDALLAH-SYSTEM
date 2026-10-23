@@ -22,7 +22,14 @@ interface RetailErpPosSaleGridProps {
 
 /** ERP-style sales grid, but with exact retail variant IDs and a photo viewer. */
 export function RetailErpPosSaleGrid({
-  cart, pricingLines, units, total, onDecrease, onIncrease, onAdjust, onRemove,
+  cart,
+  pricingLines,
+  units,
+  total,
+  onDecrease,
+  onIncrease,
+  onAdjust,
+  onRemove,
 }: RetailErpPosSaleGridProps) {
   return (
     <Card className="overflow-hidden min-w-0" id="retail-pos-cart">
@@ -56,28 +63,76 @@ export function RetailErpPosSaleGrid({
                   />
                   <div className="min-w-0 flex-1" data-no-translate>
                     <div className="truncate font-semibold">{line.name}</div>
-                    <div className="truncate text-xs text-muted-foreground">{line.brand} · {line.color} / {line.size}</div>
+                    <div className="truncate text-xs text-muted-foreground">
+                      {line.brand} · {line.color} / {line.size}
+                    </div>
                     <div className="truncate font-mono text-[10px] text-muted-foreground">{line.barcode}</div>
-                    {adjusted && <div className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400">Discount / override applied</div>}
-                    {line.cartQuantity > line.quantity && <div className="text-xs text-destructive">Above available stock ({line.quantity})</div>}
+                    {adjusted && (
+                      <div className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
+                        Discount / override applied
+                      </div>
+                    )}
+                    {line.cartQuantity > line.quantity && (
+                      <div className="text-xs text-destructive">Above available stock ({line.quantity})</div>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center justify-center gap-1">
-                  <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={() => onDecrease(line.variantId)} aria-label={`Decrease ${line.name} quantity`}>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7"
+                    onClick={() => onDecrease(line.variantId)}
+                    aria-label={`Decrease ${line.name} quantity`}
+                  >
                     <Minus className="h-3.5 w-3.5" />
                   </Button>
-                  <span className="min-w-5 text-center font-mono" data-testid={`retail-grid-quantity-${line.variantId}`}>{line.cartQuantity}</span>
-                  <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={() => onIncrease(line)} aria-label={`Increase ${line.name} quantity`}>
+                  <span
+                    className="min-w-5 text-center font-mono"
+                    data-testid={`retail-grid-quantity-${line.variantId}`}
+                  >
+                    {line.cartQuantity}
+                  </span>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7"
+                    onClick={() => onIncrease(line)}
+                    aria-label={`Increase ${line.name} quantity`}
+                  >
                     <Plus className="h-3.5 w-3.5" />
                   </Button>
                 </div>
-                <div className="border-x px-2 text-right font-mono text-xs" data-no-translate>{money(rate)}</div>
-                <div className="border-r bg-muted/20 px-2 text-right font-mono font-semibold" data-no-translate>{money(amount)}</div>
+                <div className="border-x px-2 text-right font-mono text-xs" data-no-translate>
+                  {money(rate)}
+                </div>
+                <div className="border-r bg-muted/20 px-2 text-right font-mono font-semibold" data-no-translate>
+                  {money(amount)}
+                </div>
                 <div className="flex justify-center">
-                  <Button type="button" size="icon" variant={adjusted ? "secondary" : "ghost"} className="h-8 w-8" onClick={() => onAdjust(line)} title="Discount or price override" aria-label="Line discount or price override" data-testid="retail-line-discount">
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant={adjusted ? "secondary" : "ghost"}
+                    className="h-8 w-8"
+                    onClick={() => onAdjust(line)}
+                    title="Discount or price override"
+                    aria-label="Line discount or price override"
+                    data-testid="retail-line-discount"
+                  >
                     <Percent className="h-4 w-4" />
                   </Button>
-                  <Button type="button" size="icon" variant="ghost" className="h-8 w-8" onClick={() => onRemove(line.variantId)} title="Remove item" aria-label={`Remove ${line.name} from sale`}>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8"
+                    onClick={() => onRemove(line.variantId)}
+                    title="Remove item"
+                    aria-label={`Remove ${line.name} from sale`}
+                  >
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
@@ -91,8 +146,14 @@ export function RetailErpPosSaleGrid({
             </div>
           )}
           <div className="flex items-center justify-between gap-4 bg-muted/20 px-3 py-2 text-sm">
-            <div className="text-muted-foreground"><strong className="text-foreground">{cart.length}</strong> items · Qty <strong className="font-mono text-foreground">{units.toFixed(2)}</strong></div>
-            <div className="flex items-baseline gap-2"><span className="text-muted-foreground">Total</span><strong className="font-mono text-2xl">{money(total)}</strong></div>
+            <div className="text-muted-foreground">
+              <strong className="text-foreground">{cart.length}</strong> items · Qty{" "}
+              <strong className="font-mono text-foreground">{units.toFixed(2)}</strong>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-muted-foreground">Total</span>
+              <strong className="font-mono text-2xl">{money(total)}</strong>
+            </div>
           </div>
         </div>
       </div>
@@ -114,16 +175,33 @@ interface RetailErpPosItemPickerProps {
 
 /** Same side-panel search pattern as ERP POS; photo clicks never select or sell. */
 export function RetailErpPosItemPicker({
-  items, searchText, onSearchChange, onBarcodeSubmit, onPick, scanInputRef, loading, hasLocation, lastScan,
+  items,
+  searchText,
+  onSearchChange,
+  onBarcodeSubmit,
+  onPick,
+  scanInputRef,
+  loading,
+  hasLocation,
+  lastScan,
 }: RetailErpPosItemPickerProps) {
   return (
-    <Card className="flex min-h-[340px] flex-col overflow-hidden xl:sticky xl:top-3 xl:max-h-[min(76vh,760px)]" aria-label="Retail POS item selection">
+    <Card
+      className="flex min-h-[340px] flex-col overflow-hidden xl:sticky xl:top-3 xl:max-h-[min(76vh,760px)]"
+      aria-label="Retail POS item selection"
+    >
       <div className="border-b p-3">
         <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
           <ScanLine className="h-4 w-4" /> Items
           <span className="ml-auto text-xs font-normal text-muted-foreground">Exact color / size</span>
         </div>
-        <form className="flex gap-2" onSubmit={(event) => { event.preventDefault(); onBarcodeSubmit(searchText); }}>
+        <form
+          className="flex gap-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onBarcodeSubmit(searchText);
+          }}
+        >
           <div className="relative min-w-0 flex-1">
             <ScanLine className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -151,19 +229,37 @@ export function RetailErpPosItemPicker({
         ) : (
           <>
             {items.map((item) => (
-              <div key={item.variantId} className="flex min-h-[68px] items-center gap-2 border-b px-3 py-2 hover:bg-muted/30">
+              <div
+                key={item.variantId}
+                className="flex min-h-[68px] items-center gap-2 border-b px-3 py-2 hover:bg-muted/30"
+              >
                 <RetailPhotoGallery
                   images={item.imageUrls ?? []}
                   title={`${item.brand} · ${item.name} · ${item.color} / ${item.size}`}
                   imageClassName="h-12 w-12 rounded-md border"
                 />
-                <button type="button" onClick={() => onPick(item)} className="min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={`Add ${item.name}, ${item.color}, size ${item.size} to sale`}>
-                  <div className="truncate text-sm font-semibold" data-no-translate>{item.name}</div>
-                  <div className="truncate text-xs text-muted-foreground" data-no-translate>{item.brand} · {item.color} / {item.size}</div>
-                  <div className="truncate font-mono text-[10px] text-muted-foreground" data-no-translate>{item.barcode}</div>
+                <button
+                  type="button"
+                  onClick={() => onPick(item)}
+                  className="min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-label={`Add ${item.name}, ${item.color}, size ${item.size} to sale`}
+                >
+                  <div className="truncate text-sm font-semibold" data-no-translate>
+                    {item.name}
+                  </div>
+                  <div className="truncate text-xs text-muted-foreground" data-no-translate>
+                    {item.brand} · {item.color} / {item.size}
+                  </div>
+                  <div className="truncate font-mono text-[10px] text-muted-foreground" data-no-translate>
+                    {item.barcode}
+                  </div>
                   <div className="mt-1 flex items-center justify-between gap-2 text-xs">
-                    <span className="font-semibold" data-no-translate>{item.promotion ? money(item.promotion.promotionPrice) : money(item.price)}</span>
-                    <span className={item.quantity <= 0 ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}>
+                    <span className="font-semibold" data-no-translate>
+                      {item.promotion ? money(item.promotion.promotionPrice) : money(item.price)}
+                    </span>
+                    <span
+                      className={item.quantity <= 0 ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}
+                    >
                       {item.quantity <= 0 ? "Out" : `Stock ${item.quantity}`}
                     </span>
                   </div>
@@ -174,7 +270,11 @@ export function RetailErpPosItemPicker({
           </>
         )}
       </div>
-      {lastScan && <div className="max-h-52 overflow-y-auto border-t p-2"><RetailScanFeedback outcome={lastScan} /></div>}
+      {lastScan && (
+        <div className="max-h-52 overflow-y-auto border-t p-2">
+          <RetailScanFeedback outcome={lastScan} />
+        </div>
+      )}
       <div className="flex items-center justify-between border-t px-3 py-2 text-xs text-muted-foreground">
         <span>Scan or select a variant to add it</span>
         <ShoppingCart className="h-4 w-4" />

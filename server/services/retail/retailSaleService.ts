@@ -521,12 +521,17 @@ export async function createRetailReturnInTx(
       if (previous && previous.restock !== restock) throw new Error("Conflicting restock disposition on return retry");
       expected.set(line.saleItemId, { quantity: (previous?.quantity ?? 0) + line.quantity, restock });
     }
-    if (priorLines.length !== expected.size ||
-        priorLines.some((line) => {
-          const requested = expected.get(line.saleItemId);
-          return !requested || Math.abs(toNumber(line.quantity) - requested.quantity) > 0.000001 ||
-            line.restocked !== requested.restock;
-        })) {
+    if (
+      priorLines.length !== expected.size ||
+      priorLines.some((line) => {
+        const requested = expected.get(line.saleItemId);
+        return (
+          !requested ||
+          Math.abs(toNumber(line.quantity) - requested.quantity) > 0.000001 ||
+          line.restocked !== requested.restock
+        );
+      })
+    ) {
       throw new Error("Return idempotency key was already used for different items or quantities");
     }
     return {
@@ -606,7 +611,11 @@ export async function createRetailReturnInTx(
     const after = restock ? nextRetailReturnQuantity(stock.quantity, quantity) : stock.quantity;
     if (restock) {
       await setInventoryQuantity(
-        tx, companyId, saleItem.variantId, sale.locationId, after,
+        tx,
+        companyId,
+        saleItem.variantId,
+        sale.locationId,
+        after,
         nextAverageCost(stock.quantity, stock.averageCost, quantity, toNumber(saleItem.unitCost))
       );
     }

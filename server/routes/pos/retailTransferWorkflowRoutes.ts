@@ -8,7 +8,12 @@ import { getErrorMessage } from "../../lib/httpHandlers";
 import { MoneyDecimal } from "../../lib/money";
 import { trackRetailStockValueTx } from "../../services/retail/retailInventoryJournal";
 import { ensureRetailVariant } from "../../services/retail/retailSaleService";
-import { addMovement, lockInventoryRow, nextAverageCost, setInventoryQuantity } from "../../services/retail/retailStockLedger";
+import {
+  addMovement,
+  lockInventoryRow,
+  nextAverageCost,
+  setInventoryQuantity,
+} from "../../services/retail/retailStockLedger";
 import { currentUserId, ensureCompanyLocation, requireRetailCompany } from "./retailPosContext";
 
 const IN_TRANSIT_ASSET = "RETAIL-IN-TRANSIT";
@@ -59,23 +64,28 @@ export function registerRetailTransferWorkflowRoutes(app: Express): void {
       const companyId = await requireRetailCompany(req, res);
       if (!companyId) return;
       const requested = String(req.query.status ?? "otw");
-      if (!["otw", "received", "all"].includes(requested)) return res.status(400).json({ message: "Invalid transfer status" });
+      if (!["otw", "received", "all"].includes(requested))
+        return res.status(400).json({ message: "Invalid transfer status" });
       const rows = await db
         .select()
         .from(retailStockOperations)
-        .where(and(
-          eq(retailStockOperations.companyId, companyId),
-          eq(retailStockOperations.operationType, "transfer_dispatch"),
-          requested === "all" ? undefined : sql`(${retailStockOperations.metadata}->>'status') = ${requested}`
-        ))
+        .where(
+          and(
+            eq(retailStockOperations.companyId, companyId),
+            eq(retailStockOperations.operationType, "transfer_dispatch"),
+            requested === "all" ? undefined : sql`(${retailStockOperations.metadata}->>'status') = ${requested}`
+          )
+        )
         .orderBy(desc(retailStockOperations.createdAt), desc(retailStockOperations.id))
         .limit(250);
-      res.json(rows.map((row) => ({
-        id: row.id,
-        createdAt: row.createdAt,
-        createdBy: row.createdBy,
-        ...metadata(row.metadata ?? {}),
-      })));
+      res.json(
+        rows.map((row) => ({
+          id: row.id,
+          createdAt: row.createdAt,
+          createdBy: row.createdBy,
+          ...metadata(row.metadata ?? {}),
+        }))
+      );
     } catch (error) {
       res.status(400).json({ message: getErrorMessage(error) });
     }
@@ -86,7 +96,8 @@ export function registerRetailTransferWorkflowRoutes(app: Express): void {
       const companyId = await requireRetailCompany(req, res);
       if (!companyId) return;
       const body = dispatchSchema.parse(req.body);
-      if (body.fromLocationId === body.toLocationId) return res.status(400).json({ message: "Choose different locations" });
+      if (body.fromLocationId === body.toLocationId)
+        return res.status(400).json({ message: "Choose different locations" });
       await Promise.all([
         ensureCompanyLocation(companyId, body.fromLocationId),
         ensureCompanyLocation(companyId, body.toLocationId),
@@ -94,7 +105,8 @@ export function registerRetailTransferWorkflowRoutes(app: Express): void {
       const actor = currentUserId(req);
       const result = await db.transaction(async (tx) => {
         const variant = await ensureRetailVariant(tx, companyId, body.variantId);
-        const [variantPhotos] = await tx.select({
+        const [variantPhotos] = await tx
+          .select({
             imageUrls: retailProductVariants.imageUrls,
             productImageUrls: retailProducts.imageUrls,
           })
@@ -114,23 +126,32 @@ export function registerRetailTransferWorkflowRoutes(app: Express): void {
           .onConflictDoNothing({ target: [retailStockOperations.companyId, retailStockOperations.idempotencyKey] })
           .returning({ id: retailStockOperations.id });
         if (!created) {
-          const [existing] = await tx.select({
-            id: retailStockOperations.id,
-            operationType: retailStockOperations.operationType,
-            metadata: retailStockOperations.metadata,
-          })
+          const [existing] = await tx
+            .select({
+              id: retailStockOperations.id,
+              operationType: retailStockOperations.operationType,
+              metadata: retailStockOperations.metadata,
+            })
             .from(retailStockOperations)
-            .where(and(eq(retailStockOperations.companyId, companyId), eq(retailStockOperations.idempotencyKey, body.idempotencyKey)))
+            .where(
+              and(
+                eq(retailStockOperations.companyId, companyId),
+                eq(retailStockOperations.idempotencyKey, body.idempotencyKey)
+              )
+            )
             .limit(1);
-          if (existing?.operationType !== "transfer_dispatch") throw new Error("This operation key belongs to another stock transaction");
+          if (existing?.operationType !== "transfer_dispatch")
+            throw new Error("This operation key belongs to another stock transaction");
           const prior = metadata(existing.metadata ?? {});
           // An idempotent replay may not change the stock move while silently
           // reporting success for the old request.
-          if (prior.variantId !== body.variantId ||
-              prior.fromLocationId !== body.fromLocationId ||
-              prior.toLocationId !== body.toLocationId ||
-              prior.quantity !== body.quantity ||
-              (prior.notes ?? "") !== (body.notes ?? "")) {
+          if (
+            prior.variantId !== body.variantId ||
+            prior.fromLocationId !== body.fromLocationId ||
+            prior.toLocationId !== body.toLocationId ||
+            prior.quantity !== body.quantity ||
+            (prior.notes ?? "") !== (body.notes ?? "")
+          ) {
             throw new Error("Transfer idempotency key belongs to a different dispatch");
           }
           return { replayed: true, operationId: existing.id, status: prior.status };
@@ -166,14 +187,21 @@ export function registerRetailTransferWorkflowRoutes(app: Express): void {
           dispatchedAt: new Date().toISOString(),
           notes: body.notes ?? null,
         };
-        await tx.update(retailStockOperations).set({ metadata: details as Record<string, unknown> })
+        await tx
+          .update(retailStockOperations)
+          .set({ metadata: details as Record<string, unknown> })
           .where(and(eq(retailStockOperations.id, created.id), eq(retailStockOperations.companyId, companyId)));
         await addMovement(tx, {
-          companyId, variantId: body.variantId, locationId: body.fromLocationId,
-          movementType: "transfer_out", quantityDelta: -body.quantity,
-          before: source.quantity, after,
+          companyId,
+          variantId: body.variantId,
+          locationId: body.fromLocationId,
+          movementType: "transfer_out",
+          quantityDelta: -body.quantity,
+          before: source.quantity,
+          after,
           eventKey: `transfer:${created.id}:dispatch`,
-          referenceType: "retail_transfer", referenceId: created.id,
+          referenceType: "retail_transfer",
+          referenceId: created.id,
           createdBy: actor,
           metadata: { ...details, phase: "dispatch", toLocationId: body.toLocationId },
         });
@@ -182,11 +210,13 @@ export function registerRetailTransferWorkflowRoutes(app: Express): void {
           sourceId: `dispatch-${created.id}`,
           description: `Retail transfer #${created.id} dispatched: stock in transit`,
           actor: { userId: actor, username: req.user?.username ?? null },
-          contra: [{
-            accountCode: IN_TRANSIT_ASSET,
-            amount: inTransitValue,
-            narration: `Retail transfer #${created.id}: in-transit stock asset`,
-          }],
+          contra: [
+            {
+              accountCode: IN_TRANSIT_ASSET,
+              amount: inTransitValue,
+              narration: `Retail transfer #${created.id}: in-transit stock asset`,
+            },
+          ],
         });
         return { replayed: false, operationId: created.id, status: "otw" as const };
       });
@@ -202,24 +232,37 @@ export function registerRetailTransferWorkflowRoutes(app: Express): void {
       const companyId = await requireRetailCompany(req, res);
       if (!companyId) return;
       const transferId = Number(req.params.id);
-      if (!Number.isSafeInteger(transferId) || transferId <= 0) return res.status(400).json({ message: "Invalid transfer" });
+      if (!Number.isSafeInteger(transferId) || transferId <= 0)
+        return res.status(400).json({ message: "Invalid transfer" });
       const body = receiveSchema.parse(req.body);
       const actor = currentUserId(req);
       const result = await db.transaction(async (tx) => {
         // Lock transfer itself: two receivers cannot receive the same dispatch.
-        await tx.execute(sql`SELECT id FROM retail_stock_operations WHERE id = ${transferId} AND company_id = ${companyId} FOR UPDATE`);
-        const [op] = await tx.select().from(retailStockOperations)
+        await tx.execute(
+          sql`SELECT id FROM retail_stock_operations WHERE id = ${transferId} AND company_id = ${companyId} FOR UPDATE`
+        );
+        const [op] = await tx
+          .select()
+          .from(retailStockOperations)
           .where(and(eq(retailStockOperations.id, transferId), eq(retailStockOperations.companyId, companyId)))
           .limit(1);
         if (!op || op.operationType !== "transfer_dispatch") throw new Error("Transfer not found");
         const details = metadata(op.metadata ?? {});
         if (details.status === "received") {
-          if (details.receiveIdempotencyKey === body.idempotencyKey) return { replayed: true, operationId: transferId, status: "received" as const };
+          if (details.receiveIdempotencyKey === body.idempotencyKey)
+            return { replayed: true, operationId: transferId, status: "received" as const };
           throw new Error("Transfer has already been received");
         }
-        if (details.status !== "otw" || !details.variantId || !details.toLocationId ||
-          !details.fromLocationId || !details.quantity || details.sourceUnitCost == null ||
-          details.inTransitValue == null) throw new Error("Transfer has incomplete dispatch evidence");
+        if (
+          details.status !== "otw" ||
+          !details.variantId ||
+          !details.toLocationId ||
+          !details.fromLocationId ||
+          !details.quantity ||
+          details.sourceUnitCost == null ||
+          details.inTransitValue == null
+        )
+          throw new Error("Transfer has incomplete dispatch evidence");
         await Promise.all([
           ensureCompanyLocation(companyId, details.fromLocationId),
           ensureCompanyLocation(companyId, details.toLocationId),
@@ -230,15 +273,24 @@ export function registerRetailTransferWorkflowRoutes(app: Express): void {
         ]);
         const after = dest.quantity + details.quantity;
         await setInventoryQuantity(
-          tx, companyId, details.variantId, details.toLocationId, after,
+          tx,
+          companyId,
+          details.variantId,
+          details.toLocationId,
+          after,
           nextAverageCost(dest.quantity, dest.averageCost, details.quantity, toNumber(details.sourceUnitCost))
         );
         await addMovement(tx, {
-          companyId, variantId: details.variantId, locationId: details.toLocationId,
-          movementType: "transfer_in", quantityDelta: details.quantity,
-          before: dest.quantity, after,
+          companyId,
+          variantId: details.variantId,
+          locationId: details.toLocationId,
+          movementType: "transfer_in",
+          quantityDelta: details.quantity,
+          before: dest.quantity,
+          after,
           eventKey: `transfer:${transferId}:receive`,
-          referenceType: "retail_transfer", referenceId: transferId,
+          referenceType: "retail_transfer",
+          referenceId: transferId,
           createdBy: actor,
           metadata: { ...details, phase: "receive", fromLocationId: details.fromLocationId },
         });
@@ -247,20 +299,25 @@ export function registerRetailTransferWorkflowRoutes(app: Express): void {
           sourceId: `receive-${transferId}`,
           description: `Retail transfer #${transferId} received at location ${details.toLocationId}`,
           actor: { userId: actor, username: req.user?.username ?? null },
-          contra: [{
-            accountCode: IN_TRANSIT_ASSET,
-            amount: new MoneyDecimal(details.inTransitValue).negated(),
-            narration: `Retail transfer #${transferId}: clear in-transit stock asset`,
-          }],
+          contra: [
+            {
+              accountCode: IN_TRANSIT_ASSET,
+              amount: new MoneyDecimal(details.inTransitValue).negated(),
+              narration: `Retail transfer #${transferId}: clear in-transit stock asset`,
+            },
+          ],
         });
-        await tx.update(retailStockOperations)
-          .set({ metadata: {
-            ...details,
-            status: "received",
-            receivedAt: new Date().toISOString(),
-            receivedBy: actor,
-            receiveIdempotencyKey: body.idempotencyKey,
-          } })
+        await tx
+          .update(retailStockOperations)
+          .set({
+            metadata: {
+              ...details,
+              status: "received",
+              receivedAt: new Date().toISOString(),
+              receivedBy: actor,
+              receiveIdempotencyKey: body.idempotencyKey,
+            },
+          })
           .where(and(eq(retailStockOperations.id, transferId), eq(retailStockOperations.companyId, companyId)));
         return { replayed: false, operationId: transferId, status: "received" as const };
       });

@@ -28,8 +28,14 @@ export function RetailPaymentPanel({
 }) {
   const formId = useId();
   const allocated = value.reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
-  const paid = value.reduce((sum, payment) => payment.method === "credit" ? sum : sum + (Number(payment.amount) || 0), 0);
-  const credit = value.reduce((sum, payment) => payment.method === "credit" ? sum + (Number(payment.amount) || 0) : sum, 0);
+  const paid = value.reduce(
+    (sum, payment) => (payment.method === "credit" ? sum : sum + (Number(payment.amount) || 0)),
+    0
+  );
+  const credit = value.reduce(
+    (sum, payment) => (payment.method === "credit" ? sum + (Number(payment.amount) || 0) : sum),
+    0
+  );
   const remaining = Math.max(0, total - allocated);
   const over = Math.max(0, allocated - total);
 
@@ -42,7 +48,9 @@ export function RetailPaymentPanel({
       <div className="flex items-center justify-between gap-2">
         <div>
           <div className="text-sm font-semibold">Payment</div>
-          <div className="text-xs text-muted-foreground">Cash, card, bank, split tender, or customer credit. Credit is not money received.</div>
+          <div className="text-xs text-muted-foreground">
+            Cash, card, bank, split tender, or customer credit. Credit is not money received.
+          </div>
         </div>
         <Button
           type="button"
@@ -59,10 +67,7 @@ export function RetailPaymentPanel({
             const available = Number((amounts[largestIndex] ?? 0).toFixed(2));
             const allocatedAmount = Number(remaining.toFixed(2));
             if (allocatedAmount > 0) {
-              onChange([
-                ...value,
-                { method: "cash", amount: allocatedAmount, tenderedAmount: allocatedAmount },
-              ]);
+              onChange([...value, { method: "cash", amount: allocatedAmount, tenderedAmount: allocatedAmount }]);
               return;
             }
             if (available < 0.02) return;
@@ -70,17 +75,18 @@ export function RetailPaymentPanel({
             const existingAmount = Number((available - splitOff).toFixed(2));
             if (splitOff <= 0 || existingAmount <= 0) return;
             onChange([
-              ...value.map((payment, index) => index === largestIndex
-                ? {
-                    ...payment,
-                    amount: existingAmount,
-                    tenderedAmount: payment.method === "cash" ? existingAmount : null,
-                  }
-                : payment
+              ...value.map((payment, index) =>
+                index === largestIndex
+                  ? {
+                      ...payment,
+                      amount: existingAmount,
+                      tenderedAmount: payment.method === "cash" ? existingAmount : null,
+                    }
+                  : payment
               ),
               { method: "cash", amount: splitOff, tenderedAmount: splitOff },
             ]);
-          }
+          }}
         >
           <Plus className="mr-1 h-3.5 w-3.5" /> Split
         </Button>

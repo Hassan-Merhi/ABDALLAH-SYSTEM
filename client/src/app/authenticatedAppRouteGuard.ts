@@ -56,7 +56,10 @@ export function resolveAuthenticatedAppRoute({
   let decision: AuthenticatedAppRouteDecision = { kind: "continue" };
 
   // All Daybook is intentionally unavailable to ERP Tester, including direct links.
-  if (userRole === "ERP Tester" && (currentLocation === "/transaction-journal" || currentLocation.startsWith("/transaction-journal/"))) {
+  if (
+    userRole === "ERP Tester" &&
+    (currentLocation === "/transaction-journal" || currentLocation.startsWith("/transaction-journal/"))
+  ) {
     decision = { kind: "redirect", to: "/daybook" };
   } else if (
     userRole === "ERP Tester" &&

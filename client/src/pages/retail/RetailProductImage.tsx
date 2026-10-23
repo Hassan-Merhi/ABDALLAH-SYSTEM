@@ -1,7 +1,14 @@
 import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import { ChevronLeft, ChevronRight, ImageIcon, Images, ZoomIn, ZoomOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { normalizeRetailImageUrl, normalizeRetailImageUrls } from "@/lib/retailImageUrl";
 import { cn } from "@/lib/utils";
 import type { RetailProduct } from "./retailInventoryTypes";
@@ -14,15 +21,7 @@ export function retailProductImageUrls(product: RetailProduct): string[] {
   ]);
 }
 
-export function RetailImage({
-  src,
-  alt = "",
-  className,
-}: {
-  src?: string | null;
-  alt?: string;
-  className?: string;
-}) {
+export function RetailImage({ src, alt = "", className }: { src?: string | null; alt?: string; className?: string }) {
   const normalized = normalizeRetailImageUrl(src);
   const [failed, setFailed] = useState(false);
 
@@ -136,19 +135,22 @@ export function RetailPhotoGallery({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <button
-        type="button"
-        className={cn("group relative block shrink-0 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2", className)}
-        aria-label={`View all photos of ${title}`}
-        aria-haspopup="dialog"
-        title="View all product photos"
-        data-testid="retail-gallery-trigger"
-      >
-        <RetailImage src={sources[0]} alt={title} className={imageClassName} />
-        <span className="absolute bottom-1 right-1 rounded-sm bg-black/70 px-1.5 py-0.5 text-[10px] font-semibold text-white">
-          <Images className="mr-1 inline h-3 w-3" aria-hidden="true" />
-          {sources.length}
-        </span>
-        <span className="sr-only">Open photo gallery</span>
+          type="button"
+          className={cn(
+            "group relative block shrink-0 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+            className
+          )}
+          aria-label={`View all photos of ${title}`}
+          aria-haspopup="dialog"
+          title="View all product photos"
+          data-testid="retail-gallery-trigger"
+        >
+          <RetailImage src={sources[0]} alt={title} className={imageClassName} />
+          <span className="absolute bottom-1 right-1 rounded-sm bg-black/70 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+            <Images className="mr-1 inline h-3 w-3" aria-hidden="true" />
+            {sources.length}
+          </span>
+          <span className="sr-only">Open photo gallery</span>
         </button>
       </DialogTrigger>
 
@@ -159,7 +161,9 @@ export function RetailPhotoGallery({
       >
         <DialogHeader>
           <DialogTitle data-no-translate>{title}</DialogTitle>
-          <DialogDescription>Photo {selectedIndex + 1} of {sources.length}. Use left and right arrow keys to browse.</DialogDescription>
+          <DialogDescription>
+            Photo {selectedIndex + 1} of {sources.length}. Use left and right arrow keys to browse.
+          </DialogDescription>
         </DialogHeader>
         <div className="flex items-center justify-between gap-2 pr-10">
           <span className="text-xs text-muted-foreground" aria-live="polite">
@@ -184,10 +188,7 @@ export function RetailPhotoGallery({
                 key={current}
                 src={current}
                 alt={`${title} — photo ${selectedIndex + 1}`}
-                className={cn(
-                  "mx-auto w-full rounded-md object-contain",
-                  !zoomed && "max-h-[min(57vh,590px)]"
-                )}
+                className={cn("mx-auto w-full rounded-md object-contain", !zoomed && "max-h-[min(57vh,590px)]")}
               />
             </div>
           </div>

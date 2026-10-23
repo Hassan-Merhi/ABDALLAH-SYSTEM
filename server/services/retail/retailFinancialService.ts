@@ -468,9 +468,7 @@ export async function refundRetailPaymentsTx(
   // Reverse unpaid receivables before returning any real cash/bank tender.
   // An item returned on a partly paid invoice must never pay out more cash
   // while an uncollected credit portion still exists on that sale.
-  payments = [...payments].sort((a, b) =>
-    Number(b.method === "credit") - Number(a.method === "credit") || a.id - b.id
-  );
+  payments = [...payments].sort((a, b) => Number(b.method === "credit") - Number(a.method === "credit") || a.id - b.id);
 
   const refunds = await tx
     .select()
@@ -500,8 +498,8 @@ export async function refundRetailPaymentsTx(
     const key = deriveRetailIdempotencyKey(input.idempotencyKey, `refund:${original.id}`);
     // Credit-original = cancellation of an unpaid receivable. For collected
     // tenders customer_credit records a fresh credit to the party, not a payout.
-    const refundMethod = input.destination === "customer_credit" && original.method !== "credit"
-      ? "store_credit" : original.method;
+    const refundMethod =
+      input.destination === "customer_credit" && original.method !== "credit" ? "store_credit" : original.method;
     const [inserted] = await tx
       .insert(retailPosPayments)
       .values({
@@ -515,9 +513,10 @@ export async function refundRetailPaymentsTx(
         amount: money(amount),
         tenderedAmount: null,
         changeAmount: "0",
-        reference: refundMethod === "store_credit"
-          ? `Customer credit from payment #${original.id}`
-          : `Refund for payment #${original.id}`,
+        reference:
+          refundMethod === "store_credit"
+            ? `Customer credit from payment #${original.id}`
+            : `Refund for payment #${original.id}`,
         ledgerAccountId: refundMethod === "store_credit" ? null : original.ledgerAccountId,
         bankAccountId: refundMethod === "store_credit" ? null : original.bankAccountId,
         relatedPaymentId: original.id,
@@ -575,7 +574,10 @@ export async function postRetailRefundAccountingTx(
   // posting. Their synthetic legacy payment exists only to make the operational
   // refund safe; reconciliation continues to flag the missing historical journal.
   if (!originalSale?.accountingVoucherId) return null;
-  if (input.refunds.some((payment) => payment.method === "credit" || payment.method === "store_credit") && !originalSale.customerId) {
+  if (
+    input.refunds.some((payment) => payment.method === "credit" || payment.method === "store_credit") &&
+    !originalSale.customerId
+  ) {
     throw new Error("Cannot reverse a credit sale without its original customer");
   }
 
@@ -612,7 +614,7 @@ export async function postRetailRefundAccountingTx(
                 },
               ]),
           ...allocatePaymentLines(input.refunds, refundAccountingAmount).map(({ payment, amount }) => ({
-            ...((payment.method === "credit" || payment.method === "store_credit")
+            ...(payment.method === "credit" || payment.method === "store_credit"
               ? { customerId: originalSale.customerId! }
               : payment.bankAccountId
                 ? { bankAccountId: payment.bankAccountId }
