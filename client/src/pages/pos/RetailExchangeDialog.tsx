@@ -33,17 +33,21 @@ export function RetailExchangeDialog({
   sale,
   locationId,
   shiftId,
+  canOverride = false,
   onOpenChange,
   onCompleted,
 }: {
   sale: RetailSale | null;
   locationId: number | null;
   shiftId: number | null;
+  canOverride?: boolean;
   onOpenChange: (open: boolean) => void;
   onCompleted: (sale: RetailSale) => void | Promise<void>;
 }) {
   const { toast } = useToast();
   const [returnQty, setReturnQty] = useState<Record<number, number>>({});
+  const [noRestock, setNoRestock] = useState<Record<number, boolean>>({});
+  const [reason, setReason] = useState("");
   const [newItems, setNewItems] = useState<Array<RetailPosItem & { exchangeQuantity: number }>>([]);
   const [scanText, setScanText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -52,6 +56,8 @@ export function RetailExchangeDialog({
 
   useEffect(() => {
     setReturnQty({});
+    setNoRestock({});
+    setReason("");
     setNewItems([]);
     setScanText("");
     setPayments([{ method: "cash", amount: 0, tenderedAmount: 0 }]);
@@ -66,7 +72,7 @@ export function RetailExchangeDialog({
 
   if (!sale) return null;
 
-  const refundValue = sale.items.reduce((sum, item) => sum + (returnQty[item.id] ?? 0) * item.unitPrice, 0);
+  const refundValue = sale.items.reduce((sum, item) => sum + (returnQty[item.id] ?? 0) * (item.grossUnitPrice ?? item.unitPrice), 0);
   const newTotal = replacementTotal;
   const balance = newTotal - refundValue;
 
@@ -101,13 +107,21 @@ export function RetailExchangeDialog({
     if (!locationId) return;
     const returnItems = Object.entries(returnQty)
       .filter(([, quantity]) => quantity > 0)
-      .map(([saleItemId, quantity]) => ({ saleItemId: Number(saleItemId), quantity }));
+      .map(([saleItemId, quantity]) => ({
+        saleItemId: Number(saleItemId),
+        quantity,
+        restock: !noRestock[Number(saleItemId)],
+      }));
     const items = newItems.map((item) => ({ variantId: item.variantId, quantity: item.exchangeQuantity }));
     if (!returnItems.length || !items.length) {
       toast({ title: "Choose what is returned and what the customer takes", variant: "destructive" });
       return;
     }
-    const fingerprint = JSON.stringify({ sale: sale.id, shiftId, returnItems, items, payments });
+    if (returnItems.some((line) => !line.restock) && !reason.trim()) {
+      toast({ title: "Explain why a returned exchange item is not restocked", variant: "destructive" });
+      return;
+    }
+    const fingerprint = JSON.stringify({ sale: sale.id, shiftId, returnItems, items, payments, reason });
     if (!attemptRef.current || attemptRef.current.fingerprint !== fingerprint) {
       attemptRef.current = { fingerprint, key: makeKey("retail-exchange") };
     }
@@ -121,6 +135,7 @@ export function RetailExchangeDialog({
         returnItems,
         newItems: items,
         payments,
+        notes: reason.trim() || undefined,
       });
       const result = (await response.json()) as ExchangeResult;
       attemptRef.current = null;
@@ -163,7 +178,7 @@ export function RetailExchangeDialog({
                   <div className="min-w-0 flex-1 text-sm" data-no-translate>
                     <div className="truncate font-medium">{item.name}</div>
                     <div className="text-xs text-muted-foreground">
-                      {item.color} · {item.size} · {money(item.unitPrice)} · {remaining}/{item.quantity}
+                      {item.color} · {item.size} · {money(item.grossUnitPrice ?? item.unitPrice)} · {remaining}/{item.quantity}
                     </div>
                   </div>
                   <Button
@@ -189,6 +204,12 @@ export function RetailExchangeDialog({
                   >
                     <Plus className="h-3.5 w-3.5" />
                   </Button>
+                  {canOverride && (
+                    <label className="flex items-center gap-1 text-xs">
+                      <input type="checkbox" checked={!noRestock[item.id]} onChange={(event) => setNoRestock((current) => ({ ...current, [item.id]: !event.target.checked }))} />
+                      Restock
+                    </label>
+                  )}
                 </div>
               );
             })}
@@ -237,8 +258,9 @@ export function RetailExchangeDialog({
             ))}
           </section>
 
-          {newItems.length > 0 ? <RetailPaymentPanel total={newTotal} value={payments} onChange={setPayments} /> : null}
+          {newItems.length > 0 ? <RetailPaymentPanel total={newTotal} value={payments} onChange={setPayments} canUseCredit={Boolean(sale.customerId)} /> : null}
 
+          <Input placeholder="Exchange / damaged item reason (optional except for no-restock)" value={reason} onChange={(event) => setReason(event.target.value)} maxLength={2000} />
           <div className="space-y-1 rounded-md bg-muted/40 p-3 text-sm">
             <div className="flex justify-between">
               <span>Returned value</span>
