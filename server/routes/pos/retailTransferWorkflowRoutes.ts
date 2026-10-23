@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
-import { retailStockOperations } from "@shared/schema";
+import { retailProductVariants, retailStockOperations } from "@shared/schema";
 import { requireAuth, requireNonPOS } from "../../auth";
 import { db } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
@@ -28,6 +28,7 @@ type TransferMeta = {
   variantId?: number;
   productName?: string;
   barcode?: string;
+  imageUrls?: string[];
   color?: string;
   size?: string;
   fromLocationId?: number;
@@ -90,6 +91,10 @@ export function registerRetailTransferWorkflowRoutes(app: Express): void {
       const actor = currentUserId(req);
       const result = await db.transaction(async (tx) => {
         const variant = await ensureRetailVariant(tx, companyId, body.variantId);
+        const [variantPhotos] = await tx.select({ imageUrls: retailProductVariants.imageUrls })
+          .from(retailProductVariants)
+          .where(and(eq(retailProductVariants.id, body.variantId), eq(retailProductVariants.companyId, companyId)))
+          .limit(1);
         const [created] = await tx
           .insert(retailStockOperations)
           .values({
@@ -128,6 +133,7 @@ export function registerRetailTransferWorkflowRoutes(app: Express): void {
           color: variant.color,
           size: variant.size,
           barcode: variant.barcode,
+          imageUrls: Array.isArray(variantPhotos?.imageUrls) ? variantPhotos.imageUrls : [],
           fromLocationId: body.fromLocationId,
           toLocationId: body.toLocationId,
           quantity: body.quantity,
