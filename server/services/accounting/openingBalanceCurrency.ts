@@ -54,10 +54,10 @@ export function normalizeOpeningBalanceCurrency(
   if (currency === baseCurrency) {
     historicalRate = new Decimal(1);
     computedBase = amount;
-  } else if (currency === "CFA" && baseCurrency === "USD") {
+  } else if ((currency === "CFA" || currency === "ZMW") && baseCurrency === "USD") {
     historicalRate = validateHistoricalRate(
       input.openingBalanceHistoricalRate,
-      "CFA opening-balance historical rate",
+      `${currency} opening-balance historical rate`,
     );
     computedBase = amount.div(historicalRate);
   } else {
