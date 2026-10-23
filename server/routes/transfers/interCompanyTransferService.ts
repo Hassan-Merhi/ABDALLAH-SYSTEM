@@ -5,6 +5,7 @@ import {
   type PostingActor,
 } from "../../services/accounting";
 import { requireCompanyAccess } from "./transferRequestContext";
+import { resolveZambiaIntercompanyAmount } from "../../services/accounting/zambiaIntercompanyTransfer";
 import { TransferRouteError } from "./transferErrors";
 import { transferRepository } from "./transferRepository";
 import { parseInterCompanyTransferInput } from "./transferValidation";
@@ -57,6 +58,14 @@ export const interCompanyTransferService = {
       throw new TransferRouteError(404, "To ledger account not found or doesn't belong to to company");
     }
 
+    const fx = await resolveZambiaIntercompanyAmount({
+      fromCompany, toCompany, amount: parsed.amount, transferDate: parsed.transferDate,
+      currency: parsed.currency, exchangeRate: parsed.exchangeRate,
+    });
+    // Resolve both companies before creating any accounts or financial rows.
+    const fromIsZmw = fx.currency === "ZMW" && fx.zambiaCompanyId === parsed.fromCompanyId;
+    const toIsZmw = fx.currency === "ZMW" && fx.zambiaCompanyId === parsed.toCompanyId;
+
     const fromInterCompanyAccount = await getOrCreateInterCompanyAccount({
       companyId: parsed.fromCompanyId,
       code: `IC-TO-${toCompany.code}`,
@@ -86,7 +95,8 @@ export const interCompanyTransferService = {
         description,
         debitNarration: fromNarration,
         creditNarration: fromNarration,
-        amount: parsed.amount,
+        amount: fromIsZmw ? fx.nativeAmount : fx.baseAmount,
+        ...(fromIsZmw ? { transactionCurrency: "ZMW" as const, historicalExchangeRate: fx.historicalRate } : {}),
         debitLedgerAccountId: fromInterCompanyAccount.id,
         creditLedgerAccountId: parsed.fromLedgerAccountId,
         clientRequestId: parsed.clientRequestId,
@@ -105,7 +115,8 @@ export const interCompanyTransferService = {
         description: parsed.description || `Inter-company transfer from ${fromCompany.name}`,
         debitNarration: toNarration,
         creditNarration: toNarration,
-        amount: parsed.amount,
+        amount: toIsZmw ? fx.nativeAmount : fx.baseAmount,
+        ...(toIsZmw ? { transactionCurrency: "ZMW" as const, historicalExchangeRate: fx.historicalRate } : {}),
         debitLedgerAccountId: parsed.toLedgerAccountId,
         creditLedgerAccountId: toInterCompanyAccount.id,
         clientRequestId: fromBuilt.clientRequestId,
