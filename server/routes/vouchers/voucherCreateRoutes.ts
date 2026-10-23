@@ -110,6 +110,11 @@ export function registerVoucherCreateRoutes(app: Express) {
       const approvedHeaderRate = await assertApprovedZmwVoucherRate(
         companyId, String(req.body.voucherDate), headerCurrency, req.body.exchangeRate
       );
+      // A standalone voucher's total_amount is always historical USD,
+      // including when its user-facing header is entered in Kwacha.
+      const historicalBaseTotal = headerCurrency === "ZMW"
+        ? new Decimal(totalAmount).div(new Decimal(approvedHeaderRate!)).toDecimalPlaces(2).toFixed(2)
+        : totalAmount;
       const voucher = await storage.createVoucher({
         companyId,
         voucherNumber: String(req.body.voucherNumber),
@@ -117,7 +122,7 @@ export function registerVoucherCreateRoutes(app: Express) {
         // receives (StockTransfer/Transfer from POS, Production, Mixed).
         voucherType: String(voucherType) as InsertVoucher["voucherType"],
         voucherDate: String(req.body.voucherDate),
-        totalAmount,
+        totalAmount: historicalBaseTotal,
         description: textField(req.body.description),
         optional: req.body.optional ?? false,
         currency: headerCurrency,
