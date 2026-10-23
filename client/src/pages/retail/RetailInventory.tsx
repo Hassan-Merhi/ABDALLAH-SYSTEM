@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, useRoute } from "wouter";
-import { ArrowLeft, Boxes, Camera, Pencil, Plus, Printer, ShoppingCart, Upload } from "lucide-react";
+import { ArrowLeft, Boxes, Camera, Pencil, Plus, Printer, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -277,9 +277,8 @@ export default function RetailInventory() {
         <div className="flex flex-wrap items-start gap-5">
           <ProductImageGallery
             product={detailProduct}
-            maxImages={6}
             className="max-w-full"
-            imageClassName="h-32 w-32 rounded-lg border"
+            imageClassName="h-36 w-36 rounded-lg border sm:h-44 sm:w-44"
           />
           <div>
             <h1 className="text-3xl font-bold">{detailProduct.name}</h1>
@@ -336,9 +335,6 @@ export default function RetailInventory() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="secondary" onClick={() => navigate("/retail/pos")}>
-            <ShoppingCart className="mr-2 h-4 w-4" /> Open POS
-          </Button>
           <Button variant="outline" onClick={() => setImportOpen(true)}>
             <Upload className="mr-2 h-4 w-4" /> Import
           </Button>

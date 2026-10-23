@@ -130,6 +130,8 @@ These describe work in progress and carry live figures bound to their sources.
 | [Retail Wave 2 spec](superpowers/specs/2026-10-05-retail-wave2-customers-pricing-tax-stock-count-design.md) | Current Retail customers, discounts, tax foundation and physical stock-count contract |
 | [Retail Wave 2 plan](superpowers/plans/2026-10-05-retail-wave2-customers-pricing-tax-stock-count.md) | Implementation and verification plan for the current Retail Wave 2 rollout |
 | [retail-fashion-inventory.md](retail-fashion-inventory.md) | Retail fashion intake, generated barcodes and labels, scan-to-sell, barcode stock movements and reports |
+| [retail-pos-inventory-workflow.md](retail-pos-inventory-workflow.md) | Retail ERP-style POS, customer credit, credit-first returns/exchanges, voucher restrictions and two-stage transfers |
+| [retail-pos-inventory-claude-handoff.md](retail-pos-inventory-claude-handoff.md) | Retail POS + Inventory verification record: checks run, accounting reconciliation and open items |
 | [performance-phase9.md](performance-phase9.md) | Build, bundle, and runtime performance constraints |
 | [performance-wave5-production-certification.md](performance-wave5-production-certification.md) | Production performance certification and remaining measurement gates |
 | [remote-support-phase-17-transport-resilience.md](remote-support-phase-17-transport-resilience.md) | Remote-support Phase 17: binary transport with a conditional HTTP polling fallback |

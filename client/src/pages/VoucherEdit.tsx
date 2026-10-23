@@ -12,6 +12,7 @@ import { useAppMode, useModePrefix } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { ArrowLeft } from "lucide-react";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
+import { isRetailManualVoucherTypeHidden } from "@/lib/retailVoucherPolicy";
 
 // Sub-components
 import { focusByTestId } from "./voucher-edit/VoucherEditHelpers";
@@ -147,6 +148,23 @@ export default function VoucherEdit() {
         <div className="text-center py-8">Voucher not found</div>
       </div>
     );
+
+  if (selectedCompany?.companyType === "retail" && isRetailManualVoucherTypeHidden(voucherType)) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title={`${voucherType} Voucher`} onBack={() => handleBack()} />
+        <div className="rounded-lg border bg-card p-5 space-y-3">
+          <p className="text-sm">
+            Retail does not allow manual editing of this voucher type. Automatic accounting entries remain posted and
+            available for audit.
+          </p>
+          <Button type="button" variant="outline" onClick={() => navigate(`/voucher-detail/${id}`)}>
+            View posted voucher
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   const paymentTotal = isPaymentOrReceipt
     ? paymentForm.watch("entries").reduce((sum, entry) => sum + (parseFloat(entry.amount) || 0), 0)
