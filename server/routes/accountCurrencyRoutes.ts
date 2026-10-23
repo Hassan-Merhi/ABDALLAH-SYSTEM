@@ -3,12 +3,15 @@ import { getErrorMessage } from "../lib/httpHandlers";
 import Decimal from "decimal.js";
 import { and, eq, isNull } from "drizzle-orm";
 import { db, pool } from "../db";
-import { requireAuth, requireNonPOS } from "../auth";
+import { requireAuth, requireNonPOS, requireRole } from "../auth";
 import { bankAccounts, companies, ledgerAccounts } from "@shared/schema";
 import { normalizeOpeningBalanceCurrency } from "../services/accounting/openingBalanceCurrency";
 import { getCashLedgerAccountSummary } from "../services/accounting/cashLedgerAccountSummaryService";
 import { getCashBankAccountSummary, getCashBankRevaluation } from "../services/accounting/cashBankRevaluationService";
 import { openingSideOf } from "../services/accounting/balances/openingSide";
+import { postZambiaCashTransfer } from "../services/accounting/zambiaCashTransferService";
+import { sessionPostingActor } from "../services/accounting/erpVoucherPosting";
+import { errorStatus } from "../lib/httpHandlers";
 
 const OPENING_FIELDS = [
   "openingBalance",
@@ -262,6 +265,21 @@ async function getHistoricalLedgerBalance(companyId: number, ledgerAccountId: nu
 }
 
 export function registerAccountCurrencyRoutes(app: Express) {
+  // A real movement between two existing, company-owned Cash/Bank accounts.
+  // It creates a balanced, idempotent journal; it does NOT revalue history.
+  app.post("/api/accounts/multi-currency/zambia-transfer", requireAuth, requireNonPOS, requireRole("Admin", "Owner"), async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "Select a company" });
+      const result = await postZambiaCashTransfer(
+        req.body, companyId, sessionPostingActor(req, "Zambia USD/ZMW cash or bank currency conversion"),
+      );
+      return res.status(result.replayed ? 200 : 201).json(result);
+    } catch (error: unknown) {
+      return res.status(errorStatus(error)).json({ message: getErrorMessage(error) });
+    }
+  });
+
   app.get("/api/bank-accounts/revaluation", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
