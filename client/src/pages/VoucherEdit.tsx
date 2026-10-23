@@ -119,7 +119,7 @@ export default function VoucherEdit() {
     id,
     modeApiRequest,
     voucherType,
-    exchangeRate: exchangeRate ?? 1,
+    exchangeRate: voucher?.currency === "ZMW" ? Number(voucher.exchangeRate) : exchangeRate ?? 1,
     handleBack,
     modePrefix,
     goldenCoastParentCompanyId: goldenCoastReadiness?.parentCompanyId ?? null,
