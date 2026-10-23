@@ -2,7 +2,7 @@
  * Validation for ERP company exchange rates (USD -> local transaction units).
  *
  * Database exchange_rates.rate has decimal(20,6): at most 14 integer digits
- * and 6 fractional digits. Do not accept parseFloat("25abc"), scientific
+ * and 6 fractional digits. Do not accept trailing junk such as "25abc", scientific
  * notation, zero, or values that would be rounded to zero on persistence.
  *
  * This does not fetch market rates, write data, or select a company.

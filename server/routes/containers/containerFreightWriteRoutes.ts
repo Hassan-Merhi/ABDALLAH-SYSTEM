@@ -26,8 +26,7 @@ import {
 } from "../../services/factory/factoryVoucherCorrection";
 
 import { applyPurchaseOrderItemsUpdate } from "./purchaseOrderItemsUpdate";
-import { isUnsupportedNativeZmwPurchase } from "../../services/accounting/zambiaPurchaseCurrencyGuard";
-import { historicalUsdFromNativeZmw } from "../../services/accounting/zambiaPurchaseCosting";
+import { assertZmwPurchaseEditAllowed, convertNativeChargeEdits } from "./purchaseOrderZmwEdit";
 import { storedCents, syncContainerCharges } from "./containerChargeSync";
 import { registerPurchaseOrderDeleteRoute } from "./purchaseOrderDeleteRoute";
 import { registerPoImportBackfillRoute } from "./poImportBackfillRoute";
@@ -55,23 +54,8 @@ export function registerContainerFreightWriteRoutes(app: Express) {
         });
       }
 
-      const nativeZmw = isUnsupportedNativeZmwPurchase(existingPO.currency);
-      if (
-        (nativeZmw || isUnsupportedNativeZmwPurchase(req.body.currency)) &&
-        String(req.body.currency ?? existingPO.currency).toUpperCase() !== String(existingPO.currency).toUpperCase()
-      ) {
-        throw new HttpError(409, "Purchase currency is locked. Reverse and rebook in the new currency.");
-      }
-      if (nativeZmw && (!existingPO.historicalExchangeRate || !existingPO.historicalRateDate)) {
-        throw new HttpError(409, "Original Kwacha purchase FX is unresolved. Reconcile before editing.");
-      }
-      if (
-        nativeZmw &&
-        req.body.exchangeRate != null &&
-        !toMoney(req.body.exchangeRate).eq(toMoney(existingPO.historicalExchangeRate))
-      ) {
-        throw new HttpError(409, "Historical ZMW purchase rate cannot be edited.");
-      }
+      // A posted Kwacha PO keeps its currency and locked rate (409 otherwise).
+      const nativeZmw = assertZmwPurchaseEditAllowed(existingPO, req.body);
 
       // Check edit permissions based on role
       const userRole = req.session.currentRole;
@@ -109,28 +93,12 @@ export function registerContainerFreightWriteRoutes(app: Express) {
         return res.json(await applyPurchaseOrderItemsUpdate(req, { id, existingPO }));
       }
 
-      // Charge-only source amounts are entered in original ZMW. Preserve them
-      // separately and rewrite the request-internal charge fields to historical
-      // USD before the existing voucher, parent and inventory synchronizers.
-      const nativeChargeChanges: Partial<InsertPurchaseOrder> = {};
-      if (nativeZmw) {
-        if (req.body.itemsTotal !== undefined) {
-          throw new HttpError(409, "ZMW item totals are derived from native PO lines, not edited separately.");
-        }
-        const chargeKeys = [
-          ["freight", "nativeFreight"],
-          ["surcharge", "nativeSurcharge"],
-          ["fumigation", "nativeFumigation"],
-          ["documentCharges", "nativeDocumentCharges"],
-          ["discount", "nativeDiscount"],
-          ["otherCharges", "nativeOtherCharges"],
-        ] as const;
-        for (const [field, nativeField] of chargeKeys) {
-          if (req.body[field] === undefined) continue;
-          (nativeChargeChanges as Record<string, string>)[nativeField] = String(req.body[field]);
-          req.body[field] = historicalUsdFromNativeZmw(req.body[field], String(existingPO.historicalExchangeRate));
-        }
-      }
+      // Charge-only Kwacha edits: keep the native amounts and rewrite the
+      // request's charges to historical USD at the locked rate before the
+      // existing voucher, parent and inventory synchronizers run.
+      const nativeChargeChanges: Partial<InsertPurchaseOrder> = nativeZmw
+        ? convertNativeChargeEdits(existingPO, req.body)
+        : {};
 
       // Only allow updating specific fields if no items provided
       const allowedUpdates: Partial<InsertPurchaseOrder> = { ...nativeChargeChanges };

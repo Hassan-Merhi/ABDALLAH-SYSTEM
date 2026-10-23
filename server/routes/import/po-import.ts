@@ -32,8 +32,12 @@ import { supplierService } from "../suppliers/supplierService";
 import { collectPreviewItemErrors, findPreviewContainer, type PoImportPreviewItem } from "./po-import-preview";
 import { allocatePoCharges } from "./poChargeAllocation";
 import { applyExplicitImportCurrency } from "./poImportCurrency";
-import { isUnsupportedNativeZmwPurchase } from "../../services/accounting/zambiaPurchaseCurrencyGuard";
-import { prepareZmwPurchaseCost } from "../../services/accounting/zambiaPurchaseCosting";
+import {
+  convertZmwContainerPreview,
+  nativePurchaseOrderFields,
+  splitNativeCharges,
+  validateZmwContainerPreview,
+} from "./poImportZambia";
 import { errorStatus } from "../../lib/httpHandlers";
 
 export function registerPoImportRoutes(app: Express) {
@@ -97,23 +101,13 @@ export function registerPoImportRoutes(app: Express) {
         // be read as USD for a Kwacha-enabled company.
         const importCompany = await storage.getCompanyById(req.session.currentCompanyId!);
         errors.push(...applyExplicitImportCurrency(containerPreview.items, req.body.currency, importCompany));
-        if (containerPreview.items.some((item) => isUnsupportedNativeZmwPurchase(item.currency))) {
-          if (containerPreview.items.some((item) => !isUnsupportedNativeZmwPurchase(item.currency))) {
-            errors.push("Do not mix ZMW and other currencies in one container import.");
-          } else {
-            try {
-              await prepareZmwPurchaseCost({
-                companyId: req.session.currentCompanyId!,
-                date: req.body.importDate,
-                exchangeRate: req.body.exchangeRate,
-                lines: containerPreview.items.map((item) => ({ quantity: item.quantity, rate: item.rate })),
-                charges: containerPreview.charges,
-              });
-            } catch (error) {
-              errors.push(getErrorMessage(error));
-            }
-          }
-        }
+        errors.push(
+          ...(await validateZmwContainerPreview(containerPreview, {
+            companyId: req.session.currentCompanyId!,
+            date: req.body.importDate,
+            exchangeRate: req.body.exchangeRate,
+          }))
+        );
         errors.push(
           ...(await collectPreviewItemErrors(containerPreview.items, req.session.currentCompanyId!, allStockItems))
         );
@@ -237,40 +231,13 @@ export function registerPoImportRoutes(app: Express) {
       }
 
       // Historical ZMW is converted once before container, subsidiary voucher,
-      // parent credit or stock writes. Original money is preserved on each PO.
-      const isZmw = containerPreview.items.some((item) => isUnsupportedNativeZmwPurchase(item.currency));
-      if (isZmw && containerPreview.items.some((item) => !isUnsupportedNativeZmwPurchase(item.currency))) {
-        return res.status(409).json({ message: "Mixed ZMW/USD purchase containers are not supported." });
-      }
-      const zambiaNative = isZmw
-        ? await prepareZmwPurchaseCost({
-            companyId: currentCompanyId,
-            date: importDate,
-            exchangeRate: req.body.exchangeRate,
-            lines: containerPreview.items.map((item) => ({ quantity: item.quantity, rate: item.rate })),
-            charges: containerPreview.charges,
-          })
-        : null;
-      if (zambiaNative) {
-        containerPreview.items.forEach((item, index) => {
-          const converted = zambiaNative.lines[index];
-          item.nativeRate = converted.nativeRate;
-          item.nativeLineTotal = converted.nativeLineTotal;
-          item.rate = Number(converted.rate);
-          item.lineTotal = Number(converted.lineTotal);
-        });
-        containerPreview.charges = {
-          freight: Number(zambiaNative.freight),
-          surcharge: Number(zambiaNative.surcharge),
-          fumigation: Number(zambiaNative.fumigation),
-          documentCharges: Number(zambiaNative.documentCharges),
-          discount: Number(zambiaNative.discount),
-          otherCharges: Number(zambiaNative.otherCharges),
-        };
-        containerPreview.itemsTotal = Number(zambiaNative.itemsTotal);
-        containerPreview.chargesTotal = Number(zambiaNative.chargesTotal);
-        containerPreview.grandTotal = Number(zambiaNative.grandTotal);
-      }
+      // parent credit or stock writes (409 for a mixed-currency container).
+      // Original Kwacha money is preserved on each line and each PO.
+      const zambiaNative = await convertZmwContainerPreview(containerPreview, {
+        companyId: currentCompanyId,
+        date: importDate,
+        exchangeRate: req.body.exchangeRate,
+      });
 
       // Check idempotency
       const existingImport = await storage.getImportLogByHash(fileHash);
@@ -408,20 +375,7 @@ export function registerPoImportRoutes(app: Express) {
       // Split each container charge across the POs by item value, exact to the cent.
       const poEntries = Object.entries(poGroups);
       // Native and base charge splits share the PO grouping, but never mix units.
-      const nativeChargeSplits = zambiaNative
-        ? allocatePoCharges(
-            poEntries.map(([, items]) => items.map((item) => item.nativeLineTotal ?? "0")),
-            {
-              freight: zambiaNative.nativeFreight,
-              surcharge: zambiaNative.nativeSurcharge,
-              fumigation: zambiaNative.nativeFumigation,
-              documentCharges: zambiaNative.nativeDocumentCharges,
-              discount: zambiaNative.nativeDiscount,
-              otherCharges: zambiaNative.nativeOtherCharges,
-            },
-            resolvedFreightPaidBy === "parent"
-          )
-        : null;
+      const nativeChargeSplits = splitNativeCharges(zambiaNative, poEntries, resolvedFreightPaidBy === "parent");
       const chargeSplits = allocatePoCharges(
         poEntries.map(([, items]) => items.map((item) => item.lineTotal)),
         {
@@ -838,20 +792,7 @@ export function registerPoImportRoutes(app: Express) {
             supplierId,
             voucherId: voucher.id,
             currency: poItems[0]?.currency,
-            ...(zambiaNative && nativeChargeSplits
-              ? {
-                  historicalExchangeRate: zambiaNative.historicalExchangeRate,
-                  historicalRateDate: importDate,
-                  nativeLineCount: poItems.length,
-                  nativeItemsTotal: nativeChargeSplits[poIndex].itemsTotal.toFixed(2),
-                  nativeFreight: nativeChargeSplits[poIndex].freight.toFixed(2),
-                  nativeSurcharge: nativeChargeSplits[poIndex].surcharge.toFixed(2),
-                  nativeFumigation: nativeChargeSplits[poIndex].fumigation.toFixed(2),
-                  nativeDocumentCharges: nativeChargeSplits[poIndex].documentCharges.toFixed(2),
-                  nativeDiscount: nativeChargeSplits[poIndex].discount.toFixed(2),
-                  nativeOtherCharges: nativeChargeSplits[poIndex].otherCharges.toFixed(2),
-                }
-              : {}),
+            ...nativePurchaseOrderFields(zambiaNative, nativeChargeSplits, poIndex, poItems.length, importDate),
             itemsTotal: poItemsTotal.toFixed(),
             freight: poFreight.toFixed(2),
             surcharge: poSurcharge.toFixed(2),

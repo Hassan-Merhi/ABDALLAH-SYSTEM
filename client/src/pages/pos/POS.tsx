@@ -1,6 +1,5 @@
 import { getErrorDetails } from "@shared/errorUtils";
 import { useEffect, useMemo, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { useLocation as useLocationContext } from "@/contexts/LocationContext";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useLocation } from "wouter";
@@ -11,6 +10,7 @@ import { useCurrencyContext, type Currency } from "@/contexts/CurrencyContext";
 import { isSupportedAccountingCurrency } from "@shared/currencyCatalog";
 import { useToast } from "@/hooks/use-toast";
 
+import { usePosZmwSaleRate } from "./hooks/usePosZmwSaleRate";
 import { SaleGrid } from "./pos-components/SaleGrid";
 import { InventoryPicker } from "./pos-components/InventoryPicker";
 import type { AuthMe } from "@shared/apiTypes";
@@ -112,23 +112,13 @@ export default function POS({ posUser, editVoucherId }: { posUser?: AuthMe; edit
   } = usePosState();
 
   const activeLocation = posUser ? posSelectedLocation : selectedLocation;
-  // Zambia posting uses a date-specific approved rate, never the browser's
-  // current rate for an earlier sale date. Cash and credit use the same path.
-  const { data: datedZmwRate, isFetching: isFetchingDatedZmwRate } = useQuery<{ rate: string } | null>({
-    queryKey: ["/api/exchange-rates/latest", selectedCompany?.id, "USD", "ZMW", saleDate],
-    queryFn: async () => {
-      const query = new URLSearchParams({
-        companyId: String(selectedCompany!.id),
-        fromCurrency: "USD",
-        toCurrency: "ZMW",
-        asOf: saleDate,
-      });
-      const response = await fetch("/api/exchange-rates/latest?" + query, { credentials: "include" });
-      if (!response.ok) return null;
-      return response.json();
-    },
-    enabled: !!selectedCompany?.id && displayCurrency === "ZMW" && !!saleDate && !editVoucherId,
-    staleTime: 0,
+  // Zambia posting uses the approved rate of the sale date, never the
+  // browser's current rate for an earlier sale date (cash and credit alike).
+  const { datedZmwRate, isFetchingDatedZmwRate } = usePosZmwSaleRate({
+    companyId: selectedCompany?.id,
+    displayCurrency,
+    saleDate,
+    editVoucherId,
   });
   // Supplier Partner companies share this exact POS UI but sell from SP stock
   // (sp_stock_movements) and post through the SP-specific accounting endpoint.
