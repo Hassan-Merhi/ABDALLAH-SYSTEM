@@ -1,0 +1,85 @@
+/**
+ * Approved, company-scoped Zambia ERP voucher rate policy.
+ *
+ * ERP stores ZMW per USD. The caller's number is never trusted as approval;
+ * it must match the rate in exchange_rates effective on the voucher's date.
+ * This is a SOURCE write boundary, not a historical data migration.
+ */
+import Decimal from "decimal.js";
+import { storage } from "../../storage";
+import { companyBusinessDate } from "./companyBusinessDate";
+import { companyRateDateSchema, companyRateValueSchema } from "@shared/companyRatePolicy";
+
+export class ZambiaVoucherRateError extends Error {
+  readonly statusCode = 409;
+  readonly code = "ZMW_VOUCHER_RATE_INVALID";
+  constructor(message: string) {
+    super(message);
+    this.name = "ZambiaVoucherRateError";
+  }
+}
+
+/** Preserve existing USD and Mali CFA workflows; validate ZMW only. */
+export async function assertApprovedZmwVoucherRate(
+  companyId: number,
+  voucherDate: string,
+  currency: string | null | undefined,
+  suppliedRate: string | number | null | undefined
+): Promise<string | null> {
+  const code = String(currency || "USD").trim().toUpperCase();
+  if (code !== "ZMW") return suppliedRate == null || suppliedRate === "" ? null : String(suppliedRate);
+
+  if (!Number.isSafeInteger(companyId) || companyId <= 0 || !companyRateDateSchema.safeParse(voucherDate).success) {
+    throw new ZambiaVoucherRateError("A valid company and voucher date are required for ZMW accounting.");
+  }
+  const company = await storage.getCompanyById(companyId);
+  if (!company || String(company.baseCurrency).toUpperCase() !== "USD" ||
+      String(company.displayCurrency).toUpperCase() !== "ZMW") {
+    throw new ZambiaVoucherRateError("The active company must be configured USD base / ZMW display.");
+  }
+  if (voucherDate > await companyBusinessDate(companyId)) {
+    throw new ZambiaVoucherRateError("Cannot post a future-dated ZMW voucher.");
+  }
+  const approved = await storage.getExchangeRateForDate(companyId, "USD", "ZMW", voucherDate);
+  if (!approved || !companyRateValueSchema.safeParse(String(approved.rate)).success) {
+    throw new ZambiaVoucherRateError("An approved USD/ZMW rate is required on or before the voucher date.");
+  }
+  const entered = suppliedRate == null ? "" : String(suppliedRate).trim();
+  if (!companyRateValueSchema.safeParse(entered).success ||
+      !new Decimal(entered).eq(new Decimal(String(approved.rate)))) {
+    throw new ZambiaVoucherRateError("The supplied USD/ZMW rate differs from the approved historical rate. Reload the date-specific rate.");
+  }
+  return new Decimal(String(approved.rate)).toFixed();
+}
+
+/**
+ * A posted foreign-currency voucher has an immutable transaction date, currency
+ * and historical rate. Changing them is a reversal/rebook, not a silent edit.
+ * The caller must fetch the original voucher under the active company scope.
+ */
+export function assertLockedZmwVoucherEdit(
+  original: { currency?: string | null; voucherDate: string; exchangeRate?: string | number | null },
+  update: { currency?: unknown; voucherDate?: unknown; exchangeRate?: unknown }
+): void {
+  const wasZmw = String(original.currency ?? "USD").toUpperCase() === "ZMW";
+  if (!wasZmw) {
+    if (update.currency != null && String(update.currency).toUpperCase() === "ZMW") {
+      throw new ZambiaVoucherRateError("Changing an existing voucher currency to ZMW requires reversal and rebooking.");
+    }
+    return;
+  }
+  if (update.currency != null && String(update.currency).toUpperCase() !== "ZMW") {
+    throw new ZambiaVoucherRateError("Posted ZMW voucher currency is locked.");
+  }
+  if (update.voucherDate != null && String(update.voucherDate).slice(0,10) !== String(original.voucherDate).slice(0,10)) {
+    throw new ZambiaVoucherRateError("Changing the date of a ZMW voucher requires reversal and rebooking.");
+  }
+  if (!original.exchangeRate || !companyRateValueSchema.safeParse(String(original.exchangeRate)).success) {
+    throw new ZambiaVoucherRateError("Original ZMW voucher has no valid locked rate.");
+  }
+  if (update.exchangeRate != null &&
+      (!companyRateValueSchema.safeParse(String(update.exchangeRate)).success ||
+       !new Decimal(String(update.exchangeRate)).eq(new Decimal(String(original.exchangeRate))))) {
+    throw new ZambiaVoucherRateError("Posted ZMW voucher exchange rate cannot be changed.");
+  }
+}
