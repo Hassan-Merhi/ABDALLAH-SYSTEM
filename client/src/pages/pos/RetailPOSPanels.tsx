@@ -101,9 +101,11 @@ export function RetailLastSaleSummary({ sale, onPrint }: { sale: RetailSale; onP
         <div className="mt-2 border-t pt-2 text-xs text-muted-foreground">
           {sale.payments.map((payment) => (
             <div key={payment.id} className="flex justify-between">
-              <span>{payment.method === "credit"
-                ? payment.paymentType === "refund" ? "Credit reversed" : "On account (unpaid)"
-                : payment.paymentType === "refund" ? "Refund" : payment.method}</span>
+              <span>{payment.method === "store_credit"
+                ? "Customer account credited"
+                : payment.method === "credit"
+                  ? payment.paymentType === "refund" ? "Credit reversed" : "On account (unpaid)"
+                  : payment.paymentType === "refund" ? "Refund" : payment.method}</span>
               <span>{money(payment.amount)}</span>
             </div>
           ))}
