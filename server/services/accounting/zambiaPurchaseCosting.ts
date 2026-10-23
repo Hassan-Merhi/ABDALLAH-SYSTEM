@@ -37,6 +37,15 @@ function positiveQuantity(value: unknown): Decimal {
 const cents = (value: Decimal) => value.toDecimalPlaces(2).toFixed(2);
 const usd = (native: Decimal, rate: Decimal) => cents(native.div(rate));
 
+/** Convert one approved native charge at a persisted rate; never fetch current FX. */
+export function historicalUsdFromNativeZmw(value: string | number | null | undefined, historicalRate: string): string {
+  let rate: Decimal;
+  try { rate = new Decimal(historicalRate); }
+  catch { throw new HttpError(409, "Original ZMW purchase exchange rate is missing"); }
+  if (!rate.isFinite() || rate.lte(0)) throw new HttpError(409, "Original ZMW purchase exchange rate is invalid");
+  return usd(nonNegative(value, "Native purchase charge"), rate);
+}
+
 export interface NativePurchaseLine {
   quantity: string | number;
   rate: string | number;
