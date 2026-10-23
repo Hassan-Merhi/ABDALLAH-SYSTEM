@@ -4,6 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { buildCompanyTransferPostingRequest } from "../server/services/accounting/companyTransferPosting";
+import { zambiaTransferVoucherNumber } from "../server/services/accounting/zambiaIntercompanyTransfer";
 import {
   assertHistoricalUsdPurchaseCost,
   isUnsupportedNativeZmwPurchase,
@@ -46,6 +47,25 @@ describe("Zambia Phase 8 historical intercompany accounting", () => {
       baseCreditAmount: "10.000000",
       rateConvention: "TRANSACTION_PER_BASE",
     });
+  });
+
+  it("replays stable ZMW posting identities and refuses rate- or amount-changed retries", () => {
+    const first = buildCompanyTransferPostingRequest({
+      ...common,
+      voucherNumber: zambiaTransferVoucherNumber("ICT-FROM", "phase8-native-zmw"),
+      amount: "250.00", transactionCurrency: "ZMW", historicalExchangeRate: "25",
+    });
+    const repeatNumber = zambiaTransferVoucherNumber("ICT-FROM", "phase8-native-zmw");
+    const modified = buildCompanyTransferPostingRequest({
+      ...common,
+      voucherNumber: repeatNumber,
+      amount: "300.00", transactionCurrency: "ZMW", historicalExchangeRate: "25",
+    });
+    expect(first.request.voucher.voucherNumber).toBe(repeatNumber);
+    expect(first.request.source.idempotencyKey).toBe(modified.request.source.idempotencyKey);
+    expect(first.request.entries[0].transactionDebitAmount)
+      .not.toBe(modified.request.entries[0].transactionDebitAmount);
+    expect(() => zambiaTransferVoucherNumber("ICT-FROM", "")).toThrow();
   });
 
   it("does not alter legacy USD intercompany postings", () => {
