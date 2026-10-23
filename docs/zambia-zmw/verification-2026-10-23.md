@@ -87,11 +87,24 @@ Full-suite results on the merged tree (`7fbc03d`):
 | Full backend suite (`vitest run`) | 1091 files, 7509 passed, 12 skipped, 0 failed |
 | Full frontend suite | 244 files, 2265 passed, 0 failed |
 
+## Production schema path (2026-10-23)
+
+A read-only look at the production database showed no `__drizzle_migrations` table: production has never been
+migrated by the versioned runner, and the application's startup statements (`server/startup-schema`) are the live
+schema path (`replit.md`: "direct SQL in `server/index.ts` is the active migration method"). Stage 036
+(`036-zambia-historical-purchase-cost.ts`) therefore mirrors `20261023_001_zambia_historical_purchase_cost.sql`
+statement for statement: twelve `ADD COLUMN IF NOT EXISTS` and one guarded `NOT VALID` constraint. It was run twice
+against a local database to prove idempotency, and the startup-schema pin test records the appended stage. The SQL file
+stays registered for environments that use the runner.
+
+Production state observed read-only before release: Zambia (company 19) is `erp`, USD base, no display currency,
+parent HADI L'SHI (1), no USD/ZMW rates, 4 purchase orders, 4 vouchers, 6 ledger accounts; Mali (9) is USD/CFA.
+
 ## Remaining before production
 
 1. Run hosted CI on the merged branch (every check above was run locally, not on GitHub Actions).
-2. Apply `20261023_001_zambia_historical_purchase_cost.sql` through the versioned runner
-   (`scripts/run-versioned-migrations.mjs --apply`) in a maintenance window; it is additive and `NOT VALID`.
+2. Deploy: the Zambia columns are created by startup stage 036 at boot (additive, `NOT VALID`); the versioned SQL
+   file remains for runner-based environments.
 3. Activation is configuration, not code: set Zambia (company 19) display currency to ZMW, keep USD base, set the
    Africa/Lusaka timezone, and record the business's own approved daily USD/ZMW rate before any Kwacha transaction.
 4. Permissioned before/after reconciliation of Zambia and Mali balances on production data (blocked by tenant
