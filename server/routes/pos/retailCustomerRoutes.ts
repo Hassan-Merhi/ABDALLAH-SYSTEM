@@ -26,6 +26,7 @@ import { db } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { punctuationInsensitiveSearch } from "../../lib/searchNormalization";
 import { loadSaleResponse } from "../../services/retail/retailSaleService";
+import { getCustomerBalance } from "../../storage/accounting/customer-balances";
 import { ensureCompanyLocation, requireRetailCompany } from "./retailPosContext";
 
 const customerCreateSchema = z.object({
@@ -91,6 +92,31 @@ export function registerRetailCustomerRoutes(app: Express): void {
         .orderBy(desc(customers.createdAt))
         .limit(limit);
       res.json(rows);
+    } catch (error) {
+      res.status(400).json({ message: getErrorMessage(error) });
+    }
+  });
+
+  /** Signed balance from the canonical ERP customer ledger (debit = amount owed). */
+  app.get("/api/pos/retail/customers/:id/balance", requireAuth, async (req, res) => {
+    try {
+      const companyId = await requireRetailCompany(req, res);
+      if (!companyId) return;
+      const customerId = Number(req.params.id);
+      if (!Number.isInteger(customerId) || customerId <= 0) {
+        return res.status(400).json({ message: "Invalid customer" });
+      }
+      const [owned] = await db
+        .select({ id: customers.id })
+        .from(customers)
+        .where(and(
+          eq(customers.id, customerId),
+          eq(customers.companyId, companyId),
+          isNull(customers.deletedAt)
+        ))
+        .limit(1);
+      if (!owned) return res.status(404).json({ message: "Customer not found" });
+      res.json({ customerId, balance: await getCustomerBalance(customerId, companyId) });
     } catch (error) {
       res.status(400).json({ message: getErrorMessage(error) });
     }
