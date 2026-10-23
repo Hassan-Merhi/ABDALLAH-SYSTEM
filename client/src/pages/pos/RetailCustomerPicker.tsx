@@ -6,6 +6,9 @@ import { Input } from "@/components/ui/input";
 import { SearchField } from "@/components/ui/search-field";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { useCompany } from "@/contexts/CompanyContext";
+import { apiRequest } from "@/lib/queryClient";
+import { money } from "./retailPosTypes";
 import { createRetailCustomer, searchRetailCustomers } from "./retailWave2Api";
 import type { RetailCustomerSummary as Customer } from "./retailWave2Types";
 
@@ -23,6 +26,7 @@ export function RetailCustomerPicker({
   onSelect: (customer: Customer | null) => void;
 }) {
   const { toast } = useToast();
+  const { selectedCompany } = useCompany();
   const customerPickerId = useId();
   const [open, setOpen] = useState(false);
   const [term, setTerm] = useState("");
@@ -41,6 +45,16 @@ export function RetailCustomerPicker({
     queryFn: () => searchRetailCustomers(search),
     enabled: open,
     staleTime: 15_000,
+  });
+
+  const balanceQuery = useQuery<{ customerId: number; balance: number }>({
+    queryKey: ["retail-pos-customer-balance", selectedCompany?.id, customer?.id],
+    queryFn: async () => {
+      const response = await apiRequest("GET", `/api/pos/retail/customers/${customer!.id}/balance`);
+      return (await response.json()) as { customerId: number; balance: number };
+    },
+    enabled: selectedCompany?.companyType === "retail" && Boolean(customer?.id),
+    staleTime: 10_000,
   });
 
   const createMutation = useMutation({
@@ -72,6 +86,18 @@ export function RetailCustomerPicker({
             {customer.code}
             {customer.phone ? ` · ${customer.phone}` : ""}
           </div>
+          {balanceQuery.data && (
+            <div className="text-xs font-medium" data-testid="retail-customer-balance" data-no-translate>
+              {balanceQuery.data.balance > 0.005
+                ? `Account balance owed: ${money(balanceQuery.data.balance)}`
+                : balanceQuery.data.balance < -0.005
+                  ? `Customer credit balance: ${money(-balanceQuery.data.balance)}`
+                  : "Account balance: 0.00"}
+            </div>
+          )}
+          {balanceQuery.isError && (
+            <div className="text-xs text-destructive">Could not load customer balance</div>
+          )}
         </div>
         <Button
           size="sm"
