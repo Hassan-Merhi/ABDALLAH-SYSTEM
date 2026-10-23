@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RetailItemImage } from "./RetailScanFeedback";
+import { RetailPhotoGallery } from "@/pages/retail/RetailProductImage";
 import { money, type CartLine, type Location, type RetailPosItem, type RetailSale } from "./retailPosTypes";
 
 /** One cart line: exact variant, availability, line adjustment and quantity controls. */
@@ -235,6 +236,7 @@ export function RetailVariantTransferCard({
   onQuantityChange: (value: number) => void;
   onSubmit: () => void;
 }) {
+  const selected = items.find((item) => item.variantId === variantId);
   return (
     <Card>
       <CardHeader>
@@ -257,6 +259,21 @@ export function RetailVariantTransferCard({
               </option>
             ))}
           </select>
+          {selected && (
+            <div className="mt-2 flex items-center gap-3 rounded-md border p-2">
+              <RetailPhotoGallery
+                images={selected.imageUrls}
+                title={`${selected.brand} · ${selected.name} · ${selected.color} / ${selected.size}`}
+                imageClassName="h-16 w-16 rounded-md border"
+              />
+              <div className="min-w-0 text-sm">
+                <div className="font-semibold">{selected.brand} · {selected.name}</div>
+                <div>{selected.color} / {selected.size}</div>
+                <div className="font-mono text-xs text-muted-foreground">{selected.barcode}</div>
+                <div className="text-xs">Source stock: {selected.quantity}</div>
+              </div>
+            </div>
+          )}
         </div>
         <div>
           <Label>Destination</Label>
@@ -292,6 +309,9 @@ export function RetailVariantTransferCard({
         >
           {pending ? "Transferring…" : "Transfer exact variant"}
         </Button>
+        <a href="/retail/stock?mode=transfer" className="block text-center text-sm font-medium text-primary underline-offset-4 hover:underline">
+          Open photo-based stock transfers, dispatch and receive
+        </a>
       </CardContent>
     </Card>
   );
