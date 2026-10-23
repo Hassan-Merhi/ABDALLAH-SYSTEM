@@ -535,7 +535,7 @@ export function registerCreditNoteRoutes(app: Express) {
         return res.status(409).json({ code: "ZMW_REFUND_DATE_LOCKED", message: "Reverse and rebook to change the date of a Kwacha refund." });
       }
       if (wasZmw && ((currency !== undefined && currency !== "ZMW") ||
-          (exchangeRate != null && String(exchangeRate) !== String(voucher.exchangeRate)))) {
+          (exchangeRate != null && !toInventoryDecimal(exchangeRate).eq(voucher.exchangeRate || "0")))) {
         return res.status(409).json({ code: "ZMW_REFUND_RATE_LOCKED", message: "Cannot change the original Kwacha refund currency or locked rate." });
       }
       if (!wasZmw && currency === "ZMW") {
