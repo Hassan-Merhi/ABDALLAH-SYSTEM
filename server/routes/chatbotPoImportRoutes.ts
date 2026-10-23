@@ -481,6 +481,17 @@ export function registerChatbotPoImportRoutes(app: Express) {
         .minus(discountAmt)
         .plus(otherChargesAmt);
 
+      const atomicNativeLines = zwmHistorical ? lines.map((line: {
+        stockItemId: unknown; itemName?: string; rawName?: string
+      }, index: number) => ({
+        stockItemId: Number(line.stockItemId),
+        itemName: line.itemName || line.rawName || "Unknown Item",
+        quantity: storedLines[index].qty.toFixed(3),
+        rate: storedLines[index].rate.toFixed(2),
+        lineTotal: storedLines[index].lineTotal.toFixed(2),
+        nativeRate: zwmHistorical.lines[index].nativeRate,
+        nativeLineTotal: zwmHistorical.lines[index].nativeLineTotal,
+      })) : undefined;
       const po = await storage.createPurchaseOrder(
         {
           companyId,
@@ -512,10 +523,13 @@ export function registerChatbotPoImportRoutes(app: Express) {
             (amount) => amount.greaterThan(0)
           ),
         },
-        importDate
+        importDate,
+        atomicNativeLines,
       );
 
-      for (const [index, line] of lines.entries()) {
+      // ZMW entries were inserted alongside both company vouchers; a later
+      // line insert failure cannot leave an orphaned posted purchase.
+      if (!zwmHistorical) for (const [index, line] of lines.entries()) {
         const stored = storedLines[index];
         await db.insert(poLineItems).values({
           poId: po.id,
