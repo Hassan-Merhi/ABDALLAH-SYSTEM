@@ -103,7 +103,8 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   const displayCurrency = configuredDisplay && configuredDisplay !== baseCurrency ? configuredDisplay : null;
   const isMultiCurrency = !!displayCurrency;
   const companyCurrency = (value: string): value is Currency => isSupportedAccountingCurrency(value);
-  const defaultCurrency: Currency = companyCurrency(baseCurrency) ? baseCurrency : "USD";
+  const defaultCurrency: Currency = displayCurrency === "USD" && baseCurrency !== "USD"
+    ? "USD" : companyCurrency(baseCurrency) ? baseCurrency : "USD";
 
   const authenticatedId = authenticatedUser?.id;
   const scope = companyId && authenticatedId !== undefined && authenticatedId !== null
@@ -181,7 +182,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
 
   const toggleCurrency = () => {
     if (!displayCurrency) return;
-    setCurrency(selectedCurrency === baseCurrency ? displayCurrency as Currency : defaultCurrency);
+    setCurrency(selectedCurrency === baseCurrency ? displayCurrency as Currency : baseCurrency as Currency);
   };
 
   // Keep original USD text spacing and zero-decimal CFA presentation. ZMW
@@ -202,6 +203,9 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   const convertToDisplay = (usdAmount: number): number => {
     if (selectedCurrency === "USD") return usdAmount;
     if (exchangeRate && selectedCurrency === displayCurrency) return usdAmount * exchangeRate;
+    if (baseCurrency === "CFA" && displayCurrency === "USD" && selectedCurrency === "CFA" && exchangeRate) {
+      return usdAmount * exchangeRate;
+    }
     // Preserve the existing Mali numerical display fallback; for Zambia an
     // unresolved conversion is invalid rather than an invented ZMW amount.
     return selectedCurrency === "CFA" ? usdAmount : Number.NaN;
@@ -210,6 +214,9 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   const convertToUSD = (amount: number): number => {
     if (selectedCurrency === "USD") return amount;
     if (exchangeRate && selectedCurrency === displayCurrency) return amount / exchangeRate;
+    if (baseCurrency === "CFA" && displayCurrency === "USD" && selectedCurrency === "CFA" && exchangeRate) {
+      return amount / exchangeRate;
+    }
     return Number.NaN;
   };
 
@@ -230,6 +237,9 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     if (destination === "USD") return native(value, "USD");
     if (destination === displayCurrency && exchangeRate) {
       return native(value * exchangeRate, destination);
+    }
+    if (baseCurrency === "CFA" && displayCurrency === "USD" && destination === "CFA" && exchangeRate) {
+      return native(value * exchangeRate, "CFA");
     }
     // Missing rate: display the original USD amount instead of a fabricated
     // number with a foreign currency prefix. Existing Mali behavior retained.
@@ -261,6 +271,9 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
       if (source === displayCurrency && selectedCurrency === "USD") return native(value / exchangeRate, "USD");
       if (source === "USD" && selectedCurrency === displayCurrency) return native(value * exchangeRate, displayCurrency);
     }
+    if (baseCurrency === "CFA" && displayCurrency === "USD" && source === "CFA" && selectedCurrency === "USD" && exchangeRate) {
+      return native(value / exchangeRate, "USD");
+    }
     // An unrelated native currency or missing rate cannot be automatically
     // translated using the USD/ZMW company pair. Show native money honestly.
     return native(value, source);
@@ -273,6 +286,10 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     const entry = native(value, selectedCurrency);
     if (!displayCurrency) return entry;
     if (!exchangeRate) return entry + " (exchange rate unavailable)";
+    if (baseCurrency === "CFA" && displayCurrency === "USD") {
+      if (selectedCurrency === "USD") return entry + " ≈ " + native(value * exchangeRate, "CFA");
+      if (selectedCurrency === "CFA") return entry + " ≈ " + native(value / exchangeRate, "USD");
+    }
     if (selectedCurrency === baseCurrency) return entry + " ≈ " + native(value * exchangeRate, displayCurrency);
     if (selectedCurrency === displayCurrency) return entry + " ≈ " + native(value / exchangeRate, baseCurrency);
     return entry;
