@@ -186,6 +186,34 @@ export default function POS({ posUser, editVoucherId }: { posUser?: AuthMe; edit
         ? approvedZmwRate : null
     : dailyExchangeRate;
 
+  // Keep a line's display price and canonical USD rate synchronized when
+  // switching USD/ZMW or selecting a different sale date. A date change while
+  // entering K preserves the typed K price and recalculates its USD equivalent.
+  // Do not reinterpret the rows until a valid dated FX rate has resolved.
+  const lastDisplayedFx = useRef<{ companyId: number; currency: Currency; rate: number | null } | null>(null);
+  useEffect(() => {
+    if (editVoucherId || !selectedCompany?.id) return;
+    if (activeCurrency !== "USD" && (!exchangeRate || !Number.isFinite(exchangeRate))) return;
+    const next = { companyId: selectedCompany.id, currency: activeCurrency, rate: exchangeRate };
+    const old = lastDisplayedFx.current;
+    if (!old || old.companyId !== next.companyId) {
+      lastDisplayedFx.current = next;
+      return;
+    }
+    if (old.currency === next.currency && old.rate === next.rate) return;
+    setRows((oldRows) => oldRows.map((row) => {
+      if (!row.stockItemId || !Number.isFinite(row.rateUSD)) return row;
+      const newUsd = old.currency === next.currency && next.currency !== "USD"
+        ? row.rate / next.rate!
+        : row.rateUSD;
+      const displayRate = next.currency === "USD" ? newUsd
+        : next.currency === "CFA" ? Math.round(newUsd * next.rate!)
+        : Number((newUsd * next.rate!).toFixed(2));
+      return { ...row, rateUSD: newUsd, rate: displayRate, amount: Number((row.quantity * displayRate).toFixed(2)) };
+    }));
+    lastDisplayedFx.current = next;
+  }, [activeCurrency, exchangeRate, editVoucherId, selectedCompany?.id, setRows]);
+
   // POS view-only is a real write boundary, not just a server-side fallback.
   // Keep every client mutation path quiet so expected denials do not become
   // repeated production ERROR logs.
