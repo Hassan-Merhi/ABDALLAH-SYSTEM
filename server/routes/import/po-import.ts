@@ -31,7 +31,9 @@ import { resolvePoImportCreditTarget } from "../../services/accounting/poImportA
 import { supplierService } from "../suppliers/supplierService";
 import { collectPreviewItemErrors, findPreviewContainer, type PoImportPreviewItem } from "./po-import-preview";
 import { allocatePoCharges } from "./poChargeAllocation";
-import { isUnsupportedNativeZmwPurchase, ZMW_PURCHASE_REQUIRES_HISTORICAL_COST } from "../../services/accounting/zambiaPurchaseCurrencyGuard";
+import { isUnsupportedNativeZmwPurchase } from "../../services/accounting/zambiaPurchaseCurrencyGuard";
+import { prepareZmwPurchaseCost } from "../../services/accounting/zambiaPurchaseCosting";
+import { errorStatus } from "../../lib/httpHandlers";
 
 export function registerPoImportRoutes(app: Express) {
   app.post("/api/po-import/validate", requireAuth, async (req, res) => {
@@ -90,7 +92,21 @@ export function registerPoImportRoutes(app: Express) {
       } else {
         const containerPreview = parsedPreview.container;
         if (containerPreview.items.some(item => isUnsupportedNativeZmwPurchase(item.currency))) {
-          errors.push(ZMW_PURCHASE_REQUIRES_HISTORICAL_COST);
+          if (containerPreview.items.some(item => !isUnsupportedNativeZmwPurchase(item.currency))) {
+            errors.push("Do not mix ZMW and other currencies in one container import.");
+          } else {
+            try {
+              await prepareZmwPurchaseCost({
+                companyId: req.session.currentCompanyId!,
+                date: req.body.importDate,
+                exchangeRate: req.body.exchangeRate,
+                lines: containerPreview.items.map(item => ({ quantity: item.quantity, rate: item.rate })),
+                charges: containerPreview.charges,
+              });
+            } catch (error) {
+              errors.push(getErrorMessage(error));
+            }
+          }
         }
         errors.push(
           ...(await collectPreviewItemErrors(containerPreview.items, req.session.currentCompanyId!, allStockItems))
@@ -181,14 +197,7 @@ export function registerPoImportRoutes(app: Express) {
         return res.status(400).json({ message: "Container data not found in preview" });
       }
       const containerPreview = parsedPreview.container;
-      // Reject BEFORE creating/updating the container, vouchers, parent-company
-      // credit or stock cost. A currency label is not a historical conversion.
-      if (containerPreview.items.some(item => isUnsupportedNativeZmwPurchase(item.currency))) {
-        return res.status(409).json({
-          code: "ZMW_PURCHASE_HISTORICAL_COST_REQUIRED",
-          message: ZMW_PURCHASE_REQUIRES_HISTORICAL_COST,
-        });
-      }
+      // Currency normalization follows successful structural validation, before any writes.
       // This endpoint writes these figures, so a payload that did not carry them
       // as readable numbers is refused rather than summed into NaN.
       for (const line of parsedPreview.linesWithUnreadableMoney) {
@@ -213,6 +222,40 @@ export function registerPoImportRoutes(app: Express) {
           message: "Validation failed",
           errors: validationErrors,
         });
+      }
+
+      // Historical ZMW is converted once before container, subsidiary voucher,
+      // parent credit or stock writes. Original money is preserved on each PO.
+      const isZmw = containerPreview.items.some(item => isUnsupportedNativeZmwPurchase(item.currency));
+      if (isZmw && containerPreview.items.some(item => !isUnsupportedNativeZmwPurchase(item.currency))) {
+        return res.status(409).json({ message: "Mixed ZMW/USD purchase containers are not supported." });
+      }
+      const zambiaNative = isZmw ? await prepareZmwPurchaseCost({
+        companyId: currentCompanyId,
+        date: importDate,
+        exchangeRate: req.body.exchangeRate,
+        lines: containerPreview.items.map(item => ({ quantity: item.quantity, rate: item.rate })),
+        charges: containerPreview.charges,
+      }) : null;
+      if (zambiaNative) {
+        containerPreview.items.forEach((item, index) => {
+          const converted = zambiaNative.lines[index];
+          item.nativeRate = converted.nativeRate;
+          item.nativeLineTotal = converted.nativeLineTotal;
+          item.rate = Number(converted.rate);
+          item.lineTotal = Number(converted.lineTotal);
+        });
+        containerPreview.charges = {
+          freight: Number(zambiaNative.freight),
+          surcharge: Number(zambiaNative.surcharge),
+          fumigation: Number(zambiaNative.fumigation),
+          documentCharges: Number(zambiaNative.documentCharges),
+          discount: Number(zambiaNative.discount),
+          otherCharges: Number(zambiaNative.otherCharges),
+        };
+        containerPreview.itemsTotal = Number(zambiaNative.itemsTotal);
+        containerPreview.chargesTotal = Number(zambiaNative.chargesTotal);
+        containerPreview.grandTotal = Number(zambiaNative.grandTotal);
       }
 
       // Check idempotency
@@ -350,6 +393,19 @@ export function registerPoImportRoutes(app: Express) {
 
       // Split each container charge across the POs by item value, exact to the cent.
       const poEntries = Object.entries(poGroups);
+      // Native and base charge splits share the PO grouping, but never mix units.
+      const nativeChargeSplits = zambiaNative ? allocatePoCharges(
+        poEntries.map(([, items]) => items.map(item => item.nativeLineTotal ?? "0")),
+        {
+          freight: zambiaNative.nativeFreight,
+          surcharge: zambiaNative.nativeSurcharge,
+          fumigation: zambiaNative.nativeFumigation,
+          documentCharges: zambiaNative.nativeDocumentCharges,
+          discount: zambiaNative.nativeDiscount,
+          otherCharges: zambiaNative.nativeOtherCharges,
+        },
+        resolvedFreightPaidBy === "parent"
+      ) : null;
       const chargeSplits = allocatePoCharges(
         poEntries.map(([, items]) => items.map((item) => item.lineTotal)),
         {
@@ -766,6 +822,17 @@ export function registerPoImportRoutes(app: Express) {
             supplierId,
             voucherId: voucher.id,
             currency: poItems[0]?.currency,
+            ...(zambiaNative && nativeChargeSplits ? {
+              historicalExchangeRate: zambiaNative.historicalExchangeRate,
+              historicalRateDate: importDate,
+              nativeItemsTotal: nativeChargeSplits[poIndex].itemsTotal.toFixed(2),
+              nativeFreight: nativeChargeSplits[poIndex].freight.toFixed(2),
+              nativeSurcharge: nativeChargeSplits[poIndex].surcharge.toFixed(2),
+              nativeFumigation: nativeChargeSplits[poIndex].fumigation.toFixed(2),
+              nativeDocumentCharges: nativeChargeSplits[poIndex].documentCharges.toFixed(2),
+              nativeDiscount: nativeChargeSplits[poIndex].discount.toFixed(2),
+              nativeOtherCharges: nativeChargeSplits[poIndex].otherCharges.toFixed(2),
+            } : {}),
             itemsTotal: poItemsTotal.toFixed(),
             freight: poFreight.toFixed(2),
             surcharge: poSurcharge.toFixed(2),
@@ -777,7 +844,7 @@ export function registerPoImportRoutes(app: Express) {
             freightPaidBy: resolvedFreightPaidBy,
             freightParentAccountId: resolvedFreightPaidBy === "parent" ? resolvedFreightParentAccountId : null,
           },
-          getClientDate(req)
+          zambiaNative ? importDate : getClientDate(req)
         );
 
         for (const item of poItems) {
@@ -810,6 +877,7 @@ export function registerPoImportRoutes(app: Express) {
             quantity: item.quantity.toString(),
             rate: item.rate.toString(),
             lineTotal: item.lineTotal.toString(),
+            ...(zambiaNative ? { nativeRate: item.nativeRate, nativeLineTotal: item.nativeLineTotal } : {}),
           });
         }
       }
@@ -861,7 +929,7 @@ export function registerPoImportRoutes(app: Express) {
         res.status(error.status).json({ code: error.code, message: error.message });
         return;
       }
-      res.status(500).json({ message: getErrorMessage(error) });
+      res.status(errorStatus(error)).json({ message: getErrorMessage(error) });
     }
   });
 }
