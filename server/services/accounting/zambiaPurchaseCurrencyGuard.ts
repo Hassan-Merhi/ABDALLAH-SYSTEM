@@ -6,14 +6,14 @@
  * not convert those amounts and could corrupt inventory and a parent voucher.
  * Fail closed rather than silently invent a 1:1 conversion.
  *
- * Future native Kwacha POs must atomically retain every original native
+ * Native Kwacha PO paths must retain every original native
  * price/charge, the approved dated USD/ZMW rate and the converted USD cost
- * before they can enter this storage/write path.
+ * before they can enter a purchase storage/write path.
  */
 import { HttpError } from "../../lib/httpError";
 
 export const ZMW_PURCHASE_REQUIRES_HISTORICAL_COST =
-  "Kwacha purchase orders are not yet enabled: original ZMW line prices and charges need an approved historical rate and locked USD inventory cost. Use a USD-priced purchase order, or defer posting until native-ZMW purchasing is implemented.";
+  "This legacy purchase-voucher endpoint cannot safely edit original Kwacha prices. Use the purchase-order editor or ZMW purchase importer, which preserve approved historical FX and locked USD stock costs.";
 
 export function isUnsupportedNativeZmwPurchase(currency: unknown): boolean {
   return typeof currency === "string" && currency.trim().toUpperCase() === "ZMW";
