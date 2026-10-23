@@ -21,7 +21,7 @@ export const useFormInitialization = (
   bankAccounts: BankAccount[],
   suppliers: Supplier[],
   allAccountsData: AccountWithBalance[],
-  selectedCurrency: "USD" | "CFA",
+  selectedCurrency: "USD" | "CFA" | "ZMW",
   paymentForm: UseFormReturn<VoucherFormData>,
   journalForm: UseFormReturn<JournalFormData>,
   salesForm: UseFormReturn<SalesFormData>,
@@ -70,7 +70,7 @@ export const useFormInitialization = (
         paymentAccountId: accountId,
         paymentAccountName: accountName,
         voucherDate: parseISO(voucher.voucherDate),
-        currency: (voucher.currency as "USD" | "CFA") || selectedCurrency,
+        currency: (voucher.currency as "USD" | "CFA" | "ZMW") || selectedCurrency,
         paymentAccountNarration: mainEntry?.narration || "",
         notes: voucher.description || "",
         entries: contraEntries.map((e) => {
@@ -108,7 +108,7 @@ export const useFormInitialization = (
     } else if (isJournal) {
       journalForm.reset({
         voucherDate: parseISO(voucher.voucherDate),
-        currency: (voucher.currency as "USD" | "CFA") || selectedCurrency,
+        currency: (voucher.currency as "USD" | "CFA" | "ZMW") || selectedCurrency,
         notes: voucher.description || "",
         entries: voucher.entries.map((e) => {
           const type = parseFloat(e.debitAmount) > 0 ? "DR" : "CR";
@@ -141,7 +141,7 @@ export const useFormInitialization = (
     } else if (isPurchase) {
       purchaseForm.reset({
         voucherDate: parseISO(voucher.voucherDate),
-        currency: (voucher.currency as "USD" | "CFA") || selectedCurrency,
+        currency: (voucher.currency as "USD" | "CFA" | "ZMW") || selectedCurrency,
         items: (voucher.purchaseOrder?.items || []).map((item) => ({
           id: item.id,
           stockItemId: item.stockItemId,
@@ -169,7 +169,7 @@ export const useFormInitialization = (
     } else if (isStockTransfer) {
       transferForm.reset({
         voucherDate: parseISO(voucher.voucherDate),
-        currency: (voucher.currency as "USD" | "CFA") || selectedCurrency,
+        currency: (voucher.currency as "USD" | "CFA" | "ZMW") || selectedCurrency,
         sourceLocationId: voucher.transferData?.sourceLocationId || voucher.locationId || 0,
         destinationLocationId: voucher.transferData?.destinationLocationId || 0,
         items: (voucher.transferData?.items || []).map((item) => ({
