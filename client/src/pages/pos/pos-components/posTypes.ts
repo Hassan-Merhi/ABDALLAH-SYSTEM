@@ -106,6 +106,8 @@ export type PosSaleItemPayload = {
   salesItemId?: number;
   quantity: string | number;
   rate: string | number;
+  /** Original ZMW unit price used to derive the USD unit rate. */
+  originalCurrencyRate?: string | number;
   stockItemName?: string;
   stockItemCode?: string;
   configuredPrice?: number;
