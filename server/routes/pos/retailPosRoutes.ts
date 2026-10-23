@@ -541,13 +541,16 @@ export function registerRetailPosRoutes(app: Express): void {
       let customer: RetailSaleInput["customer"] = null;
       if (body.customerId) {
         const [row] = await db
-          .select({ id: customers.id, legalName: customers.legalName })
+          .select({ id: customers.id, legalName: customers.legalName, active: customers.active })
           .from(customers)
           .where(
             and(eq(customers.id, body.customerId), eq(customers.companyId, companyId), isNull(customers.deletedAt))
           )
           .limit(1);
         if (!row) return res.status(404).json({ message: "Customer not found" });
+        if (body.payments?.some((payment) => payment.method === "credit") && !row.active) {
+          return res.status(400).json({ message: "Select an active customer for credit sales" });
+        }
         customer = { id: row.id, name: row.legalName };
       } else if (body.customerName?.trim()) {
         customer = { id: null, name: body.customerName.trim() };
