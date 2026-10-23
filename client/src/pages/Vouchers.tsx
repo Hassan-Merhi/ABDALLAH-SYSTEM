@@ -53,6 +53,7 @@ import { voucherFormSchema } from "@/pages/vouchers/voucherTypes";
 import type { VoucherFormData } from "@/pages/vouchers/voucherTypes";
 import { ErrorState } from "@/components/ui/page-state";
 import { useHubQueryState } from "@/hooks/use-hub-query-state";
+import { isRetailManualVoucherTabHidden, isRetailManualVoucherTypeHidden } from "@/lib/retailVoucherPolicy";
 
 type VoucherTab = "payment" | "receipt" | "journal" | "transfer" | "transferorder" | "adjustment" | "creditnote";
 
@@ -85,6 +86,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
   const isFactoryCompany = selectedCompany?.companyType === "factory";
+  const isRetailCompany = selectedCompany?.companyType === "retail";
   const isPropertiesCompany = selectedCompany?.companyType === "properties";
   const [isAutoCreating, setIsAutoCreating] = useState(false);
   const {
@@ -117,20 +119,22 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     enabled: isFactoryMode && !isPOS,
   });
   const factoryHiddenTabs = factoryAccess?.hiddenCostFields ?? [];
-  const visibleSidebarGroups = isFactoryMode
-    ? sidebarGroups
-        .map((group) => ({
-          ...group,
-          items: group.items.filter(
-            (item) => !factoryHiddenTabs.includes(FACTORY_VOUCHER_HIDDEN_KEYS[item.key as VoucherTab])
-          ),
-        }))
-        .filter((group) => group.items.length > 0)
-    : sidebarGroups;
+  // Retail is an ERP company: only hide manual entry types, not posted journals,
+  // receipt/payment vouchers, stock movements, or automatic Retail accounting.
+  // Filtering the source groups updates both mobile and desktop navigation.
+  const visibleSidebarGroups = sidebarGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) =>
+        (!isFactoryMode || !factoryHiddenTabs.includes(FACTORY_VOUCHER_HIDDEN_KEYS[item.key as VoucherTab])) &&
+        (!isRetailCompany || !isRetailManualVoucherTabHidden(item.key))
+      ),
+    }))
+    .filter((group) => group.items.length > 0);
   const visibleVoucherTabs = visibleSidebarGroups.flatMap((group) => group.items.map((item) => item.key as VoucherTab));
   const fallbackVoucherTab = visibleVoucherTabs[0] ?? null;
-  const canShowVoucherTab = (tab: VoucherTab) => !isFactoryMode || visibleVoucherTabs.includes(tab);
-  const allowedVoucherTabs = isFactoryMode && !isPOS ? visibleVoucherTabs : ALL_VOUCHER_TABS;
+  const canShowVoucherTab = (tab: VoucherTab) => isPOS || (!isFactoryMode && !isRetailCompany) || visibleVoucherTabs.includes(tab);
+  const allowedVoucherTabs = (isFactoryMode || isRetailCompany) && !isPOS ? visibleVoucherTabs : ALL_VOUCHER_TABS;
   const [activeTab, setActiveTab] = useHubQueryState<VoucherTab>({
     key: "tab",
     allowedValues: allowedVoucherTabs,
@@ -184,6 +188,22 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     isPOS,
     posLocationId,
   });
+
+  // Stale Daybook "edit" deep links must not reopen system-generated Retail
+  // journals/credit notes in a generic write dialog. Keep the audit detail
+  // available instead.
+  useEffect(() => {
+    if (
+      isRetailCompany &&
+      voucherIdToEdit &&
+      voucherToEdit &&
+      isRetailManualVoucherTypeHidden(voucherToEdit.voucherType)
+    ) {
+      setEditVoucherId(null);
+      setEditDialogOpen(false);
+      setLocation(`/voucher-detail/${voucherIdToEdit}`);
+    }
+  }, [isRetailCompany, voucherIdToEdit, voucherToEdit, setLocation]);
 
   useEffect(() => {
     if (voucherIdToEdit) setAccountPickersNeeded(true);
@@ -772,7 +792,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
       <VoucherEditDialog
         voucherId={editVoucherId}
-        open={editDialogOpen}
+        open={editDialogOpen && !(isRetailCompany && isRetailManualVoucherTypeHidden(voucherToEdit?.voucherType))}
         onOpenChange={(open) => {
           setEditDialogOpen(open);
           if (!open) setEditVoucherId(null);
