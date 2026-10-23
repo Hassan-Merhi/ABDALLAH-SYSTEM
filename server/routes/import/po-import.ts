@@ -825,6 +825,7 @@ export function registerPoImportRoutes(app: Express) {
             ...(zambiaNative && nativeChargeSplits ? {
               historicalExchangeRate: zambiaNative.historicalExchangeRate,
               historicalRateDate: importDate,
+              nativeLineCount: poItems.length,
               nativeItemsTotal: nativeChargeSplits[poIndex].itemsTotal.toFixed(2),
               nativeFreight: nativeChargeSplits[poIndex].freight.toFixed(2),
               nativeSurcharge: nativeChargeSplits[poIndex].surcharge.toFixed(2),
