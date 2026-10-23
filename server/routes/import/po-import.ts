@@ -31,6 +31,7 @@ import { resolvePoImportCreditTarget } from "../../services/accounting/poImportA
 import { supplierService } from "../suppliers/supplierService";
 import { collectPreviewItemErrors, findPreviewContainer, type PoImportPreviewItem } from "./po-import-preview";
 import { allocatePoCharges } from "./poChargeAllocation";
+import { isUnsupportedNativeZmwPurchase, ZMW_PURCHASE_REQUIRES_HISTORICAL_COST } from "../../services/accounting/zambiaPurchaseCurrencyGuard";
 
 export function registerPoImportRoutes(app: Express) {
   app.post("/api/po-import/validate", requireAuth, async (req, res) => {
@@ -88,6 +89,9 @@ export function registerPoImportRoutes(app: Express) {
         errors.push("Container data not found in preview");
       } else {
         const containerPreview = parsedPreview.container;
+        if (containerPreview.items.some(item => isUnsupportedNativeZmwPurchase(item.currency))) {
+          errors.push(ZMW_PURCHASE_REQUIRES_HISTORICAL_COST);
+        }
         errors.push(
           ...(await collectPreviewItemErrors(containerPreview.items, req.session.currentCompanyId!, allStockItems))
         );
@@ -177,6 +181,14 @@ export function registerPoImportRoutes(app: Express) {
         return res.status(400).json({ message: "Container data not found in preview" });
       }
       const containerPreview = parsedPreview.container;
+      // Reject BEFORE creating/updating the container, vouchers, parent-company
+      // credit or stock cost. A currency label is not a historical conversion.
+      if (containerPreview.items.some(item => isUnsupportedNativeZmwPurchase(item.currency))) {
+        return res.status(409).json({
+          code: "ZMW_PURCHASE_HISTORICAL_COST_REQUIRED",
+          message: ZMW_PURCHASE_REQUIRES_HISTORICAL_COST,
+        });
+      }
       // This endpoint writes these figures, so a payload that did not carry them
       // as readable numbers is refused rather than summed into NaN.
       for (const line of parsedPreview.linesWithUnreadableMoney) {
