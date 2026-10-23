@@ -209,7 +209,7 @@ export function registerCreditNoteRoutes(app: Express) {
           await tx.insert(voucherEntries).values({
             voucherId: createdVoucher.id,
             ledgerAccountId: cashAccountId,
-            ...normEntryAmounts(cashDebit, cashCredit),
+            ...normEntryAmounts(cashDebit, cashCredit, lockedPosCurrency),
             narration: `${noteType} - cash ${noteType === "Credit Note" ? "refund" : "receipt"}`,
           });
         }
@@ -386,6 +386,9 @@ export function registerCreditNoteRoutes(app: Express) {
         message: `${noteType} created successfully`,
       });
     } catch (error: unknown) {
+      if (error instanceof PosZmwRateError) {
+        return res.status(error.statusCode).json({ code: error.code, message: error.message });
+      }
       logger.error("Credit/Debit note error:", { error });
       res.status(error instanceof HttpError ? error.statusCode : 500).json({ message: getErrorMessage(error) });
     }
@@ -518,12 +521,38 @@ export function registerCreditNoteRoutes(app: Express) {
       const voucherId = parseInt(req.params.id);
       if (isNaN(voucherId)) return res.status(400).json({ message: "Invalid credit note ID" });
 
-      const { voucherDate, cashAccountId, cashAccountType, description, items } = req.body;
+      const { voucherDate, cashAccountId, cashAccountType, description, items, currency, exchangeRate } = req.body;
       const [voucher] = await db
         .select()
         .from(vouchers)
         .where(and(eq(vouchers.id, voucherId), eq(vouchers.companyId, companyId)));
       if (!voucher) return res.status(404).json({ message: "Credit note not found" });
+
+      // A historic Kwacha refund keeps the rate originally recorded on this
+      // note. Editing its date/currency would require a reversal and rebook.
+      const wasZmw = voucher.currency === "ZMW";
+      if (wasZmw && voucherDate && voucherDate !== String(voucher.voucherDate)) {
+        return res.status(409).json({ code: "ZMW_REFUND_DATE_LOCKED", message: "Reverse and rebook to change the date of a Kwacha refund." });
+      }
+      if (wasZmw && ((currency !== undefined && currency !== "ZMW") ||
+          (exchangeRate != null && String(exchangeRate) !== String(voucher.exchangeRate)))) {
+        return res.status(409).json({ code: "ZMW_REFUND_RATE_LOCKED", message: "Cannot change the original Kwacha refund currency or locked rate." });
+      }
+      if (!wasZmw && currency === "ZMW") {
+        return res.status(409).json({ code: "REFUND_CURRENCY_LOCKED", message: "Cannot change an existing refund's currency to ZMW." });
+      }
+      if (wasZmw && !voucher.exchangeRate) {
+        return res.status(409).json({ code: "ZMW_REFUND_RATE_MISSING", message: "Original ZMW refund has no locked exchange rate." });
+      }
+      const lockedPosCurrency: LockedPosCurrency = {
+        currency: voucher.currency || "USD",
+        exchangeRate: voucher.exchangeRate == null ? null : String(voucher.exchangeRate),
+      };
+      if (wasZmw) {
+        assertZmwImportPrices(items.map((item: { refundRate: unknown; originalCurrencyRate?: unknown }) => ({
+          rate: item.refundRate, originalCurrencyRate: item.originalCurrencyRate,
+        })), lockedPosCurrency);
+      }
 
       const noteType = voucher.voucherType;
       if (!["Credit Note", "Debit Note"].includes(noteType || "")) {
@@ -598,14 +627,14 @@ export function registerCreditNoteRoutes(app: Express) {
           await tx.insert(voucherEntries).values({
             voucherId,
             bankAccountId: cashAccountId,
-            ...normEntryAmounts(cashDebit, cashCredit),
+            ...normEntryAmounts(cashDebit, cashCredit, lockedPosCurrency),
             narration: `${noteType} - cash ${noteType === "Credit Note" ? "refund" : "receipt"}`,
           });
         } else {
           await tx.insert(voucherEntries).values({
             voucherId,
             ledgerAccountId: cashAccountId,
-            ...normEntryAmounts(cashDebit, cashCredit),
+            ...normEntryAmounts(cashDebit, cashCredit, lockedPosCurrency),
             narration: `${noteType} - cash ${noteType === "Credit Note" ? "refund" : "receipt"}`,
           });
         }
@@ -765,6 +794,9 @@ export function registerCreditNoteRoutes(app: Express) {
 
       res.json({ success: true, voucherId, message: `${noteType} updated successfully` });
     } catch (error: unknown) {
+      if (error instanceof PosZmwRateError) {
+        return res.status(error.statusCode).json({ code: error.code, message: error.message });
+      }
       logger.error("Update credit note error:", { error });
       if (sendVoucherCorrectionRefusal(res, error)) return;
       res.status(error instanceof HttpError ? error.statusCode : 500).json({ message: getErrorMessage(error) });
