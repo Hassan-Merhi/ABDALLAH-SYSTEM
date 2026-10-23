@@ -16,6 +16,7 @@ import {
 import { requireAuth } from "../../auth";
 import { db } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
+import { retailLocationRefusal } from "./retailLocationAccess";
 import { resolveRetailSaleCustomer, retailReturnRefusal } from "./retailCheckoutPolicy";
 import { currentUserId, ensureCompanyLocation, requireRetailCompany } from "./retailPosContext";
 import {
@@ -681,6 +682,10 @@ export function registerRetailPosRoutes(app: Express): void {
       if (req.user?.role === "POS") return res.status(403).json({ message: "POS users cannot transfer retail stock" });
       if (body.fromLocationId === body.toLocationId)
         return res.status(400).json({ message: "Transfer locations must be different" });
+      // An immediate transfer both ships and receives, so both stores must be the user's.
+      const locationRefusal = await retailLocationRefusal(req, companyId, [body.fromLocationId, body.toLocationId]);
+      if (locationRefusal)
+        return res.status(403).json({ code: "RETAIL_LOCATION_NOT_ASSIGNED", message: locationRefusal });
       await Promise.all([
         ensureCompanyLocation(companyId, body.fromLocationId),
         ensureCompanyLocation(companyId, body.toLocationId),

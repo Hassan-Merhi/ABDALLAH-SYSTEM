@@ -576,6 +576,105 @@ describe("Two-stage transfers through RETAIL-IN-TRANSIT", () => {
   });
 });
 
+describe("Retail transfer location assignments", () => {
+  // A non-manager clerk assigned only to the second store.
+  let clerk: request.SuperAgentTest;
+  let otherStoreTransferId = 0;
+
+  beforeAll(async () => {
+    const bcrypt = await import("bcryptjs");
+    const [user] = await db
+      .insert(schema.users)
+      .values({ username: `${PREFIX}_storeclerk`, password: await bcrypt.hash("testpassword123", 10) })
+      .returning({ id: schema.users.id });
+    await db.insert(schema.userCompanyRoles).values({ userId: user.id, companyId: ctx.companyId, role: "Normal User" });
+    await pool.query(
+      `INSERT INTO user_security_permissions (user_id, company_id, permission, granted_by)
+       SELECT $1, company_id, permission, granted_by FROM user_security_permissions WHERE user_id = $2`,
+      [user.id, ctx.userId]
+    );
+    // Normal Users reach the Retail stock screens through the company's POS module grant.
+    await pool.query(
+      `INSERT INTO role_feature_permissions (company_id, role, feature_key, enabled)
+       VALUES ($1, 'Normal User', 'mod_pos', true) ON CONFLICT DO NOTHING`,
+      [ctx.companyId]
+    );
+    await db
+      .insert(schema.userLocations)
+      .values({ userId: user.id, companyId: ctx.companyId, locationId: ctx.location2Id });
+    clerk = request.agent(ctx.app);
+    expect(
+      (await clerk.post("/api/auth/login").send({ username: `${PREFIX}_storeclerk`, password: "testpassword123" }))
+        .status
+    ).toBe(200);
+    expect((await clerk.post("/api/auth/set-company").send({ companyId: ctx.companyId })).status).toBe(200);
+
+    // A manager ships main → second: the clerk may receive it, but may not ship from main.
+    const shipped = await agent.post("/api/pos/retail/transfers/dispatch").send({
+      idempotencyKey: "rpiw-dispatch-to-clerk",
+      variantId: shirtId,
+      fromLocationId: ctx.locationId,
+      toLocationId: ctx.location2Id,
+      quantity: 1,
+    });
+    expect(shipped.status).toBe(201);
+    otherStoreTransferId = Number(shipped.body.operationId);
+  });
+
+  it("refuses shipping from, or moving stock into, a store the clerk is not assigned to", async () => {
+    const dispatchFromMain = await clerk.post("/api/pos/retail/transfers/dispatch").send({
+      idempotencyKey: "rpiw-clerk-dispatch-main",
+      variantId: shirtId,
+      fromLocationId: ctx.locationId,
+      toLocationId: ctx.location2Id,
+      quantity: 1,
+    });
+    expect(dispatchFromMain.status).toBe(403);
+    expect(dispatchFromMain.body.code).toBe("RETAIL_LOCATION_NOT_ASSIGNED");
+    const immediateIntoMain = await clerk.post("/api/pos/retail/transfers").send({
+      idempotencyKey: "rpiw-clerk-immediate-main",
+      variantId: shirtId,
+      fromLocationId: ctx.location2Id,
+      toLocationId: ctx.locationId,
+      quantity: 1,
+    });
+    expect(immediateIntoMain.status).toBe(403);
+  });
+
+  it("lets the clerk receive at, and ship from, the assigned store", async () => {
+    const received = await clerk
+      .post(`/api/pos/retail/transfers/${otherStoreTransferId}/receive`)
+      .send({ idempotencyKey: "rpiw-clerk-receive-0001" });
+    expect(received.status).toBe(201);
+    const shipped = await clerk.post("/api/pos/retail/transfers/dispatch").send({
+      idempotencyKey: "rpiw-clerk-dispatch-second",
+      variantId: shirtId,
+      fromLocationId: ctx.location2Id,
+      toLocationId: ctx.locationId,
+      quantity: 1,
+    });
+    expect(shipped.status).toBe(201);
+    // The main store, not the clerk, confirms that shipment's arrival.
+    const notTheirs = await clerk
+      .post(`/api/pos/retail/transfers/${shipped.body.operationId}/receive`)
+      .send({ idempotencyKey: "rpiw-clerk-receive-0002" });
+    expect(notTheirs.status).toBe(403);
+    const pendingForClerk = await clerk.get("/api/pos/retail/transfers/workflow?status=all");
+    expect(pendingForClerk.status).toBe(200);
+    expect(
+      pendingForClerk.body.every(
+        (row: { fromLocationId: number; toLocationId: number }) =>
+          row.fromLocationId === ctx.location2Id || row.toLocationId === ctx.location2Id
+      )
+    ).toBe(true);
+    const managerReceives = await agent
+      .post(`/api/pos/retail/transfers/${shipped.body.operationId}/receive`)
+      .send({ idempotencyKey: "rpiw-manager-receive-clerk" });
+    expect(managerReceives.status).toBe(201);
+    expect(await ledgerBalance("RETAIL-IN-TRANSIT")).toBe("0.00");
+  });
+});
+
 describe("Retail manual voucher boundary", () => {
   let saleVoucherId = 0;
 

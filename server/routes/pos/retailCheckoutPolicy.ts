@@ -1,13 +1,12 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { customers, retailPosSales } from "@shared/schema";
 import { db } from "../../db";
+import { RETAIL_MANAGER_ROLES } from "../../services/retail/retailDiscountApproval";
 import type { RetailSaleInput } from "../../services/retail/retailSaleService";
-
-const RETAIL_MANAGER_ROLES = new Set(["Admin", "Owner", "Manager", "Developer"]);
 
 /** Roles allowed to approve account credits and damaged (non-restock) returns. */
 export function isRetailManagerRole(role: string | null | undefined): boolean {
-  return RETAIL_MANAGER_ROLES.has(role ?? "");
+  return (RETAIL_MANAGER_ROLES as readonly string[]).includes(role ?? "");
 }
 
 export interface RetailReturnRefusal {

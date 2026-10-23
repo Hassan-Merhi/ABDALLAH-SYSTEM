@@ -252,8 +252,8 @@ Every assertion reads the posted vouchers:
 
 ### Open items (not fixed — need an owner decision)
 
-- **Per-location authorization:** dispatch/receive/immediate transfers require a non-POS
-  role in the Retail company, not an assignment to the source/destination location.
+- ~~Per-location authorization~~ — resolved: non-manager roles may only ship from,
+  receive at, or immediately move between their assigned Retail locations.
 - **Receivables paid later through ERP receipts:** returns reverse the sale's own unpaid
   credit tender first even if the customer has since paid their account through an ERP
   Receipt voucher; the customer then holds an account credit rather than receiving cash.

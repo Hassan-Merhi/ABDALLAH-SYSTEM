@@ -283,9 +283,12 @@ No tests, CI, lint, typechecks, builds, merge, rebase or deployment performed.
   the pre-existing Retail stock operations JSONB metadata records statuses.
   The in-transit system account is created by the existing registry only
   when an applicable dispatch posting is actually performed after deployment.
-- Existing company/type and non-POS authorization checks are retained. Fine-
-  grained per-employee location permissions are **not** introduced here; Claude
-  should review that as an authorization requirement before production rollout.
+- Location assignments: Developer/Admin/Owner/Manager may move stock between
+  any Retail locations. Every other role is limited to its `user_locations`
+  assignments (`server/routes/pos/retailLocationAccess.ts`): dispatch requires
+  the source store, receipt requires the destination store, an immediate
+  transfer requires both, and the pending list shows only shipments leaving or
+  arriving at the user's stores. A user with no assignment can move nothing.
 
 **Claude verification:** Exercise immediate transfer vs dispatch/receipt, exact
 barcode/color/size identity, source stock zero and overshipment refusal,

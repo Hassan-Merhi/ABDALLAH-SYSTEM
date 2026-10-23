@@ -14,6 +14,7 @@ import {
   nextAverageCost,
   setInventoryQuantity,
 } from "../../services/retail/retailStockLedger";
+import { retailAllowedLocationIds, retailLocationRefusal } from "./retailLocationAccess";
 import { currentUserId, ensureCompanyLocation, requireRetailCompany } from "./retailPosContext";
 
 const IN_TRANSIT_ASSET = "RETAIL-IN-TRANSIT";
@@ -66,6 +67,15 @@ export function registerRetailTransferWorkflowRoutes(app: Express): void {
       const requested = String(req.query.status ?? "otw");
       if (!["otw", "received", "all"].includes(requested))
         return res.status(400).json({ message: "Invalid transfer status" });
+      // Location-restricted users only see shipments leaving or arriving at their stores.
+      const allowed = await retailAllowedLocationIds(req, companyId);
+      if (allowed && allowed.size === 0) return res.json([]);
+      const allowedIds = allowed
+        ? sql.join(
+            [...allowed].map((id) => sql`${id}`),
+            sql`, `
+          )
+        : null;
       const rows = await db
         .select()
         .from(retailStockOperations)
@@ -73,7 +83,11 @@ export function registerRetailTransferWorkflowRoutes(app: Express): void {
           and(
             eq(retailStockOperations.companyId, companyId),
             eq(retailStockOperations.operationType, "transfer_dispatch"),
-            requested === "all" ? undefined : sql`(${retailStockOperations.metadata}->>'status') = ${requested}`
+            requested === "all" ? undefined : sql`(${retailStockOperations.metadata}->>'status') = ${requested}`,
+            allowedIds === null
+              ? undefined
+              : sql`((${retailStockOperations.metadata}->>'fromLocationId')::int IN (${allowedIds})
+                  OR (${retailStockOperations.metadata}->>'toLocationId')::int IN (${allowedIds}))`
           )
         )
         .orderBy(desc(retailStockOperations.createdAt), desc(retailStockOperations.id))
@@ -98,6 +112,10 @@ export function registerRetailTransferWorkflowRoutes(app: Express): void {
       const body = dispatchSchema.parse(req.body);
       if (body.fromLocationId === body.toLocationId)
         return res.status(400).json({ message: "Choose different locations" });
+      // Shipping is done by the source store; the destination confirms receipt separately.
+      const locationRefusal = await retailLocationRefusal(req, companyId, [body.fromLocationId]);
+      if (locationRefusal)
+        return res.status(403).json({ code: "RETAIL_LOCATION_NOT_ASSIGNED", message: locationRefusal });
       await Promise.all([
         ensureCompanyLocation(companyId, body.fromLocationId),
         ensureCompanyLocation(companyId, body.toLocationId),
@@ -236,6 +254,7 @@ export function registerRetailTransferWorkflowRoutes(app: Express): void {
         return res.status(400).json({ message: "Invalid transfer" });
       const body = receiveSchema.parse(req.body);
       const actor = currentUserId(req);
+      const allowed = await retailAllowedLocationIds(req, companyId);
       const result = await db.transaction(async (tx) => {
         // Lock transfer itself: two receivers cannot receive the same dispatch.
         await tx.execute(
@@ -248,6 +267,8 @@ export function registerRetailTransferWorkflowRoutes(app: Express): void {
           .limit(1);
         if (!op || op.operationType !== "transfer_dispatch") throw new Error("Transfer not found");
         const details = metadata(op.metadata ?? {});
+        // Only the receiving store confirms what physically arrived.
+        if (allowed && !allowed.has(Number(details.toLocationId))) return { forbidden: true as const };
         if (details.status === "received") {
           if (details.receiveIdempotencyKey === body.idempotencyKey)
             return { replayed: true, operationId: transferId, status: "received" as const };
@@ -320,6 +341,11 @@ export function registerRetailTransferWorkflowRoutes(app: Express): void {
           .where(and(eq(retailStockOperations.id, transferId), eq(retailStockOperations.companyId, companyId)));
         return { replayed: false, operationId: transferId, status: "received" as const };
       });
+      if ("forbidden" in result) {
+        return res
+          .status(403)
+          .json({ code: "RETAIL_LOCATION_NOT_ASSIGNED", message: "You are not assigned to this Retail location" });
+      }
       res.status(result.replayed ? 200 : 201).json(result);
     } catch (error) {
       const message = getErrorMessage(error);
