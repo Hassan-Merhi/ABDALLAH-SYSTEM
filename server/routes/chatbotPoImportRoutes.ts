@@ -1,4 +1,5 @@
 import { prepareZmwPurchaseCost } from "../services/accounting/zambiaPurchaseCosting";
+import { HttpError } from "../lib/httpError";
 /**
  * Chatbot PO-import routes.
  *
@@ -568,6 +569,7 @@ export function registerChatbotPoImportRoutes(app: Express) {
         availableProformas,
       });
     } catch (error: unknown) {
+      if (error instanceof HttpError) return res.status(error.statusCode).json({ message: error.message });
       logger.error("PO import confirm error:", { error: error });
       res.status(500).json({ message: "Internal server error" });
     }
