@@ -84,7 +84,7 @@ export async function prepareZmwPurchaseCost(input: {
     key === "discount" ? sum.minus(baseCharges[key]) : sum.plus(baseCharges[key]),
   new Decimal(0));
   return {
-    historicalExchangeRate: rate.toFixed(10),
+    historicalExchangeRate: historicalRate,
     historicalRateDate: input.date,
     nativeItemsTotal: cents(nativeItemsTotal),
     nativeFreight: originalCharges.freight,
