@@ -237,8 +237,12 @@ describe("Retail Wave 2 — client UI", () => {
       expect(routes).toContain(page);
     }
     const nav = read("client/src/pages/retail/RetailNav.tsx");
-    for (const href of ["/retail/stock-count", "/retail/selling", "/retail/history"]) {
+    for (const href of ["/retail/inventory", "/retail/quick-add", "/retail/stock", "/retail/selling"]) {
       expect(nav).toContain(href);
+    }
+    // Legacy routes remain registered for compatibility, but are no longer shown in retail navigation.
+    for (const href of ["/retail/stock-count", "/retail/history", "/retail/reports", "/retail/pos"]) {
+      expect(nav).not.toContain(`href: "${href}"`);
     }
     const stockCount = read("client/src/pages/retail/RetailStockCount.tsx");
     for (const marker of [
