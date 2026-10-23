@@ -1,4 +1,4 @@
-import { assertHistoricalUsdPurchaseCost } from "../../services/accounting/zambiaPurchaseCurrencyGuard";
+import { assertPreparedZmwPurchaseCost } from "../../services/accounting/zambiaPurchaseCosting";
 import { postFactoryPartyLineVoucherTx, postFactoryVoucherTx } from "../../services/factory/factoryVoucherPosting";
 import { retireVouchersTx, type VoucherRetirementActor } from "../../services/accounting/voucherRetirement";
 import { resolvePoImportCreditTarget } from "../../services/accounting/poImportAccounting";
@@ -28,7 +28,7 @@ export async function createPurchaseOrder(
 ): Promise<PurchaseOrder> {
   // purchase_orders amounts and all linked landed-cost journals are historical
   // USD; a ZMW label alone would silently post native Kwacha as USD.
-  assertHistoricalUsdPurchaseCost(po.currency);
+  await assertPreparedZmwPurchaseCost(po, voucherDateOverride);
   // The PO, its voucher(s), their lines and the PO's voucher link commit
   // together; they used to be separate autocommit writes.
   return db.transaction(async (tx) => {
