@@ -33,6 +33,7 @@
 - \`server/routes/vouchers/voucherJournalRoutes.ts\` and \`server/routes/vouchers/voucherPaymentRoutes.ts\` recheck the immutable header inside their edit transaction and refuse editing ZMW vouchers with missing original/native amounts or rates, before replacing any lines.
 - \`server/routes/vouchers/transfer/with-entries.ts\` refuses unresolved historical ZMW entries; reconstructs USD entry amounts from native Kwacha using original rate; checks conflict between supplied debit/credit and transaction amount fields; stores historical USD voucher totals to six decimals and distinguishes native versus USD daybook amounts.
 - \`server/routes/voucherEntryCurrencyEditRoutes.ts\` stops direct edits from changing a posted ZMW line's currency/rate and refuses unresolved native amounts. Such historical repairs require a separately reviewed reconciliation/reversal process.
+- Generated engine ROUNDING entries are USD-only even on a ZMW voucher. `assertResolvedZmwVoucherEntriesTx` recognizes **only** a USD line belonging to the company's ROUNDING account with the engine's exact narration; unrelated/missing native lines still block the edit. The journal form, payment/receipt form and legacy editor exclude this synthetic line from user-entered ZMW amounts. This was a source-level fix and requires Claude regression coverage.
 - Existing tenant checks, intercompany mutation locks, accounting-period editing controls and audited source paths remain in effect.
 
 ### Existing credit/debit notes and party ledgers
