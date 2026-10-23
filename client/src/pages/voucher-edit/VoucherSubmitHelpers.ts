@@ -62,7 +62,8 @@ export const preparePaymentReceiptData = (
   };
 
   const contraEntries = data.entries.map((entry) => {
-    const usdAmount = convertAmountToUSD(entry.amount, data.currency, exchangeRate);
+    const usdAmount = data.currency === "ZMW"
+      ? entry.amount : convertAmountToUSD(entry.amount, data.currency, exchangeRate);
     return {
       ledgerAccountId: entry.accountType === "ledger" ? entry.accountId : null,
       bankAccountId: entry.accountType === "bank" ? entry.accountId : null,
