@@ -146,9 +146,13 @@ export function RetailReturnDialog({
         notes: reason.trim() || undefined,
       });
       const data = (await response.json()) as { replayed: boolean; refundAmount: number; sale: RetailSale };
+      const outcome =
+        destination === "customer_credit"
+          ? "Credited to customer account"
+          : "Reversed / refunded against original tenders";
       toast({
         title: data.replayed ? "Return already recorded" : "Return completed",
-        description: `${money(data.refundAmount)} ${destination === "customer_credit" ? "credited to customer account" : "reversed / refunded against original tenders"}`,
+        description: `${outcome}: ${money(data.refundAmount)}`,
       });
       attempt.current = null;
       await onCompleted(data.sale);
