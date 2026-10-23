@@ -5,7 +5,7 @@ import {
   type PostingActor,
 } from "../../services/accounting";
 import { requireCompanyAccess } from "./transferRequestContext";
-import { resolveZambiaIntercompanyAmount } from "../../services/accounting/zambiaIntercompanyTransfer";
+import { resolveZambiaIntercompanyAmount, zambiaTransferVoucherNumber } from "../../services/accounting/zambiaIntercompanyTransfer";
 import { TransferRouteError } from "./transferErrors";
 import { transferRepository } from "./transferRepository";
 import { parseInterCompanyTransferInput } from "./transferValidation";
@@ -81,8 +81,12 @@ export const interCompanyTransferService = {
       accounts: toAccounts,
     });
     const voucherTimestamp = Date.now();
-    const fromVoucherNumber = `ICT-FROM-${voucherTimestamp}`;
-    const toVoucherNumber = `ICT-TO-${voucherTimestamp}`;
+    const fromVoucherNumber = fx.currency === "ZMW"
+      ? zambiaTransferVoucherNumber("ICT-FROM", parsed.clientRequestId ?? "")
+      : `ICT-FROM-${voucherTimestamp}`;
+    const toVoucherNumber = fx.currency === "ZMW"
+      ? zambiaTransferVoucherNumber("ICT-TO", parsed.clientRequestId ?? "")
+      : `ICT-TO-${voucherTimestamp}`;
     const description = parsed.description || `Inter-company transfer to ${toCompany.name}`;
 
     return transferRepository.transaction(async (tx) => {
