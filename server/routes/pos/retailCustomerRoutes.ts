@@ -15,6 +15,7 @@ import {
   retailBrands,
   retailPosReturnItems,
   retailPosReturns,
+  retailPosPayments,
   retailPosSaleItems,
   retailPosSales,
   retailProductVariants,
@@ -384,11 +385,29 @@ export function registerRetailCustomerRoutes(app: Express): void {
       if (!Number.isInteger(saleId) || saleId <= 0) return res.status(400).json({ message: "Invalid sale" });
       const body = z.object({ customerId: z.coerce.number().int().positive().nullable() }).parse(req.body ?? {});
       const [sale] = await db
-        .select({ id: retailPosSales.id })
+        .select({ id: retailPosSales.id, customerId: retailPosSales.customerId })
         .from(retailPosSales)
         .where(and(eq(retailPosSales.id, saleId), eq(retailPosSales.companyId, companyId)))
         .limit(1);
       if (!sale) return res.status(404).json({ message: "Retail sale not found" });
+      // Customer receivable journal entries are immutable. A customer edit on a
+      // credit sale must use a supervised reversal/repost workflow, not a name update.
+      if (body.customerId !== sale.customerId) {
+        const [creditTender] = await db
+          .select({ id: retailPosPayments.id })
+          .from(retailPosPayments)
+          .where(and(
+            eq(retailPosPayments.companyId, companyId),
+            eq(retailPosPayments.saleId, saleId),
+            eq(retailPosPayments.method, "credit"),
+            eq(retailPosPayments.paymentType, "payment")
+          ))
+          .limit(1);
+        if (creditTender) return res.status(409).json({
+          code: "RETAIL_CREDIT_CUSTOMER_LOCKED",
+          message: "Cannot change the customer on a posted credit sale; use an accounting reversal instead",
+        });
+      }
       let customerName = "Walk-in";
       if (body.customerId) {
         const [customer] = await db
