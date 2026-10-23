@@ -7,6 +7,10 @@
  */
 import Decimal from "decimal.js";
 import { HttpError } from "../../lib/httpError";
+import { and, eq } from "drizzle-orm";
+import { ledgerAccounts } from "@shared/schema";
+import { ROUNDING_ACCOUNT_CODE, ENGINE_ROUNDING_NARRATION } from "./engineRounding";
+import type { DbTransaction } from "../../db";
 import { storage } from "../../storage";
 import { companyBusinessDate } from "./companyBusinessDate";
 import { companyRateDateSchema, companyRateValueSchema } from "@shared/companyRatePolicy";
@@ -97,5 +101,51 @@ export function assertLockedZmwVoucherEdit(
     if (!proposed.isFinite() || !proposed.eq(lockedRate)) {
       throw new ZambiaVoucherRateError("Posted ZMW voucher exchange rate cannot be changed.");
     }
+  }
+}
+
+
+/**
+ * Confirm that a posted ZMW voucher has recoverable original native amounts.
+ * An engine-owned, USD-only base rounding line is a legitimate exception,
+ * identified by BOTH the designated company ROUNDING account and the engine's
+ * exact narration. An arbitrary USD line is NOT an exception.
+ */
+export async function assertResolvedZmwVoucherEntriesTx(
+  tx: DbTransaction,
+  companyId: number,
+  entries: readonly {
+    ledgerAccountId: number | null;
+    narration: string | null;
+    transactionCurrency: string | null;
+    transactionDebitAmount: string | null;
+    transactionCreditAmount: string | null;
+    historicalExchangeRate: string | null;
+  }[],
+): Promise<void> {
+  const [rounding] = await tx
+    .select({ id: ledgerAccounts.id }).from(ledgerAccounts)
+    .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.code, ROUNDING_ACCOUNT_CODE)))
+    .limit(1);
+  let nativeEntries = 0;
+  for (const entry of entries) {
+    if (rounding &&
+      entry.ledgerAccountId === rounding.id &&
+      entry.narration === ENGINE_ROUNDING_NARRATION &&
+      entry.transactionCurrency === "USD") {
+      continue;
+    }
+    if (entry.transactionCurrency !== "ZMW" ||
+        entry.transactionDebitAmount == null ||
+        entry.transactionCreditAmount == null ||
+        entry.historicalExchangeRate == null) {
+      throw new ZambiaVoucherRateError(
+        "Original ZMW amounts/rate are unresolved. Reconcile the voucher before editing it."
+      );
+    }
+    nativeEntries++;
+  }
+  if (nativeEntries === 0) {
+    throw new ZambiaVoucherRateError("No native ZMW entries remain to edit.");
   }
 }
