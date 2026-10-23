@@ -17,6 +17,7 @@ import { RetailLastSaleSummary, RetailVariantTransferCard } from "./RetailPOSPan
 import { RetailShiftPanel, type RetailShift } from "./RetailShiftPanel";
 import { useRetailReceiptPrinter } from "./retailReceipt";
 import { RetailApprovalDialog } from "./RetailApprovalDialog";
+import { useRetailBarcodeScanner } from "./useRetailBarcodeScanner";
 import { RetailCustomerPicker } from "./RetailCustomerPicker";
 import { RetailLineAdjustDialog, type LineAdjustment } from "./RetailLineAdjustDialog";
 import { fetchRetailCartPreview, requestRetailDiscountApproval, type CartRequestLine } from "./retailWave2Api";
@@ -35,42 +36,6 @@ import {
   type RetailSale,
   type ScanOutcome,
 } from "./retailPosTypes";
-
-/**
- * Hardware scanners type the code followed by Enter. When focus is outside an
- * input (e.g. after clicking a button) the keystrokes are captured globally so a
- * scan is never lost.
- */
-function useBarcodeScanner(onScan: (barcode: string) => void) {
-  const bufferRef = useRef("");
-  const lastKeyAtRef = useRef(0);
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (target?.closest("input, textarea, select, [contenteditable='true'], [role='dialog']")) return;
-      const now = Date.now();
-      if (now - lastKeyAtRef.current > 120) bufferRef.current = "";
-      lastKeyAtRef.current = now;
-
-      if (event.key === "Enter") {
-        const barcode = bufferRef.current.trim();
-        bufferRef.current = "";
-        if (barcode.length >= 3) {
-          event.preventDefault();
-          onScan(barcode);
-        }
-        return;
-      }
-      if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
-        bufferRef.current += event.key;
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown, true);
-    return () => window.removeEventListener("keydown", handleKeyDown, true);
-  }, [onScan]);
-}
 
 export default function RetailPOS() {
   const { selectedCompany } = useCompany();
@@ -282,7 +247,7 @@ export default function RetailPOS() {
     [selectedLocation?.id, cart, allowNegative, focusScan, toast]
   );
 
-  useBarcodeScanner(scanBarcode);
+  useRetailBarcodeScanner(scanBarcode);
 
   const saleMutation = useMutation({
     // The approval token can be passed explicitly so the retry right after a manager

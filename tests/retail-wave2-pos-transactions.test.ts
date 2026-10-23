@@ -103,14 +103,9 @@ describe("Retail POS Wave 2 transaction invariants", () => {
     expect(posRoutes).toContain('selectedCompany?.companyType === "retail"');
     expect(posRoutes).toContain('<Route path="/">{() => <RetailPOS />}</Route>');
     expect(posRoutes).toContain('<Route path="/pos">{() => <RetailPOS />}</Route>');
-    // Inventory no longer advertises a separate retail POS, while POS remains reachable
-    // from the standard ERP POS route for managers and / for POS-role cashiers.
-    const retailNav = read("client/src/pages/retail/RetailNav.tsx");
-    const guard = read("client/src/app/authenticatedAppRouteGuard.ts");
-    expect(retailNav).not.toContain('href: "/retail/pos"');
+    // Inventory no longer advertises a separate retail POS; /pos still reaches it
+    // (tests/ui/retail-navigation-behavior.test.ts checks the redirect).
     expect(inventory).not.toContain("Open POS");
-    expect(guard).toContain('currentLocation === "/pos"');
-    expect(guard).toContain('to: "/retail/pos"');
     const retailPos = read("client/src/pages/pos/RetailPOS.tsx");
     expect(retailPos).toContain('selectedCompany?.role === "POS"');
     expect(retailPos).toContain("assignedLocationId");
@@ -121,9 +116,10 @@ describe("Retail POS Wave 2 transaction invariants", () => {
   it("supports exact barcode lookup and keyboard wedge scanners", () => {
     const route = read("server/routes/pos/retailPosRoutes.ts");
     const ui = read("client/src/pages/pos/RetailPOS.tsx");
+    const scanner = read("client/src/pages/pos/useRetailBarcodeScanner.ts");
     expect(route).toContain("/api/pos/retail/barcodes/:barcode");
-    expect(ui).toContain('window.addEventListener("keydown"');
-    expect(ui).toContain('event.key === "Enter"');
-    expect(ui).toContain("scanBarcode");
+    expect(scanner).toContain('window.addEventListener("keydown"');
+    expect(scanner).toContain('event.key === "Enter"');
+    expect(ui).toContain("useRetailBarcodeScanner(scanBarcode)");
   });
 });

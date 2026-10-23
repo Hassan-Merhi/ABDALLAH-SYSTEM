@@ -1,9 +1,8 @@
 import { punctuationInsensitiveSearch } from "../../lib/searchNormalization";
 import type { Express } from "express";
-import { and, desc, eq, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import {
-  customers,
   locations,
   retailBrands,
   retailPosSales,
@@ -17,6 +16,7 @@ import {
 import { requireAuth } from "../../auth";
 import { db } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
+import { resolveRetailSaleCustomer, retailReturnRefusal } from "./retailCheckoutPolicy";
 import { currentUserId, ensureCompanyLocation, requireRetailCompany } from "./retailPosContext";
 import {
   addMovement,
@@ -534,32 +534,9 @@ export function registerRetailPosRoutes(app: Express): void {
         };
       }
 
-      // Uncollected credit must belong to a real company-owned ERP customer,
-      // never an anonymous walk-in or a free-text customer name.
-      if (body.payments?.some((payment) => payment.method === "credit") && !body.customerId) {
-        return res.status(400).json({
-          code: "RETAIL_CREDIT_CUSTOMER_REQUIRED",
-          message: "Select a customer before recording a credit sale",
-        });
-      }
-      // The customer is optional for fully paid transactions.
-      let customer: RetailSaleInput["customer"] = null;
-      if (body.customerId) {
-        const [row] = await db
-          .select({ id: customers.id, legalName: customers.legalName, active: customers.active })
-          .from(customers)
-          .where(
-            and(eq(customers.id, body.customerId), eq(customers.companyId, companyId), isNull(customers.deletedAt))
-          )
-          .limit(1);
-        if (!row) return res.status(404).json({ message: "Customer not found" });
-        if (body.payments?.some((payment) => payment.method === "credit") && !row.active) {
-          return res.status(400).json({ message: "Select an active customer for credit sales" });
-        }
-        customer = { id: row.id, name: row.legalName };
-      } else if (body.customerName?.trim()) {
-        customer = { id: null, name: body.customerName.trim() };
-      }
+      const resolved = await resolveRetailSaleCustomer(companyId, body);
+      if ("status" in resolved) return res.status(resolved.status).json(resolved.body);
+      const { customer } = resolved;
 
       const result = await db.transaction((tx) =>
         createRetailSaleInTx(tx, {
@@ -626,31 +603,8 @@ export function registerRetailPosRoutes(app: Express): void {
       const body = returnSchema.parse(req.body);
       await ensureCompanyLocation(companyId, body.locationId);
       const userId = currentUserId(req);
-      // A shift is optional, as for sales: a refund made without one stays off every
-      // drawer (see validateRetailShiftTx) rather than landing on a closed shift.
-      if (
-        !["Admin", "Owner", "Manager", "Developer"].includes(req.user?.role ?? "") &&
-        (body.refundDestination === "customer_credit" || body.items.some((item) => !item.restock))
-      ) {
-        return res.status(403).json({
-          code: "RETAIL_RETURN_MANAGER_REQUIRED",
-          message: "Manager access is required for account credits and damaged/non-restock returns",
-        });
-      }
-      // Cash refunds may follow the original tender. A credit to the customer
-      // account must belong to a named customer from this same company's sale.
-      if (body.refundDestination === "customer_credit") {
-        const [original] = await db
-          .select({ customerId: retailPosSales.customerId })
-          .from(retailPosSales)
-          .where(and(eq(retailPosSales.companyId, companyId), eq(retailPosSales.id, saleId)))
-          .limit(1);
-        if (!original?.customerId)
-          return res.status(400).json({
-            code: "RETAIL_RETURN_CUSTOMER_REQUIRED",
-            message: "Assign an ERP customer to the original sale before issuing account credit",
-          });
-      }
+      const refusal = await retailReturnRefusal({ companyId, saleId, role: req.user?.role, ...body });
+      if (refusal) return res.status(refusal.status).json(refusal.body);
 
       const result = await db.transaction(async (tx) => {
         const returned = await createRetailReturnInTx(tx, {

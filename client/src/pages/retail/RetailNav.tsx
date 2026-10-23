@@ -2,7 +2,8 @@ import { useLocation } from "wouter";
 import { Boxes, Camera, ScanLine, Settings2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const LINKS = [
+/** Retail workspace pills; POS, reports, stock count and history are reached elsewhere. */
+export const RETAIL_NAV_LINKS = [
   { href: "/retail/inventory", label: "Inventory", icon: Boxes },
   { href: "/retail/quick-add", label: "Quick add", icon: Camera },
   { href: "/retail/stock", label: "Stock operations", icon: ScanLine },
@@ -14,7 +15,7 @@ export function RetailNav() {
   const [location, navigate] = useLocation();
   return (
     <nav className="-mx-1 flex gap-1 overflow-x-auto pb-1" aria-label="Retail">
-      {LINKS.map(({ href, label, icon: Icon }) => {
+      {RETAIL_NAV_LINKS.map(({ href, label, icon: Icon }) => {
         const active = location === href || (href === "/retail/inventory" && location.startsWith("/retail/products/"));
         return (
           <button

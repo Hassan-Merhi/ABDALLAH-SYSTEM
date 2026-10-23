@@ -177,10 +177,14 @@ closed shift behavior and existing ERP / Factory / non-retail accounting.
   and may use that customer's credit tender. The replacement total is taken
   from the existing Retail server cart preview (promotions/tax). Its credit
   difference is a net presentation of the two real posting legs; their refund
-  and new-sale payment entries remain auditable separately.
+  and new-sale payment entries remain auditable separately. The counter
+  balance (`balanceDue`) is replacement money collected now minus tender
+  actually paid back: a return that only reverses an unpaid receivable is
+  not cash for the customer (`receivableReversed` vs `tenderRefund`).
 - Manager+ authorization required for damaged/non-restock and customer-account
-  credit refunds. POS cashiers must provide an open shift for normal returns
-  and exchanges; existing original settlement and posting audits are preserved.
+  credit refunds. A cashier shift is optional for returns and exchanges, as for
+  sales: a refund without a shift stays off every drawer (established contract,
+  covered by `tests/retail-wave2-pos-integration.test.ts`).
 - Existing retail sale records and historic vouchers are not rewritten.
   All new return/refund/COGS/inventory postings are performed transactionally
   only when the code is later deployed and a real return is requested.
@@ -223,9 +227,8 @@ No CI, tests, builds, lint, typechecks, rebase or deploy performed here.
   refund, credit, COGS and tax journals continue to be created by their
   transaction-owned server services. Financial statements/Daybook still
   display the entries.
-- This phase restricts **UI entry/edit affordances**. It does *not* add a
-  cross-cutting API authorization rule for direct generic voucher write APIs;
-  review that separately before treating hidden tabs as a security boundary.
+- This phase restricts **UI entry/edit affordances**; the Phase 8 HTTP guard
+  below enforces the same rule on the server.
 
 **Claude verification:** On a Retail company check mobile and desktop voucher
 navigation, all four blocked query/hash deep links, normal Payment and Receipt
@@ -309,14 +312,16 @@ against latest `main` only when Claude takes ownership; none were run here.
 - Added strict **dispatch replay** identity checks: an existing operation key
   must match the exact product variant, source/destination, quantity and note.
 - Added a Retail-only **manual voucher HTTP guard**:
-  `server/middleware/retailManualVoucherBoundary.ts`, registered before
-  generic Voucher routes in `server/routes/voucherRoutes.ts`. It blocks
-  manually creating or editing Journal, Credit/Debit Note, Adjustment and
-  Transfer Order voucher types for the selected Retail company. Existing
-  automatically posted journals remain visible but read-only. The guard
-  neither intercepts internal Retail transaction-owned central postings
-  nor changes non-Retail company behavior. Other write endpoints outside
-  `/api/vouchers/*` must still be reviewed for authorization.
+  `server/middleware/retailManualVoucherBoundary.ts`, registered with the
+  permission boundaries (`server/routes/core/permissionBoundaryRoutes.ts`)
+  ahead of every voucher writer. For the selected Retail company it refuses
+  `POST /api/vouchers/journal`, every write to `/api/credit-notes` and
+  `/api/stock-adjustments`, generic creates of a hidden type, and any
+  edit/delete through `/api/vouchers/:id*`, `/api/vouchers/bulk-delete` or
+  `/api/voucher-entries` that targets a Journal, Credit/Debit Note,
+  Adjustment or Transfer Order voucher. Payment, Receipt and Stock Transfer
+  vouchers, internal transaction-owned postings and non-Retail companies are
+  unaffected.
 - Added detailed owner/Claude handoff at
   `docs/retail-pos-inventory-claude-handoff.md`, including route mappings,
   migration sequencing, permission boundaries, accounting examples, source
@@ -328,3 +333,11 @@ against latest `main` only when Claude takes ownership; none were run here.
 
 No CI, tests, lint, typechecks, builds, SQL migration, merge, rebase, deployment
 or production accounting/stock writes were performed by ChatGPT.
+
+## Claude verification (2026-10-23)
+
+Verified on this branch after merging current `main`. Evidence, fixes and
+open items are recorded in `docs/retail-pos-inventory-claude-handoff.md`
+("Verification record"). Accounting reconciliation runs in
+`tests/retail-pos-inventory-workflow-integration.test.ts`.
+

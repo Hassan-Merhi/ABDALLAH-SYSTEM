@@ -18,6 +18,7 @@ import { db } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { lineAmount, MoneyDecimal, moneyString, toMoney } from "../../lib/money";
 import { RETAIL_GRNI_ACCOUNT, trackRetailStockValueTx } from "../../services/retail/retailInventoryJournal";
+import { isRetailManagerRole } from "./retailCheckoutPolicy";
 import { currentUserId, ensureCompanyLocation, requireRetailCompany } from "./retailPosContext";
 import {
   addMovement,
@@ -245,10 +246,7 @@ export function registerRetailStockOpsRoutes(app: Express): void {
       const userId = currentUserId(req);
       // A shift is optional, as for sales: a refund made without one stays off every
       // drawer (see validateRetailShiftTx) rather than landing on a closed shift.
-      if (
-        !["Admin", "Owner", "Manager", "Developer"].includes(req.user?.role ?? "") &&
-        body.returnItems.some((item) => !item.restock)
-      ) {
+      if (!isRetailManagerRole(req.user?.role) && body.returnItems.some((item) => !item.restock)) {
         return res
           .status(403)
           .json({ message: "Manager approval is required to exchange damaged items without restocking" });
