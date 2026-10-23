@@ -456,7 +456,7 @@ export interface RetailReturnInput {
   locationId: number;
   idempotencyKey: string;
   notes?: string | null;
-  items: Array<{ saleItemId: number; quantity: number }>;
+  items: Array<{ saleItemId: number; quantity: number; restock?: boolean }>;
   userId: string;
   metadata?: Record<string, unknown>;
 }
@@ -522,8 +522,15 @@ export async function createRetailReturnInTx(
   if (sale.locationId !== input.locationId) throw new Error("Return location must match the original sale location");
   if (sale.status !== "completed") throw new Error("Canceled sales cannot receive additional returns");
 
-  const aggregate = new Map<number, number>();
-  for (const item of input.items) aggregate.set(item.saleItemId, (aggregate.get(item.saleItemId) ?? 0) + item.quantity);
+  const aggregate = new Map<number, { quantity: number; restock: boolean }>();
+  for (const item of input.items) {
+    const restock = item.restock !== false;
+    const previous = aggregate.get(item.saleItemId);
+    if (previous && previous.restock !== restock) {
+      throw new Error("One sale line cannot have mixed restock dispositions in the same return");
+    }
+    aggregate.set(item.saleItemId, { quantity: (previous?.quantity ?? 0) + item.quantity, restock });
+  }
 
   // Lock and preload every referenced sale item in one statement. Locking in a
   // deterministic id order also keeps concurrent returns from deadlocking each other.
@@ -559,7 +566,7 @@ export async function createRetailReturnInTx(
   let refundAmount = new MoneyDecimal(0);
   let refundTaxAmount = new MoneyDecimal(0);
   let costValue = new MoneyDecimal(0);
-  for (const [saleItemId, quantity] of aggregate) {
+  for (const [saleItemId, { quantity, restock }] of aggregate) {
     const saleItem = saleItemsById.get(saleItemId);
     if (!saleItem) throw new Error(`Sale item ${saleItemId} not found`);
     const sold = toNumber(saleItem.quantity);
@@ -567,16 +574,15 @@ export async function createRetailReturnInTx(
     const nextReturnedQuantity = validateRetailReturnQuantity(sold, alreadyReturned, quantity);
 
     const stock = await lockInventoryRow(tx, companyId, saleItem.variantId, sale.locationId);
-    const after = nextRetailReturnQuantity(stock.quantity, quantity);
-    // Wave 17 (D): the units come back at the cost they left with (value-exact), blended into the average.
-    await setInventoryQuantity(
-      tx,
-      companyId,
-      saleItem.variantId,
-      sale.locationId,
-      after,
-      nextAverageCost(stock.quantity, stock.averageCost, quantity, toNumber(saleItem.unitCost))
-    );
+    // Damaged/non-sellable goods are financially returned, but never reintroduced
+    // into available stock. Keep the original COGS expense for written-off goods.
+    const after = restock ? nextRetailReturnQuantity(stock.quantity, quantity) : stock.quantity;
+    if (restock) {
+      await setInventoryQuantity(
+        tx, companyId, saleItem.variantId, sale.locationId, after,
+        nextAverageCost(stock.quantity, stock.averageCost, quantity, toNumber(saleItem.unitCost))
+      );
+    }
     await tx
       .update(retailPosSaleItems)
       .set({ returnedQuantity: String(nextReturnedQuantity) })
@@ -592,7 +598,7 @@ export async function createRetailReturnInTx(
       sold > 0 ? toMoney(saleItem.taxAmount).times(quantity).div(sold).toDecimalPlaces(6) : new MoneyDecimal(0);
     refundAmount = refundAmount.plus(lineRefund);
     refundTaxAmount = refundTaxAmount.plus(lineRefundTax);
-    costValue = costValue.plus(lineAmount(quantity, saleItem.unitCost));
+    if (restock) costValue = costValue.plus(lineAmount(quantity, saleItem.unitCost));
 
     const [returnItem] = await tx
       .insert(retailPosReturnItems)
@@ -607,6 +613,7 @@ export async function createRetailReturnInTx(
         unitCost: saleItem.unitCost,
         grossUnitPrice: grossPerUnit.toFixed(),
         taxAmount: lineRefundTax.toFixed(),
+        restocked: restock,
       })
       .returning({ id: retailPosReturnItems.id });
     await addMovement(tx, {
@@ -614,14 +621,16 @@ export async function createRetailReturnInTx(
       variantId: saleItem.variantId,
       locationId: sale.locationId,
       movementType: "return",
-      quantityDelta: quantity,
+      // Keep a zero-delta audit movement even for an un-restocked return. This
+      // preserves the chain without pretending damaged goods are sellable.
+      quantityDelta: restock ? quantity : 0,
       before: stock.quantity,
       after,
       eventKey: `return:${createdReturn.id}:${returnItem.id}`,
       referenceType: "retail_pos_return",
       referenceId: createdReturn.id,
       createdBy: input.userId,
-      metadata: { saleId, saleItemId: saleItem.id, ...input.metadata },
+      metadata: { saleId, saleItemId: saleItem.id, restocked: restock, returnedQuantity: quantity, ...input.metadata },
     });
   }
   refundAmount = refundAmount.toDecimalPlaces(6);
