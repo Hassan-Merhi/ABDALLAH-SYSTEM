@@ -41,9 +41,9 @@ export function RetailCustomerPicker({
   }, [term]);
 
   const customersQuery = useQuery({
-    queryKey: ["retail-pos-customers", search],
+    queryKey: ["retail-pos-customers", selectedCompany?.id, search],
     queryFn: () => searchRetailCustomers(search),
-    enabled: open,
+    enabled: open && selectedCompany?.companyType === "retail",
     staleTime: 15_000,
   });
 
