@@ -52,7 +52,7 @@ function buildTransferReversalRequest(input: {
     creditAmount: String(entry.debitAmount ?? "0"),
     narration: entry.narration ? `Reversal: ${entry.narration}` : `Reversal of ${snapshot.voucher.voucherNumber}`,
     // Reverse the original currency evidence, not the current conversion.
-    ...(entry.transactionCurrency ? {
+    ...(snapshot.voucher.currency === "ZMW" && entry.transactionCurrency === "ZMW" ? {
       transactionCurrency: entry.transactionCurrency,
       transactionDebitAmount: entry.transactionCreditAmount,
       transactionCreditAmount: entry.transactionDebitAmount,
@@ -72,8 +72,9 @@ function buildTransferReversalRequest(input: {
       description: `Reversal of company transfer #${transferId} (${side})`,
       totalAmount: snapshot.voucher.totalAmount,
       optional: false,
-      currency: snapshot.voucher.currency,
-      exchangeRate: snapshot.voucher.exchangeRate,
+      ...(snapshot.voucher.currency === "ZMW" ? {
+        currency: "ZMW", exchangeRate: snapshot.voucher.exchangeRate,
+      } : {}),
     },
     entries,
     source: {
