@@ -48,16 +48,38 @@ export function RetailPaymentPanel({
           type="button"
           size="sm"
           variant="outline"
-          disabled={value.length >= 8 || remaining <= 0.005}
-          onClick={() =>
+          disabled={value.length >= 8 || total <= 0}
+          onClick={() => {
+            // Most sales start with one tender covering the *full* invoice.
+            // In that case simply appending the unallocated remainder would
+            // create a zero-value tender, which checkout cannot post. Split
+            // the existing largest tender instead, preserving exact totals.
+            const amounts = value.map((payment) => Number(payment.amount) || 0);
+            const largestIndex = amounts.indexOf(Math.max(...amounts));
+            const available = Number((amounts[largestIndex] ?? 0).toFixed(2));
+            const allocatedAmount = Number(remaining.toFixed(2));
+            if (allocatedAmount > 0) {
+              onChange([
+                ...value,
+                { method: "cash", amount: allocatedAmount, tenderedAmount: allocatedAmount },
+              ]);
+              return;
+            }
+            if (available < 0.02) return;
+            const splitOff = Number((available / 2).toFixed(2));
+            const existingAmount = Number((available - splitOff).toFixed(2));
+            if (splitOff <= 0 || existingAmount <= 0) return;
             onChange([
-              ...value,
-              {
-                method: "cash",
-                amount: Number(remaining.toFixed(2)),
-                tenderedAmount: remaining > 0 ? Number(remaining.toFixed(2)) : null,
-              },
-            ])
+              ...value.map((payment, index) => index === largestIndex
+                ? {
+                    ...payment,
+                    amount: existingAmount,
+                    tenderedAmount: payment.method === "cash" ? existingAmount : null,
+                  }
+                : payment
+              ),
+              { method: "cash", amount: splitOff, tenderedAmount: splitOff },
+            ]);
           }
         >
           <Plus className="mr-1 h-3.5 w-3.5" /> Split
