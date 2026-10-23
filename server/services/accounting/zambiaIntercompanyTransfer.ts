@@ -5,8 +5,22 @@
  * No new cross-company exchange rate or implicit current-rate translation.
  */
 import Decimal from "decimal.js";
+import { createHash } from "node:crypto";
 import { assertApprovedZmwVoucherRate } from "./zambiaVoucherRatePolicy";
 import { TransferRouteError } from "../../routes/transfers/transferErrors";
+
+/**
+ * Stable posting number for a ZMW transfer retry. The central engine includes
+ * voucherNumber in its request fingerprint, so Date.now() defeats replay.
+ * Keep legacy USD display numbering untouched.
+ */
+export function zambiaTransferVoucherNumber(prefix: string, clientRequestId: string): string {
+  if (!/^[A-Za-z0-9._:-]{1,128}$/.test(clientRequestId)) {
+    throw new TransferRouteError(400, "ZMW intercompany transfer requires a clientRequestId for safe retries");
+  }
+  const digest = createHash("sha256").update(clientRequestId).digest("hex").slice(0, 24);
+  return `${prefix}-ZMW-${digest}`;
+}
 
 interface TransferCompany {
   id: number;
