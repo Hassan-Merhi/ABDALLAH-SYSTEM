@@ -124,7 +124,8 @@ async function loadVariantStock(companyId: number, match: ReturnType<typeof eq>)
     ...rest,
     brand: rest.brand ?? "Other / No Brand",
     active: Boolean(rest.active && productActive),
-    imageUrls: variantImages.length ? variantImages : Array.isArray(productImageUrls) ? productImageUrls : [],
+    // Exact variant images first, then generic style images; no sibling colors/sizes.
+    imageUrls: [...variantImages, ...(Array.isArray(productImageUrls) ? productImageUrls : [])],
     cost: toNumber(rest.cost),
     sellingPrice: toNumber(rest.sellingPrice),
     stocks: stocks.map((stock) => ({ ...stock, quantity: toNumber(stock.quantity) })),
