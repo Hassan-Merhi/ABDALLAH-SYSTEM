@@ -143,16 +143,6 @@ export function registerCreditSalesImportRoutes(app: Express) {
       const warnings: string[] = [];
       const validatedItems: Record<string, unknown>[] = [];
 
-      const lockedPosCurrency = await resolveLockedZmwPosCurrency(
-        req.session.currentCompanyId, saleDate, currency, exchangeRate
-      );
-      assertZmwImportPrices(items, lockedPosCurrency);
-      const nativeTransaction = (total: string) => lockedPosCurrency.currency === "ZMW"
-        ? {
-            currency: "ZMW",
-            amount: toMoney(total).times(toMoney(lockedPosCurrency.exchangeRate)).toFixed(6),
-            rate: lockedPosCurrency.exchangeRate!,
-          } : null;
       const location = await storage.getLocationById(locationId);
       if (!location || location.companyId !== req.session.currentCompanyId) {
         errors.push("Selected location not found");
@@ -232,6 +222,21 @@ export function registerCreditSalesImportRoutes(app: Express) {
       if (!locationId || !saleDate || !items || !Array.isArray(items) || !customerId) {
         return res.status(400).json({ message: "Missing required fields" });
       }
+
+      // Verify the company's effective-dated rate and every USD/native sheet
+      // price BEFORE any customer, voucher, inventory, or financial-operation
+      // write. This applies to imported credit sales as well as cash sales.
+      const lockedPosCurrency = await resolveLockedZmwPosCurrency(
+        req.session.currentCompanyId, saleDate, currency, exchangeRate
+      );
+      assertZmwImportPrices(items, lockedPosCurrency);
+      const nativeTransaction = (total: string) => lockedPosCurrency.currency === "ZMW"
+        ? {
+            currency: "ZMW",
+            amount: toMoney(total).times(toMoney(lockedPosCurrency.exchangeRate!)).toFixed(6),
+            rate: lockedPosCurrency.exchangeRate!,
+          }
+        : null;
 
       const location = await storage.getLocationById(locationId);
       if (!location || location.companyId !== req.session.currentCompanyId) {
