@@ -1,4 +1,8 @@
-import { assertApprovedZmwVoucherRate, assertLockedZmwVoucherEdit, assertResolvedZmwVoucherEntriesTx } from "../../services/accounting/zambiaVoucherRatePolicy";
+import {
+  assertApprovedZmwVoucherRate,
+  assertLockedZmwVoucherEdit,
+  assertResolvedZmwVoucherEntriesTx,
+} from "../../services/accounting/zambiaVoucherRatePolicy";
 import type { Express } from "express";
 import { getErrorMessage, errorStatus } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
@@ -103,7 +107,10 @@ export function registerVoucherPaymentRoutes(app: Express) {
       // baseTotal is the historical base-currency (USD) equivalent stored on the voucher.
       const vCurrency = (currency as string | undefined) || "USD";
       const vRateRaw = await assertApprovedZmwVoucherRate(
-        req.session.currentCompanyId!, voucherDate, vCurrency, exchangeRate
+        req.session.currentCompanyId!,
+        voucherDate,
+        vCurrency,
+        exchangeRate
       );
       // For CFA vouchers: baseTotal = transactionTotal / cfaPerUsd (CFA ÷ rate = USD)
       // For USD vouchers: baseTotal = transactionTotal (no conversion)
@@ -492,15 +499,20 @@ export function registerVoucherPaymentRoutes(app: Express) {
       }
 
       // Determine currency/rate for the PATCH (may preserve existing if not re-sent).
-      const [priorVoucher] = await db.select().from(vouchers)
+      const [priorVoucher] = await db
+        .select()
+        .from(vouchers)
         .where(and(eq(vouchers.id, voucherId), eq(vouchers.companyId, req.session.currentCompanyId!)))
         .limit(1);
       if (!priorVoucher) return res.status(404).json({ message: "Voucher not found" });
       assertLockedZmwVoucherEdit(priorVoucher, { voucherDate, currency, exchangeRate });
-      const pCurrency = String(priorVoucher.currency || currency || "USD").toUpperCase();
-      const pRateRaw = pCurrency === "ZMW"
+      // Only a posted Kwacha voucher locks its currency and rate on edit; the
+      // existing USD/CFA PATCH contract (caller-supplied currency/rate) is kept.
+      const priorIsZmw = String(priorVoucher.currency || "USD").toUpperCase() === "ZMW";
+      const pCurrency = priorIsZmw ? "ZMW" : (currency as string | undefined) || "USD";
+      const pRateRaw = priorIsZmw
         ? String(priorVoucher.exchangeRate)
-        : ((exchangeRate as string | number | undefined) || null);
+        : (exchangeRate as string | number | undefined) || null;
       // Base total (historical USD) — stored in vouchers.totalAmount
       const pTotals = paymentVoucherTotals(entries, pCurrency, pRateRaw);
       if (!pTotals) return res.status(400).json({ message: "Invalid amount" });

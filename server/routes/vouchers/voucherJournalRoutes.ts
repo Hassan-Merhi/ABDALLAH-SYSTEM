@@ -1,4 +1,8 @@
-import { assertApprovedZmwVoucherRate, assertLockedZmwVoucherEdit, assertResolvedZmwVoucherEntriesTx } from "../../services/accounting/zambiaVoucherRatePolicy";
+import {
+  assertApprovedZmwVoucherRate,
+  assertLockedZmwVoucherEdit,
+  assertResolvedZmwVoucherEntriesTx,
+} from "../../services/accounting/zambiaVoucherRatePolicy";
 import type { Express } from "express";
 import { getErrorMessage, errorStatus } from "../../lib/httpHandlers";
 import { db } from "../../db";
@@ -239,7 +243,12 @@ export function registerVoucherJournalRoutes(app: Express) {
       // Determine voucher currency and rate (CFA per USD convention for non-USD).
       // totalDebits/totalCredits below are in the voucher's transaction currency (e.g. CFA).
       const vCurrency = (currency as string | undefined) || "USD";
-      const vRateRaw = await assertApprovedZmwVoucherRate(req.session.currentCompanyId!, voucherDate, vCurrency, exchangeRate);
+      const vRateRaw = await assertApprovedZmwVoucherRate(
+        req.session.currentCompanyId!,
+        voucherDate,
+        vCurrency,
+        exchangeRate
+      );
       const cfaPerUsd = journalRate(vCurrency, vRateRaw);
 
       // Calculate total debits and credits in transaction currency
@@ -476,15 +485,20 @@ export function registerVoucherJournalRoutes(app: Express) {
 
       // Determine voucher currency and rate for the PATCH handler.
       // currency/exchangeRate may not be sent on a PATCH (preserve existing values).
-      const [priorVoucher] = await db.select().from(vouchers)
+      const [priorVoucher] = await db
+        .select()
+        .from(vouchers)
         .where(and(eq(vouchers.id, voucherId), eq(vouchers.companyId, req.session.currentCompanyId!)))
         .limit(1);
       if (!priorVoucher) return res.status(404).json({ message: "Voucher not found" });
       assertLockedZmwVoucherEdit(priorVoucher, { voucherDate, currency, exchangeRate });
-      const vCurrencyPatch = String(priorVoucher.currency || currency || "USD").toUpperCase();
-      const vRateRawPatch = vCurrencyPatch === "ZMW"
+      // Only a posted Kwacha voucher locks its currency and rate on edit; the
+      // existing USD/CFA PATCH contract (caller-supplied currency/rate) is kept.
+      const priorIsZmw = String(priorVoucher.currency || "USD").toUpperCase() === "ZMW";
+      const vCurrencyPatch = priorIsZmw ? "ZMW" : (currency as string | undefined) || "USD";
+      const vRateRawPatch = priorIsZmw
         ? String(priorVoucher.exchangeRate)
-        : ((exchangeRate as string | number | undefined) || null);
+        : (exchangeRate as string | number | undefined) || null;
       const cfaPerUsdPatch = journalRate(vCurrencyPatch, vRateRawPatch);
 
       // Calculate total debits and credits in transaction currency

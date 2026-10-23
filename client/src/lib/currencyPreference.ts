@@ -13,11 +13,19 @@ export function currencyPreferenceScope(companyId: number, userId: string | numb
 
 export function readScopedCurrencyPreference(scope: string | null): string | null {
   if (!scope) return null;
-  try { return localStorage.getItem(scope); } catch { return null; }
+  try {
+    return localStorage.getItem(scope);
+  } catch {
+    return null;
+  }
 }
 
 export function saveScopedCurrencyPreference(scope: string, currency: string): void {
-  try { localStorage.setItem(scope, currency); } catch { /* storage disabled: in-memory choice still works */ }
+  try {
+    localStorage.setItem(scope, currency);
+  } catch {
+    /* storage disabled: in-memory choice still works */
+  }
 }
 
 export function legacyCfaCurrencyPreference(preferredCurrency: string | null | undefined): string | null {
@@ -25,7 +33,18 @@ export function legacyCfaCurrencyPreference(preferredCurrency: string | null | u
   try {
     const old = localStorage.getItem("selectedCurrency");
     return old === "USD" || old === "CFA" ? old : null;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
+}
+
+/** Legacy CFA companies keep writing the global browser key older screens read. */
+export function saveLegacyCfaCurrencyPreference(currency: "USD" | "CFA"): void {
+  try {
+    localStorage.setItem("selectedCurrency", currency);
+  } catch {
+    /* storage disabled */
+  }
 }
 
 /** Only allow currencies belonging to the selected company's pair. */

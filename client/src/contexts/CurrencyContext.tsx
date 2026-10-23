@@ -2,8 +2,19 @@ import { createContext, useContext, useState, useEffect, ReactNode } from "react
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { authenticatedUserQueryOptions } from "@/contracts/sessionQueryContracts";
 import { formatMoneyDisplay } from "@/lib/moneyDisplay";
-import { allowedCompanyCurrency, currencyPreferenceScope, legacyCfaCurrencyPreference, readScopedCurrencyPreference, saveScopedCurrencyPreference } from "@/lib/currencyPreference";
-import { isSupportedAccountingCurrency, normalizeAccountingCurrencyAlias, type SupportedAccountingCurrency } from "@shared/currencyCatalog";
+import {
+  allowedCompanyCurrency,
+  currencyPreferenceScope,
+  legacyCfaCurrencyPreference,
+  readScopedCurrencyPreference,
+  saveLegacyCfaCurrencyPreference,
+  saveScopedCurrencyPreference,
+} from "@/lib/currencyPreference";
+import {
+  isSupportedAccountingCurrency,
+  normalizeAccountingCurrencyAlias,
+  type SupportedAccountingCurrency,
+} from "@shared/currencyCatalog";
 import { useCompany } from "@/contexts/CompanyContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Company, UserPreferences } from "@shared/schema";
@@ -97,18 +108,21 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   });
   const isLoadingCompany = !companyId || isLoadingCompanyQuery || !company;
   const baseCurrency = normalizeAccountingCurrencyAlias(company?.baseCurrency || "USD");
-  const configuredDisplay = company?.displayCurrency && company.displayCurrency !== "none"
-    ? normalizeAccountingCurrencyAlias(company.displayCurrency)
-    : null;
+  const configuredDisplay =
+    company?.displayCurrency && company.displayCurrency !== "none"
+      ? normalizeAccountingCurrencyAlias(company.displayCurrency)
+      : null;
   const displayCurrency = configuredDisplay && configuredDisplay !== baseCurrency ? configuredDisplay : null;
   const isMultiCurrency = !!displayCurrency;
   const companyCurrency = (value: string): value is Currency => isSupportedAccountingCurrency(value);
-  const defaultCurrency: Currency = displayCurrency === "USD" && baseCurrency !== "USD"
-    ? "USD" : companyCurrency(baseCurrency) ? baseCurrency : "USD";
+  const defaultCurrency: Currency =
+    displayCurrency === "USD" && baseCurrency !== "USD" ? "USD" : companyCurrency(baseCurrency) ? baseCurrency : "USD";
 
   const authenticatedId = authenticatedUser?.id;
-  const scope = companyId && authenticatedId !== undefined && authenticatedId !== null
-    ? currencyPreferenceScope(companyId, String(authenticatedId)) : null;
+  const scope =
+    companyId && authenticatedId !== undefined && authenticatedId !== null
+      ? currencyPreferenceScope(companyId, String(authenticatedId))
+      : null;
   const [choice, setChoice] = useState<{ scope: string; currency: Currency } | null>(null);
   const activeChoiceScope = scope ?? (companyId ? "unpersisted-company:" + companyId : null);
 
@@ -118,13 +132,18 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   // Resolving this value from the CURRENT scope means even the first render
   // following a company switch cannot display the old company's currency.
   const savedChoice = readScopedCurrencyPreference(scope);
-  const legacyPreference = displayCurrency === "CFA" || baseCurrency === "CFA"
-    ? legacyCfaCurrencyPreference(userPrefs?.preferredCurrency) : null;
+  const legacyPreference =
+    displayCurrency === "CFA" || baseCurrency === "CFA"
+      ? legacyCfaCurrencyPreference(userPrefs?.preferredCurrency)
+      : null;
   const selectedCurrency: Currency =
-    activeChoiceScope && choice?.scope === activeChoiceScope && allowed(choice.currency) ? choice.currency
-    : allowed(savedChoice) ? savedChoice
-    : allowed(legacyPreference) ? legacyPreference
-    : defaultCurrency;
+    activeChoiceScope && choice?.scope === activeChoiceScope && allowed(choice.currency)
+      ? choice.currency
+      : allowed(savedChoice)
+        ? savedChoice
+        : allowed(legacyPreference)
+          ? legacyPreference
+          : defaultCurrency;
 
   // A change in another browser tab updates this tab without changing the
   // active company or cross-loading stale preferences into the next company.
@@ -133,7 +152,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     if (!scope) return;
     const onStorage = (event: StorageEvent) => {
       if (event.key === scope) {
-        setChoice((previous) => previous?.scope === scope ? null : previous);
+        setChoice((previous) => (previous?.scope === scope ? null : previous));
         setStorageRevision((n) => n + 1);
       }
     };
@@ -148,7 +167,9 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     queryFn: async () => {
       if (!companyId || !displayCurrency) return null;
       const params = new URLSearchParams({
-        companyId: String(companyId), fromCurrency: baseCurrency, toCurrency: displayCurrency,
+        companyId: String(companyId),
+        fromCurrency: baseCurrency,
+        toCurrency: displayCurrency,
       });
       const res = await fetch("/api/exchange-rates/latest?" + params.toString(), { credentials: "include" });
       if (!res.ok) return null;
@@ -159,13 +180,18 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     refetchOnWindowFocus: true,
   });
   const parsedRate = Number(rateData?.rate);
-  const exchangeRate = displayCurrency && rateData && Number.isFinite(parsedRate) && parsedRate > 0
-    ? parsedRate : null;
+  const exchangeRate = displayCurrency && rateData && Number.isFinite(parsedRate) && parsedRate > 0 ? parsedRate : null;
   const hasExchangeRate = !displayCurrency || exchangeRate !== null;
 
   useEffect(() => {
     if (displayCurrency && !isLoadingCompany && !isLoadingRate && !hasExchangeRate) {
-      console.warn("[Currency] Missing company rate for " + baseCurrency + "/" + displayCurrency + "; ZMW transactions cannot be converted.");
+      console.warn(
+        "[Currency] Missing company rate for " +
+          baseCurrency +
+          "/" +
+          displayCurrency +
+          "; ZMW transactions cannot be converted."
+      );
     }
   }, [displayCurrency, baseCurrency, isLoadingCompany, isLoadingRate, hasExchangeRate]);
 
@@ -173,16 +199,18 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     if (isLoadingCompany || !allowed(currency)) return;
     if (activeChoiceScope) setChoice({ scope: activeChoiceScope, currency });
     if (scope) saveScopedCurrencyPreference(scope, currency);
-    // Keep the original CFA-only global preference API behavior; ZMW never
-    // writes a global preference that could overwrite Mali's selection.
-    if (displayCurrency === "CFA" && currency !== "ZMW") {
+    // Keep the original CFA-only global preference behavior (legacy browser
+    // key and backend preference); ZMW never writes a global preference that
+    // could overwrite Mali's selection.
+    if ((displayCurrency === "CFA" || baseCurrency === "CFA") && (currency === "USD" || currency === "CFA")) {
+      saveLegacyCfaCurrencyPreference(currency);
       saveLegacyCfaPreference.mutate(currency);
     }
   };
 
   const toggleCurrency = () => {
     if (!displayCurrency) return;
-    setCurrency(selectedCurrency === baseCurrency ? displayCurrency as Currency : baseCurrency as Currency);
+    setCurrency(selectedCurrency === baseCurrency ? (displayCurrency as Currency) : (baseCurrency as Currency));
   };
 
   // Keep original USD text spacing and zero-decimal CFA presentation. ZMW
@@ -194,7 +222,9 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     const code = normalizeAccountingCurrencyAlias(currency);
     if (code === "USD") {
       const whole = Math.abs(number) % 1 === 0;
-      return "$ " + number.toLocaleString(undefined, { minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: 2 });
+      return (
+        "$ " + number.toLocaleString(undefined, { minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: 2 })
+      );
     }
     if (code === "CFA") return "CFA " + Math.round(number).toLocaleString(undefined, { maximumFractionDigits: 0 });
     return formatMoneyDisplay(number, { currency: code });
@@ -211,23 +241,21 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     return selectedCurrency === "CFA" ? usdAmount : Number.NaN;
   };
 
+  // Unchanged contract: an amount in the company's foreign currency divided by
+  // the pair rate whenever one exists (Mali callers rely on this regardless of
+  // the toggle). Without a rate, CFA keeps its legacy pass-through; a Kwacha
+  // amount is never silently treated as USD.
   const convertToUSD = (amount: number): number => {
-    if (selectedCurrency === "USD") return amount;
-    if (exchangeRate && selectedCurrency === displayCurrency) return amount / exchangeRate;
-    if (baseCurrency === "CFA" && displayCurrency === "USD" && selectedCurrency === "CFA" && exchangeRate) {
-      return amount / exchangeRate;
-    }
-    return Number.NaN;
+    if (exchangeRate) return amount / exchangeRate;
+    return displayCurrency === "ZMW" ? Number.NaN : amount;
   };
 
-  const formatAmountRaw = (amount: number | string | null | undefined): string =>
-    native(amount, selectedCurrency);
+  const formatAmountRaw = (amount: number | string | null | undefined): string => native(amount, selectedCurrency);
 
   const formatTransactionAmount = (amount: number | string | null | undefined, currency: string): string =>
     native(amount, currency);
 
-  const formatHistoricalBaseAmount = (amount: number | string | null | undefined): string =>
-    native(amount, "USD");
+  const formatHistoricalBaseAmount = (amount: number | string | null | undefined): string => native(amount, "USD");
 
   const formatAmount = (amount: number | string | null | undefined, currency?: Currency): string => {
     if (amount === null || amount === undefined) return "";
@@ -260,7 +288,8 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   };
 
   const formatCurrentCashTranslation = (
-    nativeAmount: number | string | null | undefined, nativeCurrency: string
+    nativeAmount: number | string | null | undefined,
+    nativeCurrency: string
   ): string => {
     if (nativeAmount === null || nativeAmount === undefined) return "";
     const value = typeof nativeAmount === "number" ? nativeAmount : Number(nativeAmount);
@@ -269,9 +298,16 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     if (selectedCurrency === source) return native(value, source);
     if (baseCurrency === "USD" && displayCurrency && exchangeRate) {
       if (source === displayCurrency && selectedCurrency === "USD") return native(value / exchangeRate, "USD");
-      if (source === "USD" && selectedCurrency === displayCurrency) return native(value * exchangeRate, displayCurrency);
+      if (source === "USD" && selectedCurrency === displayCurrency)
+        return native(value * exchangeRate, displayCurrency);
     }
-    if (baseCurrency === "CFA" && displayCurrency === "USD" && source === "CFA" && selectedCurrency === "USD" && exchangeRate) {
+    if (
+      baseCurrency === "CFA" &&
+      displayCurrency === "USD" &&
+      source === "CFA" &&
+      selectedCurrency === "USD" &&
+      exchangeRate
+    ) {
       return native(value / exchangeRate, "USD");
     }
     // An unrelated native currency or missing rate cannot be automatically
@@ -296,13 +332,29 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <CurrencyContext.Provider value={{
-      selectedCurrency, setCurrency, toggleCurrency, exchangeRate,
-      isLoadingRate, isLoadingCompany, baseCurrency, displayCurrency, isMultiCurrency, hasExchangeRate,
-      formatAmount, formatAmountRaw, formatCashAmount, formatTransactionAmount,
-      formatHistoricalBaseAmount, formatCurrentCashTranslation, formatNewTransactionPreview,
-      convertToDisplay, convertToUSD,
-    }}>
+    <CurrencyContext.Provider
+      value={{
+        selectedCurrency,
+        setCurrency,
+        toggleCurrency,
+        exchangeRate,
+        isLoadingRate,
+        isLoadingCompany,
+        baseCurrency,
+        displayCurrency,
+        isMultiCurrency,
+        hasExchangeRate,
+        formatAmount,
+        formatAmountRaw,
+        formatCashAmount,
+        formatTransactionAmount,
+        formatHistoricalBaseAmount,
+        formatCurrentCashTranslation,
+        formatNewTransactionPreview,
+        convertToDisplay,
+        convertToUSD,
+      }}
+    >
       {children}
     </CurrencyContext.Provider>
   );
