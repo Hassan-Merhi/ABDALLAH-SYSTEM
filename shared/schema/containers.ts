@@ -168,6 +168,7 @@ export const purchaseOrders = pgTable(
     // Existing monetary columns remain historical USD, including stock valuation.
     historicalExchangeRate: decimal("historical_exchange_rate", { precision: 20, scale: 10 }),
     historicalRateDate: date("historical_rate_date"),
+    nativeLineCount: integer("native_line_count"),
     nativeItemsTotal: decimal("native_items_total", { precision: 20, scale: 2 }),
     nativeFreight: decimal("native_freight", { precision: 20, scale: 2 }),
     nativeSurcharge: decimal("native_surcharge", { precision: 20, scale: 2 }),
