@@ -42,10 +42,22 @@ No tests, CI, lint, typechecks or builds were executed for this phase.
 
 ## Remaining phases
 
-### Phase 2 — product gallery
-Main product thumbnail throughout retail inventory. Image click opens a full-screen
-(or roomy dialog) gallery of every product image with next/previous and zoom.
-Preserve color/size-specific images and accessible keyboard/dialog interaction.
+### Phase 2 — product gallery (implemented)
+- Retail product cards and product detail use the first saved style image as their
+  primary cover thumbnail. Clicking a photo (not the product name) opens a roomy,
+  responsive gallery modal with all the style photos and additional variant photos.
+- Exact color/size inventory rows use their own photos first, then generic style
+  photos, and deliberately do not mix photos from other variants.
+- Gallery includes image counter, next/previous buttons, clickable thumbnail filmstrip,
+  left/right keyboard navigation, close via existing Radix dialog and scrollable zoom.
+  Empty-image placeholders remain non-interactive; duplicate URLs are deduplicated.
+- Product and variant editors support **Set main**, placing the selected photo first
+  in their persisted image URL list. No new photo data schema or backend routes.
+- Existing media-route URL normalization remains in use for portability across hosts.
+- No changes to standard ERP/Factory POS, Retail checkout, stock or accounting.
+- Implementation committed without running tests, CI, typechecks, lint or builds.
+  Claude should later manually verify touch layout, many-photo galleries, keyboard
+  focus/escape behavior, chosen cover-photo persistence and graceful broken images.
 
 ### Phase 3 — standard ERP POS presentation for Retail
 Retain the standard normal-ERP POS screen arrangement (header, location/date,
