@@ -153,7 +153,7 @@ export async function postZambiaCashTransfer(input: unknown, companyId: number, 
       companyId,
       voucherType: "Journal",
       voucherDate: data.transferDate,
-      description: data.description?.trim() || \`Currency transfer \${data.fromCurrency} to \${data.toCurrency}\`,
+      description: data.description?.trim() || `Currency transfer ${data.fromCurrency} to ${data.toCurrency}`,
       currency: "USD", // mixed-currency journal, USD accounting base
       source: { type: "zambia-cash-currency-transfer", id: data.clientRequestId },
       actor,
