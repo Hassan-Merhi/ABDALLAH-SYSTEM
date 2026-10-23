@@ -12,7 +12,7 @@ import { requireAuth, requireRole } from "../auth";
 import { getCompanyBusinessDate } from "../lib/dateUtils";
 import { insertExchangeRateSchema } from "@shared/schema";
 import { normalizeAccountingCurrencyAlias } from "@shared/currencyCatalog";
-import { companyRateValueSchema } from "@shared/companyRatePolicy";
+import { companyRateValueSchema, companyRateDateSchema } from "@shared/companyRatePolicy";
 import { saveCompanyExchangeRate } from "../services/accounting/exchangeRateWrites";
 
 type CompanyCurrencyPair = { fromCurrency: string; toCurrency: string };
@@ -124,7 +124,18 @@ export function registerExchangeRateRoutes(app: Express) {
       if (!company) return res.status(404).json({ message: "Company not found" });
       const pair = requestedPairMatches(req, res, configuredRatePair(company), true);
       if (!pair) return;
-      const rate = await storage.getLatestExchangeRate(companyId, pair.fromCurrency, pair.toCurrency);
+      const asOf = req.query.asOf;
+      if (asOf !== undefined && (typeof asOf !== "string" || !companyRateDateSchema.safeParse(asOf).success)) {
+        return res.status(400).json({ code: "EXCHANGE_RATE_DATE_INVALID", message: "Use a valid YYYY-MM-DD asOf date." });
+      }
+      const settings = await storage.getCompanySettings(companyId);
+      const businessDate = getCompanyBusinessDate(settings?.timezone);
+      if (typeof asOf === "string" && asOf > businessDate) {
+        return res.status(400).json({ code: "EXCHANGE_RATE_FUTURE_DATE", message: "Cannot use a future-dated company rate for POS sales." });
+      }
+      const rate = typeof asOf === "string"
+        ? await storage.getExchangeRateForDate(companyId, pair.fromCurrency, pair.toCurrency, asOf)
+        : await storage.getLatestExchangeRate(companyId, pair.fromCurrency, pair.toCurrency, businessDate);
       res.json(validRateRow(rate) ? rate : null);
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
