@@ -98,12 +98,12 @@ export default function VoucherEdit() {
       voucher,
       voucherType,
       isPaymentOrReceipt,
-      selectedCurrency,
+      selectedCurrency: voucher?.currency === "ZMW" ? "ZMW" : selectedCurrency,
       ledgerAccounts,
       bankAccounts,
       suppliers,
       allAccountsData,
-      exchangeRate: exchangeRate ?? 1,
+      exchangeRate: voucher?.currency === "ZMW" ? Number(voucher.exchangeRate) : (exchangeRate ?? 1),
       id,
     });
 
@@ -120,7 +120,7 @@ export default function VoucherEdit() {
     id,
     modeApiRequest,
     voucherType,
-    exchangeRate: exchangeRate ?? 1,
+    exchangeRate: voucher?.currency === "ZMW" ? Number(voucher.exchangeRate) : (exchangeRate ?? 1),
     handleBack,
     modePrefix,
     goldenCoastParentCompanyId: goldenCoastReadiness?.parentCompanyId ?? null,

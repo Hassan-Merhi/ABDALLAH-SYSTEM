@@ -7,8 +7,10 @@ import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/PageHeader";
 import { Textarea } from "@/components/ui/textarea";
 import { useCurrencyContext, type Currency } from "@/contexts/CurrencyContext";
+import { isSupportedAccountingCurrency } from "@shared/currencyCatalog";
 import { useToast } from "@/hooks/use-toast";
 
+import { usePosZmwSaleRate } from "./hooks/usePosZmwSaleRate";
 import { SaleGrid } from "./pos-components/SaleGrid";
 import { InventoryPicker } from "./pos-components/InventoryPicker";
 import type { AuthMe } from "@shared/apiTypes";
@@ -111,8 +113,14 @@ export default function POS({ posUser, editVoucherId }: { posUser?: AuthMe; edit
   } = usePosState();
 
   const activeLocation = posUser ? posSelectedLocation : selectedLocation;
-  const activeCurrency: Currency = displayCurrency ? selectedCurrency : "USD";
-  const exchangeRate = dailyExchangeRate;
+  // Zambia posting uses the approved rate of the sale date, never the
+  // browser's current rate for an earlier sale date (cash and credit alike).
+  const { datedZmwRate, isFetchingDatedZmwRate } = usePosZmwSaleRate({
+    companyId: selectedCompany?.id,
+    displayCurrency,
+    saleDate,
+    editVoucherId,
+  });
   // Supplier Partner companies share this exact POS UI but sell from SP stock
   // (sp_stock_movements) and post through the SP-specific accounting endpoint.
   const isSpCompany = selectedCompany?.companyType === "supplier_partner";
@@ -154,6 +162,58 @@ export default function POS({ posUser, editVoucherId }: { posUser?: AuthMe; edit
     showStockPrompt,
     isSpCompany,
   });
+
+  const editedCurrency = editVoucherId && editVoucher?.currency;
+  const activeCurrency: Currency = displayCurrency
+    ? (editedCurrency === displayCurrency || editedCurrency === "USD") &&
+      typeof editedCurrency === "string" &&
+      isSupportedAccountingCurrency(editedCurrency)
+      ? editedCurrency
+      : selectedCurrency
+    : "USD";
+  const editLockedRate = editVoucherId && editVoucher?.exchangeRate ? Number(editVoucher.exchangeRate) : null;
+  const approvedZmwRate = displayCurrency === "ZMW" && !editVoucherId ? Number(datedZmwRate?.rate) : null;
+  const exchangeRate =
+    displayCurrency === "ZMW"
+      ? editVoucherId
+        ? editLockedRate && editLockedRate > 0
+          ? editLockedRate
+          : null
+        : !isFetchingDatedZmwRate && approvedZmwRate && Number.isFinite(approvedZmwRate) && approvedZmwRate > 0
+          ? approvedZmwRate
+          : null
+      : dailyExchangeRate;
+
+  // Keep a line's display price and canonical USD rate synchronized when
+  // switching USD/ZMW or selecting a different sale date. A date change while
+  // entering K preserves the typed K price and recalculates its USD equivalent.
+  // Do not reinterpret the rows until a valid dated FX rate has resolved.
+  const lastDisplayedFx = useRef<{ companyId: number; currency: Currency; rate: number | null } | null>(null);
+  useEffect(() => {
+    if (editVoucherId || !selectedCompany?.id) return;
+    if (activeCurrency !== "USD" && (!exchangeRate || !Number.isFinite(exchangeRate))) return;
+    const next = { companyId: selectedCompany.id, currency: activeCurrency, rate: exchangeRate };
+    const old = lastDisplayedFx.current;
+    if (!old || old.companyId !== next.companyId) {
+      lastDisplayedFx.current = next;
+      return;
+    }
+    if (old.currency === next.currency && old.rate === next.rate) return;
+    setRows((oldRows) =>
+      oldRows.map((row) => {
+        if (!row.stockItemId || !Number.isFinite(row.rateUSD)) return row;
+        const newUsd = old.currency === next.currency && next.currency !== "USD" ? row.rate / next.rate! : row.rateUSD;
+        const displayRate =
+          next.currency === "USD"
+            ? newUsd
+            : next.currency === "CFA"
+              ? Math.round(newUsd * next.rate!)
+              : Number((newUsd * next.rate!).toFixed(2));
+        return { ...row, rateUSD: newUsd, rate: displayRate, amount: Number((row.quantity * displayRate).toFixed(2)) };
+      })
+    );
+    lastDisplayedFx.current = next;
+  }, [activeCurrency, exchangeRate, editVoucherId, selectedCompany?.id, setRows]);
 
   // POS view-only is a real write boundary, not just a server-side fallback.
   // Keep every client mutation path quiet so expected denials do not become
@@ -264,7 +324,10 @@ export default function POS({ posUser, editVoucherId }: { posUser?: AuthMe; edit
       stockItemId: item.stockItemId ? Number(item.stockItemId) : undefined,
       salesItemId: item.id,
       quantity: parseFloat(String(item.quantity)),
-      rate: parseFloat(String(item.sellingPrice)),
+      rate:
+        editVoucher?.currency === "ZMW" && editVoucher.exchangeRate
+          ? Number((Number(item.sellingPrice) * Number(editVoucher.exchangeRate)).toFixed(2))
+          : parseFloat(String(item.sellingPrice)),
       rateUSD: parseFloat(String(item.sellingPrice)),
       amount: parseFloat(String(item.totalSales)),
       configuredPrice: parseFloat(String(item.configuredPrice || "0")) || undefined,
@@ -451,7 +514,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: AuthMe; edit
     clientSaleIdRef,
     activeCurrency,
     exchangeRate,
-    dailyExchangeRate,
+    dailyExchangeRate: exchangeRate,
     activeLocation,
     editVoucherId,
     editVoucher,

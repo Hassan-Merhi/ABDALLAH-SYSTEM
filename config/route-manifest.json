@@ -1,7 +1,7 @@
 {
   "formatVersion": 1,
   "description": "Ordered snapshot of every registered Express route (method, path, guard chain) and middleware mount. Regenerate with UPDATE_ROUTE_MANIFEST=1 only when a route change is intended; during a file split the manifest must not change at all.",
-  "routeCount": 2233,
+  "routeCount": 2234,
   "middlewareMountCount": 137,
   "routes": [
     "GET /api/admin/operational-monitoring [requireAuth > <anonymous> > <anonymous>]",
@@ -1093,6 +1093,7 @@
     "GET /api/accounts/multi-currency/repair-center [requireAuth > requireNonPOS > <anonymous>]",
     "POST /api/accounts/multi-currency/repair-center/plan [requireAuth > requireNonPOS > <anonymous>]",
     "POST /api/accounts/multi-currency/repair-center/apply [requireAuth > requireNonPOS > <anonymous>]",
+    "POST /api/accounts/multi-currency/zambia-transfer [requireAuth > requireNonPOS > <anonymous> > <anonymous>]",
     "GET /api/bank-accounts/revaluation [requireAuth > requireNonPOS > <anonymous>]",
     "GET /api/accounts/ledger/:id/balance [requireAuth > <anonymous>]",
     "GET /api/accounts/ledger/:id/currency-balances [requireAuth > <anonymous>]",
