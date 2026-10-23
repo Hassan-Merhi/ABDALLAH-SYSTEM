@@ -235,10 +235,64 @@ to normal ERP/Factory. Confirm ordinary Retail POS sales/refund accounting
 journals still post and remain readable, with no cross-company UI regressions.
 No tests, CI, lint, typechecks, builds, merge, rebase or deployment performed.
 
-### Phase 7 — transfers between locations
-Image thumbnails and full gallery in variant selector. Transfer exact variant with
-quantity/location validation, preserving cost and no artificial revenue; immediate
-transfer and dispatch/receipt modes, with statuses and audit log.
+### Phase 7 — multi-location transfers (implemented in source)
+
+- Retail Stock Operations → **Transfer** now offers a searchable sidebar of exact
+  color/size/barcode variants at the selected source location. Product thumbnails
+  open the full photo gallery independently of selecting the item; both variant
+  and generic product pictures are included, without sibling variant pictures.
+- Select source/destination location, validate a positive whole-unit quantity
+  and available source stock, then choose **Immediate** or **Dispatch / Receive**.
+  Immediate retains the existing atomic Retail transfer service; its stock-out
+  and stock-in movements and weighted-average cost remain unchanged.
+- Dispatch uses `POST /api/pos/retail/transfers/dispatch` and creates an
+  idempotent `retail_stock_operations` row with `operationType =
+  "transfer_dispatch"` and status `otw`, plus source/destination IDs, exact
+  variant, quantity, original source unit cost and historical image snapshot.
+  It deducts the exact variant from source only; the destination cannot sell it
+  until confirmed. A source stock row lock prevents overshipment.
+- Pending queue: `GET /api/pos/retail/transfers/workflow?status=otw` returns
+  company-scoped pending dispatches with item details and source/destination
+  locations. Each has a **Confirm receipt** button.
+- Receipt uses `POST /api/pos/retail/transfers/:id/receive`. A database lock
+  on the dispatch row prevents two receivers from accepting the same shipment.
+  It records the unique receipt key/status/timestamps and user, receives into
+  the destination at the original source unit cost blended into the destination
+  average, and adds one `transfer_in` movement referencing the dispatch.
+  Replay of the *same* receipt key is harmless; a second distinct receipt
+  fails. The entire receipt is transactional.
+- Inventory accounting: new registry account `RETAIL-IN-TRANSIT` (**Asset**).
+  After Retail inventory opening, dispatch moves asset value from source stock
+  inventory to in-transit; receipt clears in-transit to destination inventory.
+  These are automatic **balanced** accounting vouchers, not sales, revenue,
+  COGS or manual Transfer Order vouchers. Rounding/re-costing residuals continue
+  to use the existing Retail stock adjustment accounting logic. Before the
+  company's stock opening, the existing stock-value tracker intentionally
+  suppresses journals on both stages. Applying a new opening while *any*
+  dispatch remains pending is blocked, preventing unmatched stage postings.
+- Both stages create variant-level stock-movement audit events with a shared
+  transfer operation reference plus phase, source, destination, and quantity.
+  The full movement history remains available in Retail Stock Operations.
+- The small manager transfer card on the Retail POS also displays a variant
+  thumbnail with gallery access and links directly to the full photo-based
+  dispatch/receive workspace. No normal ERP / Factory transfer API changed.
+- No schema migration or manual accounting voucher updates are necessary:
+  the pre-existing Retail stock operations JSONB metadata records statuses.
+  The in-transit system account is created by the existing registry only
+  when an applicable dispatch posting is actually performed after deployment.
+- Existing company/type and non-POS authorization checks are retained. Fine-
+  grained per-employee location permissions are **not** introduced here; Claude
+  should review that as an authorization requirement before production rollout.
+
+**Claude verification:** Exercise immediate transfer vs dispatch/receipt, exact
+barcode/color/size identity, source stock zero and overshipment refusal,
+concurrent dispatches, two simultaneous receipt attempts, retry key replay,
+accounting ledger/sub-ledger and RETAIL-IN-TRANSIT balance before/after,
+asset valuation after destination blending, pre-opening dispatch/receipt,
+cutover blocked while pending, closed/inactive locations, multi-company
+isolation, manager/non-POS permissions, photo gallery focus, and both POS/
+Stock Operations transfer entry points. Run tests/typechecks/CI and reconcile
+against latest `main` only when Claude takes ownership; none were run here.
 
 ### Phase 8 — source-level integration and Claude handoff
 Finish wiring, review migration expectations and document Claude's checks.
