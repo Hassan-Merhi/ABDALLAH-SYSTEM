@@ -189,6 +189,7 @@ export function convertTransactionToBase(
   const txNorm = normalizeCurrencyCode(transactionCurrency);
   const baseNorm = normalizeCurrencyCode(baseCurrency);
   const amount = new Decimal(transactionAmount);
+  if (!amount.isFinite()) throw new Error("transactionAmount must be finite");
 
   if (txNorm === baseNorm) {
     return amount.toDecimalPlaces(6).toFixed(6);
@@ -228,6 +229,7 @@ export function convertBaseToTransaction(
   const txNorm = normalizeCurrencyCode(transactionCurrency);
   const baseNorm = normalizeCurrencyCode(baseCurrency);
   const amount = new Decimal(baseAmount);
+  if (!amount.isFinite()) throw new Error("baseAmount must be finite");
 
   if (txNorm === baseNorm) {
     return amount.toDecimalPlaces(6).toFixed(6);
@@ -294,6 +296,10 @@ export function normalizeVoucherEntryAmounts(input: NormalizeVoucherEntryAmounts
 
   const txDebit = new Decimal(input.transactionDebitAmount ?? 0);
   const txCredit = new Decimal(input.transactionCreditAmount ?? 0);
+
+  if (!txDebit.isFinite() || !txCredit.isFinite()) {
+    throw new Error("Posted transaction debit and credit amounts must be finite");
+  }
 
   // Validate: amounts must be non-negative
   if (txDebit.lt(0)) throw new Error("transactionDebitAmount must be ≥ 0");
