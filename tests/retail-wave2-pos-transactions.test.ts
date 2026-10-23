@@ -103,8 +103,14 @@ describe("Retail POS Wave 2 transaction invariants", () => {
     expect(posRoutes).toContain('selectedCompany?.companyType === "retail"');
     expect(posRoutes).toContain('<Route path="/">{() => <RetailPOS />}</Route>');
     expect(posRoutes).toContain('<Route path="/pos">{() => <RetailPOS />}</Route>');
-    expect(inventory).toContain('navigate("/retail/pos")');
-    expect(inventory).toContain("Open POS");
+    // Inventory no longer advertises a separate retail POS, while POS remains reachable
+    // from the standard ERP POS route for managers and / for POS-role cashiers.
+    const retailNav = read("client/src/pages/retail/RetailNav.tsx");
+    const guard = read("client/src/app/authenticatedAppRouteGuard.ts");
+    expect(retailNav).not.toContain('href: "/retail/pos"');
+    expect(inventory).not.toContain("Open POS");
+    expect(guard).toContain('currentLocation === "/pos"');
+    expect(guard).toContain('to: "/retail/pos"');
     const retailPos = read("client/src/pages/pos/RetailPOS.tsx");
     expect(retailPos).toContain('selectedCompany?.role === "POS"');
     expect(retailPos).toContain("assignedLocationId");
