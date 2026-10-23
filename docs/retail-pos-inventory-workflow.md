@@ -59,12 +59,39 @@ No tests, CI, lint, typechecks or builds were executed for this phase.
   Claude should later manually verify touch layout, many-photo galleries, keyboard
   focus/escape behavior, chosen cover-photo persistence and graceful broken images.
 
-### Phase 3 — standard ERP POS presentation for Retail
-Retain the standard normal-ERP POS screen arrangement (header, location/date,
-cash/credit/customer row, sale grid, totals, notes, item sidebar) while resolving
-items by retail barcode to exact variant IDs, with thumbnails in the sale grid and
-sidebar and image-gallery entry points. Reuse view components and hooks where safe;
-keep the retail transaction backend until monetary/accounting behavior is reconciled.
+### Phase 3 — standard ERP POS presentation for Retail (implemented in source)
+
+- Retail POS now renders a standard ERP-style **Point of Sale** header and a
+  working top Save action, plus a location/date/payment/customer control strip.
+- Retail exact-variant sale lines appear in a left-hand table with item, photo,
+  color/size, barcode, quantity +/- controls, effective rate, amount, line
+  discount/price override and remove actions. Its total is fed by the **retail
+  server-side cart preview**, not duplicated client accounting math.
+- A right-hand scrollable item selector supports barcode scanning, text search,
+  image thumbnails, click-to-open full product gallery and item selection.
+  Clicking the photo does NOT add an item; clicking the item entry does.
+- Shared `PosWorkspaceColumns` places these two screens in the same pattern as
+  normal ERP POS, with narrow/mobile layouts stacking them vertically.
+- Customer picker is in the top strip; whole-sale discounts, manager approval,
+  split payments, existing receipts, returns/exchanges, shift requirement,
+  location controls and back-office transfer widgets remain in place.
+- The top payment method picker is bound to the existing first tender; when
+  cart totals change, the selected payment method is no longer reset to cash.
+- The date reflects the local current day, for display only: Retail checkout
+  still uses the server's actual sale timestamp. Do not imply manual
+  backdating exists. Retail credit sales are **not yet available**: the credit
+  control is explicitly disabled until Phase 4 implements correct A/R.
+- The grid deliberately does not show simulated P/L; retail POS item responses
+  do not expose authoritative profitability data. This remains a separately
+  verified reporting requirement, not an invented value.
+- **Retail-only presentation.** Existing ERP / Factory / Supplier Partner POS
+  components, server-side retail variant accounting, stock movements and journal
+  posting were not changed.
+
+No tests, CI, lint, typechecks or builds were run. Claude should verify the
+responsive grid, scanner input, image viewer focus, stock guard, promotions and
+server preview, tender persistence, discounts/approval, receipt flow, route
+guards and existing ERP POS behavior before merging or deployment.
 
 ### Phase 4 — customers and checkout controls
 Full customer selection, cash/bank and credit sales as normal ERP allows, per-line and
