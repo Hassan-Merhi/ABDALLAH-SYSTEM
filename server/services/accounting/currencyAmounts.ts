@@ -366,8 +366,10 @@ export function normalizeVoucherEntryAmounts(input: NormalizeVoucherEntryAmounts
 }
 
 /**
- * Sum the base-currency debit and credit totals from a list of normalized entries.
- * Returns { totalBaseDebit, totalBaseCredit } as decimal strings (6dp).
+ * Sum base amounts for a normalized journal. Legacy transaction totals below
+ * remain for backward compatibility but are NOT meaningful if the entries use
+ * more than one native currency. Use groupNormalizedTransactionAmountsByCurrency
+ * when displaying or reconciling native amounts from a mixed-currency journal.
  */
 export function sumNormalizedEntries(entries: NormalizedEntryAmounts[]): {
   totalBaseDebit: string;
@@ -393,6 +395,32 @@ export function sumNormalizedEntries(entries: NormalizedEntryAmounts[]): {
     totalTransactionDebit: totalTxDebit.toDecimalPlaces(6).toFixed(6),
     totalTransactionCredit: totalTxCredit.toDecimalPlaces(6).toFixed(6),
   };
+}
+
+/**
+ * Separately total the original transaction amounts for each actual currency.
+ * Never add ZMW and USD (or CFA and USD) as if they were one native balance.
+ * Every amount stays in its own currency and at its historical posting value.
+ */
+export function groupNormalizedTransactionAmountsByCurrency(
+  entries: NormalizedEntryAmounts[]
+): Record<string, { debit: string; credit: string }> {
+  const groups = new Map<string, { debit: Decimal; credit: Decimal }>();
+  for (const entry of entries) {
+    const currency = normalizeCurrencyCode(entry.transactionCurrency);
+    const totals = groups.get(currency) ?? { debit: new Decimal(0), credit: new Decimal(0) };
+    totals.debit = totals.debit.plus(entry.transactionDebitAmount);
+    totals.credit = totals.credit.plus(entry.transactionCreditAmount);
+    groups.set(currency, totals);
+  }
+  const result: Record<string, { debit: string; credit: string }> = {};
+  for (const [currency, totals] of groups) {
+    result[currency] = {
+      debit: totals.debit.toDecimalPlaces(6).toFixed(6),
+      credit: totals.credit.toDecimalPlaces(6).toFixed(6),
+    };
+  }
+  return result;
 }
 
 /**
