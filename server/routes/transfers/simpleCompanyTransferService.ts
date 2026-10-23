@@ -111,6 +111,11 @@ export const simpleCompanyTransferService = {
     });
     const fromIsZmw = fx.currency === "ZMW" && fx.zambiaCompanyId === parsed.fromCompanyId;
     const toIsZmw = fx.currency === "ZMW" && fx.zambiaCompanyId === parsed.toCompanyId;
+    // Validate native-ZMW request identity before creating clearing accounts.
+    const zmwOutNumber = fx.currency === "ZMW"
+      ? zambiaTransferVoucherNumber("TR-OUT", parsed.clientRequestId ?? "") : null;
+    const zmwInNumber = fx.currency === "ZMW"
+      ? zambiaTransferVoucherNumber("TR-IN", parsed.clientRequestId ?? "") : null;
 
     const description = parsed.description || `Transfer to ${toCompany.name}`;
     const [fromClearing, toClearing] = await Promise.all([
@@ -123,9 +128,7 @@ export const simpleCompanyTransferService = {
       const fromNarration = `Transfer out to ${toCompany.name}`;
       const fromBuilt = buildCompanyTransferPostingRequest({
         companyId: parsed.fromCompanyId,
-        voucherNumber: fx.currency === "ZMW"
-          ? zambiaTransferVoucherNumber("TR-OUT", parsed.clientRequestId ?? "")
-          : `TR-OUT-${voucherTimestamp}`,
+        voucherNumber: zmwOutNumber ?? `TR-OUT-${voucherTimestamp}`,
         voucherType: "Payment",
         voucherDate: parsed.transferDate,
         description: `${description} → ${toCompany.name}`,
@@ -145,9 +148,7 @@ export const simpleCompanyTransferService = {
       const toNarration = `Transfer in from ${fromCompany.name}`;
       const toBuilt = buildCompanyTransferPostingRequest({
         companyId: parsed.toCompanyId,
-        voucherNumber: fx.currency === "ZMW"
-          ? zambiaTransferVoucherNumber("TR-IN", parsed.clientRequestId ?? "")
-          : `TR-IN-${voucherTimestamp}`,
+        voucherNumber: zmwInNumber ?? `TR-IN-${voucherTimestamp}`,
         voucherType: "Receipt",
         voucherDate: parsed.transferDate,
         description: `Transfer from ${fromCompany.name}`,
