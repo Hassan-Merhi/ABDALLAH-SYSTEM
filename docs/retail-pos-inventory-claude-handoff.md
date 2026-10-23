@@ -2,8 +2,8 @@
 
 **Branch:** `feature/retail-pos-inventory-workflow`
 **Target:** `main` — do not merge without verification and owner approval.
-**Status:** Source changes committed; NO CI, unit/integration tests, typechecks,
-lint, builds, migrations, deployment, merge or rebase have been executed by ChatGPT.
+**Status:** Implemented by ChatGPT (phases 1–8), then verified and repaired by
+Claude on 2026-10-23 — see **Verification record** below. Not merged or deployed.
 
 ## Objective and boundaries
 
@@ -181,6 +181,88 @@ behavior must remain unchanged.
   duplicate or mismatched new Retail-side report modules.
 - Verify daily Daybook balances, COGS, taxes, cash drawers, customer statements,
   payment sources and valuation under the selected company.
+
+## Verification record (Claude, 2026-10-23)
+
+Isolated environment only: a local PostgreSQL 16 database built with
+`drizzle-kit push` plus the application's startup migrations. No production
+database, Render service, voucher, balance or stock row was touched.
+
+### Branch reconciliation
+
+`main` was merged into the branch twice (no conflicts): the six commits it was
+behind, then the later Puppeteer 25.14.0 `allowScripts` approval that every CI
+`npm ci` step needs.
+
+### Defects found and fixed
+
+| Area | Defect | Fix |
+|---|---|---|
+| Build | Branch did not compile: unclosed JSX in the exchange dialog, unclosed Split `onClick`, duplicate-key spread in the return dialog | Repaired |
+| Phase 4 POS | After a credit/split sale tenders were not reset; the next sale stayed on a credit tender with no customer | Tenders reset on success; clearing the customer turns credit back into cash |
+| Phase 5 exchange | Counter balance assumed the return was paid back in cash; on a credit original the screen said "even exchange" while the replacement was booked as cash received (drawer short) | Server reports `receivableReversed`, `tenderRefund` and `balanceDue` = replacement money collected − tender paid back; dialog shows the same breakdown |
+| Phase 5 shifts | New hard rule "POS cashier needs an open shift to refund" broke the established, tested shiftless-refund contract (sales never required a shift) | Restored; refunds without a shift stay off every drawer |
+| Phase 5 receipts | A completed return was not offered for reprint | Return becomes the last sale |
+| Phase 6 API | Guard only covered `/api/vouchers/*`; manual Credit Notes (`/api/credit-notes`), Stock Adjustments (`/api/stock-adjustments`), voucher-entry edits and bulk delete were open | Guard extended and registered with the permission boundaries ahead of every writer |
+| Phase 7 | Receipt required the *source* location to be active, stranding goods in RETAIL-IN-TRANSIT if the source closed | Only the destination must be active |
+| CI ratchets | Unformatted files, two files over the 900-line cap, stale route manifest, unindexed docs, +3 literal source-text assertions | Formatted; logic split into `useRetailBarcodeScanner` / `retailCheckoutPolicy`; manifest regenerated; docs indexed; literal checks replaced by behavioural tests |
+
+### Accounting reconciliation (`tests/retail-pos-inventory-workflow-integration.test.ts`)
+
+Every assertion reads the posted vouchers:
+
+- **Credit split sale** $100 = $60 cash + $40 credit → Dr RETAIL-CASH 60, Dr customer 40,
+  Cr RETAIL-SALES 100, Dr COGS 36 / Cr RETAIL-INVENTORY 36; customer balance 40.
+- **Credit-first returns** first $30 → one `credit` refund of 30, no cash, balance 10;
+  second $30 → `credit` 10 + `cash` 20, balance 0; voucher Dr sales 30, Cr customer 10,
+  Cr cash 20, Dr inventory 10 / Cr COGS 10. Same-key replay → 200; same key with a
+  changed disposition → 400.
+- **Damaged return** refund voucher is only Dr sales 40 / Cr cash 40 (no COGS reversal);
+  stock unchanged; zero-delta movement with `restocked:false, returnedQuantity:1`.
+- **Customer-account credit** on a card sale → `store_credit` refund, Cr customer 30.
+- **Exchange** of a credit sale at a raised current price ($30 → $35) → refund at the
+  historical $30 reverses the receivable, replacement priced $35 by the server,
+  `balanceDue` 35.
+- **Dispatch** 3 × $16 → Cr RETAIL-INVENTORY 48 / Dr RETAIL-IN-TRANSIT 48; source −3,
+  destination unchanged; overshipment 409; replay 200; changed replay 400.
+- **Receive** (two concurrent receivers → one 201, one 409) → Dr inventory 48 / Cr in-transit
+  48; destination 2 @ $19 + 3 @ $16 = 5 @ $17.20; in-transit balance 0; no revenue/COGS lines.
+- **Voucher guard** Retail Journal / Credit Note / Adjustment creation and edits, deletes,
+  bulk deletes and entry edits of automatic journals → 403; reading them → 200;
+  Payment vouchers and non-Retail companies unaffected.
+- **Final tie-out** RETAIL-CASH ledger = Σ cash tenders − Σ cash refunds; customer ledger and
+  the POS balance endpoint = Σ credit tenders − Σ credit/store-credit refunds; inventory
+  sub-ledger = RETAIL-INVENTORY (difference 0.00) after every step; RETAIL-IN-TRANSIT 0;
+  Retail dashboard revenue and COGS = the posted RETAIL-SALES and RETAIL-COGS balances.
+
+### Checks run (local, isolated database)
+
+| Check | Result |
+|---|---|
+| `npm run check` (TypeScript) | Pass, 0 errors |
+| `npm run lint` + lint ratchet | Pass, 0 errors / 0 warnings |
+| Prettier on every file the branch changes | Pass |
+| `npm run build` (client + server bundle verification) | Pass |
+| `drizzle-kit push` + application startup migrations + `verify:startup-migrations` | Pass, 0 failures; `restocked` column present; migration SQL idempotent |
+| Retail suites (`tests/retail-*`, wave 17c/17d) incl. the new reconciliation test | 19 files, 130 tests pass |
+| Full frontend suite | 244 files, 2,265 tests pass (+ 2 new Retail UI test files) |
+| Full backend suite | 1,086 of 1,089 files pass (7,494 tests); the 3 failing files fail identically on `main` (Node-version toolchain checks; `wave17c-rates` factory FX) |
+| Repository audits (doc index, write routes, write evidence, type escapes, god files, route manifest, source-text ratchet) | Pass, except `audit:toolchain` (pre-existing on `main`) |
+| GitHub CI (`workflow_dispatch`, no PR opened) | Type-check, Build and Frontend Tests pass. Remaining reds trace to `main`: the Node-version toolchain check, and on a dispatch the changed-file format step diffs the merge commit's first parent, which checks files `main` left unformatted |
+
+### Open items (not fixed — need an owner decision)
+
+- **Per-location authorization:** dispatch/receive/immediate transfers require a non-POS
+  role in the Retail company, not an assignment to the source/destination location.
+- **Receivables paid later through ERP receipts:** returns reverse the sale's own unpaid
+  credit tender first even if the customer has since paid their account through an ERP
+  Receipt voucher; the customer then holds an account credit rather than receiving cash.
+  Accounting stays correct; a cashier may still need to pay cash manually.
+- **Repository-wide, pre-existing on `main`:** `audit:toolchain` fails (render.yaml pins
+  Node 24.22.0 while `.node-version` is 24.22.1). Not changed here because `render.yaml`
+  is deployment configuration.
+- Manual device checks (camera scanning, touch gallery, printers) were not possible in
+  this environment.
 
 ## Release and handoff rules
 
