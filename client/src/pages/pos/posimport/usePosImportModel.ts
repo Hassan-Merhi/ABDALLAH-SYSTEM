@@ -375,6 +375,8 @@ export function usePosImportModel() {
         locationId: parseInt(selectedLocation),
         cashAccountId: parseInt(selectedCashAccount),
         saleDate,
+        currency: saleCurrency,
+        exchangeRate: saleCurrency === "USD" ? undefined : String(applicableExchangeRate),
         items: itemsToImport,
         ...requestIdentity,
       });
