@@ -309,7 +309,12 @@ export default function StockInSalesReportComparison() {
     if (kind === "money") return value < 0 ? `-${formatAmount(Math.abs(value))}` : formatAmount(value);
     if (displayCurrency && selectedCurrency === displayCurrency) {
       const converted = convertToDisplay(value);
-      if (Number.isFinite(converted)) return `${value < 0 ? "-" : ""}${formatMoneyDisplay(Math.abs(converted), { currency: displayCurrency })}`;
+      if (Number.isFinite(converted)) {
+        const label = displayCurrency === "CFA"
+          ? `CFA ${formatNumber(Math.abs(converted), 2)}`
+          : formatMoneyDisplay(Math.abs(converted), { currency: displayCurrency });
+        return `${value < 0 ? "-" : ""}${label}`;
+      }
     }
     return `${value < 0 ? "-" : ""}$ ${formatNumber(Math.abs(value), key === "avgProfitPerBale" ? 2 : 6)}`;
   };
