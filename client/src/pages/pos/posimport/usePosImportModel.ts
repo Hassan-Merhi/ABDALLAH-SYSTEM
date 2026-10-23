@@ -69,8 +69,9 @@ export function usePosImportModel() {
     return prefix ? prefix + "\u00A0" + num : num;
   };
 
-  // Print always shows USD amounts
-  const printCurrPrefix = "$";
+  // Printed ZMW imports display original Kwacha worksheet amounts, not
+  // today's conversion of the already-stored USD sales items.
+  const printCurrPrefix = importedSale?.voucher?.currency === "ZMW" ? "K" : "$";
 
   const { data: locations = [] } = useQuery<Location[]>({
     queryKey: ["/api/locations"],
@@ -215,7 +216,9 @@ export function usePosImportModel() {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
 
       const location = locations.find((l) => l.id === parseInt(selectedLocation));
-      const itemsForPrint = toUsdItems(validationResult?.validatedItems || []);
+      const itemsForPrint = saleCurrency === "ZMW"
+        ? (validationResult?.validatedItems || [])
+        : toUsdItems(validationResult?.validatedItems || []);
       setImportedSale({
         voucher: data.voucher,
         items: itemsForPrint,
@@ -254,7 +257,9 @@ export function usePosImportModel() {
 
       const location = locations.find((l) => l.id === parseInt(selectedLocation));
       const customer = customers.find((c) => c.id === parseInt(selectedCustomer));
-      const itemsForPrint = toUsdItems(validationResult?.validatedItems || []);
+      const itemsForPrint = saleCurrency === "ZMW"
+        ? (validationResult?.validatedItems || [])
+        : toUsdItems(validationResult?.validatedItems || []);
       setImportedSale({
         voucher: data.voucher,
         items: itemsForPrint,
