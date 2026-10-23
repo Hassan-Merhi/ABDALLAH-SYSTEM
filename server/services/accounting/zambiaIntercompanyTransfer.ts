@@ -40,14 +40,17 @@ export async function resolveZambiaIntercompanyAmount(params: {
   } catch {
     throw new TransferRouteError(400, "Transfer amount is invalid");
   }
-  if (!amount.isFinite() || amount.lte(0) || amount.decimalPlaces() > 2) {
-    throw new TransferRouteError(400, "Transfer amount must be positive with at most two decimal places");
+  if (!amount.isFinite() || amount.lte(0)) {
+    throw new TransferRouteError(400, "Transfer amount must be positive");
+  }
+  if (currency === "ZMW" && amount.decimalPlaces() > 2) {
+    throw new TransferRouteError(400, "Kwacha amount must have at most two decimal places");
   }
   if (currency === "USD") {
     if (params.exchangeRate != null && params.exchangeRate !== "") {
       throw new TransferRouteError(400, "USD intercompany transfers must not supply a foreign exchange rate");
     }
-    return { currency, baseAmount: amount.toFixed(2), nativeAmount: amount.toFixed(2),
+    return { currency, baseAmount: amount.toFixed(), nativeAmount: amount.toFixed(),
       historicalRate: null, zambiaCompanyId: null };
   }
 
