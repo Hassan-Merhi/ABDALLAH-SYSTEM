@@ -626,7 +626,7 @@ export function registerRetailPosRoutes(app: Express): void {
       if (req.user?.role === "POS" && !body.shiftId) {
         return res.status(400).json({ message: "Open a cashier shift before refunding a sale" });
       }
-      if (req.user?.role === "POS" &&
+      if (!["Admin", "Owner", "Manager", "Developer"].includes(req.user?.role ?? "") &&
           (body.refundDestination === "customer_credit" || body.items.some((item) => !item.restock))) {
         return res.status(403).json({
           code: "RETAIL_RETURN_MANAGER_REQUIRED",
