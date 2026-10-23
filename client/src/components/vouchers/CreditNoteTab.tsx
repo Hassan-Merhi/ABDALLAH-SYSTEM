@@ -422,6 +422,10 @@ export function CreditNoteTab({ allAccounts, editVoucherId }: CreditNoteTabProps
     (sum, item) => sum + parseFloat(item.quantity) * parseFloat(item.inventoryCost),
     0
   );
+  // Inventory cost remains USD even while the refund price is entered in K.
+  const totalRefundUsd = noteCurrency === "ZMW"
+    ? noteRate ? totalRefund / noteRate : 0
+    : totalRefund;
 
   const onSubmit = (values: CreditNoteFormData) => {
     if (noteCurrency === "ZMW" && (!noteRate || !Number.isFinite(noteRate) || noteRate <= 0)) {
@@ -584,10 +588,10 @@ export function CreditNoteTab({ allAccounts, editVoucherId }: CreditNoteTabProps
                           <TableHead>Item</TableHead>
                           <TableHead>Location</TableHead>
                           <TableHead className="text-right">Qty</TableHead>
-                          <TableHead className="text-right">Refund Rate</TableHead>
+                          <TableHead className="text-right">Refund Rate ({noteCurrency})</TableHead>
                           <TableHead className="text-right">Refund Amt</TableHead>
-                          <TableHead className="text-right">Inv. Cost</TableHead>
-                          <TableHead className="text-right">Inv. Value</TableHead>
+                          <TableHead className="text-right">Inv. Cost (USD)</TableHead>
+                          <TableHead className="text-right">Inv. Value (USD)</TableHead>
                           <TableHead></TableHead>
                         </TableRow>
                       </TableHeader>
@@ -663,12 +667,12 @@ export function CreditNoteTab({ allAccounts, editVoucherId }: CreditNoteTabProps
               <div className="flex flex-wrap justify-between items-center pt-4 border-t gap-2">
                 <div className="space-y-1">
                   <div className="text-lg font-semibold">
-                    Refund Total: <span className="font-mono text-primary">{formatNumber(totalRefund)}</span>
+                    Refund Total: <span className="font-mono text-primary">{noteCurrency === "ZMW" ? "K" : "$"} {formatNumber(totalRefund, 2)}</span>
                   </div>
                   <div className="text-sm text-muted-foreground">
                     Inventory Value: <span className="font-mono">{formatNumber(totalInventoryValue)}</span>
-                    {Math.abs(totalRefund - totalInventoryValue) > 0.01 && (
-                      <span className="ml-2">(Variance: {formatNumber(totalRefund - totalInventoryValue)})</span>
+                    {Math.abs(totalRefundUsd - totalInventoryValue) > 0.01 && (
+                      <span className="ml-2">(Variance: {formatNumber(totalRefundUsd - totalInventoryValue)})</span>
                     )}
                   </div>
                 </div>
