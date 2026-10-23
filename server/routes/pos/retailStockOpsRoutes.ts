@@ -45,9 +45,9 @@ const toNumber = (value: unknown) => {
 const idempotencyKeySchema = z.string().trim().min(8).max(191);
 
 const paymentSchema = z.object({
-  method: z.enum(["cash", "card", "bank", "mobile", "other"]),
+  method: z.enum(["cash", "card", "bank", "mobile", "other", "credit"]),
   amount: z.coerce.number().finite().positive(),
-  tenderedAmount: z.coerce.number().finite().positive().optional(),
+  tenderedAmount: z.coerce.number().finite().positive().nullable().optional(),
   reference: z.string().trim().max(191).optional(),
 });
 
@@ -70,7 +70,7 @@ export const retailExchangeSchema = z.object({
   notes: z.string().trim().max(2000).optional(),
   returnItems: z
     .array(
-      z.object({ saleItemId: z.coerce.number().int().positive(), quantity: z.coerce.number().finite().positive() })
+      z.object({ saleItemId: z.coerce.number().int().positive(), quantity: z.coerce.number().finite().positive(), restock: z.boolean().default(true) })
     )
     .min(1)
     .max(100),
@@ -237,6 +237,12 @@ export function registerRetailStockOpsRoutes(app: Express): void {
       if (!companyId) return;
       const body = retailExchangeSchema.parse(req.body);
       const userId = currentUserId(req);
+      if (req.user?.role === "POS" && !body.shiftId) {
+        return res.status(400).json({ message: "Open a cashier shift before exchanging retail items" });
+      }
+      if (req.user?.role === "POS" && body.returnItems.some((item) => !item.restock)) {
+        return res.status(403).json({ message: "Manager approval is required to exchange damaged items without restocking" });
+      }
       await ensureCompanyLocation(companyId, body.locationId);
       const canSellNegativeStock = Boolean(req.user?.canSellNegativeStock);
 
@@ -324,6 +330,16 @@ export function registerRetailStockOpsRoutes(app: Express): void {
           });
         }
 
+        // The new sale belongs to the original customer's same ERP ledger;
+        // never allow its credit portion to be posted as an anonymous walk-in.
+        const [originalSale] = await tx
+          .select({ customerId: retailPosSales.customerId, customerName: retailPosSales.customerName })
+          .from(retailPosSales)
+          .where(and(eq(retailPosSales.companyId, companyId), eq(retailPosSales.id, body.saleId)))
+          .limit(1);
+        if (body.payments?.some((payment) => payment.method === "credit") && !originalSale?.customerId) {
+          throw new Error("A selected customer is required for credit on a replacement sale");
+        }
         const sold = await createRetailSaleInTx(tx, {
           companyId,
           locationId: body.locationId,
@@ -335,6 +351,7 @@ export function registerRetailStockOpsRoutes(app: Express): void {
           canSellNegativeStock,
           shiftId: body.shiftId ?? null,
           payments: body.payments,
+          customer: originalSale?.customerId ? { id: originalSale.customerId, name: originalSale.customerName } : null,
         });
 
         const refundValue = returned.refundValue;
