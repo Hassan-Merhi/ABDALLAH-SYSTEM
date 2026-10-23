@@ -277,9 +277,8 @@ export default function RetailInventory() {
         <div className="flex flex-wrap items-start gap-5">
           <ProductImageGallery
             product={detailProduct}
-            maxImages={6}
             className="max-w-full"
-            imageClassName="h-32 w-32 rounded-lg border"
+            imageClassName="h-36 w-36 rounded-lg border sm:h-44 sm:w-44"
           />
           <div>
             <h1 className="text-3xl font-bold">{detailProduct.name}</h1>
