@@ -1,3 +1,4 @@
+import { ZMW_PURCHASE_REQUIRES_HISTORICAL_COST } from "../services/accounting/zambiaPurchaseCurrencyGuard";
 /**
  * Chatbot PO-import routes.
  *
@@ -378,6 +379,14 @@ export function registerChatbotPoImportRoutes(app: Express) {
       if (denied) return res.status(denied.code).json({ message: denied.message });
 
       const { poNumber, containerNumber, importDate, currency, supplierId, lines, charges } = req.body;
+      if (typeof currency === "string" && currency.trim().toUpperCase() === "ZMW") {
+        // The importer stores prices and landed costs in historical USD.
+        // Reject native ZMW before container, PO, ledger or intercompany writes.
+        return res.status(409).json({
+          code: "ZMW_PURCHASE_HISTORICAL_COST_REQUIRED",
+          message: ZMW_PURCHASE_REQUIRES_HISTORICAL_COST,
+        });
+      }
 
       if (!poNumber) return res.status(400).json({ message: "PO number is required" });
       if (!containerNumber) return res.status(400).json({ message: "Container number is required" });
