@@ -125,9 +125,11 @@ export function RetailReceipt({
           {sale.payments.map((payment) => (
             <div className="rr-line" key={payment.id}>
               <span>
-                {payment.method === "credit"
-                  ? payment.paymentType === "refund" ? "REVERSED CREDIT" : "ON ACCOUNT"
-                  : payment.paymentType === "refund"
+                {payment.method === "store_credit"
+                  ? "CREDIT TO CUSTOMER ACCOUNT"
+                  : payment.method === "credit"
+                    ? payment.paymentType === "refund" ? "REVERSED CREDIT" : "ON ACCOUNT"
+                    : payment.paymentType === "refund"
                     ? `REFUND ${payment.method.toUpperCase()}`
                     : payment.method.toUpperCase()}
               </span>
