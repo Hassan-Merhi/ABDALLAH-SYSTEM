@@ -1,5 +1,5 @@
 import type { ClientErrorLike } from "@/lib/clientError";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
+import { useCompany } from "@/contexts/CompanyContext";
 
 interface UnresolvedOpening {
   entity_type: "ledger" | "bank" | "customer" | "supplier" | "employee" | "fixedAsset";
@@ -30,9 +31,15 @@ interface Draft {
 export function HistoricalOpeningResolver() {
   const { toast } = useToast();
   const { displayCurrency } = useCurrencyContext();
+  const { selectedCompany } = useCompany();
+  const companyId = selectedCompany?.id;
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
+  // A draft choice and a previously cached unresolved balance must not leak
+  // across company switches. Rate and opening amount are tenant data.
+  useEffect(() => { setDrafts({}); }, [companyId]);
   const query = useQuery<UnresolvedOpening[]>({
-    queryKey: ["/api/accounts/multi-currency/unresolved-openings"],
+    queryKey: ["/api/accounts/multi-currency/unresolved-openings", companyId],
+    enabled: !!companyId,
     staleTime: 30_000,
   });
 
@@ -118,8 +125,9 @@ export function HistoricalOpeningResolver() {
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Manual review required</AlertTitle>
           <AlertDescription>
-            Choose the currency originally entered and the historical CFA-per-USD rate. This preserves the native amount
-            and stores a separate historical USD value. It does not use today’s rate.
+            Choose the currency originally entered and its historical foreign-units-per-USD rate
+            (for Zambia, ZMW per USD). This preserves the native amount and a separate historical
+            USD value. Do not enter today's rate unless it truly applied to the original opening.
           </AlertDescription>
         </Alert>
 
