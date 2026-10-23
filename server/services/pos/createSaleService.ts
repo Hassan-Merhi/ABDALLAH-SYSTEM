@@ -46,7 +46,7 @@ import { postSaleCogsTx } from "../accounting/perpetualInventory/saleCogs";
 import { baleMirrorMovementRefusal } from "../accounting/perpetualInventory/cutoverRefusal";
 import { MoneyDecimal } from "../../lib/money";
 import { spDeductionAmount, spPayableAfterDeduction } from "./spDeduction";
-import { PosZmwRateError, resolveLockedZmwPosCurrency } from "./posZmwRatePolicy";
+import { PosZmwRateError, resolveLockedZmwPosCurrency, assertZmwImportPrices } from "./posZmwRatePolicy";
 
 function err(result: HandlerErrorResult): CreatePosSaleResult {
   return { status: result.status, body: result.body };
@@ -182,6 +182,18 @@ export async function createPosSale(
   let lockedPosCurrency: { currency: string; exchangeRate: string | null };
   try {
     lockedPosCurrency = await resolveLockedZmwPosCurrency(currentCompanyId, voucherDate, currency, exchangeRate);
+  } catch (error) {
+    if (error instanceof PosZmwRateError) {
+      return err({ status: error.statusCode, body: { code: error.code, message: error.message } });
+    }
+    throw error;
+  }
+
+  // Verify original ZMW POS unit prices against the USD line prices at the
+  // exact company/date rate before inventory or voucher writes. This blocks
+  // stale client rates, silent currency substitution, and altered USD prices.
+  try {
+    assertZmwImportPrices(items, lockedPosCurrency);
   } catch (error) {
     if (error instanceof PosZmwRateError) {
       return err({ status: error.statusCode, body: { code: error.code, message: error.message } });
