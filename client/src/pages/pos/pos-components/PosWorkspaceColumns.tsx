@@ -10,9 +10,10 @@ type PosWorkspaceColumnsProps = {
  * Shared two-column POS workspace shell.
  *
  * - ERP keeps its desktop-only sales-grid / item-sidebar layout (mobile is separate).
- * - Retail keeps its responsive card layout until the shared sales grid is wired in.
+ * - Retail uses an ERP-style variant sales grid and image-enabled item sidebar,
+ *   with the same responsive two-column placement and its own retail checkout engine.
  *
- * This is presentation-only: neither checkout engine, prices nor journals change.
+ * Presentation-only: neither checkout engine, prices nor journals change.
  */
 export function PosWorkspaceColumns({ children, layout }: PosWorkspaceColumnsProps) {
   if (layout === "retail") {
