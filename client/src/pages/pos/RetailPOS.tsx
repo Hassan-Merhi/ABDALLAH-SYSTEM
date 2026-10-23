@@ -841,6 +841,7 @@ export default function RetailPOS() {
         sale={exchangeSale}
         locationId={selectedLocation?.id ?? null}
         shiftId={currentShift?.id ?? null}
+        canOverride={!isPosRole}
         onOpenChange={(open) => {
           if (!open) {
             setExchangeSale(null);
