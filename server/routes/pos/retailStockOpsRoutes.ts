@@ -240,7 +240,8 @@ export function registerRetailStockOpsRoutes(app: Express): void {
       if (req.user?.role === "POS" && !body.shiftId) {
         return res.status(400).json({ message: "Open a cashier shift before exchanging retail items" });
       }
-      if (req.user?.role === "POS" && body.returnItems.some((item) => !item.restock)) {
+      if (!["Admin", "Owner", "Manager", "Developer"].includes(req.user?.role ?? "") &&
+          body.returnItems.some((item) => !item.restock)) {
         return res.status(403).json({ message: "Manager approval is required to exchange damaged items without restocking" });
       }
       await ensureCompanyLocation(companyId, body.locationId);
