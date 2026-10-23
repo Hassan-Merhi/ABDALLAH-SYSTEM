@@ -26,6 +26,12 @@ import {
   type RetailProduct,
 } from "./retailInventoryTypes";
 
+/** Image order is persisted; the first photo is the inventory cover image. */
+function putPhotoFirst(images: string[], index: number): string[] {
+  if (index <= 0 || index >= images.length) return images;
+  return [images[index], ...images.filter((_, photoIndex) => photoIndex !== index)];
+}
+
 export function ProductEditor({
   open,
   onOpenChange,
@@ -361,7 +367,9 @@ export function ProductEditor({
           <div className="space-y-3 md:col-span-2">
             <div>
               <Label>Product images</Label>
-              <p className="mt-1 text-xs text-muted-foreground">Upload JPG, PNG, WEBP or GIF images. Up to 8 images.</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Upload JPG, PNG, WEBP or GIF images. Up to 8 images. The first photo is the main inventory image.
+              </p>
             </div>
             <Input
               type="file"
@@ -379,9 +387,9 @@ export function ProductEditor({
                 {draft.imageUrls.map((src, index) => (
                   <div
                     key={`${src}-${index}`}
-                    className="group relative h-24 w-24 overflow-hidden rounded-lg border bg-muted"
+                    className="group relative h-28 w-28 overflow-hidden rounded-lg border bg-muted"
                   >
-                    <img src={normalizeRetailImageUrl(src)} alt="" className="h-full w-full object-cover" />
+                    <img src={normalizeRetailImageUrl(src)} alt={`Product photo ${index + 1}`} className="h-full w-full object-cover" />
                     <Button
                       type="button"
                       size="icon"
@@ -393,9 +401,27 @@ export function ProductEditor({
                           imageUrls: current.imageUrls.filter((_, imageIndex) => imageIndex !== index),
                         }))
                       }
+                      aria-label={`Remove product photo ${index + 1}`}
                     >
                       <X className="h-4 w-4" />
                     </Button>
+                    {index === 0 ? (
+                      <span className="absolute bottom-1 left-1 rounded bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-primary-foreground">
+                        Main
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        className="absolute bottom-1 left-1 rounded bg-background/95 px-1.5 py-1 text-[10px] font-semibold text-foreground shadow hover:bg-background"
+                        onClick={() => setDraft((current) => ({
+                          ...current,
+                          imageUrls: putPhotoFirst(current.imageUrls, index),
+                        }))}
+                        aria-label={`Set product photo ${index + 1} as main image`}
+                      >
+                        Set main
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -506,6 +532,7 @@ export function ProductEditor({
                     <Label>Variant images</Label>
                     <p className="mt-1 text-xs text-muted-foreground">
                       Optional photos for this exact color and size. Up to {MAX_VARIANT_IMAGES} images.
+                      The first is the variant cover photo.
                     </p>
                   </div>
                   <Input
@@ -526,9 +553,13 @@ export function ProductEditor({
                       {variant.imageUrls.map((src, imageIndex) => (
                         <div
                           key={`${src}-${imageIndex}`}
-                          className="relative h-20 w-20 overflow-hidden rounded-md border bg-muted"
+                          className="relative h-24 w-24 overflow-hidden rounded-md border bg-muted"
                         >
-                          <img src={normalizeRetailImageUrl(src)} alt="" className="h-full w-full object-cover" />
+                          <img
+                            src={normalizeRetailImageUrl(src)}
+                            alt={`Variant photo ${imageIndex + 1}`}
+                            className="h-full w-full object-cover"
+                          />
                           <Button
                             type="button"
                             size="icon"
@@ -539,9 +570,26 @@ export function ProductEditor({
                                 imageUrls: variant.imageUrls.filter((_, index) => index !== imageIndex),
                               })
                             }
+                            aria-label={`Remove variant photo ${imageIndex + 1}`}
                           >
                             <X className="h-3.5 w-3.5" />
                           </Button>
+                          {imageIndex === 0 ? (
+                            <span className="absolute bottom-1 left-1 rounded bg-primary px-1 py-0.5 text-[10px] font-semibold text-primary-foreground">
+                              Main
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              className="absolute bottom-1 left-1 rounded bg-background/95 px-1 py-0.5 text-[10px] font-semibold shadow hover:bg-background"
+                              onClick={() => updateVariant(variantIndex, {
+                                imageUrls: putPhotoFirst(variant.imageUrls, imageIndex),
+                              })}
+                              aria-label={`Set variant photo ${imageIndex + 1} as main image`}
+                            >
+                              Set main
+                            </button>
+                          )}
                         </div>
                       ))}
                     </div>
