@@ -82,8 +82,8 @@ No tests, CI, lint, typechecks or builds were executed for this phase.
   cart totals change, the selected payment method is no longer reset to cash.
 - The date reflects the local current day, for display only: Retail checkout
   still uses the server's actual sale timestamp. Do not imply manual
-  backdating exists. Retail credit sales are **not yet available**: the credit
-  control is explicitly disabled until Phase 4 implements correct A/R.
+  backdating exists. Credit was intentionally disabled at the end of Phase 3,
+  then enabled by the Phase 4 customer-receivable implementation below.
 - The grid deliberately does not show simulated P/L; retail POS item responses
   do not expose authoritative profitability data. This remains a separately
   verified reporting requirement, not an invented value.
@@ -96,10 +96,49 @@ responsive grid, scanner input, image viewer focus, stock guard, promotions and
 server preview, tender persistence, discounts/approval, receipt flow, route
 guards and existing ERP POS behavior before merging or deployment.
 
-### Phase 4 — customers and checkout controls
-Full customer selection, cash/bank and credit sales as normal ERP allows, per-line and
-invoice discounts in fixed amount or percent, permissions and audit metadata; locked
-discount/tax/cost history. Do not introduce duplicate receivables or journals.
+### Phase 4 — customers and checkout controls (implemented in source)
+
+- Select an existing ERP customer or create one from the POS. The customer picker
+  reads the **actual ERP customer ledger balance** through a company-scoped Retail
+  read endpoint. Debit-positive is customer receivable, debit-negative is credit.
+- The checkout Credit toggle or "Customer Credit" tender sets an **unpaid, on
+  account** portion. A real selected customer is required and validated by the
+  server; anonymous walk-ins may still pay cash, card, bank, mobile or other.
+- Retail credit is `method: "credit"` in the existing Retail payment/tender rows
+  (the database column already supports text methods). This is a debt allocation,
+  **not** cash received or a store-credit liability. The tender amounts must add to
+  the full server-priced sale total; split tenders allow part paid, part on account.
+- The central ERP accounting voucher posts **Dr selected customer** for the unpaid
+  portion, Dr actual payment accounts for collected tenders, and the existing
+  revenue/tax/COGS/inventory legs. All legs are in the existing one-transaction,
+  idempotent Retail posting path; no duplicate customer-balance table or phantom
+  cash receipts are introduced.
+- A credit return/cancellation reverses uncollected receivables first, then returns
+  any remaining real payment amount, using the same original sale's customer ID.
+  Changing a posted credit sale's customer ID through the existing receipt-edit
+  API is blocked; it would otherwise leave accounting on the old customer.
+- Retail payment validation accepts `null` cash-tendered amount on credit, card
+  and bank payments. The client preserves selected payment methods and separates
+  Collected from On account in the totals. Receipts and last-sale summaries label
+  unpaid/reversed credit accurately, without presenting it as money collected.
+- Both fixed/percentage line-level and invoice-wide discounts, reason collection,
+  manager approval and historical prices/tax/cost are preserved from prior waves;
+  the authoritative server preview and sale snapshots remain the source of truth.
+- Retail cash-shift actual cash counts already include only cash method entries.
+  Customer receivable statement and ERP account balances come from the canonical
+  posting engine rather than from Retail payment totals.
+- Receivable repayments may be handled using the existing authorized ERP customer
+  receipt/voucher workflow; a specialized Retail balance-collection UI is not part
+  of this phase.
+- No production transactions, historical voucher edits, schema migrations or
+  balance recomputations are performed. The server changes only run when this
+  branch is ultimately merged and deployed by the owner.
+
+No CI, tests, lint, typechecks or builds were run. Claude should later verify
+full/partial credit sales, cash+credit split, revenue/COGS, tax and discount math,
+credit-first returns, cancellations, customer-ledger balances, receipts, idempotent
+retry, blank customer blocking, deleted customer rejection, company isolation,
+closed shift behavior and existing ERP / Factory / non-retail accounting.
 
 ### Phase 5 — returns/refunds/exchanges
 Select original sale/receipt and exact line/quantity. Refund only that line's
