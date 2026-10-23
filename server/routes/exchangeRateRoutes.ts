@@ -147,6 +147,20 @@ export function registerExchangeRateRoutes(app: Express) {
       if (!parsed.success) {
         return res.status(400).json({ message: "Validation error", errors: parsed.error.issues });
       }
+      // Daily popup submissions must be dated TODAY in the company's own
+      // timezone, even if the popup remained open past midnight. The
+      // historical rate settings form may intentionally save another date.
+      if (req.body?.daily === true) {
+        const settings = await storage.getCompanySettings(companyId);
+        const businessDate = getCompanyBusinessDate(settings?.timezone);
+        if (parsed.data.effectiveDate !== businessDate) {
+          return res.status(409).json({
+            code: "EXCHANGE_RATE_BUSINESS_DATE_CHANGED",
+            message: "The company's business date changed. Reload the daily rate prompt before saving.",
+            today: businessDate,
+          });
+        }
+      }
       const fromCurrency = normalizeAccountingCurrencyAlias(parsed.data.fromCurrency);
       const toCurrency = normalizeAccountingCurrencyAlias(parsed.data.toCurrency);
       if (fromCurrency !== pair.fromCurrency || toCurrency !== pair.toCurrency) {
