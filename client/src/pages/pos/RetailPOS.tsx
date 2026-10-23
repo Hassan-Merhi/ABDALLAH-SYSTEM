@@ -827,6 +827,8 @@ export default function RetailPOS() {
       <RetailReturnDialog
         open={returnDialogOpen}
         locationId={selectedLocation?.id ?? null}
+        shiftId={currentShift?.id ?? null}
+        canOverride={!isPosRole}
         onOpenChange={setReturnDialogOpen}
         onExchange={setExchangeSale}
         onPrint={printReceipt}
