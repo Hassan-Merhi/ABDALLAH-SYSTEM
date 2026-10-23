@@ -141,6 +141,7 @@ export default function RetailPOS() {
 
   useEffect(() => {
     setCart([]);
+    setPayments([{ method: "cash", amount: 0, tenderedAmount: 0 }]);
     setNotes("");
     setScanText("");
     setSearch("");
