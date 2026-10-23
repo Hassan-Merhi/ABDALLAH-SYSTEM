@@ -31,18 +31,27 @@ export const preparePaymentReceiptData = (
     exchangeRate: data.currency === "ZMW" ? String(exchangeRate) : undefined,
   };
 
+  // The with-entries edit endpoint receives native Kwacha amounts and
+  // converts BOTH legs back to historical USD using the voucher's locked
+  // rate. Mixing a USD payment leg with ZMW contra legs would not balance.
   const total = data.entries
     .reduce((sum, e) => {
       const amt = parseFloat(e.amount || "0");
-      const usdAmt = data.currency === "CFA" && exchangeRate ? amt / exchangeRate : amt;
-      return sum + usdAmt;
+      const postedAmount = data.currency === "ZMW"
+        ? amt
+        : data.currency === "CFA" && exchangeRate ? amt / exchangeRate : amt;
+      return sum + postedAmount;
     }, 0)
-    .toFixed(2);
+    .toFixed(data.currency === "ZMW" ? 6 : 2);
 
   const isLiabilityPayment =
     data.paymentAccountType === "supplier" ||
     data.paymentAccountType === "factorySupplier" ||
     data.paymentAccountType === "employee";
+
+  if (data.currency === "ZMW" && (!exchangeRate || !Number.isFinite(exchangeRate) || exchangeRate <= 0)) {
+    throw new Error("The historical ZMW voucher has no valid locked exchange rate.");
+  }
 
   const paymentEntry = {
     ledgerAccountId: data.paymentAccountType === "ledger" ? data.paymentAccountId : null,
