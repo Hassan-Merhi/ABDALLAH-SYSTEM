@@ -5,6 +5,7 @@ import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { zodResolver } from "@/lib/form-resolver";
 import { format } from "date-fns";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
+import { useZmwVoucherRate } from "@/hooks/useZmwVoucherRate";
 import { useReactToPrint } from "react-to-print";
 import { useLocation } from "wouter";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -212,6 +213,16 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const fieldArray = useFieldArray({ control: form.control, name: "entries" });
   const { append } = fieldArray;
   const entries = form.watch("entries");
+  const paymentVoucherDate = format(form.watch("voucherDate") ?? new Date(), "yyyy-MM-dd");
+  const { rate: dateSpecificZmwRate } = useZmwVoucherRate(paymentVoucherDate);
+  const priorZmwRate = Number(voucherToEdit?.exchangeRate);
+  const isEditingZmw = !!voucherIdToEdit && voucherToEdit?.currency === "ZMW";
+  const paymentPostingCurrency = isEditingZmw ? "ZMW" : selectedCurrency;
+  const paymentPostingRate = paymentPostingCurrency === "ZMW"
+    ? isEditingZmw
+      ? Number.isFinite(priorZmwRate) && priorZmwRate > 0 ? priorZmwRate : null
+      : dateSpecificZmwRate
+    : exchangeRate;
   const watchedEntries = useWatch({ control: form.control, name: "entries" });
   const total = entries.reduce((sum, entry) => sum + (parseFloat(entry.amount) || 0), 0);
 
@@ -360,8 +371,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         entries: formData.entries,
         notes: autoDesc,
         optional: formData.optional,
-        currency: selectedCurrency,
-        exchangeRate: exchangeRate ? exchangeRate.toString() : undefined,
+        currency: paymentPostingCurrency,
+        exchangeRate: paymentPostingRate ? paymentPostingRate.toString() : undefined,
         effectiveDate: voucherEffectiveDate || null,
       };
       if (isEditMode) {
@@ -524,6 +535,14 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     exportVoucherHelper({ formData: form.getValues(), activeTab, toast, detailed });
 
   const onSubmit = async (data: VoucherFormData) => {
+    if (paymentPostingCurrency === "ZMW" && (!paymentPostingRate || paymentPostingRate <= 0)) {
+      toast({
+        title: "Approved USD/ZMW rate required",
+        description: "Enter a company exchange rate effective on the voucher date before posting.",
+        variant: "destructive",
+      });
+      return;
+    }
     const validEntries = data.entries.filter((entry) => entry.accountId > 0 && parseFloat(entry.amount || "0") > 0);
     if (validEntries.length === 0) {
       toast({
