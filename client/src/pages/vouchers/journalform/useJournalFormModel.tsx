@@ -664,6 +664,14 @@ export function useJournalFormModel({ voucherIdToEdit, isPOS }: JournalFormProps
       });
       return;
     }
+    if (selectedCurrency === "ZMW" && (!postingRate || !Number.isFinite(postingRate) || postingRate <= 0)) {
+      toast({
+        title: "Approved historical USD/ZMW rate required",
+        description: "Select a voucher date with an approved exchange rate before posting or editing.",
+        variant: "destructive",
+      });
+      return;
+    }
     journalMutation.mutate(data);
   };
 
