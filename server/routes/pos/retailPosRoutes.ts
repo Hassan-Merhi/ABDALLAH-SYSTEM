@@ -623,6 +623,16 @@ export function registerRetailPosRoutes(app: Express): void {
       const body = returnSchema.parse(req.body);
       await ensureCompanyLocation(companyId, body.locationId);
       const userId = currentUserId(req);
+      if (req.user?.role === "POS" && !body.shiftId) {
+        return res.status(400).json({ message: "Open a cashier shift before refunding a sale" });
+      }
+      if (req.user?.role === "POS" &&
+          (body.refundDestination === "customer_credit" || body.items.some((item) => !item.restock))) {
+        return res.status(403).json({
+          code: "RETAIL_RETURN_MANAGER_REQUIRED",
+          message: "Manager access is required for account credits and damaged/non-restock returns",
+        });
+      }
       // Cash refunds may follow the original tender. A credit to the customer
       // account must belong to a named customer from this same company's sale.
       if (body.refundDestination === "customer_credit") {
