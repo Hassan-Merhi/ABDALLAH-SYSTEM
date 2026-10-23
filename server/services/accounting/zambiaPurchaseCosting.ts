@@ -55,7 +55,32 @@ export async function prepareZmwPurchaseCost(input: {
     input.companyId, input.date, "ZMW", input.exchangeRate,
   );
   if (!historicalRate) throw new HttpError(409, "Historical ZMW purchase rate unavailable");
-  const rate = new Decimal(historicalRate);
+  return valueZmwPurchaseAtLockedRate({
+    date: input.date, historicalRate,
+    lines: input.lines, charges: input.charges,
+  });
+}
+
+/**
+ * Edit/reversal valuation MUST use the stored transaction rate, not the latest
+ * approved rate. Existing native amounts are never revalued at an edited
+ * company rate.
+ */
+export function valueZmwPurchaseAtLockedRate(input: {
+  date: string;
+  historicalRate: string;
+  lines: readonly NativePurchaseLine[];
+  charges: NativePurchaseCharges;
+}) {
+  const historicalRate = input.historicalRate;
+  if (input.lines.length === 0) throw new HttpError(400, "Purchase needs at least one line");
+  let rate: Decimal;
+  try {
+    rate = new Decimal(historicalRate);
+  } catch {
+    throw new HttpError(409, "Historical purchase rate is invalid");
+  }
+  if (!rate.isFinite() || rate.lte(0)) throw new HttpError(409, "Historical purchase rate is invalid");
   const lines = input.lines.map((line) => {
     const quantity = positiveQuantity(line.quantity);
     const nativeRate = nonNegative(line.rate, "Native item price");
