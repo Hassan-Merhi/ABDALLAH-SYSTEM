@@ -18,6 +18,7 @@ import { POSDialogs } from "./pos-components/POSDialogs";
 import { POSHeader } from "./pos-components/POSHeader";
 import { PosCheckoutStrip } from "./pos-components/PosCheckoutStrip";
 import { PosMobileLayout } from "./pos-components/PosMobileLayout";
+import { PosWorkspaceColumns } from "./pos-components/PosWorkspaceColumns";
 
 import { usePosState } from "./hooks/usePosState";
 import { usePosQueries } from "./hooks/usePosQueries";
@@ -680,8 +681,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: AuthMe; edit
       {goldenCoastPosBlocked && <GoldenCoastPosReadinessAlert blockers={goldenCoastReadiness?.blockers} />}
 
       {/* ── Desktop layout ── */}
-      <div className="hidden lg:flex flex-1 overflow-hidden p-4">
-        <div className="flex flex-row gap-4 h-full w-full">
+      <PosWorkspaceColumns layout="erp">
           <div className="flex-1 flex flex-col overflow-y-auto min-w-0">
             <div>
               {inventoryLoading ? (
@@ -732,8 +732,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: AuthMe; edit
             highlightedIndex={highlightedIndex}
             syncTerm={searchTerm}
           />
-        </div>
-      </div>
+      </PosWorkspaceColumns>
 
       {/* ── Mobile layout ── */}
       <PosMobileLayout
