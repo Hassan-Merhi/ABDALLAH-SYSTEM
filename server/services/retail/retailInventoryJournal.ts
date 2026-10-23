@@ -57,6 +57,7 @@ import {
 
 export const RETAIL_INVENTORY_ADJUSTMENT_ACCOUNT = "RETAIL-INVENTORY-ADJUSTMENT";
 export const RETAIL_GRNI_ACCOUNT = "RETAIL-GRNI";
+export const RETAIL_IN_TRANSIT_ACCOUNT = "RETAIL-IN-TRANSIT";
 export const OPENING_EQUITY_ACCOUNT = "OPENING_BALANCE_EQUITY";
 export const retailInventoryOpeningVoucherNumber = (companyId: number) => `RETAIL-INV-OPEN-${companyId}`;
 
