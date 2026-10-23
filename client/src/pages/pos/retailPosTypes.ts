@@ -78,7 +78,7 @@ export interface SaleItem {
   brand: string;
 }
 
-export type RetailPaymentMethod = "cash" | "card" | "bank" | "mobile" | "other" | "credit";
+export type RetailPaymentMethod = "cash" | "card" | "bank" | "mobile" | "other" | "credit" | "store_credit";
 
 export interface RetailPaymentDraft {
   method: RetailPaymentMethod;
