@@ -8,7 +8,7 @@
 import Decimal from "decimal.js";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
-import { bankAccounts, ledgerAccounts } from "@shared/schema";
+import { accountingPostingRequests, bankAccounts, ledgerAccounts } from "@shared/schema";
 import { db, type DbTransaction } from "../../db";
 import { postErpVoucherTx, type ErpVoucherLine, type ErpPostingResult } from "./erpVoucherPosting";
 import { assertApprovedZmwVoucherRate, ZambiaVoucherRateError } from "./zambiaVoucherRatePolicy";
@@ -135,6 +135,12 @@ export async function postZambiaCashTransfer(input: unknown, companyId: number, 
   };
 
   const posted: ErpPostingResult = await db.transaction(async tx => {
+    // Serialize *this currency conversion workflow* per company. Other
+    // third-party/manual posting routes do not use this advisory key, so
+    // the native-balance preflight remains an additional safeguard rather
+    // than an absolute guarantee against every concurrent cash movement.
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(991732, ${companyId})`);
+
     // Check account ownership in the same transaction that creates the voucher.
     const sourceAccount = await loadTransferAccount(tx, companyId, data.from);
     const destAccount = await loadTransferAccount(tx, companyId, data.to);
@@ -145,9 +151,20 @@ export async function postZambiaCashTransfer(input: unknown, companyId: number, 
     }
     // The posting engine remains the source of truth for balancing, tenant
     // ownership, accounting period, duplicate request and audit triggers.
-    const balances = await getCashBankRevaluation(companyId, { attribution: "engine" });
-    const available = new Decimal(sourceSummary(balances.accounts, data.from).nativeBalancesByCurrency[data.fromCurrency] ?? "0");
-    if (available.lt(source)) throw new ZambiaVoucherRateError("Insufficient verified funds in the source currency.");
+    // On a retry after a successful commit, the source balance may be lower.
+    // Permit the canonical engine to check its stored request fingerprint and
+    // return the original voucher instead of blocking a legitimate retry.
+    const [existingRequest] = await tx.select({ id: accountingPostingRequests.id })
+      .from(accountingPostingRequests)
+      .where(and(
+        eq(accountingPostingRequests.companyId, companyId),
+        eq(accountingPostingRequests.idempotencyKey, "zambia-cash-currency-transfer:" + data.clientRequestId),
+      )).limit(1);
+    if (!existingRequest) {
+      const balances = await getCashBankRevaluation(companyId, { attribution: "engine" });
+      const available = new Decimal(sourceSummary(balances.accounts, data.from).nativeBalancesByCurrency[data.fromCurrency] ?? "0");
+      if (available.lt(source)) throw new ZambiaVoucherRateError("Insufficient verified funds in the source currency.");
+    }
 
     return postErpVoucherTx(tx, {
       companyId,
