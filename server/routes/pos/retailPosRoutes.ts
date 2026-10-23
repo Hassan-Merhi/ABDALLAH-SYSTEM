@@ -115,11 +115,13 @@ const returnSchema = z.object({
   idempotencyKey: idempotencyKeySchema,
   shiftId: z.coerce.number().int().positive().optional(),
   notes: z.string().trim().max(2000).optional(),
+  refundDestination: z.enum(["original", "customer_credit"]).default("original"),
   items: z
     .array(
       z.object({
         saleItemId: z.coerce.number().int().positive(),
         quantity: positiveQuantitySchema,
+        restock: z.boolean().default(true),
       })
     )
     .min(1)
@@ -621,6 +623,19 @@ export function registerRetailPosRoutes(app: Express): void {
       const body = returnSchema.parse(req.body);
       await ensureCompanyLocation(companyId, body.locationId);
       const userId = currentUserId(req);
+      // Cash refunds may follow the original tender. A credit to the customer
+      // account must belong to a named customer from this same company's sale.
+      if (body.refundDestination === "customer_credit") {
+        const [original] = await db
+          .select({ customerId: retailPosSales.customerId })
+          .from(retailPosSales)
+          .where(and(eq(retailPosSales.companyId, companyId), eq(retailPosSales.id, saleId)))
+          .limit(1);
+        if (!original?.customerId) return res.status(400).json({
+          code: "RETAIL_RETURN_CUSTOMER_REQUIRED",
+          message: "Assign an ERP customer to the original sale before issuing account credit",
+        });
+      }
 
       const result = await db.transaction(async (tx) => {
         const returned = await createRetailReturnInTx(tx, {
@@ -646,6 +661,7 @@ export function registerRetailPosRoutes(app: Express): void {
             shiftId: shift?.id ?? null,
             refundAmount: returned.refundAmount,
             idempotencyKey: body.idempotencyKey,
+            destination: body.refundDestination,
             userId,
           });
           const refundVoucherId = await postRetailRefundAccountingTx(tx, {
