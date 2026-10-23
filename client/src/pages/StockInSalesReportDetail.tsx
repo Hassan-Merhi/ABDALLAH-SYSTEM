@@ -343,6 +343,9 @@ export default function StockInSalesReportDetail() {
   const rate = (value: number) => {
     const converted = convertToDisplay(value);
     if (displayCurrency && selectedCurrency === displayCurrency && Number.isFinite(converted)) {
+      // Preserve Mali's existing report-rate precision rather than changing
+      // CFA presentation as a side effect of introducing ZMW.
+      if (displayCurrency === "CFA") return `CFA ${formatNumber(converted, 2)}`;
       return formatMoneyDisplay(converted, { currency: displayCurrency });
     }
     return `$ ${formatNumber(value, 2)}`;
