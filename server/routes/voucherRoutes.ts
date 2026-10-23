@@ -1,6 +1,5 @@
 import type { Express } from "express";
 import { isValidIsoDate } from "../lib/requestValidation";
-import { registerRetailManualVoucherBoundary } from "../middleware/retailManualVoucherBoundary";
 import { registerDaybookPaginationRoutes } from "./daybookPaginationRoutes";
 import { registerSupplierPurchaseOrderPaginationRoutes } from "./vouchers/supplierPurchaseOrderPaginationRoutes";
 import { registerVoucherPaginationRoutes } from "./vouchers/voucherPaginationRoutes";
@@ -68,10 +67,6 @@ function registerVoucherCreateDateValidation(app: Express): void {
 }
 
 export function registerVoucherRoutes(app: Express) {
-  // HTTP-only Retail guard must precede every generic voucher creator/editor.
-  // Internal transaction-owned Retail journals bypass these HTTP endpoints.
-  registerRetailManualVoucherBoundary(app);
-
   // The ERP Daybook uses one SQL-paged chronological union of vouchers and offloads.
   registerDaybookPaginationRoutes(app);
 
