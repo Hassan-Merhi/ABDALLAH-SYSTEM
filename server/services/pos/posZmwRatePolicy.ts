@@ -50,3 +50,30 @@ export async function resolveLockedZmwPosCurrency(
   }
   return { currency: "ZMW", exchangeRate: locked.toFixed() };
 }
+
+/**
+ * An imported Kwacha sheet travels as converted USD unit prices, but must
+ * include each original Kwacha price as well. Reject forged/inconsistent USD
+ * values before stock or ledger posting (6dp USD price round-trip tolerance).
+ */
+export function assertZmwImportPrices(
+  rows: readonly { rate: unknown; originalCurrencyRate?: unknown }[],
+  lockedCurrency: LockedPosCurrency
+): void {
+  if (lockedCurrency.currency !== "ZMW") return;
+  if (!lockedCurrency.exchangeRate) throw new PosZmwRateError("ZMW rate was not locked.");
+  const rate = new Decimal(lockedCurrency.exchangeRate);
+  for (const [index, row] of rows.entries()) {
+    const usd = String(row.rate ?? "");
+    const native = String(row.originalCurrencyRate ?? "");
+    if (!/^\\d+(?:\\.\\d{1,6})?$/.test(usd) || !/^\\d+(?:\\.\\d{1,6})?$/.test(native)) {
+      throw new PosZmwRateError(`Excel line ${index + 1}: include a valid converted USD rate and original ZMW rate.`);
+    }
+    const usdValue = new Decimal(usd);
+    const kwachaValue = new Decimal(native);
+    if (!usdValue.gt(0) || !kwachaValue.gt(0) ||
+        usdValue.times(rate).minus(kwachaValue).abs().gt(rate.times("0.00000051"))) {
+      throw new PosZmwRateError(`Excel line ${index + 1}: USD amount does not match the original Kwacha price at the locked rate.`);
+    }
+  }
+}
