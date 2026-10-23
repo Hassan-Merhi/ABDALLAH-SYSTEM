@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import { ChevronLeft, ChevronRight, ImageIcon, Images, ZoomIn, ZoomOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { normalizeRetailImageUrl, normalizeRetailImageUrls } from "@/lib/retailImageUrl";
 import { cn } from "@/lib/utils";
 import type { RetailProduct } from "./retailInventoryTypes";
@@ -134,10 +134,10 @@ export function RetailPhotoGallery({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <button
+      <DialogTrigger asChild>
+        <button
         type="button"
         className={cn("group relative block shrink-0 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2", className)}
-        onClick={() => setOpen(true)}
         aria-label={`View all photos of ${title}`}
         aria-haspopup="dialog"
         title="View all product photos"
@@ -149,7 +149,8 @@ export function RetailPhotoGallery({
           {sources.length}
         </span>
         <span className="sr-only">Open photo gallery</span>
-      </button>
+        </button>
+      </DialogTrigger>
 
       <DialogContent
         className="flex max-h-[96vh] w-[96vw] max-w-5xl flex-col gap-3 overflow-hidden p-3 sm:p-5"
