@@ -7,6 +7,7 @@ import { format } from "date-fns";
 import { useLocation } from "wouter";
 import { resolveWhatsAppPrompt, type WhatsAppPromptState } from "@/lib/whatsapp-prompt";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
+import { useZmwVoucherRate } from "@/hooks/useZmwVoucherRate";
 import { useCompany } from "@/contexts/CompanyContext";
 import { parseDateLocal } from "@/components/vouchers/PrintTemplate";
 import type { CombinedAccount } from "@/components/AccountAutocomplete";
@@ -69,7 +70,7 @@ export function useJournalFormModel({ voucherIdToEdit, isPOS }: JournalFormProps
   const isFactoryMode = appMode === "factory";
   const modePrefix = useModePrefix();
   const [, setLocation] = useLocation();
-  const { formatAmount, selectedCurrency, convertToUSD } = useCurrencyContext();
+  const { formatAmount, selectedCurrency: preferredCurrency, convertToUSD } = useCurrencyContext();
   const [transactionRate, setTransactionRate] = useState<number | null>(null);
   const [journalEffectiveDate, setJournalEffectiveDate] = useState("");
   const [waPendingPrompt, setWaPendingPrompt] = useState<WhatsAppPromptState>(null);
@@ -150,6 +151,9 @@ export function useJournalFormModel({ voucherIdToEdit, isPOS }: JournalFormProps
       };
     },
   });
+
+  const selectedCurrency = voucherIdToEdit && voucherToEdit?.currency === "ZMW"
+    ? "ZMW" : preferredCurrency;
 
   useEffect(() => {
     if (voucherIdToEdit) setAccountPickersNeeded(true);
@@ -245,6 +249,13 @@ export function useJournalFormModel({ voucherIdToEdit, isPOS }: JournalFormProps
     name: "entries",
   });
   const journalEntries = journalForm.watch("entries");
+  const journalDateForRate = format(journalForm.watch("voucherDate") ?? new Date(), "yyyy-MM-dd");
+  const { rate: datedZmwRate } = useZmwVoucherRate(journalDateForRate);
+  const storedZmwRate = Number(voucherToEdit?.exchangeRate);
+  const lockedJournalRate = voucherIdToEdit && voucherToEdit?.currency === "ZMW"
+    ? Number.isFinite(storedZmwRate) && storedZmwRate > 0 ? storedZmwRate : null
+    : datedZmwRate;
+  const postingRate = selectedCurrency === "ZMW" ? lockedJournalRate : transactionRate;
   const totalDebit = journalEntries.reduce(
     (sum, entry) => sum + (entry.type === "DR" ? parseFloat(entry.amount) || 0 : 0),
     0
@@ -430,13 +441,15 @@ export function useJournalFormModel({ voucherIdToEdit, isPOS }: JournalFormProps
         accountId = entry.customerId;
         accountName = customers.find((customer) => customer.id === accountId)?.legalName || "";
       }
-      const debit = parseFloat(String(entry.debitAmount || "0"));
+      const usesLockedZmw = voucherToEdit.currency === "ZMW";
+      const debit = parseFloat(String((usesLockedZmw ? entry.transactionDebitAmount : entry.debitAmount) || "0"));
+      const credit = parseFloat(String((usesLockedZmw ? entry.transactionCreditAmount : entry.creditAmount) || "0"));
       return {
         type: debit > 0 ? "DR" : "CR",
         accountType,
         accountId,
         accountName,
-        amount: String(debit > 0 ? (entry.debitAmount ?? "") : (entry.creditAmount ?? "")),
+        amount: String(debit > 0 ? debit : credit),
         narration: entry.narration || "",
       };
     });
@@ -475,7 +488,7 @@ export function useJournalFormModel({ voucherIdToEdit, isPOS }: JournalFormProps
         notes: formData.notes,
         optional: formData.optional,
         currency: selectedCurrency,
-        exchangeRate: transactionRate ? transactionRate.toString() : undefined,
+        exchangeRate: postingRate ? postingRate.toString() : undefined,
         effectiveDate: journalEffectiveDate || null,
       };
       if (voucherIdToEdit) {
@@ -740,7 +753,7 @@ export function useJournalFormModel({ voucherIdToEdit, isPOS }: JournalFormProps
     selectedCurrency,
     convertToUSD,
     formatAmount,
-    transactionRate,
+    transactionRate: selectedCurrency === "ZMW" ? postingRate : transactionRate,
     setTransactionRate,
     journalEffectiveDate,
     setJournalEffectiveDate,
