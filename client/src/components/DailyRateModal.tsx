@@ -169,6 +169,7 @@ export function DailyRateModal({ companyId }: DailyRateModalProps) {
         // not this browser's local clock — so every user's save lands on the same shared
         // daily row regardless of their device/timezone.
         effectiveDate: todayRateCheck.today,
+        daily: true,
       });
     },
     onSuccess: async () => {
