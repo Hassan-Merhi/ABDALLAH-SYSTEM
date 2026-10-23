@@ -195,10 +195,45 @@ replacement customer and credit, and unrelated ERP/Factory POS regressions.
 Confirm Finance reconciliation distinguishes amount allocated vs amount collected.
 No CI, tests, builds, lint, typechecks, rebase or deploy performed here.
 
-### Phase 6 — retail-specific voucher visibility
-Hide manual Transfer Order, Adjustment/Credit Note and Journal entries *only for
-Retail* (menus and selector UI); preserve underlying accounting records,
-read-only audit access and system-generated accounting entries.
+### Phase 6 — retail-specific voucher visibility (implemented in source)
+
+- Retail-only policy (`client/src/lib/retailVoucherPolicy.ts`) removes manual
+  **Journal**, **Transfer Order**, **Adjustment**, and **Credit Note** tabs from
+  the Vouchers hub. Both mobile sheet selector and desktop sidebar derive from
+  the same filtered navigation groups.
+- The existing URL/query-state hook gets Retail's filtered `allowedValues`
+  and `knownValues`, so a deep link or stale browser hash to
+  `/vouchers?tab=journal`, `transferorder`, `adjustment`, or `creditnote`
+  falls back to the first allowed voucher type instead of rendering a manual
+  form. Switching companies restores ERP/Factory options appropriately.
+- Retains Payment, Receipt, and the existing Stock Transfer tab; **Transfer
+  Order** is a separate legacy workflow and is hidden. Retail's dedicated
+  barcode/variant Stock Operations workflow remains at `/retail/stock`.
+- Retail direct links to `/stock-transfer-order` redirect to
+  `/retail/stock` via the authenticated route guard. The standalone editor
+  also redirects *before mounting* its ERP transfer-order model.
+- Existing system-generated Journal, Credit/Debit Note and stock adjustment
+  vouchers are **read-only** through the generic `/vouchers/:id/edit`
+  route; users can open their `/voucher-detail/:id` audit details.
+  The generic voucher edit modal also refuses those edits, and on Retail its
+  type picker does not offer the Journal type. A legacy `/vouchers?edit=:id`
+  link to one of these types is redirected to its read-only detail.
+- **Not an accounting data migration.** No voucher rows are deleted, no
+  system-entry posting code is touched. Automatic Retail sale, return,
+  refund, credit, COGS and tax journals continue to be created by their
+  transaction-owned server services. Financial statements/Daybook still
+  display the entries.
+- This phase restricts **UI entry/edit affordances**. It does *not* add a
+  cross-cutting API authorization rule for direct generic voucher write APIs;
+  review that separately before treating hidden tabs as a security boundary.
+
+**Claude verification:** On a Retail company check mobile and desktop voucher
+navigation, all four blocked query/hash deep links, normal Payment and Receipt
+entry, Stock Transfer tab visibility, direct Transfer Order redirect, generic
+modal/type selector, posted system Journal detail vs edit, and company switching
+to normal ERP/Factory. Confirm ordinary Retail POS sales/refund accounting
+journals still post and remain readable, with no cross-company UI regressions.
+No tests, CI, lint, typechecks, builds, merge, rebase or deployment performed.
 
 ### Phase 7 — transfers between locations
 Image thumbnails and full gallery in variant selector. Transfer exact variant with
