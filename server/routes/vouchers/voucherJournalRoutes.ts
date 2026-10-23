@@ -1,4 +1,4 @@
-import { assertApprovedZmwVoucherRate, assertLockedZmwVoucherEdit } from "../../services/accounting/zambiaVoucherRatePolicy";
+import { assertApprovedZmwVoucherRate, assertLockedZmwVoucherEdit, ZambiaVoucherRateError } from "../../services/accounting/zambiaVoucherRatePolicy";
 import type { Express } from "express";
 import { getErrorMessage, errorStatus } from "../../lib/httpHandlers";
 import { db } from "../../db";
@@ -522,8 +522,23 @@ export function registerVoucherJournalRoutes(app: Express) {
           newEffectiveDate: effectiveDate || null,
         });
 
+        // Recheck the immutable FX header under the write transaction; a
+        // second editor must not be able to alter it between read and save.
+        assertLockedZmwVoucherEdit(existingVoucher, { voucherDate, currency, exchangeRate });
         // Get existing entries before deleting (for balance sync)
         const oldEntries = await tx.select().from(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
+        if (existingVoucher.currency === "ZMW" && (
+          !oldEntries.length || oldEntries.some(entry =>
+            entry.transactionCurrency !== "ZMW" ||
+            entry.transactionDebitAmount == null ||
+            entry.transactionCreditAmount == null ||
+            entry.historicalExchangeRate == null
+          )
+        )) {
+          throw new ZambiaVoucherRateError(
+            "The existing Kwacha voucher has unresolved native entries. Reconcile the original currency amounts before editing."
+          );
+        }
 
         // Update voucher
         const [updatedVoucher] = await tx
