@@ -1,3 +1,4 @@
+import { assertLockedZmwVoucherEdit } from "../../../services/accounting/zambiaVoucherRatePolicy";
 /**
  * voucherTransferRoutes: VoucherWithEntries endpoints.
  *
@@ -72,6 +73,9 @@ export function registerVoucherWithEntriesRoutes(app: Express) {
       if (existingVoucher.companyId !== req.session.currentCompanyId) {
         return res.status(403).json({ message: "Access denied: Voucher belongs to a different company" });
       }
+      // No edit may silently change an already-posted Kwacha voucher's
+      // original currency, accounting date, or historical rate.
+      assertLockedZmwVoucherEdit(existingVoucher, voucher);
       // Phase 19 C (MC-2): an intercompany transfer leg is not edited here (409);
       // the transfer is deleted (both legs) and recorded again. This editor used
       // to rescale the other company's voucher after commit, outside a
@@ -135,7 +139,13 @@ export function registerVoucherWithEntriesRoutes(app: Express) {
       const totalCredits = sumMoney(
         entries.map((entry: ReplacementEntryInput) => toMoney(entry.creditAmount as MoneyInput))
       );
-      const newTotal = MoneyDecimal.max(totalDebits, totalCredits).toFixed(2);
+      // The editor supplies original ZMW amounts, but voucher.total_amount
+      // remains the historical USD base. Preserve cent precision here.
+      const baseEditRate = existingVoucher.currency === "ZMW"
+        ? toMoney(existingVoucher.exchangeRate) : new MoneyDecimal(1);
+      const newTotal = existingVoucher.currency === "ZMW"
+        ? MoneyDecimal.max(totalDebits, totalCredits).dividedBy(baseEditRate).toFixed(2)
+        : MoneyDecimal.max(totalDebits, totalCredits).toFixed(2);
 
       let updatedVoucher!: typeof vouchers.$inferSelect;
       const createdEntries: (typeof voucherEntries.$inferSelect)[] = [];
@@ -233,7 +243,31 @@ export function registerVoucherWithEntriesRoutes(app: Express) {
 
         for (const [index, entry] of entries.entries()) {
           let dualCurrencyFields: Record<string, unknown> = {};
-          if (entry.transactionCurrency) {
+          if (editVoucherCurrency === "ZMW") {
+            if (entry.transactionCurrency && String(entry.transactionCurrency).toUpperCase() !== "ZMW") {
+              throw new Error("ZMW voucher entry currency must match its original voucher currency.");
+            }
+            // Build both native and base amounts from the locked original rate
+            // and typed native amounts. Untrusted base/rate inputs cannot alter it.
+            const norm = normalizeVoucherEntryAmounts({
+              transactionCurrency: "ZMW",
+              baseCurrency: "USD",
+              transactionDebitAmount: String(entry.transactionDebitAmount ?? entry.debitAmount ?? "0"),
+              transactionCreditAmount: String(entry.transactionCreditAmount ?? entry.creditAmount ?? "0"),
+              historicalRate: editVoucherRate,
+            });
+            dualCurrencyFields = {
+              transactionCurrency: norm.transactionCurrency,
+              transactionDebitAmount: norm.transactionDebitAmount,
+              transactionCreditAmount: norm.transactionCreditAmount,
+              baseDebitAmount: norm.baseDebitAmount,
+              baseCreditAmount: norm.baseCreditAmount,
+              historicalExchangeRate: norm.historicalExchangeRate,
+              rateConvention: norm.rateConvention,
+              debitAmount: norm.debitAmount,
+              creditAmount: norm.creditAmount,
+            };
+          } else if (entry.transactionCurrency) {
             try {
               const norm = normalizeVoucherEntryAmounts({
                 transactionCurrency: entry.transactionCurrency,
