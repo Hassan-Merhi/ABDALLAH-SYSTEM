@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/PageHeader";
 import { Textarea } from "@/components/ui/textarea";
 import { useCurrencyContext, type Currency } from "@/contexts/CurrencyContext";
+import { isSupportedAccountingCurrency } from "@shared/currencyCatalog";
 import { useToast } from "@/hooks/use-toast";
 
 import { SaleGrid } from "./pos-components/SaleGrid";
@@ -170,7 +171,9 @@ export default function POS({ posUser, editVoucherId }: { posUser?: AuthMe; edit
 
   const editedCurrency = editVoucherId && editVoucher?.currency;
   const activeCurrency: Currency = displayCurrency
-    ? (editedCurrency === displayCurrency || editedCurrency === "USD" ? editedCurrency : selectedCurrency)
+    ? ((editedCurrency === displayCurrency || editedCurrency === "USD") &&
+        typeof editedCurrency === "string" && isSupportedAccountingCurrency(editedCurrency)
+          ? editedCurrency : selectedCurrency)
     : "USD";
   const editLockedRate = editVoucherId && editVoucher?.exchangeRate
     ? Number(editVoucher.exchangeRate) : null;
