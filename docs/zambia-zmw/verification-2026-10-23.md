@@ -60,10 +60,36 @@ Unit coverage: `tests/zambia-phase8-purchase-costing.test.ts` (costing and expli
 | Full frontend suite | 2246 passed; 6 failures in `tests/ui/barcode-lookup-page-behavior.test.tsx` are unrelated to this work (the branch carries main's pre-fix copy; `origin/main` already contains the fix) |
 | `npm run build` (Vite client, server bundle, bundle and runtime-dependency verification) | pass |
 
+## Merge of `main` (2026-10-23, later the same day)
+
+`origin/main` (through `21be382`) was merged into the branch (`128dbed`). Conflicts and follow-ups:
+
+- `currencyAmounts.ts`: main added AUD to its known-currency set, which this branch replaced with the shared
+  catalog; AUD is registered in `shared/currencyCatalog.ts`.
+- main's FX settings change (#2440) left an unterminated arrow in `FxRatesCard.tsx`, breaking typecheck, lint and
+  build of any branch that merges it; closed on this branch.
+- Rate saves: a company **with** a configured display currency may only save that pair; a company **without** one keeps
+  the original contract (any pair against its accounting base), which three pre-existing suites assert.
+- Dated factory rate lookup returns 404 (not 500) when no stored rate or external quote exists, as main's new test asserts.
+- Ratchets: route manifest and report characterization re-pinned for the Zambia route and native PO columns; god-file
+  caps met by extracting `poImportZambia.ts`, `purchaseOrderZmwEdit.ts` and `usePosZmwSaleRate.ts`; main's Node
+  24.22.1 bump completed in `render.yaml`, README, workflow names, the coherence test and the deployment docs.
+
+Full-suite results on the merged tree (`7fbc03d`):
+
+| Check | Result |
+| --- | --- |
+| `npm run check` | pass |
+| `npm run lint` | pass, 0 warnings |
+| `npm run build` | pass |
+| Changed-file Prettier, migration registry, doc-index, toolchain audits | pass |
+| Startup migrations on a fresh local database | 0 failures |
+| Full backend suite (`vitest run`) | 1091 files, 7509 passed, 12 skipped, 0 failed |
+| Full frontend suite | 244 files, 2265 passed, 0 failed |
+
 ## Remaining before production
 
-1. Merge the current `main` into this branch (9 commits behind, including the barcode-lookup test fix) and re-run the
-   full backend suite in hosted CI; only targeted backend suites were run locally.
+1. Run hosted CI on the merged branch (every check above was run locally, not on GitHub Actions).
 2. Apply `20261023_001_zambia_historical_purchase_cost.sql` through the versioned runner
    (`scripts/run-versioned-migrations.mjs --apply`) in a maintenance window; it is additive and `NOT VALID`.
 3. Activation is configuration, not code: set Zambia (company 19) display currency to ZMW, keep USD base, set the
