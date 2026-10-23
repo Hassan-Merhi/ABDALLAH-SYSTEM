@@ -6,15 +6,15 @@
  * This is a SOURCE write boundary, not a historical data migration.
  */
 import Decimal from "decimal.js";
+import { HttpError } from "../../lib/httpError";
 import { storage } from "../../storage";
 import { companyBusinessDate } from "./companyBusinessDate";
 import { companyRateDateSchema, companyRateValueSchema } from "@shared/companyRatePolicy";
 
-export class ZambiaVoucherRateError extends Error {
-  readonly statusCode = 409;
+export class ZambiaVoucherRateError extends HttpError {
   readonly code = "ZMW_VOUCHER_RATE_INVALID";
   constructor(message: string) {
-    super(message);
+    super(409, message);
     this.name = "ZambiaVoucherRateError";
   }
 }
