@@ -28,6 +28,7 @@ export function registerAllPosRoutes(app: Express): void {
 
   registerRetailPosRoutes(app);
   registerRetailStockOpsRoutes(app);
+  registerRetailTransferWorkflowRoutes(app);
   registerRetailCustomerRoutes(app);
   registerRetailSellingRoutes(app);
   registerRetailStockCountRoutes(app);
