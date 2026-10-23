@@ -13,6 +13,7 @@ export const ACCOUNTING_CURRENCY_CODES = [
   "XOF",
   "XAF",
   "EUR",
+  "AUD",
   "GBP",
   "CNY",
   "NGN",

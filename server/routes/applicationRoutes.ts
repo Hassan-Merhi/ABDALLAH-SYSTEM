@@ -5,6 +5,7 @@ import { requireAuth } from "../auth";
 import { db } from "../db";
 import { registerAccountRoutes } from "./accounts";
 import { registerCostCenterRoutes } from "./costCenterRoutes";
+import { enforceCostCenterErpPageAccess } from "../middleware/costCenterErpPageAccess";
 import { registerCostCenterReportingRoutes } from "./costCenterReportingRoutes";
 import { registerCostCenterHistoricalRoutes } from "./costCenterHistoricalRoutes";
 import { registerCostCenterReleaseReadinessRoutes } from "./costCenterReleaseReadinessRoutes";
@@ -36,6 +37,8 @@ import { registerGoldenCoastAccountingRoutes } from "./goldenCoastAccountingRout
 import { registerGoldenCoastLegacyPostingRetirement } from "./goldenCoastLegacyPostingRetirement";
 import { registerImportCycleRoutes } from "./import-cycle";
 import { registerAccountingIntegrityRoutes } from "./accounting-integrity";
+import { registerUnifiedAccountingRoutes } from "./unifiedAccountingRoutes";
+import { enforceUnifiedAccountingRollout } from "../middleware/unifiedAccountingRolloutBoundary";
 import { registerPerpetualReadinessRoutes } from "./accounting-integrity/perpetualReadinessRoutes";
 import { registerImportRoutes } from "./import";
 import { registerIntercompanyNotificationRoutes } from "./intercompanyNotificationRoutes";
@@ -102,6 +105,10 @@ export async function registerApplicationRoutes(app: Express): Promise<Server> {
   // Shared ERP accounting endpoints are reused inside Factory pages. Enforce
   // their Factory page/tab ownership before any concrete route handler runs.
   app.use(enforceSharedFactoryAccess);
+  app.use("/api/cost-centers", requireAuth, enforceCostCenterErpPageAccess);
+  // New unified-accounting metadata writers are read-only until a
+  // company-specific, source-pinned Owner pilot. Existing voucher flows remain unchanged.
+  app.use(enforceUnifiedAccountingRollout);
   registerWhatsAppFastSendRoutes(app);
   registerBandwidthPhase3FactoryReads(app);
   registerFactoryRoutes(app, requireAuth, db);
@@ -167,6 +174,7 @@ export async function registerApplicationRoutes(app: Express): Promise<Server> {
   registerStatsRoutes(app);
   registerImportCycleRoutes(app);
   registerAccountingIntegrityRoutes(app);
+  registerUnifiedAccountingRoutes(app);
   registerPerpetualReadinessRoutes(app);
   registerDebugRoutes(app);
   registerReportsRoutes(app);
