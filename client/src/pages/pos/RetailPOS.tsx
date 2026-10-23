@@ -495,7 +495,10 @@ export default function RetailPOS() {
   }, [total]);
 
   const paymentTotal = payments.reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
+  const hasCreditTender = payments.some((payment) => payment.method === "credit");
+  const creditAmount = payments.reduce((sum, payment) => payment.method === "credit" ? sum + Number(payment.amount || 0) : sum, 0);
   const paymentsValid =
+    (!hasCreditTender || Boolean(customer?.id)) &&
     Math.abs(paymentTotal - total) <= 0.005 &&
     payments.every(
       (payment) =>
@@ -584,15 +587,34 @@ export default function RetailPOS() {
             <option value="bank">Bank</option>
             <option value="mobile">Mobile</option>
             <option value="other">Other</option>
+            <option value="credit" disabled={!customer?.id}>Customer Credit</option>
           </select>
         </div>
-        <div className="flex items-center gap-2 pt-6" title="Credit-sale accounting is part of Phase 4">
-          <input type="checkbox" disabled checked={false} aria-label="Credit sales not yet available" className="h-4 w-4" />
-          <span className="text-sm text-muted-foreground">Credit (coming in Phase 4)</span>
-        </div>
+        <label className="flex items-center gap-2 pt-6 text-sm" title={!customer ? "Select a customer for credit sales" : "Charge the sale to the selected customer's ERP account"}>
+          <input
+            type="checkbox"
+            checked={hasCreditTender}
+            disabled={!customer?.id && !hasCreditTender}
+            onChange={(event) => {
+              const amount = Number(total.toFixed(2));
+              setPayments(event.target.checked
+                ? [{ method: "credit", amount, tenderedAmount: null }]
+                : [{ method: "cash", amount, tenderedAmount: amount }]
+              );
+            }}
+            data-testid="toggle-retail-credit-sale"
+            className="h-4 w-4 accent-primary"
+          />
+          Credit
+        </label>
         <div className="min-w-[190px] flex-1 xl:max-w-[350px]">
           <RetailCustomerPicker customer={customer} onSelect={setCustomer} />
         </div>
+        {hasCreditTender && (
+          <span className="self-center text-xs font-medium text-amber-700 dark:text-amber-300" data-testid="retail-credit-amount">
+            {customer ? `On account: ${money(creditAmount)}` : "Choose a customer to post credit"}
+          </span>
+        )}
       </div>
 
       <RetailShiftPanel locationId={selectedLocation?.id ?? null} onShiftChange={setCurrentShift} />
@@ -735,7 +757,14 @@ export default function RetailPOS() {
               )}
             </div>
 
-            {cart.length > 0 && <RetailPaymentPanel total={total} value={payments} onChange={setPayments} />}
+            {cart.length > 0 && (
+              <RetailPaymentPanel
+                total={total}
+                value={payments}
+                onChange={setPayments}
+                canUseCredit={Boolean(customer?.id)}
+              />
+            )}
             {isPosRole && !currentShift && cart.length > 0 && (
               <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-sm">
                 Open a cashier shift before completing this sale.
