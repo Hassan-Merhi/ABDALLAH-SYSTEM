@@ -26,6 +26,7 @@ import {
 } from "../../services/factory/factoryVoucherCorrection";
 
 import { applyPurchaseOrderItemsUpdate } from "./purchaseOrderItemsUpdate";
+import { assertHistoricalUsdPurchaseCost } from "../../services/accounting/zambiaPurchaseCurrencyGuard";
 import { storedCents, syncContainerCharges } from "./containerChargeSync";
 import { registerPurchaseOrderDeleteRoute } from "./purchaseOrderDeleteRoute";
 import { registerPoImportBackfillRoute } from "./poImportBackfillRoute";
@@ -52,6 +53,11 @@ export function registerContainerFreightWriteRoutes(app: Express) {
           message: "Access denied: Purchase order belongs to a different company",
         });
       }
+
+      // Charge-only edits also resync parent and inventory journals. Reject native
+      // Kwacha labels before either branch enters its write transaction.
+      assertHistoricalUsdPurchaseCost(existingPO.currency);
+      assertHistoricalUsdPurchaseCost(req.body.currency);
 
       // Check edit permissions based on role
       const userRole = req.session.currentRole;
