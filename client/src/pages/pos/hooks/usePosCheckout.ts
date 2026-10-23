@@ -141,7 +141,7 @@ export function usePosCheckout({
       toast({ title: "Error", description: "Please select a customer for credit sale", variant: "destructive" });
       return;
     }
-    if (activeCurrency === "CFA" && !exchangeRate) {
+    if (activeCurrency !== "USD" && (!exchangeRate || !Number.isFinite(exchangeRate) || exchangeRate <= 0)) {
       toast({
         title: "Error",
         description: "Please enter an exchange rate for this transaction.",
@@ -176,11 +176,11 @@ export function usePosCheckout({
       isCreditSale,
       notes,
       voucherDate: saleDate,
-      currency: activeCurrency === "CFA" ? "CFA" : "USD",
-      exchangeRate: exchangeRate ? exchangeRate.toString() : undefined,
+      currency: activeCurrency,
+      exchangeRate: activeCurrency !== "USD" && exchangeRate ? exchangeRate.toString() : undefined,
       items: validItems.map((row) => {
         const rateInUSD =
-          activeCurrency === "CFA" && dailyExchangeRate
+          activeCurrency !== "USD" && dailyExchangeRate
             ? parseFloat(row.rate.toString()) / dailyExchangeRate
             : row.rateUSD;
         return {
@@ -195,6 +195,10 @@ export function usePosCheckout({
       }),
     };
 
+    if (saleData.items.some((item) => !Number.isFinite(Number(item.rate)) || Number(item.rate) <= 0)) {
+      toast({ title: "Invalid foreign-currency price", description: "Check the exchange rate and item prices before saving.", variant: "destructive" });
+      return;
+    }
     saveMutation.mutate(saleData as PosSalePayload);
   };
 
