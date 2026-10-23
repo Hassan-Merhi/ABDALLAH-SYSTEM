@@ -188,7 +188,7 @@ export function ZambiaCashCurrencyTransfer() {
         </div>
         <p className="text-sm" data-testid="zambia-transfer-preview">
           {rateLoading ? "Loading approved rate…" : historicalRate?.rate
-            ? \`1 USD = \${historicalRate.rate} ZMW · Destination receives \${toAmount ?? "—"} \${toCurrency}\`
+            ? `1 USD = ${historicalRate.rate} ZMW · Destination receives ${toAmount ?? "—"} ${toCurrency}`
             : "No approved USD/ZMW rate for the selected date. Transfer is blocked."}
         </p>
         {fromAccount?.totalsProvisional && <p className="text-sm text-destructive">Resolve source account's historical currency amounts before transferring.</p>}
