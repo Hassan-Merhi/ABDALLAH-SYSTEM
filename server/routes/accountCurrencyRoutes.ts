@@ -163,6 +163,19 @@ export const normalizeAccountOpeningBalance: RequestHandler = async (req, res, n
     const companyId = req.session.currentCompanyId ?? Number(req.body?.companyId);
     if (!companyId) return res.status(400).json({ message: "No company selected" });
     const baseCurrency = await getBaseCurrency(companyId);
+    if (String(req.body?.openingBalanceCurrency || "").toUpperCase() === "ZMW") {
+      const [company] = await db.select({
+        baseCurrency: companies.baseCurrency,
+        displayCurrency: companies.displayCurrency,
+      }).from(companies).where(eq(companies.id, companyId)).limit(1);
+      if (String(company?.baseCurrency).toUpperCase() !== "USD" ||
+          String(company?.displayCurrency).toUpperCase() !== "ZMW") {
+        return res.status(409).json({
+          code: "ZMW_OPENING_COMPANY_MISMATCH",
+          message: "A Kwacha cash/bank opening must belong to a USD-base, ZMW-display company.",
+        });
+      }
+    }
 
     let existing: typeof ledgerAccounts.$inferSelect | typeof bankAccounts.$inferSelect | null = null;
     const idMatch = req.path.match(/\/(\d+)$/);
