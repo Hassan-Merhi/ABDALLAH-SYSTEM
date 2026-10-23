@@ -160,6 +160,19 @@ export function CreditNoteTab({ allAccounts, editVoucherId }: CreditNoteTabProps
   const noteCurrency = isEditMode
     ? (editData?.voucher?.currency === "ZMW" ? "ZMW" : "USD")
     : selectedCurrency === "ZMW" && displayCurrency === "ZMW" ? "ZMW" : "USD";
+  // Currency changes must never reinterpret prices already entered in the
+  // credit-note cart. New notes clear those prices; edits retain the original
+  // voucher's locked currency and exchange rate.
+  const previousNoteCurrency = useRef(noteCurrency);
+  useEffect(() => {
+    if (isEditMode) return;
+    if (previousNoteCurrency.current !== noteCurrency) {
+      previousNoteCurrency.current = noteCurrency;
+      setItems([]);
+      setRefundRate("");
+    }
+  }, [noteCurrency, isEditMode]);
+
   const noteDate = form.watch("voucherDate");
   const { data: datedZmwRate, isFetching: isFetchingNoteRate } = useQuery<{ rate: string } | null>({
     queryKey: ["/api/exchange-rates/latest", selectedCompany?.id, "USD", "ZMW", noteDate, "credit-note"],
