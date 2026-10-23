@@ -10,6 +10,8 @@
  * price/charge, the approved dated USD/ZMW rate and the converted USD cost
  * before they can enter this storage/write path.
  */
+import { HttpError } from "../../lib/httpError";
+
 export const ZMW_PURCHASE_REQUIRES_HISTORICAL_COST =
   "Kwacha purchase orders are not yet enabled: original ZMW line prices and charges need an approved historical rate and locked USD inventory cost. Use a USD-priced purchase order, or defer posting until native-ZMW purchasing is implemented.";
 
@@ -19,10 +21,6 @@ export function isUnsupportedNativeZmwPurchase(currency: unknown): boolean {
 
 export function assertHistoricalUsdPurchaseCost(currency: unknown): void {
   if (isUnsupportedNativeZmwPurchase(currency)) {
-    const error = new Error(ZMW_PURCHASE_REQUIRES_HISTORICAL_COST) as Error & { statusCode: number; code: string };
-    error.name = "ZmwPurchaseCostNotReady";
-    error.statusCode = 409;
-    error.code = "ZMW_PURCHASE_HISTORICAL_COST_REQUIRED";
-    throw error;
+    throw new HttpError(409, ZMW_PURCHASE_REQUIRES_HISTORICAL_COST);
   }
 }
