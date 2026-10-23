@@ -7,7 +7,6 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { useLocation as useLocationContext } from "@/contexts/LocationContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { RetailNav } from "@/pages/retail/RetailNav";
 import { PosWorkspaceColumns } from "./pos-components/PosWorkspaceColumns";
 import { RetailErpPosSaleGrid, RetailErpPosItemPicker } from "./RetailErpPosWorkspace";
 import { RetailExchangeDialog } from "./RetailExchangeDialog";
@@ -513,7 +512,6 @@ export default function RetailPOS() {
   return (
     <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4 p-3 pb-24 md:p-5 xl:pb-5">
       {receiptPortal}
-      {!isPosRole && <RetailNav />}
       {/* Retail uses the normal ERP POS arrangement; posting stays on variant-aware retail services. */}
       <header className="flex flex-wrap items-center justify-between gap-3 border-b py-2">
         <h1 className="border-l-2 border-primary pl-3 text-2xl font-semibold tracking-tight">Point of Sale</h1>
