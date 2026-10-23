@@ -8,6 +8,7 @@ import { storage } from "../../storage";
 import { logAudit } from "../_helpers";
 import { HttpError } from "../../lib/httpHandlers";
 import { syncIntercoParentVoucher } from "./containerHelpers";
+import { assertHistoricalUsdPurchaseCost } from "../../services/accounting/zambiaPurchaseCurrencyGuard";
 import type Decimal from "decimal.js";
 import { MoneyDecimal, parseMoneyInput, sumMoney, toMoney } from "../../lib/money";
 import { syncPurchaseOrderGitTx } from "../../services/accounting/perpetualInventory/stockReceipts";
@@ -71,6 +72,10 @@ export async function applyPurchaseOrderItemsUpdate(
   ctx: PurchaseOrderItemsUpdateContext
 ): Promise<Record<string, unknown>> {
   const { id, existingPO } = ctx;
+  // A PO currency label does not change its USD line/landed cost basis.
+  // Guard both existing ZMW rows and attempts to relabel a USD-valued PO.
+  assertHistoricalUsdPurchaseCost(existingPO.currency);
+  assertHistoricalUsdPurchaseCost(req.body.currency);
 
   // Get existing line items to preserve values when only name changes
   const existingLineItems = await storage.getLineItemsByPO(id);
