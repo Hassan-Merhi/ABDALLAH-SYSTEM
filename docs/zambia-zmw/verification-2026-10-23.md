@@ -58,7 +58,7 @@ Unit coverage: `tests/zambia-phase8-purchase-costing.test.ts` (costing and expli
 | Application startup migrations against a fresh local database | `/api/health/db` reports 0 failures |
 | Targeted backend suites (imports, purchasing, offload, rates, transfers, chatbot, opening balances, route guards) | pass after the fixes above |
 | Full frontend suite | 2246 passed; 6 failures in `tests/ui/barcode-lookup-page-behavior.test.tsx` are unrelated to this work (the branch carries main's pre-fix copy; `origin/main` already contains the fix) |
-| `npm run build` | see the final report for the result of the run performed at the end of verification |
+| `npm run build` (Vite client, server bundle, bundle and runtime-dependency verification) | pass |
 
 ## Remaining before production
 
