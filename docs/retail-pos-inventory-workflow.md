@@ -294,13 +294,37 @@ isolation, manager/non-POS permissions, photo gallery focus, and both POS/
 Stock Operations transfer entry points. Run tests/typechecks/CI and reconcile
 against latest `main` only when Claude takes ownership; none were run here.
 
-### Phase 8 — source-level integration and Claude handoff
-Finish wiring, review migration expectations and document Claude's checks.
-No execution of CI/tests/lint/typechecks/builds by ChatGPT, no merging/deploying.
+### Phase 8 — source-level integration and Claude handoff (committed)
 
-## Phase 1 boundaries
+- Reviewed the component and route contracts across Retail Inventory photo
+  galleries, ERP-style POS, customer credit, refund accounting, returns,
+  exchanges, Retail voucher handling and two-stage stock transfers.
+- Fixed the Retail payment **Split** control when the sole default tender already
+  covered the total. Previously it could only split a payment with unallocated
+  remainder, making the typical $100 single-tender default unsplittable.
+- Added strict **return replay** identity checks: an existing idempotency key
+  must match the original sale, each sale line's quantity and its exact
+  restock disposition. A mismatched retry cannot silently report another
+  sale's refund as successful.
+- Added strict **dispatch replay** identity checks: an existing operation key
+  must match the exact product variant, source/destination, quantity and note.
+- Added a Retail-only **manual voucher HTTP guard**:
+  `server/middleware/retailManualVoucherBoundary.ts`, registered before
+  generic Voucher routes in `server/routes/voucherRoutes.ts`. It blocks
+  manually creating or editing Journal, Credit/Debit Note, Adjustment and
+  Transfer Order voucher types for the selected Retail company. Existing
+  automatically posted journals remain visible but read-only. The guard
+  neither intercepts internal Retail transaction-owned central postings
+  nor changes non-Retail company behavior. Other write endpoints outside
+  `/api/vouchers/*` must still be reviewed for authorization.
+- Added detailed owner/Claude handoff at
+  `docs/retail-pos-inventory-claude-handoff.md`, including route mappings,
+  migration sequencing, permission boundaries, accounting examples, source
+  and runtime verification matrix and a ready-to-paste Claude instruction.
+- The branch is source-complete for the agreed phase plan, but **not yet
+  runtime-verified or ready to deploy**. Claude must perform typechecks,
+  tests, CI, regression/financial reconciliation and merge-base conflict
+  resolution under its own ownership, with the owner's final approval.
 
-Phase 1 does **not** yet switch the Retail POS to the normal ERP grid, implement
-gallery interactions, enable credit terms, change refunds, hide voucher forms, add
-transfer receiving, or pipe retail transactions into the standard Sales Report.
-Those are explicitly subsequent phases.
+No CI, tests, lint, typechecks, builds, SQL migration, merge, rebase, deployment
+or production accounting/stock writes were performed by ChatGPT.
