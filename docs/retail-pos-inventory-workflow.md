@@ -140,12 +140,60 @@ credit-first returns, cancellations, customer-ledger balances, receipts, idempot
 retry, blank customer blocking, deleted customer rejection, company isolation,
 closed shift behavior and existing ERP / Factory / non-retail accounting.
 
-### Phase 5 — returns/refunds/exchanges
-Select original sale/receipt and exact line/quantity. Refund only that line's
-unreturned quantity with its original discount, tax, COGS and payment split; reverse
-the correct retail journal and inventory movements without editing the original
-sale. Support refund, account credit, exchange, and damaged/no-restock options;
-ensure partial returns, repeated submissions and POS authorization are safe.
+### Phase 5 — returns/refunds/exchanges (implemented in source)
+
+- A **Return / Exchange** action on Retail POS replaces the embedded recent-sales
+  history. Cashiers can search an original sale by receipt ID, product, SKU or
+  barcode (numeric barcode falls back after trying receipt ID). The result is
+  location- and company-scoped and shows customer, date, original items and status.
+- Return dialog supports **multiple original sale lines**, whole-unit quantities
+  capped at sold minus previously returned quantity, exact color/size/photos,
+  a written reason and original historical tax-inclusive refund amount. The server
+  recalculates all money and locks original sale/return-item rows.
+- Refund destination is original payment allocation or customer account credit.
+  Outstanding credit ("credit" tender) is reversed **first**, then collected
+  tenders are refunded to their original method or credited to the customer.
+  Account credit is recorded as a refund-only `store_credit` method with its
+  original payment reference and is posted as **Cr customer** on the ERP ledger;
+  it is not a cash refund or a second sales credit. Customer-account credit
+  requires a real original-sale customer and elevated permission.
+- Each return line has an explicit **restock** flag, with a default of true for
+  all existing returns. For damaged/non-sellable goods the flag is false: the
+  sale-line returned quantity and refund are recorded, but sellable inventory is
+  not incremented, the original COGS remains a loss and the zero-delta stock
+  movement records the financial return reason/disposition.
+- Additive migration: `migrations/20261023_001_retail_return_disposition.sql`
+  adds `retail_pos_return_items.restocked BOOLEAN NOT NULL DEFAULT true`;
+  the always-on Retail financial schema guard provides the same idempotent
+  column catch-up, so preexisting return rows preserve their earlier meaning.
+  Neither migration nor guard was executed by this implementation.
+- Retail financial/variant reports treat zero-delta damaged returns as financial
+  returns using audited `returnedQuantity` metadata and do **not** subtract
+  restored cost for goods that never returned to stock. Retail return movement
+  integrity expects zero delta for non-restocked rows rather than falsely
+  reporting a stock mismatch.
+- Exchange is an atomic **return of original sale + replacement sale** with
+  existing idempotent operation key; the new sale retains the original customer
+  and may use that customer's credit tender. The replacement total is taken
+  from the existing Retail server cart preview (promotions/tax). Its credit
+  difference is a net presentation of the two real posting legs; their refund
+  and new-sale payment entries remain auditable separately.
+- Manager+ authorization required for damaged/non-restock and customer-account
+  credit refunds. POS cashiers must provide an open shift for normal returns
+  and exchanges; existing original settlement and posting audits are preserved.
+- Existing retail sale records and historic vouchers are not rewritten.
+  All new return/refund/COGS/inventory postings are performed transactionally
+  only when the code is later deployed and a real return is requested.
+
+**Claude verification:** Apply additive schema to an isolated test database.
+Verify partial single/multiple-line returns, duplicate retry keys and concurrent
+returns, tax-inclusive and discounted historic prices, sale/account balance
+before/after mixed paid-credit refunds, customer-account credit on cash sale,
+manager/POS role gates and shift closure, damaged return no sellable stock,
+COGS/profit and audit consistency, exchange promotion/tax calculation,
+replacement customer and credit, and unrelated ERP/Factory POS regressions.
+Confirm Finance reconciliation distinguishes amount allocated vs amount collected.
+No CI, tests, builds, lint, typechecks, rebase or deploy performed here.
 
 ### Phase 6 — retail-specific voucher visibility
 Hide manual Transfer Order, Adjustment/Credit Note and Journal entries *only for
