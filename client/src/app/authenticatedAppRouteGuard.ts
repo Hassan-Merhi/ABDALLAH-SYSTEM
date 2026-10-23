@@ -94,6 +94,13 @@ export function resolveAuthenticatedAppRoute({
   } else if (isRetailCompany && (currentLocation === "/" || currentLocation === "/retail/dashboard")) {
     // Retail is still a normal ERP company. Its landing page is the standard ERP dashboard.
     decision = { kind: "redirect", to: "/financial-overview" };
+  } else if (
+    isRetailCompany &&
+    (currentLocation === "/stock-transfer-order" || currentLocation.startsWith("/stock-transfer-order/"))
+  ) {
+    // Retail stock transfers live in the exact-variant stock-operations workflow.
+    // Do not open the legacy manual Transfer Order editor by a direct URL.
+    decision = { kind: "redirect", to: "/retail/stock" };
   } else if (isRetailCompany && currentLocation === "/pos") {
     // Retail uses the variant-aware POS rather than the legacy stock-item POS.
     decision = { kind: "redirect", to: "/retail/pos" };
