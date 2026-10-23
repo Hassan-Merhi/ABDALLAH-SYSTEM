@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRightLeft, History, ImageIcon, PackagePlus, Printer, ScanLine, SlidersHorizontal } from "lucide-react";
+import { ArrowRightLeft, History, PackagePlus, Printer, ScanLine, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,9 +9,10 @@ import { Label } from "@/components/ui/label";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { normalizeRetailImageUrl } from "@/lib/retailImageUrl";
 import { cn } from "@/lib/utils";
 import { RetailNav } from "./RetailNav";
+import { RetailPhotoGallery } from "./RetailProductImage";
+import type { RetailPosItem } from "../pos/retailPosTypes";
 import { RetailMovementHistory } from "./RetailMovementHistory";
 import { RetailLabelPrintDialog } from "./retailLabels";
 import { getJson, money, type Location } from "./retailInventoryTypes";
@@ -68,6 +69,10 @@ export default function RetailStockOperations() {
   const [notFound, setNotFound] = useState<string | null>(null);
   const [locationId, setLocationId] = useState<number | "">("");
   const [toLocationId, setToLocationId] = useState<number | "">("");
+  const [transferFlow, setTransferFlow] = useState<"immediate" | "dispatch">("immediate");
+  const [transferSearch, setTransferSearch] = useState("");
+  const [transferNotes, setTransferNotes] = useState("");
+  const receiveKeys = useRef<Record<number, string>>({});
   const [quantity, setQuantity] = useState(1);
   const [direction, setDirection] = useState<1 | -1>(-1);
   const [reason, setReason] = useState(ADJUSTMENT_REASONS[0]);
@@ -86,6 +91,31 @@ export default function RetailStockOperations() {
     enabled: retailEnabled,
   });
   const activeLocations = locations.filter((location) => location.id > 0 && location.active !== false);
+  const { data: transferOptions = [], isFetching: transferOptionsLoading } = useQuery<RetailPosItem[]>({
+    queryKey: ["retail-transfer-options", companyKey, locationId, transferSearch.trim()],
+    queryFn: () => getJson<RetailPosItem[]>(`/api/pos/retail/items?locationId=${locationId}&search=${encodeURIComponent(transferSearch.trim())}&limit=40`),
+    enabled: retailEnabled && mode === "transfer" && Boolean(locationId),
+    staleTime: 15_000,
+  });
+  const { data: pendingTransfers = [], isFetching: transfersLoading } = useQuery<Array<{
+    id: number;
+    status: "otw" | "received";
+    variantId: number;
+    productName: string;
+    color: string;
+    size: string;
+    barcode: string;
+    fromLocationId: number;
+    toLocationId: number;
+    quantity: number;
+    dispatchedAt: string;
+    notes?: string | null;
+  }>>({
+    queryKey: ["retail-transfer-workflow", companyKey],
+    queryFn: () => getJson("/api/pos/retail/transfers/workflow?status=otw"),
+    enabled: retailEnabled && mode === "transfer",
+    staleTime: 0,
+  });
   useEffect(() => {
     if (locationId === "" && activeLocations.length) setLocationId(activeLocations[0].id);
   }, [activeLocations, locationId]);
@@ -128,6 +158,8 @@ export default function RetailStockOperations() {
         queryClient.invalidateQueries({ queryKey: ["retail-product"] }),
         queryClient.invalidateQueries({ queryKey: ["retail-pos-items"] }),
         queryClient.invalidateQueries({ queryKey: ["retail-variant-movements"] }),
+        queryClient.invalidateQueries({ queryKey: ["retail-transfer-workflow"] }),
+        queryClient.invalidateQueries({ queryKey: ["retail-transfer-options"] }),
       ]);
       if (variant) await loadVariant(`variantId=${variant.variantId}`);
       return true;
@@ -180,17 +212,26 @@ export default function RetailStockOperations() {
         toast({ title: "Choose two different locations and a quantity", variant: "destructive" });
         return;
       }
+      if (stockAt(locationId) + 0.000001 < quantity) {
+        toast({ title: "Insufficient stock at source location", variant: "destructive" });
+        return;
+      }
       const ok = await post(
-        "/api/pos/retail/transfers",
+        transferFlow === "dispatch"
+          ? "/api/pos/retail/transfers/dispatch"
+          : "/api/pos/retail/transfers",
         {
           variantId: variant.variantId,
           fromLocationId: Number(locationId),
           toLocationId: Number(toLocationId),
           quantity,
+          notes: transferNotes.trim() || undefined,
         },
-        `Transferred ${quantity} × ${variant.color} / ${variant.size}`
+        transferFlow === "dispatch"
+          ? `Dispatched ${quantity} × ${variant.color} / ${variant.size}; awaiting receipt`
+          : `Transferred ${quantity} × ${variant.color} / ${variant.size}`
       );
-      if (ok) setQuantity(1);
+      if (ok) { setQuantity(1); setTransferNotes(""); }
     } else if (mode === "adjust") {
       const fullReason =
         reason === "Other" ? reasonNote.trim() : `${reason}${reasonNote.trim() ? ` · ${reasonNote.trim()}` : ""}`;
@@ -212,6 +253,32 @@ export default function RetailStockOperations() {
         setQuantity(1);
         setReasonNote("");
       }
+    }
+  };
+
+  const confirmReceive = async (transferId: number) => {
+    if (busy) return;
+    const key = receiveKeys.current[transferId] ?? makeKey("retail-transfer-receive");
+    receiveKeys.current[transferId] = key;
+    setBusy(true);
+    try {
+      const response = await apiRequest("POST", `/api/pos/retail/transfers/${transferId}/receive`, { idempotencyKey: key });
+      const result = await response.json();
+      delete receiveKeys.current[transferId];
+      toast({ title: result.replayed ? "Receipt already recorded" : "Transfer received", description: "Exact variant is now available at the destination." });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["retail-transfer-workflow"] }),
+        queryClient.invalidateQueries({ queryKey: ["retail-transfer-options"] }),
+        queryClient.invalidateQueries({ queryKey: ["retail-products"] }),
+        queryClient.invalidateQueries({ queryKey: ["retail-pos-items"] }),
+        queryClient.invalidateQueries({ queryKey: ["retail-variant-movements"] }),
+      ]);
+      if (variant) await loadVariant(`variantId=${variant.variantId}`);
+    } catch (error) {
+      toast({ title: "Receive transfer failed", description: error instanceof Error ? error.message : String(error), variant: "destructive" });
+    } finally {
+      setBusy(false);
+      focusScan();
     }
   };
 
@@ -316,17 +383,11 @@ export default function RetailStockOperations() {
       {variant && (
         <Card data-testid="stock-variant">
           <CardContent className="flex gap-3 p-3">
-            {variant.imageUrls[0] ? (
-              <img
-                src={normalizeRetailImageUrl(variant.imageUrls[0])}
-                alt=""
-                className="h-24 w-24 shrink-0 rounded-md border object-cover"
-              />
-            ) : (
-              <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-md bg-muted">
-                <ImageIcon className="h-6 w-6 text-muted-foreground" />
-              </div>
-            )}
+            <RetailPhotoGallery
+              images={variant.imageUrls ?? []}
+              title={`${variant.brand} · ${variant.name} · ${variant.color} / ${variant.size}`}
+              imageClassName="h-24 w-24 shrink-0 rounded-md border object-cover"
+            />
             <div className="min-w-0 flex-1 space-y-1" data-no-translate>
               <div className="truncate font-semibold">
                 {variant.brand} · {variant.name}
