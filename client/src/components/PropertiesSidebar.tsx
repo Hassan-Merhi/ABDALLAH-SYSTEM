@@ -71,6 +71,7 @@ const PROPERTIES_PINNED_DEFAULTS: NavItem[] = [
 export function PropertiesSidebar({ user, onLogout }: { user?: ShellUser; onLogout: () => void | Promise<void> }) {
   const isAdmin = user?.role === "Admin" || user?.role === "Developer";
   const isOwner = user?.role === "Owner";
+  const isDeveloper = user?.role === "Developer";
   const visibleSections = useMemo(
     () =>
       PROPERTIES_NAV_SECTIONS.map((section) => ({
@@ -78,8 +79,7 @@ export function PropertiesSidebar({ user, onLogout }: { user?: ShellUser; onLogo
         items: section.items.filter(
           (item) =>
             (!isOwner || item.url !== "/properties/analytics") &&
-            (isAdmin ||
-              isOwner ||
+            (isDeveloper ||
               (item.url !== "/properties/accounting/open-items" &&
                 item.url !== "/properties/accounting/cash-bank" &&
                 item.url !== "/properties/accounting/monetary-fx" &&
@@ -92,7 +92,7 @@ export function PropertiesSidebar({ user, onLogout }: { user?: ShellUser; onLogo
                 item.url !== "/properties/accounting/rollout"))
         ),
       })).filter((section) => section.items.length > 0),
-    [isAdmin, isOwner]
+    [isDeveloper, isOwner]
   );
 
   const { items: pinnedItems, reorder: reorderPinned } = usePinnedOrder(

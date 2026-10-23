@@ -238,8 +238,7 @@ export function useErpVisibleSections(user?: SidebarUser): {
         item.url === "/accounting/fiscal-review" ||
         item.url === "/accounting/dashboard" ||
         item.url === "/accounting/rollout") &&
-      !isAdmin &&
-      !isOwner
+      !isDeveloper
     )
       return false;
     if (item.url === "/settings" && isOwner) return false;
