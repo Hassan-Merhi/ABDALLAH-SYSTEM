@@ -37,9 +37,8 @@ export const preparePaymentReceiptData = (
   const total = data.entries
     .reduce((sum, e) => {
       const amt = parseFloat(e.amount || "0");
-      const postedAmount = data.currency === "ZMW"
-        ? amt
-        : data.currency === "CFA" && exchangeRate ? amt / exchangeRate : amt;
+      const postedAmount =
+        data.currency === "ZMW" ? amt : data.currency === "CFA" && exchangeRate ? amt / exchangeRate : amt;
       return sum + postedAmount;
     }, 0)
     .toFixed(data.currency === "ZMW" ? 6 : 2);
@@ -71,8 +70,8 @@ export const preparePaymentReceiptData = (
   };
 
   const contraEntries = data.entries.map((entry) => {
-    const usdAmount = data.currency === "ZMW"
-      ? entry.amount : convertAmountToUSD(entry.amount, data.currency, exchangeRate);
+    const usdAmount =
+      data.currency === "ZMW" ? entry.amount : convertAmountToUSD(entry.amount, data.currency, exchangeRate);
     return {
       ledgerAccountId: entry.accountType === "ledger" ? entry.accountId : null,
       bankAccountId: entry.accountType === "bank" ? entry.accountId : null,
@@ -104,8 +103,8 @@ export const prepareJournalData = (data: JournalFormData, exchangeRate: number |
   };
 
   const entries = data.entries.map((entry) => {
-    const usdAmount = data.currency === "ZMW"
-      ? entry.amount : convertAmountToUSD(entry.amount, data.currency, exchangeRate);
+    const usdAmount =
+      data.currency === "ZMW" ? entry.amount : convertAmountToUSD(entry.amount, data.currency, exchangeRate);
     return {
       ledgerAccountId: entry.accountType === "ledger" ? entry.accountId : null,
       bankAccountId: entry.accountType === "bank" ? entry.accountId : null,

@@ -105,7 +105,10 @@ export function usePosImportModel() {
     queryKey: ["/api/exchange-rates/latest", selectedCompany?.id, "USD", "ZMW", saleDate, "pos-import"],
     queryFn: async () => {
       const query = new URLSearchParams({
-        companyId: String(selectedCompany!.id), fromCurrency: "USD", toCurrency: "ZMW", asOf: saleDate,
+        companyId: String(selectedCompany!.id),
+        fromCurrency: "USD",
+        toCurrency: "ZMW",
+        asOf: saleDate,
       });
       const response = await fetch("/api/exchange-rates/latest?" + query, { credentials: "include" });
       if (!response.ok) return null;
@@ -115,9 +118,12 @@ export function usePosImportModel() {
     staleTime: 0,
   });
   const datedZmwNumber = Number(datedZmwRate?.rate);
-  const applicableExchangeRate = saleCurrency === "ZMW"
-    ? !isFetchingZmwRate && datedZmwRate && Number.isFinite(datedZmwNumber) && datedZmwNumber > 0 ? datedZmwNumber : null
-    : exchangeRate;
+  const applicableExchangeRate =
+    saleCurrency === "ZMW"
+      ? !isFetchingZmwRate && datedZmwRate && Number.isFinite(datedZmwNumber) && datedZmwNumber > 0
+        ? datedZmwNumber
+        : null
+      : exchangeRate;
 
   /** Import payload USD rates and the original typed ZMW rate for audit/reconciliation. */
   const toUsdItems = (items: PosImportItem[]): PosImportItem[] =>
@@ -216,9 +222,10 @@ export function usePosImportModel() {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
 
       const location = locations.find((l) => l.id === parseInt(selectedLocation));
-      const itemsForPrint = saleCurrency === "ZMW"
-        ? (validationResult?.validatedItems || [])
-        : toUsdItems(validationResult?.validatedItems || []);
+      const itemsForPrint =
+        saleCurrency === "ZMW"
+          ? validationResult?.validatedItems || []
+          : toUsdItems(validationResult?.validatedItems || []);
       setImportedSale({
         voucher: data.voucher,
         items: itemsForPrint,
@@ -257,9 +264,10 @@ export function usePosImportModel() {
 
       const location = locations.find((l) => l.id === parseInt(selectedLocation));
       const customer = customers.find((c) => c.id === parseInt(selectedCustomer));
-      const itemsForPrint = saleCurrency === "ZMW"
-        ? (validationResult?.validatedItems || [])
-        : toUsdItems(validationResult?.validatedItems || []);
+      const itemsForPrint =
+        saleCurrency === "ZMW"
+          ? validationResult?.validatedItems || []
+          : toUsdItems(validationResult?.validatedItems || []);
       setImportedSale({
         voucher: data.voucher,
         items: itemsForPrint,
@@ -395,7 +403,10 @@ export function usePosImportModel() {
     if (!hasRequiredTargets()) return;
 
     if (saleCurrency !== "USD" && (!applicableExchangeRate || !Number.isFinite(applicableExchangeRate))) {
-      warn("Exchange rate required", `Set an approved USD/${saleCurrency} rate for the selected sale date before importing.`);
+      warn(
+        "Exchange rate required",
+        `Set an approved USD/${saleCurrency} rate for the selected sale date before importing.`
+      );
       return;
     }
 

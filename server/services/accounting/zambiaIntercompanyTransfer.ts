@@ -44,7 +44,9 @@ export async function resolveZambiaIntercompanyAmount(params: {
   historicalRate: string | null;
   zambiaCompanyId: number | null;
 }> {
-  const currency = String(params.currency ?? "USD").trim().toUpperCase();
+  const currency = String(params.currency ?? "USD")
+    .trim()
+    .toUpperCase();
   if (currency !== "USD" && currency !== "ZMW") {
     throw new TransferRouteError(400, "Unsupported intercompany transfer currency");
   }
@@ -64,28 +66,37 @@ export async function resolveZambiaIntercompanyAmount(params: {
     if (params.exchangeRate != null && params.exchangeRate !== "") {
       throw new TransferRouteError(400, "USD intercompany transfers must not supply a foreign exchange rate");
     }
-    return { currency, baseAmount: amount.toFixed(), nativeAmount: amount.toFixed(),
-      historicalRate: null, zambiaCompanyId: null };
+    return {
+      currency,
+      baseAmount: amount.toFixed(),
+      nativeAmount: amount.toFixed(),
+      historicalRate: null,
+      zambiaCompanyId: null,
+    };
   }
 
-  const candidates = [params.fromCompany, params.toCompany].filter(company =>
-    company.active && String(company.baseCurrency).toUpperCase() === "USD" &&
-    String(company.displayCurrency).toUpperCase() === "ZMW"
+  const candidates = [params.fromCompany, params.toCompany].filter(
+    (company) =>
+      company.active &&
+      String(company.baseCurrency).toUpperCase() === "USD" &&
+      String(company.displayCurrency).toUpperCase() === "ZMW"
   );
   const zambia = candidates.length === 1 ? candidates[0] : null;
   const other = zambia?.id === params.fromCompany.id ? params.toCompany : params.fromCompany;
   if (!zambia || !other.active || zambia.parentCompanyId !== other.id) {
-    throw new TransferRouteError(409,
-      "Kwacha intercompany transfers require a USD/ZMW subsidiary and its linked parent company");
+    throw new TransferRouteError(
+      409,
+      "Kwacha intercompany transfers require a USD/ZMW subsidiary and its linked parent company"
+    );
   }
   let historicalRate: string | null;
   try {
-    historicalRate = await assertApprovedZmwVoucherRate(
-      zambia.id, params.transferDate, "ZMW", params.exchangeRate
-    );
+    historicalRate = await assertApprovedZmwVoucherRate(zambia.id, params.transferDate, "ZMW", params.exchangeRate);
   } catch {
-    throw new TransferRouteError(409,
-      "An approved USD/ZMW exchange rate matching the transfer date and supplied rate is required");
+    throw new TransferRouteError(
+      409,
+      "An approved USD/ZMW exchange rate matching the transfer date and supplied rate is required"
+    );
   }
   if (!historicalRate) {
     throw new TransferRouteError(409, "Historical USD/ZMW exchange rate is missing");

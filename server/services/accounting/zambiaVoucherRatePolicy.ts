@@ -30,18 +30,23 @@ export async function assertApprovedZmwVoucherRate(
   currency: string | null | undefined,
   suppliedRate: string | number | null | undefined
 ): Promise<string | null> {
-  const code = String(currency || "USD").trim().toUpperCase();
+  const code = String(currency || "USD")
+    .trim()
+    .toUpperCase();
   if (code !== "ZMW") return suppliedRate == null || suppliedRate === "" ? null : String(suppliedRate);
 
   if (!Number.isSafeInteger(companyId) || companyId <= 0 || !companyRateDateSchema.safeParse(voucherDate).success) {
     throw new ZambiaVoucherRateError("A valid company and voucher date are required for ZMW accounting.");
   }
   const company = await storage.getCompanyById(companyId);
-  if (!company || String(company.baseCurrency).toUpperCase() !== "USD" ||
-      String(company.displayCurrency).toUpperCase() !== "ZMW") {
+  if (
+    !company ||
+    String(company.baseCurrency).toUpperCase() !== "USD" ||
+    String(company.displayCurrency).toUpperCase() !== "ZMW"
+  ) {
     throw new ZambiaVoucherRateError("The active company must be configured USD base / ZMW display.");
   }
-  if (voucherDate > await companyBusinessDate(companyId)) {
+  if (voucherDate > (await companyBusinessDate(companyId))) {
     throw new ZambiaVoucherRateError("Cannot post a future-dated ZMW voucher.");
   }
   const approved = await storage.getExchangeRateForDate(companyId, "USD", "ZMW", voucherDate);
@@ -49,9 +54,13 @@ export async function assertApprovedZmwVoucherRate(
     throw new ZambiaVoucherRateError("An approved USD/ZMW rate is required on or before the voucher date.");
   }
   const entered = suppliedRate == null ? "" : String(suppliedRate).trim();
-  if (!companyRateValueSchema.safeParse(entered).success ||
-      !new Decimal(entered).eq(new Decimal(String(approved.rate)))) {
-    throw new ZambiaVoucherRateError("The supplied USD/ZMW rate differs from the approved historical rate. Reload the date-specific rate.");
+  if (
+    !companyRateValueSchema.safeParse(entered).success ||
+    !new Decimal(entered).eq(new Decimal(String(approved.rate)))
+  ) {
+    throw new ZambiaVoucherRateError(
+      "The supplied USD/ZMW rate differs from the approved historical rate. Reload the date-specific rate."
+    );
   }
   return new Decimal(String(approved.rate)).toFixed();
 }
@@ -75,7 +84,10 @@ export function assertLockedZmwVoucherEdit(
   if (update.currency != null && String(update.currency).toUpperCase() !== "ZMW") {
     throw new ZambiaVoucherRateError("Posted ZMW voucher currency is locked.");
   }
-  if (update.voucherDate != null && String(update.voucherDate).slice(0,10) !== String(original.voucherDate).slice(0,10)) {
+  if (
+    update.voucherDate != null &&
+    String(update.voucherDate).slice(0, 10) !== String(original.voucherDate).slice(0, 10)
+  ) {
     throw new ZambiaVoucherRateError("Changing the date of a ZMW voucher requires reversal and rebooking.");
   }
   // Voucher storage can pad the approved 6dp company rate to 10 decimal
@@ -104,7 +116,6 @@ export function assertLockedZmwVoucherEdit(
   }
 }
 
-
 /**
  * Confirm that a posted ZMW voucher has recoverable original native amounts.
  * An engine-owned, USD-only base rounding line is a legitimate exception,
@@ -121,24 +132,29 @@ export async function assertResolvedZmwVoucherEntriesTx(
     transactionDebitAmount: string | null;
     transactionCreditAmount: string | null;
     historicalExchangeRate: string | null;
-  }[],
+  }[]
 ): Promise<void> {
   const [rounding] = await tx
-    .select({ id: ledgerAccounts.id }).from(ledgerAccounts)
+    .select({ id: ledgerAccounts.id })
+    .from(ledgerAccounts)
     .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.code, ROUNDING_ACCOUNT_CODE)))
     .limit(1);
   let nativeEntries = 0;
   for (const entry of entries) {
-    if (rounding &&
+    if (
+      rounding &&
       entry.ledgerAccountId === rounding.id &&
       entry.narration === ENGINE_ROUNDING_NARRATION &&
-      entry.transactionCurrency === "USD") {
+      entry.transactionCurrency === "USD"
+    ) {
       continue;
     }
-    if (entry.transactionCurrency !== "ZMW" ||
-        entry.transactionDebitAmount == null ||
-        entry.transactionCreditAmount == null ||
-        entry.historicalExchangeRate == null) {
+    if (
+      entry.transactionCurrency !== "ZMW" ||
+      entry.transactionDebitAmount == null ||
+      entry.transactionCreditAmount == null ||
+      entry.historicalExchangeRate == null
+    ) {
       throw new ZambiaVoucherRateError(
         "Original ZMW amounts/rate are unresolved. Reconcile the voucher before editing it."
       );

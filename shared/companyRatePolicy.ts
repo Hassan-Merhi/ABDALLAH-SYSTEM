@@ -17,15 +17,21 @@ export const companyRateValueSchema = z
     message: "Rate must be greater than zero.",
   });
 
-export const companyRateDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD.").refine((value) => {
-  const date = new Date(`${value}T00:00:00.000Z`);
-  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
-}, "Enter a valid calendar date.");
+export const companyRateDateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD.")
+  .refine((value) => {
+    const date = new Date(`${value}T00:00:00.000Z`);
+    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+  }, "Enter a valid calendar date.");
 
 /**
  * Company ZMW display pricing is supported only with a USD accounting base.
  * Future bases need dedicated posting/accounting work, not an implicit rate.
  */
-export function isSupportedZmwCompanyPair(baseCurrency: string | null | undefined, displayCurrency: string | null | undefined): boolean {
+export function isSupportedZmwCompanyPair(
+  baseCurrency: string | null | undefined,
+  displayCurrency: string | null | undefined
+): boolean {
   return String(displayCurrency || "").toUpperCase() !== "ZMW" || String(baseCurrency || "").toUpperCase() === "USD";
 }

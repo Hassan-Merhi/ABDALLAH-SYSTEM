@@ -53,18 +53,23 @@ describe("Zambia Phase 8 historical intercompany accounting", () => {
     const first = buildCompanyTransferPostingRequest({
       ...common,
       voucherNumber: zambiaTransferVoucherNumber("ICT-FROM", "phase8-native-zmw"),
-      amount: "250.00", transactionCurrency: "ZMW", historicalExchangeRate: "25",
+      amount: "250.00",
+      transactionCurrency: "ZMW",
+      historicalExchangeRate: "25",
     });
     const repeatNumber = zambiaTransferVoucherNumber("ICT-FROM", "phase8-native-zmw");
     const modified = buildCompanyTransferPostingRequest({
       ...common,
       voucherNumber: repeatNumber,
-      amount: "300.00", transactionCurrency: "ZMW", historicalExchangeRate: "25",
+      amount: "300.00",
+      transactionCurrency: "ZMW",
+      historicalExchangeRate: "25",
     });
     expect(first.request.voucher.voucherNumber).toBe(repeatNumber);
     expect(first.request.source.idempotencyKey).toBe(modified.request.source.idempotencyKey);
-    expect(first.request.entries[0].transactionDebitAmount)
-      .not.toBe(modified.request.entries[0].transactionDebitAmount);
+    expect(first.request.entries[0].transactionDebitAmount).not.toBe(
+      modified.request.entries[0].transactionDebitAmount
+    );
     expect(() => zambiaTransferVoucherNumber("ICT-FROM", "")).toThrow();
   });
 
@@ -78,9 +83,13 @@ describe("Zambia Phase 8 historical intercompany accounting", () => {
   });
 
   it("rejects unapproved or absent rate for native ZMW", () => {
-    expect(() => buildCompanyTransferPostingRequest({
-      ...common, amount: "250", transactionCurrency: "ZMW",
-    })).toThrow();
+    expect(() =>
+      buildCompanyTransferPostingRequest({
+        ...common,
+        amount: "250",
+        transactionCurrency: "ZMW",
+      })
+    ).toThrow();
   });
 
   it("prevents a Kwacha PO label from silently being accounted as USD cost", () => {

@@ -1,4 +1,7 @@
-import { assertLockedZmwVoucherEdit, assertResolvedZmwVoucherEntriesTx } from "../../../services/accounting/zambiaVoucherRatePolicy";
+import {
+  assertLockedZmwVoucherEdit,
+  assertResolvedZmwVoucherEntriesTx,
+} from "../../../services/accounting/zambiaVoucherRatePolicy";
 /**
  * voucherTransferRoutes: VoucherWithEntries endpoints.
  *
@@ -147,11 +150,12 @@ export function registerVoucherWithEntriesRoutes(app: Express) {
       );
       // The editor supplies original ZMW amounts, but voucher.total_amount
       // remains the historical USD base. Preserve cent precision here.
-      const baseEditRate = existingVoucher.currency === "ZMW"
-        ? toMoney(existingVoucher.exchangeRate) : new MoneyDecimal(1);
-      const newTotal = existingVoucher.currency === "ZMW"
-        ? MoneyDecimal.max(totalDebits, totalCredits).dividedBy(baseEditRate).toFixed(6)
-        : MoneyDecimal.max(totalDebits, totalCredits).toFixed(2);
+      const baseEditRate =
+        existingVoucher.currency === "ZMW" ? toMoney(existingVoucher.exchangeRate) : new MoneyDecimal(1);
+      const newTotal =
+        existingVoucher.currency === "ZMW"
+          ? MoneyDecimal.max(totalDebits, totalCredits).dividedBy(baseEditRate).toFixed(6)
+          : MoneyDecimal.max(totalDebits, totalCredits).toFixed(2);
 
       let updatedVoucher!: typeof vouchers.$inferSelect;
       const createdEntries: (typeof voucherEntries.$inferSelect)[] = [];
@@ -259,8 +263,12 @@ export function registerVoucherWithEntriesRoutes(app: Express) {
             // The old edit UI uses debitAmount/creditAmount as native entry
             // amounts. Never let a request validate one amount, but post an
             // unrelated transactionDebitAmount/transactionCreditAmount.
-            if ((entry.transactionDebitAmount != null && !toMoney(entry.transactionDebitAmount).eq(toMoney(entry.debitAmount))) ||
-                (entry.transactionCreditAmount != null && !toMoney(entry.transactionCreditAmount).eq(toMoney(entry.creditAmount)))) {
+            if (
+              (entry.transactionDebitAmount != null &&
+                !toMoney(entry.transactionDebitAmount).eq(toMoney(entry.debitAmount))) ||
+              (entry.transactionCreditAmount != null &&
+                !toMoney(entry.transactionCreditAmount).eq(toMoney(entry.creditAmount)))
+            ) {
               throw new Error("ZMW voucher base/transaction amount conflict; reload the original currency amounts.");
             }
             if (entry.transactionCurrency && String(entry.transactionCurrency).toUpperCase() !== "ZMW") {
@@ -350,8 +358,9 @@ export function registerVoucherWithEntriesRoutes(app: Express) {
 
         await tx
           .update(fde)
-           .set({
-            amountCurrency: editVoucherCurrency === "ZMW" ? MoneyDecimal.max(totalDebits, totalCredits).toFixed(6) : newTotal,
+          .set({
+            amountCurrency:
+              editVoucherCurrency === "ZMW" ? MoneyDecimal.max(totalDebits, totalCredits).toFixed(6) : newTotal,
             amountUsd: newTotal,
           })
           .where(and(eq(fde.referenceTable, "vouchers"), eq(fde.referenceId, id)));
@@ -376,8 +385,8 @@ export function registerVoucherWithEntriesRoutes(app: Express) {
           companyId: existingVoucher.companyId,
           voucher: existingVoucher,
           description: updatedVoucher.description,
-          newAmount: editVoucherCurrency === "ZMW"
-            ? new MoneyDecimal(newTotal) : MoneyDecimal.max(totalDebits, totalCredits),
+          newAmount:
+            editVoucherCurrency === "ZMW" ? new MoneyDecimal(newTotal) : MoneyDecimal.max(totalDebits, totalCredits),
         });
 
         // Wave 12 / phase 22 B: full before/after snapshot in this transaction; a

@@ -80,7 +80,6 @@ const MODULES = ["PROPERTIES", "ERP", "FACTORY"] as const;
 const formatUsdBase = (value: string) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number(value));
 
-
 export default function CompanyTransfer() {
   const { companies, selectedCompany: currentCompany } = useCompany();
   const { toast } = useToast();
@@ -96,7 +95,7 @@ export default function CompanyTransfer() {
   const fromCompanyId = currentCompany?.id;
   const otherCompanies = useMemo(
     () => companies.filter((company) => company.id !== fromCompanyId),
-    [companies, fromCompanyId],
+    [companies, fromCompanyId]
   );
 
   const { data: fromAccounts = [] } = useQuery<LedgerAccount[]>({
@@ -189,7 +188,7 @@ export default function CompanyTransfer() {
 
   const toggleCashAccount = (id: number) => {
     setRuleCashAccountIds((previous) =>
-      previous.includes(id) ? previous.filter((accountId) => accountId !== id) : [...previous, id],
+      previous.includes(id) ? previous.filter((accountId) => accountId !== id) : [...previous, id]
     );
   };
 
@@ -491,7 +490,8 @@ export default function CompanyTransfer() {
                   <strong>{undoTarget.transferDate}</strong>.
                   <br />
                   <br />
-                  Both company balances will return to their prior values and the transfer history entry will be removed.
+                  Both company balances will return to their prior values and the transfer history entry will be
+                  removed.
                 </>
               )}
             </AlertDialogDescription>

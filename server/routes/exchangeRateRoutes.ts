@@ -27,13 +27,19 @@ function activeRateCompanyId(req: Request, res: Response): number | null {
   // rate using a different companyId while the session is on Mali or Zambia.
   const requested = req.query.companyId;
   if (requested !== undefined && (typeof requested !== "string" || requested !== String(active))) {
-    res.status(403).json({ code: "EXCHANGE_RATE_COMPANY_MISMATCH", message: "Switch to the requested company before accessing its exchange rates." });
+    res.status(403).json({
+      code: "EXCHANGE_RATE_COMPANY_MISMATCH",
+      message: "Switch to the requested company before accessing its exchange rates.",
+    });
     return null;
   }
   return active;
 }
 
-function configuredRatePair(company: { baseCurrency?: string | null; displayCurrency?: string | null }): CompanyCurrencyPair | null {
+function configuredRatePair(company: {
+  baseCurrency?: string | null;
+  displayCurrency?: string | null;
+}): CompanyCurrencyPair | null {
   if (!company.baseCurrency || !company.displayCurrency || company.displayCurrency === "none") return null;
   const fromCurrency = normalizeAccountingCurrencyAlias(company.baseCurrency);
   const toCurrency = normalizeAccountingCurrencyAlias(company.displayCurrency);
@@ -48,7 +54,7 @@ function requestedPairMatches(
 ): CompanyCurrencyPair | null {
   const from = req.query.fromCurrency;
   const to = req.query.toCurrency;
-  if ((from === undefined && to === undefined) && !requirePair) return configured;
+  if (from === undefined && to === undefined && !requirePair) return configured;
   if (typeof from !== "string" || typeof to !== "string") {
     res.status(400).json({ message: "Both fromCurrency and toCurrency are required." });
     return null;
@@ -58,7 +64,10 @@ function requestedPairMatches(
     normalizeAccountingCurrencyAlias(from) !== configured.fromCurrency ||
     normalizeAccountingCurrencyAlias(to) !== configured.toCurrency
   ) {
-    res.status(400).json({ code: "EXCHANGE_RATE_PAIR_MISMATCH", message: "Exchange-rate pair does not match the active company's configured currencies." });
+    res.status(400).json({
+      code: "EXCHANGE_RATE_PAIR_MISMATCH",
+      message: "Exchange-rate pair does not match the active company's configured currencies.",
+    });
     return null;
   }
   return configured;
@@ -85,9 +94,10 @@ export function registerExchangeRateRoutes(app: Express) {
         // Invalid/missing historic rate is not a usable rate for a new sale.
         return res.json({ hasRate: false, today, latestRate: null, missingRate: true });
       }
-      const effectiveDate = typeof latestRate!.effectiveDate === "string"
-        ? latestRate!.effectiveDate.slice(0, 10)
-        : new Date(latestRate!.effectiveDate).toISOString().slice(0, 10);
+      const effectiveDate =
+        typeof latestRate!.effectiveDate === "string"
+          ? latestRate!.effectiveDate.slice(0, 10)
+          : new Date(latestRate!.effectiveDate).toISOString().slice(0, 10);
       res.json({ hasRate: effectiveDate === today, latestRate, today, missingRate: false });
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
@@ -107,10 +117,15 @@ export function registerExchangeRateRoutes(app: Express) {
       const pair = hasPairFilter ? requestedPairMatches(req, res, configured, true) : null;
       if (hasPairFilter && !pair) return;
       const rates = await storage.getExchangeRates(companyId);
-      res.json(pair ? rates.filter((rate) =>
-        normalizeAccountingCurrencyAlias(rate.fromCurrency) === pair.fromCurrency &&
-        normalizeAccountingCurrencyAlias(rate.toCurrency) === pair.toCurrency
-      ) : rates);
+      res.json(
+        pair
+          ? rates.filter(
+              (rate) =>
+                normalizeAccountingCurrencyAlias(rate.fromCurrency) === pair.fromCurrency &&
+                normalizeAccountingCurrencyAlias(rate.toCurrency) === pair.toCurrency
+            )
+          : rates
+      );
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
     }
@@ -126,16 +141,22 @@ export function registerExchangeRateRoutes(app: Express) {
       if (!pair) return;
       const asOf = req.query.asOf;
       if (asOf !== undefined && (typeof asOf !== "string" || !companyRateDateSchema.safeParse(asOf).success)) {
-        return res.status(400).json({ code: "EXCHANGE_RATE_DATE_INVALID", message: "Use a valid YYYY-MM-DD asOf date." });
+        return res
+          .status(400)
+          .json({ code: "EXCHANGE_RATE_DATE_INVALID", message: "Use a valid YYYY-MM-DD asOf date." });
       }
       const settings = await storage.getCompanySettings(companyId);
       const businessDate = getCompanyBusinessDate(settings?.timezone);
       if (typeof asOf === "string" && asOf > businessDate) {
-        return res.status(400).json({ code: "EXCHANGE_RATE_FUTURE_DATE", message: "Cannot use a future-dated company rate for POS sales." });
+        return res.status(400).json({
+          code: "EXCHANGE_RATE_FUTURE_DATE",
+          message: "Cannot use a future-dated company rate for POS sales.",
+        });
       }
-      const rate = typeof asOf === "string"
-        ? await storage.getExchangeRateForDate(companyId, pair.fromCurrency, pair.toCurrency, asOf)
-        : await storage.getLatestExchangeRate(companyId, pair.fromCurrency, pair.toCurrency, businessDate);
+      const rate =
+        typeof asOf === "string"
+          ? await storage.getExchangeRateForDate(companyId, pair.fromCurrency, pair.toCurrency, asOf)
+          : await storage.getLatestExchangeRate(companyId, pair.fromCurrency, pair.toCurrency, businessDate);
       res.json(validRateRow(rate) ? rate : null);
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
@@ -152,7 +173,11 @@ export function registerExchangeRateRoutes(app: Express) {
       const company = await storage.getCompanyById(companyId);
       if (!company) return res.status(404).json({ message: "Company not found" });
       const pair = configuredRatePair(company);
-      if (!pair) return res.status(409).json({ code: "EXCHANGE_RATE_NOT_CONFIGURED", message: "Enable a display currency for this company before setting exchange rates." });
+      if (!pair)
+        return res.status(409).json({
+          code: "EXCHANGE_RATE_NOT_CONFIGURED",
+          message: "Enable a display currency for this company before setting exchange rates.",
+        });
 
       const parsed = insertExchangeRateSchema.safeParse({ ...req.body, companyId });
       if (!parsed.success) {
@@ -175,7 +200,10 @@ export function registerExchangeRateRoutes(app: Express) {
       const fromCurrency = normalizeAccountingCurrencyAlias(parsed.data.fromCurrency);
       const toCurrency = normalizeAccountingCurrencyAlias(parsed.data.toCurrency);
       if (fromCurrency !== pair.fromCurrency || toCurrency !== pair.toCurrency) {
-        return res.status(400).json({ code: "EXCHANGE_RATE_PAIR_MISMATCH", message: "Only the active company's configured currency pair can be updated." });
+        return res.status(400).json({
+          code: "EXCHANGE_RATE_PAIR_MISMATCH",
+          message: "Only the active company's configured currency pair can be updated.",
+        });
       }
 
       const rate = await saveCompanyExchangeRate(

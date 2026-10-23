@@ -6,7 +6,10 @@ import {
   type PostingActor,
 } from "../../services/accounting";
 import { requireCompanyAccess } from "./transferRequestContext";
-import { resolveZambiaIntercompanyAmount, zambiaTransferVoucherNumber } from "../../services/accounting/zambiaIntercompanyTransfer";
+import {
+  resolveZambiaIntercompanyAmount,
+  zambiaTransferVoucherNumber,
+} from "../../services/accounting/zambiaIntercompanyTransfer";
 import { TransferRouteError } from "./transferErrors";
 import { transferRepository } from "./transferRepository";
 import { parseSimpleTransferInput } from "./transferValidation";
@@ -52,15 +55,17 @@ function buildTransferReversalRequest(input: {
     creditAmount: String(entry.debitAmount ?? "0"),
     narration: entry.narration ? `Reversal: ${entry.narration}` : `Reversal of ${snapshot.voucher.voucherNumber}`,
     // Reverse the original currency evidence, not the current conversion.
-    ...(snapshot.voucher.currency === "ZMW" && entry.transactionCurrency === "ZMW" ? {
-      transactionCurrency: entry.transactionCurrency,
-      transactionDebitAmount: entry.transactionCreditAmount,
-      transactionCreditAmount: entry.transactionDebitAmount,
-      baseDebitAmount: entry.baseCreditAmount,
-      baseCreditAmount: entry.baseDebitAmount,
-      historicalExchangeRate: entry.historicalExchangeRate,
-      rateConvention: entry.rateConvention,
-    } : {}),
+    ...(snapshot.voucher.currency === "ZMW" && entry.transactionCurrency === "ZMW"
+      ? {
+          transactionCurrency: entry.transactionCurrency,
+          transactionDebitAmount: entry.transactionCreditAmount,
+          transactionCreditAmount: entry.transactionDebitAmount,
+          baseDebitAmount: entry.baseCreditAmount,
+          baseCreditAmount: entry.baseDebitAmount,
+          historicalExchangeRate: entry.historicalExchangeRate,
+          rateConvention: entry.rateConvention,
+        }
+      : {}),
   }));
 
   return {
@@ -72,9 +77,12 @@ function buildTransferReversalRequest(input: {
       description: `Reversal of company transfer #${transferId} (${side})`,
       totalAmount: snapshot.voucher.totalAmount,
       optional: false,
-      ...(snapshot.voucher.currency === "ZMW" ? {
-        currency: "ZMW", exchangeRate: snapshot.voucher.exchangeRate,
-      } : {}),
+      ...(snapshot.voucher.currency === "ZMW"
+        ? {
+            currency: "ZMW",
+            exchangeRate: snapshot.voucher.exchangeRate,
+          }
+        : {}),
     },
     entries,
     source: {
@@ -106,16 +114,20 @@ export const simpleCompanyTransferService = {
     if (!fromCompany || !toCompany) throw new TransferRouteError(404, "Company not found");
 
     const fx = await resolveZambiaIntercompanyAmount({
-      fromCompany, toCompany, amount: parsed.amount, transferDate: parsed.transferDate,
-      currency: parsed.currency, exchangeRate: parsed.exchangeRate,
+      fromCompany,
+      toCompany,
+      amount: parsed.amount,
+      transferDate: parsed.transferDate,
+      currency: parsed.currency,
+      exchangeRate: parsed.exchangeRate,
     });
     const fromIsZmw = fx.currency === "ZMW" && fx.zambiaCompanyId === parsed.fromCompanyId;
     const toIsZmw = fx.currency === "ZMW" && fx.zambiaCompanyId === parsed.toCompanyId;
     // Validate native-ZMW request identity before creating clearing accounts.
-    const zmwOutNumber = fx.currency === "ZMW"
-      ? zambiaTransferVoucherNumber("TR-OUT", parsed.clientRequestId ?? "") : null;
-    const zmwInNumber = fx.currency === "ZMW"
-      ? zambiaTransferVoucherNumber("TR-IN", parsed.clientRequestId ?? "") : null;
+    const zmwOutNumber =
+      fx.currency === "ZMW" ? zambiaTransferVoucherNumber("TR-OUT", parsed.clientRequestId ?? "") : null;
+    const zmwInNumber =
+      fx.currency === "ZMW" ? zambiaTransferVoucherNumber("TR-IN", parsed.clientRequestId ?? "") : null;
 
     const description = parsed.description || `Transfer to ${toCompany.name}`;
     const [fromClearing, toClearing] = await Promise.all([

@@ -56,15 +56,20 @@ export function registerContainerFreightWriteRoutes(app: Express) {
       }
 
       const nativeZmw = isUnsupportedNativeZmwPurchase(existingPO.currency);
-      if ((nativeZmw || isUnsupportedNativeZmwPurchase(req.body.currency)) &&
-          String(req.body.currency ?? existingPO.currency).toUpperCase() !== String(existingPO.currency).toUpperCase()) {
+      if (
+        (nativeZmw || isUnsupportedNativeZmwPurchase(req.body.currency)) &&
+        String(req.body.currency ?? existingPO.currency).toUpperCase() !== String(existingPO.currency).toUpperCase()
+      ) {
         throw new HttpError(409, "Purchase currency is locked. Reverse and rebook in the new currency.");
       }
       if (nativeZmw && (!existingPO.historicalExchangeRate || !existingPO.historicalRateDate)) {
         throw new HttpError(409, "Original Kwacha purchase FX is unresolved. Reconcile before editing.");
       }
-      if (nativeZmw && req.body.exchangeRate != null &&
-          !toMoney(req.body.exchangeRate).eq(toMoney(existingPO.historicalExchangeRate))) {
+      if (
+        nativeZmw &&
+        req.body.exchangeRate != null &&
+        !toMoney(req.body.exchangeRate).eq(toMoney(existingPO.historicalExchangeRate))
+      ) {
         throw new HttpError(409, "Historical ZMW purchase rate cannot be edited.");
       }
 
@@ -113,16 +118,17 @@ export function registerContainerFreightWriteRoutes(app: Express) {
           throw new HttpError(409, "ZMW item totals are derived from native PO lines, not edited separately.");
         }
         const chargeKeys = [
-          ["freight", "nativeFreight"], ["surcharge", "nativeSurcharge"],
-          ["fumigation", "nativeFumigation"], ["documentCharges", "nativeDocumentCharges"],
-          ["discount", "nativeDiscount"], ["otherCharges", "nativeOtherCharges"],
+          ["freight", "nativeFreight"],
+          ["surcharge", "nativeSurcharge"],
+          ["fumigation", "nativeFumigation"],
+          ["documentCharges", "nativeDocumentCharges"],
+          ["discount", "nativeDiscount"],
+          ["otherCharges", "nativeOtherCharges"],
         ] as const;
         for (const [field, nativeField] of chargeKeys) {
           if (req.body[field] === undefined) continue;
           (nativeChargeChanges as Record<string, string>)[nativeField] = String(req.body[field]);
-          req.body[field] = historicalUsdFromNativeZmw(
-            req.body[field], String(existingPO.historicalExchangeRate),
-          );
+          req.body[field] = historicalUsdFromNativeZmw(req.body[field], String(existingPO.historicalExchangeRate));
         }
       }
 

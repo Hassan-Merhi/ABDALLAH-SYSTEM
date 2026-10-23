@@ -46,7 +46,9 @@ export function JournalFormView({ model }: { model: Model }) {
           />
           {selectedCurrency === "ZMW" && (
             <span className="text-xs text-muted-foreground" data-testid="zmw-locked-journal-rate">
-              {transactionRate ? "Approved rate for voucher date (locked)" : "No approved rate for this date; posting will be rejected"}
+              {transactionRate
+                ? "Approved rate for voucher date (locked)"
+                : "No approved rate for this date; posting will be rejected"}
             </span>
           )}
         </div>

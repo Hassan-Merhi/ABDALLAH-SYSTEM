@@ -87,7 +87,8 @@ export function PosImportForm({ model }: { model: PosImportModel }) {
               </Select>
               {saleCurrency !== "USD" && exchangeRate && (
                 <p className="text-sm text-muted-foreground">
-                  Rate: 1 USD = {formatNumber(exchangeRate, 6)} {saleCurrency}. Amounts will be posted in USD with the original {saleCurrency} and locked rate recorded.
+                  Rate: 1 USD = {formatNumber(exchangeRate, 6)} {saleCurrency}. Amounts will be posted in USD with the
+                  original {saleCurrency} and locked rate recorded.
                 </p>
               )}
               {saleCurrency !== "USD" && !exchangeRate && (

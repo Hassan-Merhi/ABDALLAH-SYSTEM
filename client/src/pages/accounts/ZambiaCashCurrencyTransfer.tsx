@@ -77,7 +77,10 @@ export function ZambiaCashCurrencyTransfer() {
     queryKey: ["/api/exchange-rates/latest", companyId, "USD", "ZMW", transferDate, "currency-transfer"],
     queryFn: async () => {
       const args = new URLSearchParams({
-        companyId: String(companyId), fromCurrency: "USD", toCurrency: "ZMW", asOf: transferDate,
+        companyId: String(companyId),
+        fromCurrency: "USD",
+        toCurrency: "ZMW",
+        asOf: transferDate,
       });
       const res = await fetch("/api/exchange-rates/latest?" + args, { credentials: "include" });
       if (!res.ok) throw new Error("Cannot fetch historical company rate");
@@ -88,19 +91,32 @@ export function ZambiaCashCurrencyTransfer() {
   });
 
   const accounts = summary?.accounts ?? [];
-  const fromAccount = accounts.find(account => keyForAccount(account) === source);
-  const toAccount = accounts.find(account => keyForAccount(account) === destination);
+  const fromAccount = accounts.find((account) => keyForAccount(account) === source);
+  const toAccount = accounts.find((account) => keyForAccount(account) === destination);
   const rate = Number(historicalRate?.rate);
   const numberAmount = Number(amount);
   const validAmount = /^\d{1,12}(?:\.\d{1,2})?$/.test(amount) && numberAmount > 0;
-  const toAmount = validAmount && Number.isFinite(rate) && rate > 0
-    ? (fromCurrency === "USD" ? numberAmount * rate : numberAmount / rate).toFixed(2)
-    : null;
+  const toAmount =
+    validAmount && Number.isFinite(rate) && rate > 0
+      ? (fromCurrency === "USD" ? numberAmount * rate : numberAmount / rate).toFixed(2)
+      : null;
   const available = fromAccount ? Number(fromAccount.nativeBalancesByCurrency[fromCurrency] ?? "0") : 0;
-  const valid = canPost && enabled && source !== destination && !!fromAccount && !!toAccount &&
-    validAmount && !rateLoading && Number.isFinite(rate) && rate > 0 && !!toAmount && Number(toAmount) > 0 &&
-    !!transferDate && (!daily?.today || transferDate <= daily.today) &&
-    !fromAccount.totalsProvisional && available >= numberAmount;
+  const valid =
+    canPost &&
+    enabled &&
+    source !== destination &&
+    !!fromAccount &&
+    !!toAccount &&
+    validAmount &&
+    !rateLoading &&
+    Number.isFinite(rate) &&
+    rate > 0 &&
+    !!toAmount &&
+    Number(toAmount) > 0 &&
+    !!transferDate &&
+    (!daily?.today || transferDate <= daily.today) &&
+    !fromAccount.totalsProvisional &&
+    available >= numberAmount;
 
   const mutate = useMutation({
     mutationFn: async () => {
@@ -109,13 +125,21 @@ export function ZambiaCashCurrencyTransfer() {
       const res = await apiRequest("POST", "/api/accounts/multi-currency/zambia-transfer", {
         from: { kind: fromAccount.accountKind, id: fromAccount.id },
         to: { kind: toAccount.accountKind, id: toAccount.id },
-        fromCurrency, toCurrency, amount, rate: historicalRate.rate,
-        transferDate, clientRequestId: requestId.current, description: note.trim() || null,
+        fromCurrency,
+        toCurrency,
+        amount,
+        rate: historicalRate.rate,
+        transferDate,
+        clientRequestId: requestId.current,
+        description: note.trim() || null,
       });
       return res.json() as Promise<{ voucherNumber: string; replayed: boolean }>;
     },
     onSuccess: (posted) => {
-      toast({ title: posted.replayed ? "Previously posted transfer" : "Currency transfer posted", description: "Voucher " + posted.voucherNumber });
+      toast({
+        title: posted.replayed ? "Previously posted transfer" : "Currency transfer posted",
+        description: "Voucher " + posted.voucherNumber,
+      });
       requestId.current = null;
       setAmount("");
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/multi-currency"] });
@@ -140,60 +164,127 @@ export function ZambiaCashCurrencyTransfer() {
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-xs text-muted-foreground">
-          Converts between cash/bank currency balances using the rate approved for the transfer date.
-          Posts one balanced journal; historical vouchers are never revalued.
+          Converts between cash/bank currency balances using the rate approved for the transfer date. Posts one balanced
+          journal; historical vouchers are never revalued.
         </p>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1">
             <Label>Funds leaving</Label>
-            <Select value={source} onValueChange={v => { setSource(v); requestId.current = null; }}>
-              <SelectTrigger><SelectValue placeholder="Source cash/bank account" /></SelectTrigger>
+            <Select
+              value={source}
+              onValueChange={(v) => {
+                setSource(v);
+                requestId.current = null;
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Source cash/bank account" />
+              </SelectTrigger>
               <SelectContent>
-                {accounts.map(a => <SelectItem key={keyForAccount(a)} value={keyForAccount(a)}>
-                  {a.name} ({a.accountKind}) — {fromCurrency} {a.nativeBalancesByCurrency[fromCurrency] ?? "0"}
-                </SelectItem>)}
+                {accounts.map((a) => (
+                  <SelectItem key={keyForAccount(a)} value={keyForAccount(a)}>
+                    {a.name} ({a.accountKind}) — {fromCurrency} {a.nativeBalancesByCurrency[fromCurrency] ?? "0"}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-1">
             <Label>Funds arriving</Label>
-            <Select value={destination} onValueChange={v => { setDestination(v); requestId.current = null; }}>
-              <SelectTrigger><SelectValue placeholder="Destination cash/bank account" /></SelectTrigger>
+            <Select
+              value={destination}
+              onValueChange={(v) => {
+                setDestination(v);
+                requestId.current = null;
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Destination cash/bank account" />
+              </SelectTrigger>
               <SelectContent>
-                {accounts.map(a => <SelectItem key={keyForAccount(a)} value={keyForAccount(a)}>
-                  {a.name} ({a.accountKind})
-                </SelectItem>)}
+                {accounts.map((a) => (
+                  <SelectItem key={keyForAccount(a)} value={keyForAccount(a)}>
+                    {a.name} ({a.accountKind})
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-1">
             <Label>Source currency</Label>
-            <Select value={fromCurrency} onValueChange={v => { setFromCurrency(v as Currency); requestId.current = null; }}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent><SelectItem value="USD">USD → ZMW</SelectItem><SelectItem value="ZMW">ZMW → USD</SelectItem></SelectContent>
+            <Select
+              value={fromCurrency}
+              onValueChange={(v) => {
+                setFromCurrency(v as Currency);
+                requestId.current = null;
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="USD">USD → ZMW</SelectItem>
+                <SelectItem value="ZMW">ZMW → USD</SelectItem>
+              </SelectContent>
             </Select>
           </div>
           <div className="space-y-1">
             <Label>Transfer date</Label>
-            <Input type="date" value={transferDate} max={daily?.today} onChange={e => { setTransferDate(e.target.value); requestId.current = null; }} />
+            <Input
+              type="date"
+              value={transferDate}
+              max={daily?.today}
+              onChange={(e) => {
+                setTransferDate(e.target.value);
+                requestId.current = null;
+              }}
+            />
           </div>
           <div className="space-y-1">
             <Label>Source amount ({fromCurrency})</Label>
-            <Input inputMode="decimal" value={amount} onChange={e => { setAmount(e.target.value); requestId.current = null; }} placeholder="0.00" />
+            <Input
+              inputMode="decimal"
+              value={amount}
+              onChange={(e) => {
+                setAmount(e.target.value);
+                requestId.current = null;
+              }}
+              placeholder="0.00"
+            />
           </div>
           <div className="space-y-1">
             <Label>Purpose (optional)</Label>
-            <Input value={note} maxLength={400} onChange={e => { setNote(e.target.value); requestId.current = null; }} placeholder="Cash exchanged" />
+            <Input
+              value={note}
+              maxLength={400}
+              onChange={(e) => {
+                setNote(e.target.value);
+                requestId.current = null;
+              }}
+              placeholder="Cash exchanged"
+            />
           </div>
         </div>
         <p className="text-sm" data-testid="zambia-transfer-preview">
-          {rateLoading ? "Loading approved rate…" : historicalRate?.rate
-            ? `1 USD = ${historicalRate.rate} ZMW · Destination receives ${toAmount ?? "—"} ${toCurrency}`
-            : "No approved USD/ZMW rate for the selected date. Transfer is blocked."}
+          {rateLoading
+            ? "Loading approved rate…"
+            : historicalRate?.rate
+              ? `1 USD = ${historicalRate.rate} ZMW · Destination receives ${toAmount ?? "—"} ${toCurrency}`
+              : "No approved USD/ZMW rate for the selected date. Transfer is blocked."}
         </p>
-        {fromAccount?.totalsProvisional && <p className="text-sm text-destructive">Resolve source account's historical currency amounts before transferring.</p>}
-        {validAmount && available < numberAmount && <p className="text-sm text-destructive">Insufficient native {fromCurrency} funds in the source account.</p>}
-        <Button disabled={!valid || mutate.isPending} onClick={() => mutate.mutate()} data-testid="button-post-zambia-cash-transfer">
+        {fromAccount?.totalsProvisional && (
+          <p className="text-sm text-destructive">
+            Resolve source account's historical currency amounts before transferring.
+          </p>
+        )}
+        {validAmount && available < numberAmount && (
+          <p className="text-sm text-destructive">Insufficient native {fromCurrency} funds in the source account.</p>
+        )}
+        <Button
+          disabled={!valid || mutate.isPending}
+          onClick={() => mutate.mutate()}
+          data-testid="button-post-zambia-cash-transfer"
+        >
           {mutate.isPending ? "Posting transfer…" : "Post Currency Transfer"}
         </Button>
       </CardContent>

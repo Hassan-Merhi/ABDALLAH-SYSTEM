@@ -319,7 +319,7 @@ export function ChatWidget() {
           { credentials: "include" }
         );
         if (!lookup.ok) throw new Error("Could not verify the approved USD/ZMW rate.");
-        const rate = await lookup.json() as { rate?: string } | null;
+        const rate = (await lookup.json()) as { rate?: string } | null;
         if (!rate?.rate) throw new Error("An approved historical USD/ZMW rate is required for this purchase.");
         submission = { ...parsed, exchangeRate: rate.rate };
       }

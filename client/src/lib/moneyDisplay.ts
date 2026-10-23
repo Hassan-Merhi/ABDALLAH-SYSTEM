@@ -17,13 +17,7 @@ export interface MoneyDisplayOptions {
 
 export function formatMoneyDisplay(
   amount: number | string | null | undefined,
-  {
-    currency,
-    locale = "en-US",
-    minimumFractionDigits,
-    maximumFractionDigits,
-    placeholder = "—",
-  }: MoneyDisplayOptions
+  { currency, locale = "en-US", minimumFractionDigits, maximumFractionDigits, placeholder = "—" }: MoneyDisplayOptions
 ): string {
   if (amount == null || amount === "") return placeholder;
   const numeric = typeof amount === "string" ? Number(amount.trim()) : amount;

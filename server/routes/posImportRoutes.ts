@@ -215,15 +215,20 @@ export function registerPosImportRoutes(app: Express) {
       }
 
       const lockedPosCurrency = await resolveLockedZmwPosCurrency(
-        req.session.currentCompanyId, saleDate, currency, exchangeRate
+        req.session.currentCompanyId,
+        saleDate,
+        currency,
+        exchangeRate
       );
       assertZmwImportPrices(items, lockedPosCurrency);
-      const nativeTransaction = (total: string) => lockedPosCurrency.currency === "ZMW"
-        ? {
-            currency: "ZMW",
-            amount: toInventoryDecimal(total).mul(lockedPosCurrency.exchangeRate!).toFixed(6),
-            rate: lockedPosCurrency.exchangeRate!,
-          } : null;
+      const nativeTransaction = (total: string) =>
+        lockedPosCurrency.currency === "ZMW"
+          ? {
+              currency: "ZMW",
+              amount: toInventoryDecimal(total).mul(lockedPosCurrency.exchangeRate!).toFixed(6),
+              rate: lockedPosCurrency.exchangeRate!,
+            }
+          : null;
 
       const salesRevenueAccount = await storage.getOrCreateLedgerAccount({
         companyId: req.session.currentCompanyId!,

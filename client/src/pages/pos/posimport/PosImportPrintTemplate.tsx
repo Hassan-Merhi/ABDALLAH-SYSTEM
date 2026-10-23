@@ -215,7 +215,8 @@ export function PosImportPrintTemplate({
             <span style={{ fontWeight: "900" }}>Daily Rate:</span> $1 ={" "}
             {isZmwReceipt
               ? lockedRate.toLocaleString(undefined, { maximumFractionDigits: 6 })
-              : formatNumber(Number(importedSale?.voucher?.exchangeRate ?? 0) || exchangeRate || 0)} {isZmwReceipt ? "ZMW" : "CFA"}
+              : formatNumber(Number(importedSale?.voucher?.exchangeRate ?? 0) || exchangeRate || 0)}{" "}
+            {isZmwReceipt ? "ZMW" : "CFA"}
           </div>
         )}
 

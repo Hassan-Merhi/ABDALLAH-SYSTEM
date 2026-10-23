@@ -15,8 +15,10 @@ export function useZmwVoucherRate(voucherDate: string | null | undefined) {
     queryKey: ["/api/exchange-rates/latest", companyId, "USD", "ZMW", voucherDate, "voucher-entry"],
     queryFn: async () => {
       const query = new URLSearchParams({
-        companyId: String(companyId), fromCurrency: "USD",
-        toCurrency: "ZMW", asOf: voucherDate!,
+        companyId: String(companyId),
+        fromCurrency: "USD",
+        toCurrency: "ZMW",
+        asOf: voucherDate!,
       });
       const response = await fetch("/api/exchange-rates/latest?" + query.toString(), { credentials: "include" });
       if (!response.ok) throw new Error("No approved company/date USD/ZMW rate available");

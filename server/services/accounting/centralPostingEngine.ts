@@ -263,17 +263,23 @@ const ZMW_CASH_EXCHANGE_CENT_TOLERANCE = new Decimal("0.005");
  * existing ledger-cent rounding mechanism remains authoritative.
  */
 function isVerifiedMixedZmwCashTransfer(request: CentralPostingRequest): boolean {
-  if (request.source.sourceType !== "zambia-cash-currency-transfer" ||
-      String(request.voucher.currency || "USD").toUpperCase() !== "USD" ||
-      request.entries.length !== 2) return false;
-  const codes = request.entries.map(e => String(e.transactionCurrency || "").toUpperCase()).sort();
+  if (
+    request.source.sourceType !== "zambia-cash-currency-transfer" ||
+    String(request.voucher.currency || "USD").toUpperCase() !== "USD" ||
+    request.entries.length !== 2
+  )
+    return false;
+  const codes = request.entries.map((e) => String(e.transactionCurrency || "").toUpperCase()).sort();
   if (codes[0] !== "USD" || codes[1] !== "ZMW") return false;
-  return request.entries.every(entry =>
-    entry.transactionDebitAmount != null && entry.transactionCreditAmount != null &&
-    entry.baseDebitAmount != null && entry.baseCreditAmount != null &&
-    (entry.transactionCurrency === "USD"
-      ? entry.rateConvention === "IDENTITY"
-      : entry.rateConvention === "TRANSACTION_PER_BASE")
+  return request.entries.every(
+    (entry) =>
+      entry.transactionDebitAmount != null &&
+      entry.transactionCreditAmount != null &&
+      entry.baseDebitAmount != null &&
+      entry.baseCreditAmount != null &&
+      (entry.transactionCurrency === "USD"
+        ? entry.rateConvention === "IDENTITY"
+        : entry.rateConvention === "TRANSACTION_PER_BASE")
   );
 }
 

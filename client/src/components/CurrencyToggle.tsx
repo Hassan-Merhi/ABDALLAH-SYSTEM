@@ -4,12 +4,14 @@ import { DollarSign } from "lucide-react";
 
 /** Toggle the currently selected company's base/display currency pair. */
 export function CurrencyToggle() {
-  const { selectedCurrency, toggleCurrency, baseCurrency, displayCurrency, exchangeRate, hasExchangeRate } = useCurrencyContext();
+  const { selectedCurrency, toggleCurrency, baseCurrency, displayCurrency, exchangeRate, hasExchangeRate } =
+    useCurrencyContext();
   if (!displayCurrency || baseCurrency === displayCurrency) return null;
 
-  const rateDescription = hasExchangeRate && exchangeRate
-    ? `Rate: 1 ${baseCurrency} = ${exchangeRate.toLocaleString()} ${displayCurrency}`
-    : `No ${baseCurrency}/${displayCurrency} exchange rate set in Company Settings`;
+  const rateDescription =
+    hasExchangeRate && exchangeRate
+      ? `Rate: 1 ${baseCurrency} = ${exchangeRate.toLocaleString()} ${displayCurrency}`
+      : `No ${baseCurrency}/${displayCurrency} exchange rate set in Company Settings`;
 
   return (
     <Button

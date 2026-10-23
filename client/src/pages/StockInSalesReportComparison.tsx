@@ -310,9 +310,10 @@ export default function StockInSalesReportComparison() {
     if (displayCurrency && selectedCurrency === displayCurrency) {
       const converted = convertToDisplay(value);
       if (Number.isFinite(converted)) {
-        const label = displayCurrency === "CFA"
-          ? `CFA ${formatNumber(Math.abs(converted), 2)}`
-          : formatMoneyDisplay(Math.abs(converted), { currency: displayCurrency });
+        const label =
+          displayCurrency === "CFA"
+            ? `CFA ${formatNumber(Math.abs(converted), 2)}`
+            : formatMoneyDisplay(Math.abs(converted), { currency: displayCurrency });
         return `${value < 0 ? "-" : ""}${label}`;
       }
     }

@@ -195,7 +195,9 @@ export function convertTransactionToBase(
     return amount.toDecimalPlaces(6).toFixed(6);
   }
   if (convention === RateConvention.IDENTITY) {
-    throw new InvalidExchangeRateError(`IDENTITY is invalid for ${txNorm}->${baseNorm}; an explicit foreign-currency rate is required.`);
+    throw new InvalidExchangeRateError(
+      `IDENTITY is invalid for ${txNorm}->${baseNorm}; an explicit foreign-currency rate is required.`
+    );
   }
 
   if (convention === RateConvention.TRANSACTION_PER_BASE) {
@@ -235,7 +237,9 @@ export function convertBaseToTransaction(
     return amount.toDecimalPlaces(6).toFixed(6);
   }
   if (convention === RateConvention.IDENTITY) {
-    throw new InvalidExchangeRateError(`IDENTITY is invalid for ${baseNorm}->${txNorm}; an explicit foreign-currency rate is required.`);
+    throw new InvalidExchangeRateError(
+      `IDENTITY is invalid for ${baseNorm}->${txNorm}; an explicit foreign-currency rate is required.`
+    );
   }
 
   if (convention === RateConvention.TRANSACTION_PER_BASE) {

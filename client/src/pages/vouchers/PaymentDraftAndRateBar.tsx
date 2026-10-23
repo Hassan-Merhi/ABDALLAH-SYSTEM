@@ -50,7 +50,7 @@ export function PaymentDraftAndRateBar({
             <span className="text-xs text-muted-foreground">
               {transactionRate ? "Approved date-specific rate (locked)" : "No approved rate for the voucher date"}
             </span>
-          )
+          )}
         </div>
       )}
     </>

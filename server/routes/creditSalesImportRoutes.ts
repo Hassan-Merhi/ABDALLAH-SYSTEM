@@ -227,16 +227,20 @@ export function registerCreditSalesImportRoutes(app: Express) {
       // price BEFORE any customer, voucher, inventory, or financial-operation
       // write. This applies to imported credit sales as well as cash sales.
       const lockedPosCurrency = await resolveLockedZmwPosCurrency(
-        req.session.currentCompanyId, saleDate, currency, exchangeRate
+        req.session.currentCompanyId,
+        saleDate,
+        currency,
+        exchangeRate
       );
       assertZmwImportPrices(items, lockedPosCurrency);
-      const nativeTransaction = (total: string) => lockedPosCurrency.currency === "ZMW"
-        ? {
-            currency: "ZMW",
-            amount: toMoney(total).times(toMoney(lockedPosCurrency.exchangeRate!)).toFixed(6),
-            rate: lockedPosCurrency.exchangeRate!,
-          }
-        : null;
+      const nativeTransaction = (total: string) =>
+        lockedPosCurrency.currency === "ZMW"
+          ? {
+              currency: "ZMW",
+              amount: toMoney(total).times(toMoney(lockedPosCurrency.exchangeRate!)).toFixed(6),
+              rate: lockedPosCurrency.exchangeRate!,
+            }
+          : null;
 
       const location = await storage.getLocationById(locationId);
       if (!location || location.companyId !== req.session.currentCompanyId) {

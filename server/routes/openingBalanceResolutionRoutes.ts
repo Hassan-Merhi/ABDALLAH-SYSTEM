@@ -207,8 +207,11 @@ export function registerOpeningBalanceResolutionRoutes(app: Express) {
         const baseCurrency = await getBaseCurrency(companyId);
         if (String(req.body.currency || "").toUpperCase() === "ZMW") {
           const company = await storage.getCompanyById(companyId);
-          if (!company || String(company.baseCurrency).toUpperCase() !== "USD" ||
-              String(company.displayCurrency).toUpperCase() !== "ZMW") {
+          if (
+            !company ||
+            String(company.baseCurrency).toUpperCase() !== "USD" ||
+            String(company.displayCurrency).toUpperCase() !== "ZMW"
+          ) {
             return res.status(409).json({
               code: "ZMW_OPENING_COMPANY_MISMATCH",
               message: "Kwacha historical openings require the active company to use USD/ZMW.",

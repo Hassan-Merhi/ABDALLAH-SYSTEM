@@ -144,7 +144,12 @@ async function createCentralPaymentReceipt(req: Request, res: Response, next: Ne
     }
 
     const body = req.body as CentralPaymentReceiptBody;
-    const approvedRate = await assertApprovedZmwVoucherRate(companyId, body.voucherDate, body.currency || "USD", body.exchangeRate);
+    const approvedRate = await assertApprovedZmwVoucherRate(
+      companyId,
+      body.voucherDate,
+      body.currency || "USD",
+      body.exchangeRate
+    );
     const result = await db.transaction(async (tx) => {
       const built = await buildPaymentReceiptPostingRequest({
         companyId,

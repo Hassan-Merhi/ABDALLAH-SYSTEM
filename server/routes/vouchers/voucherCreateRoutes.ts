@@ -105,16 +105,20 @@ export function registerVoucherCreateRoutes(app: Express) {
       }
       const textField = (value: unknown) => (typeof value === "string" && value.trim() ? value : undefined);
       const exchangeRate = await getCurrentExchangeRate(companyId);
-      const headerCurrency = typeof req.body.currency === "string" && /^[A-Z]{3}$/.test(req.body.currency)
-        ? req.body.currency : "USD";
+      const headerCurrency =
+        typeof req.body.currency === "string" && /^[A-Z]{3}$/.test(req.body.currency) ? req.body.currency : "USD";
       const approvedHeaderRate = await assertApprovedZmwVoucherRate(
-        companyId, String(req.body.voucherDate), headerCurrency, req.body.exchangeRate
+        companyId,
+        String(req.body.voucherDate),
+        headerCurrency,
+        req.body.exchangeRate
       );
       // A standalone voucher's total_amount is always historical USD,
       // including when its user-facing header is entered in Kwacha.
-      const historicalBaseTotal = headerCurrency === "ZMW"
-        ? new Decimal(totalAmount).div(new Decimal(approvedHeaderRate!)).toDecimalPlaces(6).toFixed(6)
-        : totalAmount;
+      const historicalBaseTotal =
+        headerCurrency === "ZMW"
+          ? new Decimal(totalAmount).div(new Decimal(approvedHeaderRate!)).toDecimalPlaces(6).toFixed(6)
+          : totalAmount;
       const voucher = await storage.createVoucher({
         companyId,
         voucherNumber: String(req.body.voucherNumber),
@@ -129,8 +133,12 @@ export function registerVoucherCreateRoutes(app: Express) {
         locationId: Number.isInteger(req.body.locationId) ? req.body.locationId : undefined,
         locationName: textField(req.body.locationName),
         effectiveDate: textField(req.body.effectiveDate) ?? null,
-        exchangeRate: headerCurrency === "ZMW" ? approvedHeaderRate ?? undefined
-          : exchangeRate == null ? undefined : String(exchangeRate),
+        exchangeRate:
+          headerCurrency === "ZMW"
+            ? (approvedHeaderRate ?? undefined)
+            : exchangeRate == null
+              ? undefined
+              : String(exchangeRate),
         sourceModule: "ERP",
         postingSource: infrastructurePostingIdentity(
           "manual-voucher",
@@ -189,13 +197,19 @@ export function registerVoucherCreateRoutes(app: Express) {
       // Use the caller-supplied currency/rate if present (multi-currency create path).
       // Fall back to the current company rate (legacy USD-only path).
       const voucherCurrency: string = (voucher.currency as string | undefined) || "USD";
-      const voucherHistoricalRate: string | null = voucherCurrency === "ZMW"
-        ? await assertApprovedZmwVoucherRate(
-            req.session.currentCompanyId!, String(voucher.voucherDate), voucherCurrency, voucher.exchangeRate
-          )
-        : voucher.exchangeRate != null
-          ? String(voucher.exchangeRate)
-          : exchangeRate != null ? String(exchangeRate) : null;
+      const voucherHistoricalRate: string | null =
+        voucherCurrency === "ZMW"
+          ? await assertApprovedZmwVoucherRate(
+              req.session.currentCompanyId!,
+              String(voucher.voucherDate),
+              voucherCurrency,
+              voucher.exchangeRate
+            )
+          : voucher.exchangeRate != null
+            ? String(voucher.exchangeRate)
+            : exchangeRate != null
+              ? String(exchangeRate)
+              : null;
 
       // Create voucher + all entries atomically inside a single transaction.
       // Any thrown error automatically rolls back both the voucher row and
@@ -249,7 +263,10 @@ export function registerVoucherCreateRoutes(app: Express) {
             // historical USD/base field on the server; never trust caller
             // supplied base fields, rate conventions, or a currency mismatch.
             if (entry.transactionCurrency && String(entry.transactionCurrency).toUpperCase() !== "ZMW") {
-              throw new PostingValidationError("POSTING_CURRENCY_INVALID", "A ZMW voucher cannot contain an unconverted non-ZMW line.");
+              throw new PostingValidationError(
+                "POSTING_CURRENCY_INVALID",
+                "A ZMW voucher cannot contain an unconverted non-ZMW line."
+              );
             }
             const norm = normalizeVoucherEntryAmounts({
               transactionCurrency: "ZMW",

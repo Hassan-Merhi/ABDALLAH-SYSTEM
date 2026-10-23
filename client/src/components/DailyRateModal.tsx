@@ -110,9 +110,10 @@ export function DailyRateModal({ companyId }: DailyRateModalProps) {
   });
 
   const previousRate = todayRateCheck?.latestRate;
-  const previousRateValue = previousRate?.rate && companyRateValueSchema.safeParse(String(previousRate.rate)).success
-    ? Number(previousRate.rate)
-    : null;
+  const previousRateValue =
+    previousRate?.rate && companyRateValueSchema.safeParse(String(previousRate.rate)).success
+      ? Number(previousRate.rate)
+      : null;
   const previousRateDate = previousRate?.effectiveDate
     ? new Date(previousRate.effectiveDate).toLocaleDateString()
     : null;
@@ -196,7 +197,11 @@ export function DailyRateModal({ companyId }: DailyRateModalProps) {
 
   const onSubmit = (data: RateFormData) => {
     if (!todayRateCheck?.today) {
-      toast({ title: "Business date unavailable", description: "Reload before saving an exchange rate.", variant: "destructive" });
+      toast({
+        title: "Business date unavailable",
+        description: "Reload before saving an exchange rate.",
+        variant: "destructive",
+      });
       return;
     }
     createRateMutation.mutate(data);
@@ -281,7 +286,11 @@ export function DailyRateModal({ companyId }: DailyRateModalProps) {
               >
                 {previousRateValue ? "Use Previous Rate" : "Skip for Now"}
               </Button>
-              <Button type="submit" disabled={createRateMutation.isPending || !todayRateCheck?.today} data-testid="button-save-daily-rate">
+              <Button
+                type="submit"
+                disabled={createRateMutation.isPending || !todayRateCheck?.today}
+                data-testid="button-save-daily-rate"
+              >
                 {createRateMutation.isPending && <RefreshCw className="h-4 w-4 mr-2 animate-spin" />}
                 Set Today's Rate
               </Button>

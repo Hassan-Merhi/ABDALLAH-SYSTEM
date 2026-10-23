@@ -152,9 +152,11 @@ export function useJournalFormModel({ voucherIdToEdit, isPOS }: JournalFormProps
     },
   });
 
-  const selectedCurrency = voucherIdToEdit &&
+  const selectedCurrency =
+    voucherIdToEdit &&
     (voucherToEdit?.currency === "ZMW" || voucherToEdit?.currency === "CFA" || voucherToEdit?.currency === "USD")
-      ? voucherToEdit.currency : preferredCurrency;
+      ? voucherToEdit.currency
+      : preferredCurrency;
 
   useEffect(() => {
     if (voucherIdToEdit) setAccountPickersNeeded(true);
@@ -253,9 +255,12 @@ export function useJournalFormModel({ voucherIdToEdit, isPOS }: JournalFormProps
   const journalDateForRate = format(journalForm.watch("voucherDate") ?? new Date(), "yyyy-MM-dd");
   const { rate: datedZmwRate } = useZmwVoucherRate(journalDateForRate);
   const storedZmwRate = Number(voucherToEdit?.exchangeRate);
-  const lockedJournalRate = voucherIdToEdit && voucherToEdit?.currency === "ZMW"
-    ? Number.isFinite(storedZmwRate) && storedZmwRate > 0 ? storedZmwRate : null
-    : datedZmwRate;
+  const lockedJournalRate =
+    voucherIdToEdit && voucherToEdit?.currency === "ZMW"
+      ? Number.isFinite(storedZmwRate) && storedZmwRate > 0
+        ? storedZmwRate
+        : null
+      : datedZmwRate;
   const postingRate = selectedCurrency === "ZMW" ? lockedJournalRate : transactionRate;
   const totalDebit = journalEntries.reduce(
     (sum, entry) => sum + (entry.type === "DR" ? parseFloat(entry.amount) || 0 : 0),
@@ -401,11 +406,12 @@ export function useJournalFormModel({ voucherIdToEdit, isPOS }: JournalFormProps
   };
 
   useEffect(() => {
-    const entries = voucherToEdit?.currency === "ZMW"
-      ? voucherToEdit?.entries?.filter((entry) =>
-          !(entry.transactionCurrency === "USD" && entry.narration === "Base currency rounding difference")
-        )
-      : voucherToEdit?.entries;
+    const entries =
+      voucherToEdit?.currency === "ZMW"
+        ? voucherToEdit?.entries?.filter(
+            (entry) => !(entry.transactionCurrency === "USD" && entry.narration === "Base currency rounding difference")
+          )
+        : voucherToEdit?.entries;
     if (!voucherToEdit || voucherToEdit.voucherType !== "Journal" || !entries?.length) return;
     if (hydratedVoucherIdRef.current === voucherToEdit.id) return;
     if (!ledgerAccountsFetched || !bankAccountsFetched) return;

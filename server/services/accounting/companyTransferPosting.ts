@@ -2,11 +2,7 @@ import { createHash } from "node:crypto";
 import Decimal from "decimal.js";
 import type { VoucherEntryInsertFields } from "./accountingTypes";
 import { normalizeVoucherEntryAmounts } from "./currencyAmounts";
-import {
-  PostingValidationError,
-  type CentralPostingRequest,
-  type PostingActor,
-} from "./centralPostingEngine";
+import { PostingValidationError, type CentralPostingRequest, type PostingActor } from "./centralPostingEngine";
 import { resolveManualJournalClientRequestId } from "./manualJournalPosting";
 
 export type CompanyTransferVoucherType = "Payment" | "Receipt";
@@ -77,7 +73,7 @@ function fingerprint(input: {
 }
 
 export function buildCompanyTransferPostingRequest(
-  input: BuildCompanyTransferPostingInput,
+  input: BuildCompanyTransferPostingInput
 ): BuiltCompanyTransferPosting {
   const nativeAmount = positiveAmount(input.amount).toFixed();
   const isZmw = input.transactionCurrency === "ZMW";
@@ -87,24 +83,29 @@ export function buildCompanyTransferPostingRequest(
   if (isZmw && !input.historicalExchangeRate) {
     throw new PostingValidationError("POSTING_RATE_INVALID", "ZMW transfer needs an approved locked USD/ZMW rate");
   }
-  const debitNative = isZmw ? normalizeVoucherEntryAmounts({
-    transactionCurrency: "ZMW", baseCurrency: "USD",
-    transactionDebitAmount: nativeAmount, transactionCreditAmount: "0",
-    historicalRate: input.historicalExchangeRate,
-  }) : null;
-  const creditNative = isZmw ? normalizeVoucherEntryAmounts({
-    transactionCurrency: "ZMW", baseCurrency: "USD",
-    transactionDebitAmount: "0", transactionCreditAmount: nativeAmount,
-    historicalRate: input.historicalExchangeRate,
-  }) : null;
+  const debitNative = isZmw
+    ? normalizeVoucherEntryAmounts({
+        transactionCurrency: "ZMW",
+        baseCurrency: "USD",
+        transactionDebitAmount: nativeAmount,
+        transactionCreditAmount: "0",
+        historicalRate: input.historicalExchangeRate,
+      })
+    : null;
+  const creditNative = isZmw
+    ? normalizeVoucherEntryAmounts({
+        transactionCurrency: "ZMW",
+        baseCurrency: "USD",
+        transactionDebitAmount: "0",
+        transactionCreditAmount: nativeAmount,
+        historicalRate: input.historicalExchangeRate,
+      })
+    : null;
   const amount = debitNative?.baseDebitAmount ?? nativeAmount;
   const debitLedgerAccountId = positiveId(input.debitLedgerAccountId, "debitLedgerAccountId");
   const creditLedgerAccountId = positiveId(input.creditLedgerAccountId, "creditLedgerAccountId");
   if (debitLedgerAccountId === creditLedgerAccountId) {
-    throw new PostingValidationError(
-      "POSTING_TARGET_INVALID",
-      "Transfer debit and credit accounts must be different",
-    );
+    throw new PostingValidationError("POSTING_TARGET_INVALID", "Transfer debit and credit accounts must be different");
   }
 
   const clientRequestId = resolveManualJournalClientRequestId(input.clientRequestId);
@@ -117,30 +118,34 @@ export function buildCompanyTransferPostingRequest(
       debitAmount: amount,
       creditAmount: "0",
       narration: debitNarration,
-      ...(debitNative ? {
-        transactionCurrency: debitNative.transactionCurrency,
-        transactionDebitAmount: debitNative.transactionDebitAmount,
-        transactionCreditAmount: debitNative.transactionCreditAmount,
-        baseDebitAmount: debitNative.baseDebitAmount,
-        baseCreditAmount: debitNative.baseCreditAmount,
-        historicalExchangeRate: debitNative.historicalExchangeRate,
-        rateConvention: debitNative.rateConvention,
-      } : {}),
+      ...(debitNative
+        ? {
+            transactionCurrency: debitNative.transactionCurrency,
+            transactionDebitAmount: debitNative.transactionDebitAmount,
+            transactionCreditAmount: debitNative.transactionCreditAmount,
+            baseDebitAmount: debitNative.baseDebitAmount,
+            baseCreditAmount: debitNative.baseCreditAmount,
+            historicalExchangeRate: debitNative.historicalExchangeRate,
+            rateConvention: debitNative.rateConvention,
+          }
+        : {}),
     },
     {
       ledgerAccountId: creditLedgerAccountId,
       debitAmount: "0",
       creditAmount: amount,
       narration: creditNarration,
-      ...(creditNative ? {
-        transactionCurrency: creditNative.transactionCurrency,
-        transactionDebitAmount: creditNative.transactionDebitAmount,
-        transactionCreditAmount: creditNative.transactionCreditAmount,
-        baseDebitAmount: creditNative.baseDebitAmount,
-        baseCreditAmount: creditNative.baseCreditAmount,
-        historicalExchangeRate: creditNative.historicalExchangeRate,
-        rateConvention: creditNative.rateConvention,
-      } : {}),
+      ...(creditNative
+        ? {
+            transactionCurrency: creditNative.transactionCurrency,
+            transactionDebitAmount: creditNative.transactionDebitAmount,
+            transactionCreditAmount: creditNative.transactionCreditAmount,
+            baseDebitAmount: creditNative.baseDebitAmount,
+            baseCreditAmount: creditNative.baseCreditAmount,
+            historicalExchangeRate: creditNative.historicalExchangeRate,
+            rateConvention: creditNative.rateConvention,
+          }
+        : {}),
     },
   ];
   const payloadFingerprint = fingerprint({
@@ -153,7 +158,13 @@ export function buildCompanyTransferPostingRequest(
     creditLedgerAccountId,
     sourceType: input.sourceType,
     sourceSide: input.sourceSide,
-    ...(isZmw ? { transactionCurrency: "ZMW" as const, nativeAmount, historicalExchangeRate: String(input.historicalExchangeRate) } : {}),
+    ...(isZmw
+      ? {
+          transactionCurrency: "ZMW" as const,
+          nativeAmount,
+          historicalExchangeRate: String(input.historicalExchangeRate),
+        }
+      : {}),
   });
 
   return {

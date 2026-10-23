@@ -74,8 +74,10 @@ export async function applyPurchaseOrderItemsUpdate(
 ): Promise<Record<string, unknown>> {
   const { id, existingPO } = ctx;
   const nativeZmw = isUnsupportedNativeZmwPurchase(existingPO.currency);
-  if ((nativeZmw || isUnsupportedNativeZmwPurchase(req.body.currency)) &&
-      String(req.body.currency ?? existingPO.currency).toUpperCase() !== String(existingPO.currency).toUpperCase()) {
+  if (
+    (nativeZmw || isUnsupportedNativeZmwPurchase(req.body.currency)) &&
+    String(req.body.currency ?? existingPO.currency).toUpperCase() !== String(existingPO.currency).toUpperCase()
+  ) {
     throw new HttpError(409, "PO currency is locked after posting. Reverse and rebook instead.");
   }
   if (nativeZmw && (!existingPO.historicalExchangeRate || !existingPO.historicalRateDate)) {
@@ -103,7 +105,9 @@ export async function applyPurchaseOrderItemsUpdate(
     const rate =
       item.rate !== undefined && item.rate !== null && item.rate !== ""
         ? item.rate.toString()
-        : (nativeZmw ? existingItem?.nativeRate ?? "" : existingItem?.rate ?? "0");
+        : nativeZmw
+          ? (existingItem?.nativeRate ?? "")
+          : (existingItem?.rate ?? "0");
     if (nativeZmw && !rate) throw new HttpError(409, "Missing original native PO line price");
     const lineTotal = amountInput(quantity).times(amountInput(rate));
     itemsTotal = itemsTotal.plus(lineTotal);
@@ -119,22 +123,25 @@ export async function applyPurchaseOrderItemsUpdate(
   });
 
   // Native ZMW is revalued at the ORIGINAL purchase rate, never a current rate.
-  const nativeCost = nativeZmw ? valueZmwPurchaseAtLockedRate({
-    date: existingPO.historicalRateDate!,
-    historicalRate: String(existingPO.historicalExchangeRate),
-    lines: newItems.map(item => ({ quantity: item.quantity, rate: item.rate })),
-    charges: {
-      freight: req.body.freight ?? existingPO.nativeFreight,
-      surcharge: req.body.surcharge ?? existingPO.nativeSurcharge,
-      fumigation: req.body.fumigation ?? existingPO.nativeFumigation,
-      documentCharges: req.body.documentCharges ?? existingPO.nativeDocumentCharges,
-      discount: req.body.discount ?? existingPO.nativeDiscount,
-      otherCharges: req.body.otherCharges ?? existingPO.nativeOtherCharges,
-    },
-  }) : null;
+  const nativeCost = nativeZmw
+    ? valueZmwPurchaseAtLockedRate({
+        date: existingPO.historicalRateDate!,
+        historicalRate: String(existingPO.historicalExchangeRate),
+        lines: newItems.map((item) => ({ quantity: item.quantity, rate: item.rate })),
+        charges: {
+          freight: req.body.freight ?? existingPO.nativeFreight,
+          surcharge: req.body.surcharge ?? existingPO.nativeSurcharge,
+          fumigation: req.body.fumigation ?? existingPO.nativeFumigation,
+          documentCharges: req.body.documentCharges ?? existingPO.nativeDocumentCharges,
+          discount: req.body.discount ?? existingPO.nativeDiscount,
+          otherCharges: req.body.otherCharges ?? existingPO.nativeOtherCharges,
+        },
+      })
+    : null;
   const valuedItems = nativeCost
     ? newItems.map((item, index) => ({
-        ...item, rate: nativeCost.lines[index].rate,
+        ...item,
+        rate: nativeCost.lines[index].rate,
         lineTotal: nativeCost.lines[index].lineTotal,
         nativeRate: nativeCost.lines[index].nativeRate,
         nativeLineTotal: nativeCost.lines[index].nativeLineTotal,
@@ -146,7 +153,9 @@ export async function applyPurchaseOrderItemsUpdate(
   const freight = amountInput(nativeCost?.freight ?? req.body.freight ?? existingPO.freight ?? "0");
   const surcharge = amountInput(nativeCost?.surcharge ?? req.body.surcharge ?? existingPO.surcharge ?? "0");
   const fumigation = amountInput(nativeCost?.fumigation ?? req.body.fumigation ?? existingPO.fumigation ?? "0");
-  const documentCharges = amountInput(nativeCost?.documentCharges ?? req.body.documentCharges ?? existingPO.documentCharges ?? "0");
+  const documentCharges = amountInput(
+    nativeCost?.documentCharges ?? req.body.documentCharges ?? existingPO.documentCharges ?? "0"
+  );
   const discount = amountInput(nativeCost?.discount ?? req.body.discount ?? existingPO.discount ?? "0");
   const otherCharges = amountInput(nativeCost?.otherCharges ?? req.body.otherCharges ?? existingPO.otherCharges ?? "0");
   // Every charge but the freight, net of the discount.
@@ -192,9 +201,9 @@ export async function applyPurchaseOrderItemsUpdate(
       // Re-check here after the container lock so an offload that won the race cannot
       // be followed by a stock-item swap against inventory that was already materialized.
       if (nativeZmw && lockedContainer?.status === "OFFLOADED") {
-          throw new HttpError(409, "Reverse the offload before editing native Kwacha purchase quantities or prices.");
-        }
-        if (lockedContainer?.status === "OFFLOADED") {
+        throw new HttpError(409, "Reverse the offload before editing native Kwacha purchase quantities or prices.");
+      }
+      if (lockedContainer?.status === "OFFLOADED") {
         const currentLineItems = await tx
           .select({ stockItemId: poLineItems.stockItemId })
           .from(poLineItems)
@@ -233,16 +242,18 @@ export async function applyPurchaseOrderItemsUpdate(
         .update(purchaseOrders)
         .set({
           itemsTotal: cents(itemsTotal),
-          ...(nativeCost ? {
-            nativeLineCount: nativeCost.nativeLineCount,
-            nativeItemsTotal: nativeCost.nativeItemsTotal,
-            nativeFreight: nativeCost.nativeFreight,
-            nativeSurcharge: nativeCost.nativeSurcharge,
-            nativeFumigation: nativeCost.nativeFumigation,
-            nativeDocumentCharges: nativeCost.nativeDocumentCharges,
-            nativeDiscount: nativeCost.nativeDiscount,
-            nativeOtherCharges: nativeCost.nativeOtherCharges,
-          } : {}),
+          ...(nativeCost
+            ? {
+                nativeLineCount: nativeCost.nativeLineCount,
+                nativeItemsTotal: nativeCost.nativeItemsTotal,
+                nativeFreight: nativeCost.nativeFreight,
+                nativeSurcharge: nativeCost.nativeSurcharge,
+                nativeFumigation: nativeCost.nativeFumigation,
+                nativeDocumentCharges: nativeCost.nativeDocumentCharges,
+                nativeDiscount: nativeCost.nativeDiscount,
+                nativeOtherCharges: nativeCost.nativeOtherCharges,
+              }
+            : {}),
           freight: cents(freight),
           surcharge: cents(surcharge),
           fumigation: cents(fumigation),

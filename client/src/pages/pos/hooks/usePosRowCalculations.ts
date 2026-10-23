@@ -41,11 +41,14 @@ export function resolvePosItemRate(
   /** The last price it sold at in the display currency, when there is one. */
   lastSoldDisplayRate: number | null;
 } {
-  const toDisplay = (usd: number) => activeCurrency === "USD"
-    ? usd
-    : exchangeRate && Number.isFinite(exchangeRate) && exchangeRate > 0
-      ? activeCurrency === "CFA" ? Math.round(usd * exchangeRate) : Number((usd * exchangeRate).toFixed(2))
-      : Number.NaN;
+  const toDisplay = (usd: number) =>
+    activeCurrency === "USD"
+      ? usd
+      : exchangeRate && Number.isFinite(exchangeRate) && exchangeRate > 0
+        ? activeCurrency === "CFA"
+          ? Math.round(usd * exchangeRate)
+          : Number((usd * exchangeRate).toFixed(2))
+        : Number.NaN;
   const lastSoldUSD = lastSoldPrices[item.stockItemId] ? parseFloat(lastSoldPrices[item.stockItemId]) : null;
   const rateUSD = lastSoldUSD ?? item.price;
   return {

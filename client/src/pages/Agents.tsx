@@ -37,7 +37,8 @@ import { AddAgentDialog } from "./agents/AddAgentDialog";
 export default function Agents() {
   const { selectedCompany } = useCompany();
   const factoryMode = useAppMode() === "factory";
-  const { formatAmount, selectedCurrency, exchangeRate, isMultiCurrency, baseCurrency, displayCurrency } = useCurrencyContext();
+  const { formatAmount, selectedCurrency, exchangeRate, isMultiCurrency, baseCurrency, displayCurrency } =
+    useCurrencyContext();
   const { formatDisplayDate } = useDateFormat();
   const { toast } = useToast();
 

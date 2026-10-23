@@ -13,7 +13,12 @@ import {
 } from "../lib/inventoryMath";
 import { db, type DatabaseOrTransaction } from "../db";
 import { normalizeVoucherEntryAmounts } from "../services/accounting/currencyAmounts";
-import { PosZmwRateError, resolveLockedZmwPosCurrency, assertZmwImportPrices, type LockedPosCurrency } from "../services/pos/posZmwRatePolicy";
+import {
+  PosZmwRateError,
+  resolveLockedZmwPosCurrency,
+  assertZmwImportPrices,
+  type LockedPosCurrency,
+} from "../services/pos/posZmwRatePolicy";
 import { getOrCreateInventoryControlAccount } from "../services/accounting/inventoryControlAccount";
 import { storage } from "../storage";
 import { requireAuth, requireNonPOS } from "../auth";
@@ -134,7 +139,8 @@ export function registerCreditNoteRoutes(app: Express) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const { noteType, voucherDate, cashAccountId, cashAccountType, description, items, currency, exchangeRate } = req.body;
+      const { noteType, voucherDate, cashAccountId, cashAccountType, description, items, currency, exchangeRate } =
+        req.body;
       if (!noteType || !["Credit Note", "Debit Note"].includes(noteType)) {
         return res.status(400).json({ message: "Invalid note type. Must be 'Credit Note' or 'Debit Note'" });
       }
@@ -160,9 +166,13 @@ export function registerCreditNoteRoutes(app: Express) {
       }
 
       const lockedPosCurrency = await resolveLockedZmwPosCurrency(companyId, voucherDate, currency, exchangeRate);
-      assertZmwImportPrices(items.map((item: { refundRate: unknown; originalCurrencyRate?: unknown }) => ({
-        rate: item.refundRate, originalCurrencyRate: item.originalCurrencyRate,
-      })), lockedPosCurrency);
+      assertZmwImportPrices(
+        items.map((item: { refundRate: unknown; originalCurrencyRate?: unknown }) => ({
+          rate: item.refundRate,
+          originalCurrencyRate: item.originalCurrencyRate,
+        })),
+        lockedPosCurrency
+      );
 
       let totalRefundAmount = toInventoryDecimal(0);
       let totalInventoryValue = toInventoryDecimal(0);
@@ -532,26 +542,43 @@ export function registerCreditNoteRoutes(app: Express) {
       // note. Editing its date/currency would require a reversal and rebook.
       const wasZmw = voucher.currency === "ZMW";
       if (wasZmw && voucherDate && voucherDate !== String(voucher.voucherDate)) {
-        return res.status(409).json({ code: "ZMW_REFUND_DATE_LOCKED", message: "Reverse and rebook to change the date of a Kwacha refund." });
+        return res.status(409).json({
+          code: "ZMW_REFUND_DATE_LOCKED",
+          message: "Reverse and rebook to change the date of a Kwacha refund.",
+        });
       }
-      if (wasZmw && ((currency !== undefined && currency !== "ZMW") ||
-          (exchangeRate != null && !toInventoryDecimal(exchangeRate).eq(voucher.exchangeRate || "0")))) {
-        return res.status(409).json({ code: "ZMW_REFUND_RATE_LOCKED", message: "Cannot change the original Kwacha refund currency or locked rate." });
+      if (
+        wasZmw &&
+        ((currency !== undefined && currency !== "ZMW") ||
+          (exchangeRate != null && !toInventoryDecimal(exchangeRate).eq(voucher.exchangeRate || "0")))
+      ) {
+        return res.status(409).json({
+          code: "ZMW_REFUND_RATE_LOCKED",
+          message: "Cannot change the original Kwacha refund currency or locked rate.",
+        });
       }
       if (!wasZmw && currency === "ZMW") {
-        return res.status(409).json({ code: "REFUND_CURRENCY_LOCKED", message: "Cannot change an existing refund's currency to ZMW." });
+        return res
+          .status(409)
+          .json({ code: "REFUND_CURRENCY_LOCKED", message: "Cannot change an existing refund's currency to ZMW." });
       }
       if (wasZmw && !voucher.exchangeRate) {
-        return res.status(409).json({ code: "ZMW_REFUND_RATE_MISSING", message: "Original ZMW refund has no locked exchange rate." });
+        return res
+          .status(409)
+          .json({ code: "ZMW_REFUND_RATE_MISSING", message: "Original ZMW refund has no locked exchange rate." });
       }
       const lockedPosCurrency: LockedPosCurrency = {
         currency: voucher.currency || "USD",
         exchangeRate: voucher.exchangeRate == null ? null : String(voucher.exchangeRate),
       };
       if (wasZmw) {
-        assertZmwImportPrices(items.map((item: { refundRate: unknown; originalCurrencyRate?: unknown }) => ({
-          rate: item.refundRate, originalCurrencyRate: item.originalCurrencyRate,
-        })), lockedPosCurrency);
+        assertZmwImportPrices(
+          items.map((item: { refundRate: unknown; originalCurrencyRate?: unknown }) => ({
+            rate: item.refundRate,
+            originalCurrencyRate: item.originalCurrencyRate,
+          })),
+          lockedPosCurrency
+        );
       }
 
       const noteType = voucher.voucherType;

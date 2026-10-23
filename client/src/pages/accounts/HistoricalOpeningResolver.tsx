@@ -36,7 +36,9 @@ export function HistoricalOpeningResolver() {
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   // A draft choice and a previously cached unresolved balance must not leak
   // across company switches. Rate and opening amount are tenant data.
-  useEffect(() => { setDrafts({}); }, [companyId]);
+  useEffect(() => {
+    setDrafts({});
+  }, [companyId]);
   const query = useQuery<UnresolvedOpening[]>({
     queryKey: ["/api/accounts/multi-currency/unresolved-openings", companyId],
     enabled: !!companyId,
@@ -125,9 +127,9 @@ export function HistoricalOpeningResolver() {
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Manual review required</AlertTitle>
           <AlertDescription>
-            Choose the currency originally entered and its historical foreign-units-per-USD rate
-            (for Zambia, ZMW per USD). This preserves the native amount and a separate historical
-            USD value. Do not enter today's rate unless it truly applied to the original opening.
+            Choose the currency originally entered and its historical foreign-units-per-USD rate (for Zambia, ZMW per
+            USD). This preserves the native amount and a separate historical USD value. Do not enter today's rate unless
+            it truly applied to the original opening.
           </AlertDescription>
         </Alert>
 
@@ -152,7 +154,10 @@ export function HistoricalOpeningResolver() {
                   mutation.variables?.row.entity_type === row.entity_type &&
                   mutation.variables?.row.id === row.id;
                 const invalidRate =
-                  draft.currency !== "USD" && (!draft.historicalRate || !Number.isFinite(Number(draft.historicalRate)) || Number(draft.historicalRate) <= 0);
+                  draft.currency !== "USD" &&
+                  (!draft.historicalRate ||
+                    !Number.isFinite(Number(draft.historicalRate)) ||
+                    Number(draft.historicalRate) <= 0);
                 return (
                   <TableRow key={key}>
                     <TableCell className="capitalize">
@@ -170,6 +175,7 @@ export function HistoricalOpeningResolver() {
                         value={draft.currency}
                         onValueChange={(currency) => {
                           if (currency !== "USD" && currency !== displayCurrency) return;
+                          if (currency !== "USD" && currency !== "CFA" && currency !== "ZMW") return;
                           setDrafts((current) => ({ ...current, [key]: { ...draft, currency } }));
                         }}
                       >

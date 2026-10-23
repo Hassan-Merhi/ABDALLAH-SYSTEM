@@ -219,14 +219,19 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const isEditingZmw = !!voucherIdToEdit && voucherToEdit?.currency === "ZMW";
   // Editing a historical document keeps its original native currency,
   // independently of the current user's currency-toggle preference.
-  const paymentPostingCurrency = voucherIdToEdit &&
+  const paymentPostingCurrency =
+    voucherIdToEdit &&
     (voucherToEdit?.currency === "ZMW" || voucherToEdit?.currency === "CFA" || voucherToEdit?.currency === "USD")
-      ? voucherToEdit.currency : selectedCurrency;
-  const paymentPostingRate = paymentPostingCurrency === "ZMW"
-    ? isEditingZmw
-      ? Number.isFinite(priorZmwRate) && priorZmwRate > 0 ? priorZmwRate : null
-      : dateSpecificZmwRate
-    : exchangeRate;
+      ? voucherToEdit.currency
+      : selectedCurrency;
+  const paymentPostingRate =
+    paymentPostingCurrency === "ZMW"
+      ? isEditingZmw
+        ? Number.isFinite(priorZmwRate) && priorZmwRate > 0
+          ? priorZmwRate
+          : null
+        : dateSpecificZmwRate
+      : exchangeRate;
   const watchedEntries = useWatch({ control: form.control, name: "entries" });
   const total = entries.reduce((sum, entry) => sum + (parseFloat(entry.amount) || 0), 0);
 

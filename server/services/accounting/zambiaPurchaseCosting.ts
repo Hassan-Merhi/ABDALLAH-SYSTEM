@@ -9,10 +9,8 @@ import { assertApprovedZmwVoucherRate } from "./zambiaVoucherRatePolicy";
 import { isUnsupportedNativeZmwPurchase } from "./zambiaPurchaseCurrencyGuard";
 
 const ZERO = "0";
-const chargeNames = [
-  "freight", "surcharge", "fumigation", "documentCharges", "discount", "otherCharges",
-] as const;
-type ChargeName = typeof chargeNames[number];
+const chargeNames = ["freight", "surcharge", "fumigation", "documentCharges", "discount", "otherCharges"] as const;
+type ChargeName = (typeof chargeNames)[number];
 export type NativePurchaseCharges = Partial<Record<ChargeName, string | number | null>>;
 
 function nonNegative(value: unknown, field: string): Decimal {
@@ -40,8 +38,11 @@ const usd = (native: Decimal, rate: Decimal) => cents(native.div(rate));
 /** Convert one approved native charge at a persisted rate; never fetch current FX. */
 export function historicalUsdFromNativeZmw(value: string | number | null | undefined, historicalRate: string): string {
   let rate: Decimal;
-  try { rate = new Decimal(historicalRate); }
-  catch { throw new HttpError(409, "Original ZMW purchase exchange rate is missing"); }
+  try {
+    rate = new Decimal(historicalRate);
+  } catch {
+    throw new HttpError(409, "Original ZMW purchase exchange rate is missing");
+  }
   if (!rate.isFinite() || rate.lte(0)) throw new HttpError(409, "Original ZMW purchase exchange rate is invalid");
   return usd(nonNegative(value, "Native purchase charge"), rate);
 }
@@ -60,13 +61,13 @@ export async function prepareZmwPurchaseCost(input: {
   charges: NativePurchaseCharges;
 }) {
   if (input.lines.length === 0) throw new HttpError(400, "A purchase requires at least one item");
-  const historicalRate = await assertApprovedZmwVoucherRate(
-    input.companyId, input.date, "ZMW", input.exchangeRate,
-  );
+  const historicalRate = await assertApprovedZmwVoucherRate(input.companyId, input.date, "ZMW", input.exchangeRate);
   if (!historicalRate) throw new HttpError(409, "Historical ZMW purchase rate unavailable");
   return valueZmwPurchaseAtLockedRate({
-    date: input.date, historicalRate,
-    lines: input.lines, charges: input.charges,
+    date: input.date,
+    historicalRate,
+    lines: input.lines,
+    charges: input.charges,
   });
 }
 
@@ -111,12 +112,14 @@ export function valueZmwPurchaseAtLockedRate(input: {
     originalCharges[key] = cents(nativeValue);
     baseCharges[key] = usd(nativeValue, rate);
   }
-  const nativeChargesTotal = chargeNames.reduce((sum, key) =>
-    key === "discount" ? sum.minus(originalCharges[key]) : sum.plus(originalCharges[key]),
-  new Decimal(0));
-  const baseChargesTotal = chargeNames.reduce((sum, key) =>
-    key === "discount" ? sum.minus(baseCharges[key]) : sum.plus(baseCharges[key]),
-  new Decimal(0));
+  const nativeChargesTotal = chargeNames.reduce(
+    (sum, key) => (key === "discount" ? sum.minus(originalCharges[key]) : sum.plus(originalCharges[key])),
+    new Decimal(0)
+  );
+  const baseChargesTotal = chargeNames.reduce(
+    (sum, key) => (key === "discount" ? sum.minus(baseCharges[key]) : sum.plus(baseCharges[key])),
+    new Decimal(0)
+  );
   return {
     historicalExchangeRate: historicalRate,
     historicalRateDate: input.date,
@@ -146,31 +149,51 @@ export function valueZmwPurchaseAtLockedRate(input: {
  * Called by generic PO storage before its transaction, so no ZMW cost can be
  * accepted with missing metadata or mismatched company-approved rate.
  */
-export async function assertPreparedZmwPurchaseCost(input: {
-  companyId: number;
-  currency?: string | null;
-  historicalExchangeRate?: string | null;
-  historicalRateDate?: string | null;
-  nativeItemsTotal?: string | null;
-  nativeLineCount?: number | null;
-  itemsTotal?: string | null;
-  [key: string]: unknown;
-}, voucherDate?: string): Promise<void> {
+export async function assertPreparedZmwPurchaseCost(
+  input: {
+    companyId: number;
+    currency?: string | null;
+    historicalExchangeRate?: string | null;
+    historicalRateDate?: string | null;
+    nativeItemsTotal?: string | null;
+    nativeLineCount?: number | null;
+    itemsTotal?: string | null;
+    [key: string]: unknown;
+  },
+  voucherDate?: string
+): Promise<void> {
   if (!isUnsupportedNativeZmwPurchase(input.currency)) return;
-  if (!input.historicalRateDate || input.historicalRateDate !== voucherDate ||
-      !input.historicalExchangeRate || input.nativeItemsTotal == null) {
+  if (
+    !input.historicalRateDate ||
+    input.historicalRateDate !== voucherDate ||
+    !input.historicalExchangeRate ||
+    input.nativeItemsTotal == null
+  ) {
     throw new HttpError(409, "Native Kwacha PO needs original amounts, voucher date and a locked historical rate");
   }
   const rate = await assertApprovedZmwVoucherRate(
-    input.companyId, input.historicalRateDate, "ZMW", input.historicalExchangeRate,
+    input.companyId,
+    input.historicalRateDate,
+    "ZMW",
+    input.historicalExchangeRate
   );
   if (!rate) throw new HttpError(409, "Historical ZMW PO rate is unavailable");
-  if (!Number.isSafeInteger(input.nativeLineCount) || Number(input.nativeLineCount) <= 0 || Number(input.nativeLineCount) > 10000) {
+  if (
+    !Number.isSafeInteger(input.nativeLineCount) ||
+    Number(input.nativeLineCount) <= 0 ||
+    Number(input.nativeLineCount) > 10000
+  ) {
     throw new HttpError(409, "Original native purchase line count is missing");
   }
-  const required = ["nativeFreight", "nativeSurcharge", "nativeFumigation",
-    "nativeDocumentCharges", "nativeDiscount", "nativeOtherCharges"];
-  if (required.some(key => input[key] == null)) {
+  const required = [
+    "nativeFreight",
+    "nativeSurcharge",
+    "nativeFumigation",
+    "nativeDocumentCharges",
+    "nativeDiscount",
+    "nativeOtherCharges",
+  ];
+  if (required.some((key) => input[key] == null)) {
     throw new HttpError(409, "Original ZMW PO charges are missing");
   }
   // Sum of individually rounded base lines can legitimately differ from
@@ -182,9 +205,12 @@ export async function assertPreparedZmwPurchaseCost(input: {
   // Every USD line is rounded independently to cents; any larger variance
   // indicates an incorrect conversion or a Kwacha-as-USD financial value.
   const linkedCharges: Array<[string, string]> = [
-    ["nativeFreight", "freight"], ["nativeSurcharge", "surcharge"],
-    ["nativeFumigation", "fumigation"], ["nativeDocumentCharges", "documentCharges"],
-    ["nativeDiscount", "discount"], ["nativeOtherCharges", "otherCharges"],
+    ["nativeFreight", "freight"],
+    ["nativeSurcharge", "surcharge"],
+    ["nativeFumigation", "fumigation"],
+    ["nativeDocumentCharges", "documentCharges"],
+    ["nativeDiscount", "discount"],
+    ["nativeOtherCharges", "otherCharges"],
   ];
   for (const [nativeField, baseField] of linkedCharges) {
     const originalCharge = nonNegative(input[nativeField], nativeField);

@@ -152,7 +152,9 @@ async function prepareCompanyPayload(
     const base = payload.baseCurrency === undefined ? (current?.baseCurrency ?? "USD") : payload.baseCurrency;
     const display = payload.displayCurrency === undefined ? current?.displayCurrency : payload.displayCurrency;
     if (!isSupportedZmwCompanyPair(String(base ?? ""), display == null ? null : String(display))) {
-      throw new CompanyParentValidationError("ZMW display currency currently requires USD as the company's base currency.");
+      throw new CompanyParentValidationError(
+        "ZMW display currency currently requires USD as the company's base currency."
+      );
     }
   }
   return payload;

@@ -167,11 +167,20 @@ export function usePosCheckout({
       return;
     }
 
-    if (activeCurrency === "ZMW" && validItems.some((row) =>
-      !Number.isFinite(row.rate) || row.rate <= 0 ||
-      Math.abs(row.rate * 100 - Math.round(row.rate * 100)) > 0.000001
-    )) {
-      toast({ title: "Invalid Kwacha price", description: "Enter a positive unit price to two decimal places (ngwee).", variant: "destructive" });
+    if (
+      activeCurrency === "ZMW" &&
+      validItems.some(
+        (row) =>
+          !Number.isFinite(row.rate) ||
+          row.rate <= 0 ||
+          Math.abs(row.rate * 100 - Math.round(row.rate * 100)) > 0.000001
+      )
+    ) {
+      toast({
+        title: "Invalid Kwacha price",
+        description: "Enter a positive unit price to two decimal places (ngwee).",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -208,7 +217,11 @@ export function usePosCheckout({
     };
 
     if (saleData.items.some((item) => !Number.isFinite(Number(item.rate)) || Number(item.rate) <= 0)) {
-      toast({ title: "Invalid foreign-currency price", description: "Check the exchange rate and item prices before saving.", variant: "destructive" });
+      toast({
+        title: "Invalid foreign-currency price",
+        description: "Check the exchange rate and item prices before saving.",
+        variant: "destructive",
+      });
       return;
     }
     saveMutation.mutate(saleData as PosSalePayload);

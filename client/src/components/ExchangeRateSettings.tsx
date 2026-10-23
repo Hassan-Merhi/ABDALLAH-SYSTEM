@@ -57,7 +57,9 @@ export function ExchangeRateSettings() {
   const { data: todayRateCheck } = useQuery<{ today: string; hasRate: boolean; missingRate?: boolean }>({
     queryKey: ["/api/exchange-rates/check-today", activeCompanyId],
     queryFn: async () => {
-      const res = await fetch(`/api/exchange-rates/check-today?companyId=${activeCompanyId}`, { credentials: "include" });
+      const res = await fetch(`/api/exchange-rates/check-today?companyId=${activeCompanyId}`, {
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Cannot load company business date");
       return res.json();
     },
@@ -74,10 +76,11 @@ export function ExchangeRateSettings() {
     }
   }, [todayRateCheck?.today, form]);
 
+  // A company switch discards the previous company's unsaved rate draft.
   useEffect(() => {
     form.reset({ rate: "", effectiveDate: "" });
     setShowForm(false);
-  }, [activeCompanyId]);
+  }, [activeCompanyId, form]);
 
   const { data: exchangeRates = [], isLoading } = useQuery<Serialized<ExchangeRate>[]>({
     queryKey: ["/api/exchange-rates", activeCompanyId, baseCurrency, displayCurrency],
@@ -125,7 +128,8 @@ export function ExchangeRateSettings() {
     onSuccess: async () => {
       toast({
         title: "Exchange rate saved",
-        description: "Saved for the selected date. Historical vouchers are unchanged; current cash/bank translations update in reports.",
+        description:
+          "Saved for the selected date. Historical vouchers are unchanged; current cash/bank translations update in reports.",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/exchange-rates"] });
       queryClient.invalidateQueries({ queryKey: ["/api/exchange-rates/check-today", activeCompanyId] });
@@ -165,7 +169,11 @@ export function ExchangeRateSettings() {
 
   const onSubmit = (data: ExchangeRateFormData) => {
     if (!canEditRate || !todayRateCheck?.today) {
-      toast({ title: "Cannot save exchange rate", description: "The company business date is unavailable or your role cannot edit rates.", variant: "destructive" });
+      toast({
+        title: "Cannot save exchange rate",
+        description: "The company business date is unavailable or your role cannot edit rates.",
+        variant: "destructive",
+      });
       return;
     }
     createRateMutation.mutate(data);
@@ -185,7 +193,12 @@ export function ExchangeRateSettings() {
             </CardDescription>
           </div>
           {canEditRate && (
-            <Button onClick={() => setShowForm(!showForm)} size="sm" disabled={!todayRateCheck?.today} data-testid="button-add-exchange-rate">
+            <Button
+              onClick={() => setShowForm(!showForm)}
+              size="sm"
+              disabled={!todayRateCheck?.today}
+              data-testid="button-add-exchange-rate"
+            >
               <Plus className="h-4 w-4 mr-1" />
               Set Rate
             </Button>
@@ -209,7 +222,8 @@ export function ExchangeRateSettings() {
 
         {todayRateCheck && !todayRateCheck.hasRate && (
           <p className="text-sm text-amber-700 dark:text-amber-300" data-testid="exchange-rate-not-today">
-            No rate recorded for {todayRateCheck.today}. {latestRate
+            No rate recorded for {todayRateCheck.today}.{" "}
+            {latestRate
               ? "The most recent earlier rate remains available for applicable new transactions."
               : "No usable rate is available. Foreign-currency transactions require a confirmed rate."}
           </p>
@@ -307,7 +321,10 @@ export function ExchangeRateSettings() {
 
         {!isLoading && exchangeRates.length === 0 && !latestRate && (
           <p className="text-muted-foreground text-sm text-center py-4">
-            No exchange rates set for this company's currency pair. {canEditRate ? "Set a rate before accepting foreign-currency transactions." : "Ask an Admin or Owner to set a rate."}
+            No exchange rates set for this company's currency pair.{" "}
+            {canEditRate
+              ? "Set a rate before accepting foreign-currency transactions."
+              : "Ask an Admin or Owner to set a rate."}
           </p>
         )}
       </CardContent>

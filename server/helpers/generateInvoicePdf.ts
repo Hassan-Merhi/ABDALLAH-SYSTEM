@@ -296,10 +296,12 @@ async function buildPdf(d: InvoiceData): Promise<{ buffer: Buffer; pageCount: nu
   let pageCount = 1; // autoFirstPage adds page 1
 
   const isMali = d.companyName.toLowerCase().includes("mali");
-  const isZmwInvoice = d.currency === "ZMW" && d.exchangeRate !== null && Number.isFinite(d.exchangeRate) && d.exchangeRate > 0;
-  const formatSaleAmount = (usd: number) => isZmwInvoice
-    ? `K${(usd * d.exchangeRate!).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-    : fmtUSD(usd);
+  const isZmwInvoice =
+    d.currency === "ZMW" && d.exchangeRate !== null && Number.isFinite(d.exchangeRate) && d.exchangeRate > 0;
+  const formatSaleAmount = (usd: number) =>
+    isZmwInvoice
+      ? `K${(usd * d.exchangeRate!).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      : fmtUSD(usd);
 
   // Auto-hide profit columns when no item has a configured price set
   const hasConfiguredPrice = d.items.some((item) => item.configuredPrice > 0);
@@ -505,7 +507,11 @@ async function buildPdf(d: InvoiceData): Promise<{ buffer: Buffer; pageCount: nu
 
     doc.font("Helvetica").fontSize(FONT_ROW).fillColor(CLR_BODY);
     doc.text(fmtQty(item.quantity), X_QTY + 1, cy, { width: COL_QTY_W - 2, align: "center", lineBreak: false });
-    doc.text(formatSaleAmount(item.rateUSD), X_RATE + 1, cy, { width: COL_RATE_W - 2, align: "center", lineBreak: false });
+    doc.text(formatSaleAmount(item.rateUSD), X_RATE + 1, cy, {
+      width: COL_RATE_W - 2,
+      align: "center",
+      lineBreak: false,
+    });
     doc.font("Helvetica-Bold").fontSize(FONT_ROW).fillColor(CLR_BODY);
     doc.text(formatSaleAmount(amtUSD), X_AMT + 1, cy, { width: COL_AMT_W - 2, align: "center", lineBreak: false });
 
@@ -569,7 +575,9 @@ async function buildPdf(d: InvoiceData): Promise<{ buffer: Buffer; pageCount: nu
     .font("Helvetica")
     .fontSize(d.compactMode ? 7 : 8)
     .fillColor(CLR_MUTED);
-  doc.text(isZmwInvoice ? "TOTAL PAID (ZMW)" : "TOTAL PAID", MARGIN_X + 10, y + (d.compactMode ? 6 : 8), { lineBreak: false });
+  doc.text(isZmwInvoice ? "TOTAL PAID (ZMW)" : "TOTAL PAID", MARGIN_X + 10, y + (d.compactMode ? 6 : 8), {
+    lineBreak: false,
+  });
 
   doc
     .font("Helvetica-Bold")

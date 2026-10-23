@@ -16,10 +16,16 @@ import { companyRateDateSchema, companyRateValueSchema } from "@shared/companyRa
 export class PosZmwRateError extends Error {
   readonly statusCode = 409;
   readonly code = "POS_ZMW_RATE_REQUIRED";
-  constructor(message: string) { super(message); this.name = "PosZmwRateError"; }
+  constructor(message: string) {
+    super(message);
+    this.name = "PosZmwRateError";
+  }
 }
 
-export interface LockedPosCurrency { currency: string; exchangeRate: string | null; }
+export interface LockedPosCurrency {
+  currency: string;
+  exchangeRate: string | null;
+}
 
 export async function resolveLockedZmwPosCurrency(
   companyId: number,
@@ -42,7 +48,9 @@ export async function resolveLockedZmwPosCurrency(
   // tomorrow's sale must never be booked today against an earlier rate.
   const currentBusinessDate = await companyBusinessDate(companyId);
   if (voucherDate > currentBusinessDate) {
-    throw new PosZmwRateError("Future-dated Kwacha sales/refunds are not allowed. Select a business date on or before today.");
+    throw new PosZmwRateError(
+      "Future-dated Kwacha sales/refunds are not allowed. Select a business date on or before today."
+    );
   }
   if (!company || company.baseCurrency !== "USD" || company.displayCurrency !== "ZMW") {
     throw new PosZmwRateError("USD/ZMW must be configured for the active company before posting Kwacha sales.");
@@ -56,13 +64,14 @@ export async function resolveLockedZmwPosCurrency(
     throw new PosZmwRateError("No approved USD/ZMW exchange rate exists on or before the sale date.");
   }
   const locked = new Decimal(String(dated.rate));
-  const submitted = suppliedRate === undefined || suppliedRate === null || suppliedRate === ""
-    ? null : String(suppliedRate);
+  const submitted =
+    suppliedRate === undefined || suppliedRate === null || suppliedRate === "" ? null : String(suppliedRate);
   // An old browser tab or an intentionally backdated form must reload the rate
   // instead of posting USD lines calculated using a mismatched current rate.
-  if (!submitted || !companyRateValueSchema.safeParse(submitted).success ||
-      !new Decimal(submitted).eq(locked)) {
-    throw new PosZmwRateError("The USD/ZMW rate for this sale date differs from the selected rate. Reload the date-specific rate and recalculate the prices.");
+  if (!submitted || !companyRateValueSchema.safeParse(submitted).success || !new Decimal(submitted).eq(locked)) {
+    throw new PosZmwRateError(
+      "The USD/ZMW rate for this sale date differs from the selected rate. Reload the date-specific rate and recalculate the prices."
+    );
   }
   return { currency: "ZMW", exchangeRate: locked.toFixed() };
 }
@@ -87,9 +96,14 @@ export function assertZmwImportPrices(
     }
     const usdValue = new Decimal(usd);
     const kwachaValue = new Decimal(native);
-    if (!usdValue.gt(0) || !kwachaValue.gt(0) ||
-        usdValue.times(rate).minus(kwachaValue).abs().gt(rate.times("0.00000051"))) {
-      throw new PosZmwRateError(`Excel line ${index + 1}: USD amount does not match the original Kwacha price at the locked rate.`);
+    if (
+      !usdValue.gt(0) ||
+      !kwachaValue.gt(0) ||
+      usdValue.times(rate).minus(kwachaValue).abs().gt(rate.times("0.00000051"))
+    ) {
+      throw new PosZmwRateError(
+        `Excel line ${index + 1}: USD amount does not match the original Kwacha price at the locked rate.`
+      );
     }
   }
 }

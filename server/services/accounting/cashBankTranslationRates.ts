@@ -29,8 +29,9 @@ export async function getCashBankTranslationRates(companyId: number, asOf?: stri
     .where(eq(companies.id, companyId))
     .limit(1);
 
-  const isZambiaPair = String(company?.baseCurrency ?? "").toUpperCase() === "USD"
-    && String(company?.displayCurrency ?? "").toUpperCase() === "ZMW";
+  const isZambiaPair =
+    String(company?.baseCurrency ?? "").toUpperCase() === "USD" &&
+    String(company?.displayCurrency ?? "").toUpperCase() === "ZMW";
 
   const [cfa, zmw] = await Promise.all([
     getLatestCfaPerUsd(companyId, asOf),

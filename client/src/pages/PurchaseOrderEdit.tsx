@@ -114,8 +114,8 @@ export default function PurchaseOrderEdit() {
         stockItemId: item.stockItemId,
         itemName: item.itemName,
         quantity: item.quantity,
-        rate: po.currency === "ZMW" ? item.nativeRate ?? "" : item.rate,
-        lineTotal: po.currency === "ZMW" ? item.nativeLineTotal ?? "" : item.lineTotal,
+        rate: po.currency === "ZMW" ? (item.nativeRate ?? "") : item.rate,
+        lineTotal: po.currency === "ZMW" ? (item.nativeLineTotal ?? "") : item.lineTotal,
       }))
     );
     setFreight((po.currency === "ZMW" ? po.nativeFreight : po.freight) || "0");
@@ -385,9 +385,11 @@ export default function PurchaseOrderEdit() {
           <CardContent className="space-y-4">
             {po.currency === "ZMW" && (
               <p className="text-sm text-muted-foreground rounded-md border p-3">
-                Original purchase prices and charges are in Kwacha (K). Historical USD inventory and parent-company costs
-                are fixed using {po.historicalExchangeRate ? `K${po.historicalExchangeRate} per USD` : "an unresolved rate"}
-                {po.historicalRateDate ? ` as of ${po.historicalRateDate}` : ""}. To change currency or the rate, reverse and rebook.
+                Original purchase prices and charges are in Kwacha (K). Historical USD inventory and parent-company
+                costs are fixed using{" "}
+                {po.historicalExchangeRate ? `K${po.historicalExchangeRate} per USD` : "an unresolved rate"}
+                {po.historicalRateDate ? ` as of ${po.historicalRateDate}` : ""}. To change currency or the rate,
+                reverse and rebook.
               </p>
             )}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -563,7 +565,8 @@ export default function PurchaseOrderEdit() {
                           />
                         </TableCell>
                         <TableCell className="text-right font-mono">
-                          {priceSymbol}{formatCurrency(parseFloat(lineTotals[index] || "0"))}
+                          {priceSymbol}
+                          {formatCurrency(parseFloat(lineTotals[index] || "0"))}
                         </TableCell>
                         <TableCell>
                           <Button
@@ -592,7 +595,8 @@ export default function PurchaseOrderEdit() {
                         </TableCell>
                         <TableCell></TableCell>
                         <TableCell className="text-right font-mono font-bold">
-                          {priceSymbol}{formatCurrency(parseFloat(itemsTotal))}
+                          {priceSymbol}
+                          {formatCurrency(parseFloat(itemsTotal))}
                         </TableCell>
                         <TableCell></TableCell>
                       </TableRow>
@@ -743,10 +747,14 @@ export default function PurchaseOrderEdit() {
               <div className="bg-muted/50 rounded-md p-4">
                 <div className="flex justify-between items-center">
                   <span className="font-medium">Grand Total:</span>
-                  <span className="text-xl font-bold font-mono">{priceSymbol}{formatCurrency(parseFloat(grandTotal))}</span>
+                  <span className="text-xl font-bold font-mono">
+                    {priceSymbol}
+                    {formatCurrency(parseFloat(grandTotal))}
+                  </span>
                 </div>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Items ({priceSymbol}{formatCurrency(parseFloat(itemsTotal))}) + Charges ({priceSymbol}
+                  Items ({priceSymbol}
+                  {formatCurrency(parseFloat(itemsTotal))}) + Charges ({priceSymbol}
                   {formatCurrency(parseFloat(chargesTotal))})
                 </p>
               </div>

@@ -38,11 +38,12 @@ export const useFormInitialization = (
     const isConsumption = voucherType === "Consumption" || voucherType === "Production" || voucherType === "Mixed";
     const isStockTransfer = voucherType === "Stock Transfer";
 
-    const originalEntries = voucher.currency === "ZMW"
-      ? voucher.entries.filter((entry) =>
-          !(entry.transactionCurrency === "USD" && entry.narration === "Base currency rounding difference")
-        )
-      : voucher.entries;
+    const originalEntries =
+      voucher.currency === "ZMW"
+        ? voucher.entries.filter(
+            (entry) => !(entry.transactionCurrency === "USD" && entry.narration === "Base currency rounding difference")
+          )
+        : voucher.entries;
     if (isPaymentOrReceipt) {
       const mainEntry = originalEntries[0];
       const contraEntries = originalEntries.slice(1);
@@ -104,9 +105,16 @@ export const useFormInitialization = (
             accountType: eAccountType,
             accountId: eAccountId,
             accountName: eAccountName,
-            amount: voucher.currency === "ZMW"
-              ? String(Number(e.transactionDebitAmount || "0") > 0 ? e.transactionDebitAmount : e.transactionCreditAmount || "0")
-              : parseFloat(e.debitAmount) > 0 ? e.debitAmount : e.creditAmount,
+            amount:
+              voucher.currency === "ZMW"
+                ? String(
+                    Number(e.transactionDebitAmount || "0") > 0
+                      ? e.transactionDebitAmount
+                      : e.transactionCreditAmount || "0"
+                  )
+                : parseFloat(e.debitAmount) > 0
+                  ? e.debitAmount
+                  : e.creditAmount,
             narration: e.narration || "",
           };
         }),
@@ -139,9 +147,12 @@ export const useFormInitialization = (
             accountType: accountType,
             accountId,
             accountName,
-            amount: voucher.currency === "ZMW"
-              ? String(type === "DR" ? e.transactionDebitAmount ?? "0" : e.transactionCreditAmount ?? "0")
-              : type === "DR" ? e.debitAmount : e.creditAmount,
+            amount:
+              voucher.currency === "ZMW"
+                ? String(type === "DR" ? (e.transactionDebitAmount ?? "0") : (e.transactionCreditAmount ?? "0"))
+                : type === "DR"
+                  ? e.debitAmount
+                  : e.creditAmount,
             narration: e.narration || "",
           };
         }),

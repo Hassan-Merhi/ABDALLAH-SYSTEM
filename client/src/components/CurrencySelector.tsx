@@ -11,8 +11,8 @@ interface CurrencySelectorProps {
 /** Only currencies configured for the active company are selectable. */
 export function CurrencySelector({ value, onChange, className }: CurrencySelectorProps) {
   const { selectedCurrency, setCurrency, baseCurrency, displayCurrency, isLoadingCompany } = useCurrencyContext();
-  const options = displayCurrency && displayCurrency !== baseCurrency
-    ? [baseCurrency, displayCurrency] : [baseCurrency];
+  const options =
+    displayCurrency && displayCurrency !== baseCurrency ? [baseCurrency, displayCurrency] : [baseCurrency];
   const currentValue = options.includes(value ?? selectedCurrency) ? (value ?? selectedCurrency) : baseCurrency;
 
   const handleChange = (currency: Currency) => {

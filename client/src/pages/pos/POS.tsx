@@ -118,7 +118,10 @@ export default function POS({ posUser, editVoucherId }: { posUser?: AuthMe; edit
     queryKey: ["/api/exchange-rates/latest", selectedCompany?.id, "USD", "ZMW", saleDate],
     queryFn: async () => {
       const query = new URLSearchParams({
-        companyId: String(selectedCompany!.id), fromCurrency: "USD", toCurrency: "ZMW", asOf: saleDate,
+        companyId: String(selectedCompany!.id),
+        fromCurrency: "USD",
+        toCurrency: "ZMW",
+        asOf: saleDate,
       });
       const response = await fetch("/api/exchange-rates/latest?" + query, { credentials: "include" });
       if (!response.ok) return null;
@@ -171,20 +174,24 @@ export default function POS({ posUser, editVoucherId }: { posUser?: AuthMe; edit
 
   const editedCurrency = editVoucherId && editVoucher?.currency;
   const activeCurrency: Currency = displayCurrency
-    ? ((editedCurrency === displayCurrency || editedCurrency === "USD") &&
-        typeof editedCurrency === "string" && isSupportedAccountingCurrency(editedCurrency)
-          ? editedCurrency : selectedCurrency)
+    ? (editedCurrency === displayCurrency || editedCurrency === "USD") &&
+      typeof editedCurrency === "string" &&
+      isSupportedAccountingCurrency(editedCurrency)
+      ? editedCurrency
+      : selectedCurrency
     : "USD";
-  const editLockedRate = editVoucherId && editVoucher?.exchangeRate
-    ? Number(editVoucher.exchangeRate) : null;
-  const approvedZmwRate = displayCurrency === "ZMW" && !editVoucherId
-    ? Number(datedZmwRate?.rate) : null;
-  const exchangeRate = displayCurrency === "ZMW"
-    ? editVoucherId
-      ? (editLockedRate && editLockedRate > 0 ? editLockedRate : null)
-      : !isFetchingDatedZmwRate && approvedZmwRate && Number.isFinite(approvedZmwRate) && approvedZmwRate > 0
-        ? approvedZmwRate : null
-    : dailyExchangeRate;
+  const editLockedRate = editVoucherId && editVoucher?.exchangeRate ? Number(editVoucher.exchangeRate) : null;
+  const approvedZmwRate = displayCurrency === "ZMW" && !editVoucherId ? Number(datedZmwRate?.rate) : null;
+  const exchangeRate =
+    displayCurrency === "ZMW"
+      ? editVoucherId
+        ? editLockedRate && editLockedRate > 0
+          ? editLockedRate
+          : null
+        : !isFetchingDatedZmwRate && approvedZmwRate && Number.isFinite(approvedZmwRate) && approvedZmwRate > 0
+          ? approvedZmwRate
+          : null
+      : dailyExchangeRate;
 
   // Keep a line's display price and canonical USD rate synchronized when
   // switching USD/ZMW or selecting a different sale date. A date change while
@@ -201,16 +208,19 @@ export default function POS({ posUser, editVoucherId }: { posUser?: AuthMe; edit
       return;
     }
     if (old.currency === next.currency && old.rate === next.rate) return;
-    setRows((oldRows) => oldRows.map((row) => {
-      if (!row.stockItemId || !Number.isFinite(row.rateUSD)) return row;
-      const newUsd = old.currency === next.currency && next.currency !== "USD"
-        ? row.rate / next.rate!
-        : row.rateUSD;
-      const displayRate = next.currency === "USD" ? newUsd
-        : next.currency === "CFA" ? Math.round(newUsd * next.rate!)
-        : Number((newUsd * next.rate!).toFixed(2));
-      return { ...row, rateUSD: newUsd, rate: displayRate, amount: Number((row.quantity * displayRate).toFixed(2)) };
-    }));
+    setRows((oldRows) =>
+      oldRows.map((row) => {
+        if (!row.stockItemId || !Number.isFinite(row.rateUSD)) return row;
+        const newUsd = old.currency === next.currency && next.currency !== "USD" ? row.rate / next.rate! : row.rateUSD;
+        const displayRate =
+          next.currency === "USD"
+            ? newUsd
+            : next.currency === "CFA"
+              ? Math.round(newUsd * next.rate!)
+              : Number((newUsd * next.rate!).toFixed(2));
+        return { ...row, rateUSD: newUsd, rate: displayRate, amount: Number((row.quantity * displayRate).toFixed(2)) };
+      })
+    );
     lastDisplayedFx.current = next;
   }, [activeCurrency, exchangeRate, editVoucherId, selectedCompany?.id, setRows]);
 
@@ -323,9 +333,10 @@ export default function POS({ posUser, editVoucherId }: { posUser?: AuthMe; edit
       stockItemId: item.stockItemId ? Number(item.stockItemId) : undefined,
       salesItemId: item.id,
       quantity: parseFloat(String(item.quantity)),
-      rate: editVoucher?.currency === "ZMW" && editVoucher.exchangeRate
-        ? Number((Number(item.sellingPrice) * Number(editVoucher.exchangeRate)).toFixed(2))
-        : parseFloat(String(item.sellingPrice)),
+      rate:
+        editVoucher?.currency === "ZMW" && editVoucher.exchangeRate
+          ? Number((Number(item.sellingPrice) * Number(editVoucher.exchangeRate)).toFixed(2))
+          : parseFloat(String(item.sellingPrice)),
       rateUSD: parseFloat(String(item.sellingPrice)),
       amount: parseFloat(String(item.totalSales)),
       configuredPrice: parseFloat(String(item.configuredPrice || "0")) || undefined,

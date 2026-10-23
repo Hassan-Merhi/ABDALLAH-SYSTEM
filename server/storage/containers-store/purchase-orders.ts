@@ -26,7 +26,7 @@ export async function createPurchaseOrder(
   po: InsertPurchaseOrder,
   voucherDateOverride?: string,
   /** Only native-ZMW callers provide all valued lines for an atomic write. */
-  nativeLines?: Array<Omit<InsertPOLineItem, "poId">>,
+  nativeLines?: Array<Omit<InsertPOLineItem, "poId">>
 ): Promise<PurchaseOrder> {
   // purchase_orders amounts and all linked landed-cost journals are historical
   // USD; a ZMW label alone would silently post native Kwacha as USD.
@@ -36,24 +36,33 @@ export async function createPurchaseOrder(
   return db.transaction(async (tx) => {
     const [created] = await tx.insert(schema.purchaseOrders).values(po).returning();
     if (nativeLines !== undefined) {
-      if (String(po.currency ?? "").toUpperCase() !== "ZMW" ||
-          !Number.isSafeInteger(po.nativeLineCount) ||
-          nativeLines.length !== po.nativeLineCount || nativeLines.length === 0) {
+      if (
+        String(po.currency ?? "").toUpperCase() !== "ZMW" ||
+        !Number.isSafeInteger(po.nativeLineCount) ||
+        nativeLines.length !== po.nativeLineCount ||
+        nativeLines.length === 0
+      ) {
         throw new Error("Native purchase line set is incomplete");
       }
       // Source-controlled quantities, foreign prices and historical base
       // totals commit together with the PO and both company journals.
-      const nativeTotal = sumMoney(nativeLines.map(line => line.nativeLineTotal));
-      const baseTotal = sumMoney(nativeLines.map(line => line.lineTotal));
-      if (nativeLines.some(line => line.nativeRate == null || line.nativeLineTotal == null ||
-            toMoney(line.quantity).lte(0)) ||
-          !nativeTotal.eq(toMoney(po.nativeItemsTotal)) ||
-          !baseTotal.eq(toMoney(po.itemsTotal))) {
+      const nativeTotal = sumMoney(nativeLines.map((line) => line.nativeLineTotal));
+      const baseTotal = sumMoney(nativeLines.map((line) => line.lineTotal));
+      if (
+        nativeLines.some(
+          (line) => line.nativeRate == null || line.nativeLineTotal == null || toMoney(line.quantity).lte(0)
+        ) ||
+        !nativeTotal.eq(toMoney(po.nativeItemsTotal)) ||
+        !baseTotal.eq(toMoney(po.itemsTotal))
+      ) {
         throw new Error("Native PO line values do not reconcile to stored historic USD costs");
       }
-      await tx.insert(schema.poLineItems).values(nativeLines.map(line => ({
-        ...line, poId: created.id,
-      })));
+      await tx.insert(schema.poLineItems).values(
+        nativeLines.map((line) => ({
+          ...line,
+          poId: created.id,
+        }))
+      );
     }
 
     if (po.voucherId) {
