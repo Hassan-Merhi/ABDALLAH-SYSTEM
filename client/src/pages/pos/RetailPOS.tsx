@@ -472,9 +472,21 @@ export default function RetailPOS() {
   const settings = preview?.settings ?? null;
   const requiresApproval = Boolean(preview?.policy.requiresApproval) && !approvalToken;
 
+  // Reprice the default single tender without silently reverting a cashier's selected
+  // card/bank method to cash. A split tender is kept intact for manual rebalancing.
   useEffect(() => {
     const amount = Number(total.toFixed(2));
-    setPayments([{ method: "cash", amount, tenderedAmount: amount }]);
+    setPayments((current) => {
+      if (current.length !== 1) return current;
+      const payment = current[0];
+      return [{
+        ...payment,
+        amount,
+        tenderedAmount: payment.method === "cash"
+          ? Math.max(amount, Number(payment.tenderedAmount ?? 0))
+          : null,
+      }];
+    });
   }, [total]);
 
   const paymentTotal = payments.reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
@@ -540,7 +552,7 @@ export default function RetailPOS() {
             id="retail-pos-date"
             type="date"
             className="block h-9 rounded-md border bg-muted/40 px-3 font-mono text-sm"
-            value={new Date().toLocaleDateString("en-CA").split("/").reverse().join("-")}
+            value={new Date().toLocaleDateString("sv-SE")}
             readOnly
             aria-label="Sale date (set by server at checkout)"
             title="Retail sales use the actual checkout date; backdated posting is not enabled"
