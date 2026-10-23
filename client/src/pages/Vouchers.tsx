@@ -217,7 +217,11 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const { rate: dateSpecificZmwRate } = useZmwVoucherRate(paymentVoucherDate);
   const priorZmwRate = Number(voucherToEdit?.exchangeRate);
   const isEditingZmw = !!voucherIdToEdit && voucherToEdit?.currency === "ZMW";
-  const paymentPostingCurrency = isEditingZmw ? "ZMW" : selectedCurrency;
+  // Editing a historical document keeps its original native currency,
+  // independently of the current user's currency-toggle preference.
+  const paymentPostingCurrency = voucherIdToEdit &&
+    (voucherToEdit?.currency === "ZMW" || voucherToEdit?.currency === "CFA" || voucherToEdit?.currency === "USD")
+      ? voucherToEdit.currency : selectedCurrency;
   const paymentPostingRate = paymentPostingCurrency === "ZMW"
     ? isEditingZmw
       ? Number.isFinite(priorZmwRate) && priorZmwRate > 0 ? priorZmwRate : null
