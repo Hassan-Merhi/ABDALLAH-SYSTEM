@@ -172,17 +172,28 @@ export function registerExchangeRateRoutes(app: Express) {
       if (companyId === null) return;
       const company = await storage.getCompanyById(companyId);
       if (!company) return res.status(404).json({ message: "Company not found" });
-      const pair = configuredRatePair(company);
-      if (!pair)
-        return res.status(409).json({
-          code: "EXCHANGE_RATE_NOT_CONFIGURED",
-          message: "Enable a display currency for this company before setting exchange rates.",
-        });
-
       const parsed = insertExchangeRateSchema.safeParse({ ...req.body, companyId });
       if (!parsed.success) {
         return res.status(400).json({ message: "Validation error", errors: parsed.error.issues });
       }
+      // A company with a configured display currency may only save that pair
+      // (Mali USD/CFA, Zambia USD/ZMW). A company without one keeps the original
+      // contract: any pair quoted against its own accounting base.
+      const configured = configuredRatePair(company);
+      const requestedFrom = normalizeAccountingCurrencyAlias(parsed.data.fromCurrency);
+      const requestedTo = normalizeAccountingCurrencyAlias(parsed.data.toCurrency);
+      const pair: CompanyCurrencyPair | null =
+        configured ??
+        (requestedFrom === normalizeAccountingCurrencyAlias(company.baseCurrency || "USD") &&
+        requestedFrom !== requestedTo
+          ? { fromCurrency: requestedFrom, toCurrency: requestedTo }
+          : null);
+      if (!pair)
+        return res.status(409).json({
+          code: "EXCHANGE_RATE_NOT_CONFIGURED",
+          message:
+            "Rates are quoted against the company's accounting base currency; enable a display currency to use a fixed pair.",
+        });
       // Daily popup submissions must be dated TODAY in the company's own
       // timezone, even if the popup remained open past midnight. The
       // historical rate settings form may intentionally save another date.
@@ -197,8 +208,8 @@ export function registerExchangeRateRoutes(app: Express) {
           });
         }
       }
-      const fromCurrency = normalizeAccountingCurrencyAlias(parsed.data.fromCurrency);
-      const toCurrency = normalizeAccountingCurrencyAlias(parsed.data.toCurrency);
+      const fromCurrency = requestedFrom;
+      const toCurrency = requestedTo;
       if (fromCurrency !== pair.fromCurrency || toCurrency !== pair.toCurrency) {
         return res.status(400).json({
           code: "EXCHANGE_RATE_PAIR_MISMATCH",

@@ -84,7 +84,11 @@ export function registerFactoryFxRatesRoutes(app: Express) {
       }
       res.json(rateResponse(await resolveFactoryFxRateToUsd(companyId, currency, dateISO)));
     } catch (error: unknown) {
-      res.status(500).json({ message: getErrorMessage(error) });
+      // No stored rate on or before the date and no external quote: the rate
+      // does not exist for that date, which is a 404, not a server fault.
+      const message = getErrorMessage(error);
+      if (message.startsWith("No FX rate available")) return res.status(404).json({ message });
+      res.status(500).json({ message });
     }
   });
 
