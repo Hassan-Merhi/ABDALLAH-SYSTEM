@@ -19,7 +19,6 @@
  *   - the Retail stock sub-ledger equals RETAIL-INVENTORY throughout.
  */
 import request from "supertest";
-import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { db, pool } from "../server/db";
@@ -37,7 +36,7 @@ let customerId = 0;
 let shiftId = 0;
 const today = () => getCompanyBusinessDate(undefined);
 
-async function purgeRetailRows(companyId: number) {
+async function purgeRetailRows() {
   for (const table of [
     "retail_cash_movements",
     "retail_inventory_openings",
@@ -219,7 +218,7 @@ beforeAll(async () => {
 }, 120000);
 
 afterAll(async () => {
-  await purgeRetailRows(ctx.companyId);
+  await purgeRetailRows();
   await cleanupTestData(PREFIX);
   await closeTestServer();
 }, 120000);
