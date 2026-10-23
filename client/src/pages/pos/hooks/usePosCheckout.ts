@@ -167,6 +167,14 @@ export function usePosCheckout({
       return;
     }
 
+    if (activeCurrency === "ZMW" && validItems.some((row) =>
+      !Number.isFinite(row.rate) || row.rate <= 0 ||
+      Math.abs(row.rate * 100 - Math.round(row.rate * 100)) > 0.000001
+    )) {
+      toast({ title: "Invalid Kwacha price", description: "Enter a positive unit price to two decimal places (ngwee).", variant: "destructive" });
+      return;
+    }
+
     const saleData = {
       locationId: activeLocation?.id || editVoucher?.locationId,
       shiftId: posUser && currentShift ? currentShift.id : undefined,
@@ -188,6 +196,10 @@ export function usePosCheckout({
           salesItemId: row.salesItemId,
           quantity: row.quantity.toString(),
           rate: rateInUSD.toFixed(6),
+          // USD is the inventory/ledger basis. Preserve the *typed* Kwacha
+          // unit price separately so the server can verify the round-trip
+          // against the rate locked for this exact sale date.
+          originalCurrencyRate: activeCurrency === "ZMW" ? row.rate.toFixed(2) : undefined,
           stockItemName: row.itemName,
           stockItemCode: row.stockItemCode,
           configuredPrice: row.configuredPrice,
