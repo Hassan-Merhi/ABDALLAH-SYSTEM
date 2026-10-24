@@ -60,10 +60,10 @@ export async function readRetailSupplierImageZip(file: File): Promise<RetailSupp
     // Reject zip bombs before inflating a potentially large image.
     const metadata = entry as unknown as { _data?: { uncompressedSize?: number } };
     const declared = metadata._data?.uncompressedSize;
-    if (!Number.isSafeInteger(declared) || declared! < 1 || declared! > MAX_IMAGE_BYTES) {
+    if (typeof declared !== "number" || !Number.isSafeInteger(declared) || declared < 1 || declared > MAX_IMAGE_BYTES) {
       throw new Error(`Invalid or too-large image in ZIP: ${entry.name}`);
     }
-    declaredBytes += declared!;
+    declaredBytes += declared;
     if (declaredBytes > MAX_ZIP_UNCOMPRESSED_BYTES) throw new Error("ZIP exceeds 100 MB of image data.");
     const bytes = await entry.async("uint8array");
     if (!bytes.length || bytes.length > MAX_IMAGE_BYTES) throw new Error(`Image too large: ${entry.name}`);
