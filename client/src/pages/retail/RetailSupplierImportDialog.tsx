@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { AlertTriangle, FileSpreadsheet, Image as ImageIcon, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -9,6 +10,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { useToast } from "@/hooks/use-toast";
 import { read, utils, writeFile } from "@/lib/excelHelper";
 import { getJson, type Location } from "./retailInventoryTypes";
+import { matchRetailSupplierImages, readRetailSupplierImageZip, type RetailSupplierImageArchive } from "./retailSupplierImageZip";
 import {
   RETAIL_SUPPLIER_IMPORT_LIMIT, RETAIL_SUPPLIER_TEMPLATE_COLUMNS,
   parseRetailSupplierImportRows, summarizeRetailSupplierImport,
@@ -22,6 +24,25 @@ interface SupplierOption {
   name?: string | null;
 }
 type SourceRow = { rowNumber: number; values: Record<string, unknown> };
+
+type CatalogDecision = {
+  rowNumber: number;
+  status: "new-product" | "new-variant" | "existing-variant" | "conflict";
+  productId: number | null;
+  variantId: number | null;
+  existingBarcode: string | null;
+  messages: string[];
+};
+type CatalogPreview = {
+  decisions: CatalogDecision[];
+  summary: { newProducts: number; newVariants: number; existingVariants: number; conflicts: number };
+};
+const catalogLabels: Record<CatalogDecision["status"], string> = {
+  "new-product": "New product",
+  "new-variant": "New variant",
+  "existing-variant": "Existing variant — restock",
+  conflict: "Catalog conflict",
+};
 
 function localISODate() {
   const date = new Date();
@@ -84,6 +105,10 @@ export function RetailSupplierImportDialog({
   const [invoiceDate, setInvoiceDate] = useState(localISODate);
   const [fileName, setFileName] = useState("");
   const [photoArchiveName, setPhotoArchiveName] = useState("");
+  const [photoArchive, setPhotoArchive] = useState<RetailSupplierImageArchive | null>(null);
+  const [photoError, setPhotoError] = useState("");
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoPreviewUrls, setPhotoPreviewUrls] = useState<Map<number, string>>(new Map());
   const [rows, setRows] = useState<RetailSupplierImportRow[]>([]);
   const [busy, setBusy] = useState(false);
   const [fileError, setFileError] = useState("");
@@ -93,6 +118,8 @@ export function RetailSupplierImportDialog({
     setLocationId("");
     setFileName("");
     setPhotoArchiveName("");
+    setPhotoArchive(null);
+    setPhotoError("");
     setRows([]);
     setFileError("");
   }, [companyId]);
@@ -108,8 +135,61 @@ export function RetailSupplierImportDialog({
     enabled,
   });
   const summary = useMemo(() => summarizeRetailSupplierImport(rows), [rows]);
+  const imageMatches = useMemo(() => matchRetailSupplierImages(rows, photoArchive), [rows, photoArchive]);
+  const imageIssueCount = useMemo(() => [...imageMatches.values()].filter(result => result.errors.length > 0).length, [imageMatches]);
+  const imageMatchedCount = useMemo(() =>
+    [...imageMatches.values()].reduce((count, result) => count + result.files.length, 0), [imageMatches]);
+  const { data: catalogPreview, isFetching: catalogChecking, isError: catalogFailed } = useQuery<CatalogPreview>({
+    queryKey: ["retail-supplier-catalog-preview", companyId, rows],
+    queryFn: async () => {
+      const response = await apiRequest("POST", "/api/retail/supplier-import/catalog-preview", {
+        rows: rows.map(row => ({
+          rowNumber: row.rowNumber, name: row.name, brand: row.brand,
+          category: row.category, size: row.size, color: row.color,
+          sku: row.sku, barcode: row.barcode,
+        })),
+      });
+      return response.json();
+    },
+    enabled: enabled && rows.length > 0 && summary.invalidRows === 0,
+    staleTime: 30000,
+    retry: false,
+  });
+  const catalogByRow = useMemo(() => new Map(
+    (catalogPreview?.decisions ?? []).map(decision => [decision.rowNumber, decision])
+  ), [catalogPreview]);
   const hasMissingContext = !supplierId || !locationId || !invoiceDate.trim();
-  const readyForFuturePosting = rows.length > 0 && !summary.invalidRows && !hasMissingContext;
+  const readyForFuturePosting = rows.length > 0 && !summary.invalidRows &&
+    !imageIssueCount && !hasMissingContext && Boolean(catalogPreview) && !catalogPreview.summary.conflicts;
+  useEffect(() => {
+    const previews = new Map<number, string>();
+    for (const row of rows.slice(0, 100)) {
+      const file = imageMatches.get(row.rowNumber)?.files[0];
+      if (file) previews.set(row.rowNumber, URL.createObjectURL(file));
+    }
+    setPhotoPreviewUrls(previews);
+    return () => {
+      previews.forEach(url => URL.revokeObjectURL(url));
+    };
+  }, [rows, imageMatches]);
+
+  const handlePhotoArchive = async (file?: File) => {
+    setPhotoArchive(null);
+    setPhotoArchiveName("");
+    setPhotoError("");
+    if (!file) return;
+    setPhotoBusy(true);
+    try {
+      const archive = await readRetailSupplierImageZip(file);
+      setPhotoArchive(archive);
+      setPhotoArchiveName(archive.filename);
+      toast({ title: "Image archive checked", description: `${archive.imageCount} images available for matching` });
+    } catch (error) {
+      setPhotoError(error instanceof Error ? error.message : "Cannot open image ZIP");
+    } finally {
+      setPhotoBusy(false);
+    }
+  };
   const knownSupplier = suppliers.find(supplier => String(supplier.id) === supplierId);
   const knownLocation = locations.find(location => String(location.id) === locationId);
 
@@ -187,10 +267,10 @@ export function RetailSupplierImportDialog({
           </DialogTitle>
         </DialogHeader>
         <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-100">
-          <strong>Phase 1 — preview only.</strong> You can download the template, choose a supplier and
-          warehouse, upload a spreadsheet and correct errors. <strong>No products, stock, supplier
-          balances, vouchers or labels are created yet.</strong> Posting becomes available after
-          the linked stock-receipt and payable flow is implemented.
+          <strong>Phase 2 — catalog and picture matching preview.</strong> The supplier Excel and
+          image ZIP are checked against existing brands, styles, SKUs and barcodes.
+          <strong> No products, images, stock, supplier balances, vouchers or labels are saved yet.</strong>
+          Final creation and inventory/accounting posting are enabled only after the linked purchase flow is implemented.
         </div>
 
         <div className="grid gap-3 md:grid-cols-2">
@@ -269,13 +349,14 @@ export function RetailSupplierImportDialog({
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="retail-supplier-photos">3. Product image ZIP (optional)</Label>
-              <Input id="retail-supplier-photos" type="file" accept=".zip"
-                onChange={event => setPhotoArchiveName(event.target.files?.[0]?.name ?? "")} />
+              <Input id="retail-supplier-photos" type="file" accept=".zip" disabled={photoBusy}
+                onChange={event => void handlePhotoArchive(event.target.files?.[0])} />
               <p className="text-xs text-muted-foreground">
                 <ImageIcon className="mr-1 inline h-3 w-3" />
-                {photoArchiveName ? `${photoArchiveName} selected — image matching arrives in Phase 2`
-                  : "Use filenames in Main Image / Extra Images. ZIP linking arrives in Phase 2."}
+                {photoArchiveName ? `${photoArchiveName} — ${photoArchive?.imageCount ?? 0} verified images`
+                  : photoBusy ? "Checking picture ZIP…" : "Choose ZIP with JPG/PNG/WEBP/GIF files referenced by their filenames in Excel."}
               </p>
+              {photoError && <p role="alert" className="text-xs text-destructive">{photoError}</p>
             </div>
           </div>
           {fileError && <p role="alert" className="text-sm text-destructive">{fileError}</p>}
@@ -296,7 +377,21 @@ export function RetailSupplierImportDialog({
               {summary.invalidRows > 0 && <span className="text-destructive">
                 <AlertTriangle className="mr-1 inline h-4 w-4" />{summary.invalidRows} invalid lines
               </span>}
+              <span className="rounded-md border px-2 py-1">{imageMatchedCount} images matched</span>
+              {imageIssueCount > 0 && <span className="text-destructive">{imageIssueCount} rows missing/invalid pictures</span>}
             </div>
+            {catalogChecking && <p className="text-xs text-muted-foreground">Checking product / variant identities against this company's catalog…</p>}
+            {catalogFailed && <p role="alert" className="text-xs text-destructive">
+              Catalog check failed; supplier import cannot be confirmed without reconciling existing items.
+            </p>}
+            {catalogPreview && (
+              <p className="text-xs font-medium">
+                Catalog: {catalogPreview.summary.newProducts} new styles ·
+                {" "}{catalogPreview.summary.newVariants} new variants ·
+                {" "}{catalogPreview.summary.existingVariants} existing variants ·
+                {" "}{catalogPreview.summary.conflicts} conflicts
+              </p>
+            )}
             <p className="text-xs text-muted-foreground">
               Supplier: {knownSupplier?.legalName || knownSupplier?.name || "not selected"} ·
               Location: {knownLocation?.name || "not selected"} ·
@@ -306,24 +401,45 @@ export function RetailSupplierImportDialog({
             <div className="max-h-72 overflow-auto rounded-md border">
               <table className="w-full min-w-[900px] text-left text-xs">
                 <thead className="sticky top-0 bg-muted">
-                  <tr>{["Row", "Item / Brand", "Category", "Variant", "Qty", "Unit cost", "Sell price", "Barcode", "Status"].map(col =>
+                  <tr>{["Row", "Picture", "Item / Brand", "Category", "Variant", "Qty", "Unit cost", "Sell price", "Barcode", "Catalog / Validation"].map(col =>
                     <th className="whitespace-nowrap px-2 py-2 font-semibold" key={col}>{col}</th>)}</tr>
                 </thead>
                 <tbody>
                   {rows.slice(0, 100).map(row => (
                     <tr key={row.rowNumber} className="border-t align-top">
                       <td className="px-2 py-2">{row.rowNumber}</td>
+                      <td className="px-2 py-2">
+                        {photoPreviewUrls.get(row.rowNumber) ? (
+                          <img src={photoPreviewUrls.get(row.rowNumber)} alt={row.name}
+                            className="h-12 w-12 rounded border object-contain" />
+                        ) : <span className="text-muted-foreground">—</span>}
+                        <span className="whitespace-nowrap text-muted-foreground">
+                          {imageMatches.get(row.rowNumber)?.files.length ?? 0} image(s)
+                        </span>
+                      </td>
                       <td className="px-2 py-2"><strong>{row.name || "—"}</strong><div>{row.brand}</div></td>
                       <td className="px-2 py-2">{row.category || "—"}</td>
                       <td className="px-2 py-2">{row.color} / {row.size || "Standard"}</td>
                       <td className="px-2 py-2">{row.quantity}</td>
                       <td className="px-2 py-2">{row.costPrice.toFixed(2)}</td>
                       <td className="px-2 py-2">{row.sellingPrice.toFixed(2)}</td>
-                      <td className="px-2 py-2">{row.barcode || "Generate later"}</td>
+                      <td className="px-2 py-2">{row.barcode || catalogByRow.get(row.rowNumber)?.existingBarcode || "Generate later"}</td>
                       <td className="px-2 py-2">
-                        {row.errors.length ? (
-                          <span className="text-destructive">{row.errors.join("; ")}</span>
-                        ) : <span className="text-green-700 dark:text-green-400">Valid</span>}
+                        {row.errors.length || imageMatches.get(row.rowNumber)?.errors.length ||
+                          catalogByRow.get(row.rowNumber)?.status === "conflict" ? (
+                          <span className="text-destructive">
+                            {[...row.errors, ...(imageMatches.get(row.rowNumber)?.errors ?? []),
+                              ...(catalogByRow.get(row.rowNumber)?.status === "conflict"
+                                ? catalogByRow.get(row.rowNumber)?.messages ?? [] : [])].join("; ")}
+                          </span>
+                        ) : <span className="text-green-700 dark:text-green-400">
+                          {catalogByRow.get(row.rowNumber)
+                            ? catalogLabels[catalogByRow.get(row.rowNumber)!.status] : "Local validation passed"}
+                        </span>}
+                        {catalogByRow.get(row.rowNumber)?.status !== "conflict" &&
+                          catalogByRow.get(row.rowNumber)?.messages.map((msg, index) => (
+                            <div key={index} className="text-muted-foreground">{msg}</div>
+                          ))}
                       </td>
                     </tr>
                   ))}
@@ -335,8 +451,8 @@ export function RetailSupplierImportDialog({
             </p>}
             <p className="text-xs text-muted-foreground">
               {readyForFuturePosting
-                ? "Preflight is ready. Final import will be enabled only when atomic receiving and supplier credit posting are implemented."
-                : "Select a supplier and location, then fix invalid rows before a future import can be posted."}
+                ? "All rows and image filenames match safely. This is still a non-persistent preview; stock and supplier credit posting arrive in Phase 4."
+                : "Select a supplier/location and resolve spreadsheet, image and catalog conflicts. No stock or accounting changes were made."}
             </p>
           </div>
         )}
