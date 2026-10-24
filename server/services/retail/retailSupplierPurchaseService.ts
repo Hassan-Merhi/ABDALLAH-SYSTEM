@@ -14,6 +14,11 @@ import { retailInventoryOpeningTx } from "./retailInventoryJournal";
 import { addMovement, lockInventoryRow, setInventoryQuantity } from "./retailStockLedger";
 import { writeRetailSupplierCatalogBatchTx } from "./retailSupplierCatalogBatch";
 import type { RetailSupplierPurchaseItem } from "./retailSupplierPurchaseHistory";
+import {
+  retailSupplierFileMagicMatches,
+  RETAIL_SUPPLIER_ALLOWED_IMAGE_TYPES,
+  RETAIL_SUPPLIER_ALLOWED_INVOICE_TYPES,
+} from "./retailSupplierImportFileValidation";
 
 const price = z.coerce.number().finite().nonnegative().max(1_000_000_000);
 export const retailSupplierPurchaseSchema = z.object({
@@ -167,33 +172,32 @@ export async function postRetailSupplierPurchase(
 
     const fileIds = [...new Set(input.lines.flatMap(line => line.imageUrls.map(url => Number(url.split("/").pop()))))];
     for (const fileId of fileIds) {
-      const [file] = await tx.select({ id: storedFiles.id, fileType: storedFiles.fileType })
-        .from(storedFiles).where(and(eq(storedFiles.companyId, companyId),
-          eq(storedFiles.id, fileId))).limit(1);
-      if (!file || !["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.fileType)) {
-        throw new Error("Uploaded picture is missing or does not belong to this company");
+      const [file] = await tx.select({
+        id: storedFiles.id, fileType: storedFiles.fileType,
+        fileSize: storedFiles.fileSize,
+        signature: sql<string>`left(${storedFiles.fileData}, 48)`,
+      }).from(storedFiles).where(and(eq(storedFiles.companyId, companyId),
+        eq(storedFiles.id, fileId))).limit(1);
+      if (!file || !RETAIL_SUPPLIER_ALLOWED_IMAGE_TYPES.has(file.fileType) ||
+          file.fileSize < 1 || file.fileSize > 10 * 1024 * 1024 ||
+          !retailSupplierFileMagicMatches(file.fileType, file.signature)) {
+        throw new Error("Supplier picture is missing, unsafe, or does not belong to this company");
       }
     }
 
     if (input.invoiceFileId) {
       const [attachment] = await tx.select({
-        id: storedFiles.id, fileType: storedFiles.fileType, fileSize: storedFiles.fileSize, fileData: storedFiles.fileData,
+        id: storedFiles.id, fileType: storedFiles.fileType, fileSize: storedFiles.fileSize,
+        signature: sql<string>`left(${storedFiles.fileData}, 48)`,
       }).from(storedFiles).where(and(
         eq(storedFiles.companyId, companyId),
         eq(storedFiles.id, input.invoiceFileId),
       )).limit(1);
-      if (!attachment || !["application/pdf", "image/jpeg", "image/png"].includes(attachment.fileType) ||
-          attachment.fileSize < 1 || attachment.fileSize > 10 * 1024 * 1024) {
-        throw new Error("Invoice attachment must be a company-owned PDF, JPG or PNG up to 10 MB");
+      if (!attachment || !RETAIL_SUPPLIER_ALLOWED_INVOICE_TYPES.has(attachment.fileType) ||
+          attachment.fileSize < 1 || attachment.fileSize > 10 * 1024 * 1024 ||
+          !retailSupplierFileMagicMatches(attachment.fileType, attachment.signature)) {
+        throw new Error("Invoice attachment must be a company-owned PDF, JPG or PNG with valid content, up to 10 MB");
       }
-      const signature = Buffer.from(attachment.fileData.slice(0, 40), "base64");
-      const validSignature = attachment.fileType === "application/pdf"
-        ? signature.subarray(0, 5).toString("ascii") === "%PDF-"
-        : attachment.fileType === "image/jpeg"
-          ? signature.length >= 3 && signature[0] === 0xff && signature[1] === 0xd8 && signature[2] === 0xff
-          : signature.length >= 8 &&
-            [137, 80, 78, 71, 13, 10, 26, 10].every((byte, index) => signature[index] === byte);
-      if (!validSignature) throw new Error("Invoice attachment content does not match its file type");
     }
     const [operation] = await tx.insert(retailStockOperations).values({
       companyId, operationType: "supplier_purchase", idempotencyKey: input.idempotencyKey,
