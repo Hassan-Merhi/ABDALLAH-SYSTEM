@@ -81,12 +81,13 @@ export function PurchasePanel({
             <Button
               variant="outline"
               size="sm"
-              onClick={() =>
-                openInCompany(
-                  companyId,
-                  `/containers/${po.containerId}/verification?autoCompare=true&supplierId=${po.supplierId}`
-                )
-              }
+              onClick={() => {
+                window.open(
+                  `/containers/${po.containerId}/verification?autoCompare=true&supplierId=${po.supplierId}`,
+                  "_blank",
+                  "noopener,noreferrer"
+                );
+              }}
               data-testid="button-compare-po"
             >
               Compare
