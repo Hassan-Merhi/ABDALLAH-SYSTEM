@@ -25,6 +25,7 @@ import {
   writeVariantInventoryWithMovement,
 } from "../services/retail/retailProductStockWrites";
 import { trackRetailStockValueTx } from "../services/retail/retailInventoryJournal";
+import { previewRetailSupplierCatalog, retailSupplierCatalogPreviewRowsSchema } from "../services/retail/retailSupplierCatalogPreview";
 
 const normalize = (value: string) => value.trim().toLowerCase().replace(/\s+/g, " ");
 const asNumber = (value: unknown) => Number(value ?? 0);
@@ -294,6 +295,20 @@ function filterProducts(products: Awaited<ReturnType<typeof loadProducts>>, quer
 }
 
 export function registerRetailRoutes(app: Express) {
+  // Phase 2: company-scoped catalog reconciliation. Read-only by design:
+  // supplier inventory and payable must be posted atomically in Phase 4.
+  app.post("/api/retail/supplier-import/catalog-preview", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = await requireRetailCompany(req, res);
+      if (!companyId) return;
+      const rows = retailSupplierCatalogPreviewRowsSchema.parse(req.body?.rows);
+      const preview = await previewRetailSupplierCatalog(companyId, rows);
+      return res.json(preview);
+    } catch (error) {
+      return res.status(400).json({ message: getErrorMessage(error) });
+    }
+  });
+
   app.get("/api/retail/brands", requireAuth, async (req, res) => {
     try {
       const companyId = await requireRetailCompany(req, res);
