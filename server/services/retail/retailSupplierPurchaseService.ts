@@ -20,6 +20,12 @@ export const retailSupplierPurchaseSchema = z.object({
   supplierId: z.coerce.number().int().positive(),
   locationId: z.coerce.number().int().positive(),
   invoiceReference: z.string().trim().min(1).max(100),
+  // A supplier invoice can be received in multiple batches only when every
+  // batch declares partial receipt and has its own delivery reference.
+  partialReceipt: z.boolean().default(false),
+  deliveryReference: z.string().trim().max(100).optional().default(""),
+  /** Company-owned PDF/JPG/PNG uploaded to the existing file store. */
+  invoiceFileId: z.number().int().positive().nullable().optional(),
   invoiceDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   currency: z.string().trim().min(3).max(3).default("USD"),
   exchangeRate: z.union([z.string(), z.number()]).nullable().optional(),
@@ -38,6 +44,15 @@ export const retailSupplierPurchaseSchema = z.object({
     barcode: z.string().trim().max(191).default(""),
     imageUrls: z.array(z.string().regex(/^\/api\/retail\/media\/\d+$/)).max(4).default([]),
   })).min(1).max(5000),
+}).superRefine((input, context) => {
+  if (input.partialReceipt && !input.deliveryReference.trim()) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["deliveryReference"],
+      message: "Each partial receipt requires a unique delivery reference" });
+  }
+  if (!input.partialReceipt && input.deliveryReference.trim()) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["deliveryReference"],
+      message: "Delivery reference is only used for partial supplier receipts" });
+  }
 });
 export type RetailSupplierPurchaseInput = z.infer<typeof retailSupplierPurchaseSchema>;
 const postingDependencies = createDatabasePostingDependencies();
@@ -52,6 +67,9 @@ function responseOf(meta: Record<string, unknown>) {
     invoiceReference: String(meta.invoiceReference), currency: String(meta.currency),
     purchaseTotal: String(meta.purchaseTotal), baseTotal: String(meta.baseTotal),
     items: meta.items as Array<{ rowNumber: number; variantId: number; barcode: string; quantity: number }>,
+    deliveryReference: typeof meta.deliveryReference === "string" ? meta.deliveryReference : "",
+    partialReceipt: meta.partialReceipt === true,
+    invoiceFileId: meta.invoiceFileId ? Number(meta.invoiceFileId) : null,
   };
 }
 
@@ -114,14 +132,25 @@ export async function postRetailSupplierPurchase(
     if (input.invoiceDate < String(opening.openingDate).slice(0, 10)) {
       throw new Error("Supplier invoice date cannot be earlier than the Retail inventory opening date");
     }
-    const [sameInvoice] = await tx.select({ id: retailStockOperations.id })
-      .from(retailStockOperations).where(and(
-        eq(retailStockOperations.companyId, companyId),
-        eq(retailStockOperations.operationType, "supplier_purchase"),
-        sql`${retailStockOperations.metadata}->>'supplierId' = ${String(input.supplierId)}`,
-        sql`lower(${retailStockOperations.referenceId}) = lower(${input.invoiceReference})`,
-      )).limit(1);
-    if (sameInvoice) throw new Error("This supplier invoice has already been imported");
+    const invoiceReceipts = await tx.select({
+      id: retailStockOperations.id,
+      metadata: retailStockOperations.metadata,
+    }).from(retailStockOperations).where(and(
+      eq(retailStockOperations.companyId, companyId),
+      eq(retailStockOperations.operationType, "supplier_purchase"),
+      sql`${retailStockOperations.metadata}->>'supplierId' = ${String(input.supplierId)}`,
+      sql`lower(trim(${retailStockOperations.referenceId})) = lower(trim(${input.invoiceReference}))`,
+    ));
+    for (const prior of invoiceReceipts) {
+      const old = prior.metadata ?? {};
+      if (!input.partialReceipt || old.partialReceipt !== true) {
+        throw new Error("Supplier invoice already received; use a partial delivery reference only if prior receipts were partial");
+      }
+      if (String(old.deliveryReference ?? "").trim().toLowerCase() ===
+          input.deliveryReference.trim().toLowerCase()) {
+        throw new Error("This supplier invoice delivery reference has already been received");
+      }
+    }
 
     const fileIds = [...new Set(input.lines.flatMap(line => line.imageUrls.map(url => Number(url.split("/").pop()))))];
     for (const fileId of fileIds) {
@@ -133,6 +162,18 @@ export async function postRetailSupplierPurchase(
       }
     }
 
+    if (input.invoiceFileId) {
+      const [attachment] = await tx.select({
+        id: storedFiles.id, fileType: storedFiles.fileType, fileSize: storedFiles.fileSize,
+      }).from(storedFiles).where(and(
+        eq(storedFiles.companyId, companyId),
+        eq(storedFiles.id, input.invoiceFileId),
+      )).limit(1);
+      if (!attachment || !["application/pdf", "image/jpeg", "image/png"].includes(attachment.fileType) ||
+          attachment.fileSize < 1 || attachment.fileSize > 10 * 1024 * 1024) {
+        throw new Error("Invoice attachment must be a company-owned PDF, JPG or PNG up to 10 MB");
+      }
+    }
     const [operation] = await tx.insert(retailStockOperations).values({
       companyId, operationType: "supplier_purchase", idempotencyKey: input.idempotencyKey,
       referenceId: input.invoiceReference, createdBy: actor.userId,
@@ -171,8 +212,13 @@ export async function postRetailSupplierPurchase(
           unitCostBase: unitCost.toDecimalPlaces(6).toFixed(6),
         },
       });
-      items.push({ rowNumber: line.rowNumber, variantId: assigned.variantId,
-        barcode: assigned.barcode, quantity: line.quantity });
+      items.push({
+        rowNumber: line.rowNumber, variantId: assigned.variantId,
+        barcode: assigned.barcode, quantity: line.quantity,
+        name: line.name, brand: line.brand, color: line.color, size: line.size,
+        unitCost: new Decimal(line.costPrice).toFixed(4),
+        sellingPrice: new Decimal(line.sellingPrice).toFixed(4),
+      });
     }
     const bookedCost = new Decimal(debit.baseDebitAmount);
     if (!stockValueAfter.minus(stockValueBefore).toDecimalPlaces(2).eq(bookedCost.toDecimalPlaces(2))) {
@@ -203,6 +249,9 @@ export async function postRetailSupplierPurchase(
       operationType: "supplier_purchase", operationId: operation.id, fingerprint,
       supplierId: input.supplierId, locationId: input.locationId,
       invoiceReference: input.invoiceReference, invoiceDate: input.invoiceDate,
+      partialReceipt: input.partialReceipt,
+      deliveryReference: input.partialReceipt ? input.deliveryReference.trim() : "",
+      invoiceFileId: input.invoiceFileId ?? null,
       currency, exchangeRate: rateString, voucherId: posting.voucher.id,
       purchaseTotal: transactionTotal.toFixed(6), baseTotal: debit.baseDebitAmount, items,
     };
