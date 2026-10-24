@@ -1,5 +1,6 @@
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { getPartyBalance } from "../accounting/balances/ledgerBalanceEngine";
+import { companyBusinessDate } from "../accounting/companyBusinessDate";
 import { bankAccounts, ledgerAccounts, posShifts, retailCashMovements, retailPosPayments } from "@shared/schema";
 import { db, pool } from "../../db";
 import { getRetailAccountingSettings } from "./retailAccountingSettingsService";
@@ -40,7 +41,9 @@ export async function getRetailCashDrawerBalance(
     throw new Error("Select an active Cash ledger account belonging to this company");
   }
 
-  const balance = await getPartyBalance(db, { companyId, kind: "ledger", id: account.id });
+  // Match the current-date ERP ledger, excluding future-dated vouchers.
+  const asOf = await companyBusinessDate(companyId);
+  const balance = await getPartyBalance(db, { companyId, kind: "ledger", id: account.id, asOf });
   if (!balance) throw new Error("Cash ledger balance is unavailable");
   return {
     cashAccountId: account.id,
