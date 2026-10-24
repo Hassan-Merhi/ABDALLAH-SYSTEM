@@ -107,8 +107,12 @@ export async function postRetailSupplierPurchase(
     if (!location) throw new Error("Receiving location is not active in this company");
     const today = await companyBusinessDate(companyId, tx);
     if (input.invoiceDate > today) throw new Error("Supplier invoice date cannot be in the future");
-    if (!await retailInventoryOpeningTx(tx, companyId)) {
+    const opening = await retailInventoryOpeningTx(tx, companyId);
+    if (!opening) {
       throw new Error("Apply the Retail inventory accounting opening before importing supplier purchases");
+    }
+    if (input.invoiceDate < String(opening.openingDate).slice(0, 10)) {
+      throw new Error("Supplier invoice date cannot be earlier than the Retail inventory opening date");
     }
     const [sameInvoice] = await tx.select({ id: retailStockOperations.id })
       .from(retailStockOperations).where(and(
