@@ -290,7 +290,7 @@ describe("RETAIL-INVENTORY connected to the Retail stock (decision 3)", () => {
   let shiftId = 0;
   const reconciliation = async () => (await agent.get("/api/retail/financial/inventory-reconciliation")).body;
 
-  it("journals nothing before the opening", async () => {
+  it("keeps stock off the ledger before opening while still journalling sale cash and revenue", async () => {
     const receipt = await agent.post("/api/pos/retail/receipts").send({
       idempotencyKey: "w17d-receipt-0001",
       variantId,
