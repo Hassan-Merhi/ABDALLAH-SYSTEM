@@ -31,7 +31,6 @@ export function registerCentralGlobalTransactionRoutes(app: Express, requireAuth
 
       const page = Math.max(1, Number.parseInt(pageParam || "1", 10) || 1);
       const limit = Math.min(200, Math.max(1, Number.parseInt(limitParam || "50", 10) || 50));
-      const offset = (page - 1) * limit;
       const includeFactory = includeFactoryParam === "true";
 
       let allowedCompanyIds = await resolveAllowedGlobalCompanyIds(userId, role);
