@@ -187,6 +187,7 @@ export default function RetailPOS() {
       queryClient.invalidateQueries({ queryKey: ["retail-products"] }),
       queryClient.invalidateQueries({ queryKey: ["retail-product"] }),
       queryClient.invalidateQueries({ queryKey: ["retail-shift-summary"] }),
+      queryClient.invalidateQueries({ queryKey: ["retail-shift-ledger-balance"] }),
       queryClient.invalidateQueries({ queryKey: ["retail-current-shift"] }),
       queryClient.invalidateQueries({ queryKey: ["retail-pos-customer-balance"] }),
       queryClient.invalidateQueries({ queryKey: ["retail-accounting-customer-history", selectedCompany?.id] }),
@@ -529,7 +530,11 @@ export default function RetailPOS() {
         )}
       </div>
 
-      <RetailShiftPanel locationId={selectedLocation?.id ?? null} onShiftChange={setCurrentShift} />
+      <RetailShiftPanel
+        locationId={selectedLocation?.id ?? null}
+        cashAccountId={payments[0]?.method === "cash" ? payments[0].ledgerAccountId ?? null : null}
+        onShiftChange={setCurrentShift}
+      />
 
       <PosWorkspaceColumns layout="retail">
         <div className="flex min-w-0 flex-col gap-3">
