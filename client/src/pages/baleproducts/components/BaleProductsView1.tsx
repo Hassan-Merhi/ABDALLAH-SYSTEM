@@ -64,7 +64,7 @@ export function BaleProductsView1({ model }: { model: Model }) {
           {selectedIds.size > 0 && (
             <>
               <span className="text-xs text-muted-foreground border-l pl-2">{selectedIds.size} selected</span>
-              {selectedActiveIds.length > 0 && (
+              {isAdmin && selectedActiveIds.length > 0 && (
                 <Button
                   size="sm"
                   variant="outline"
@@ -76,7 +76,7 @@ export function BaleProductsView1({ model }: { model: Model }) {
                   Hide ({selectedActiveIds.length})
                 </Button>
               )}
-              {selectedHiddenIds.length > 0 && (
+              {isAdmin && selectedHiddenIds.length > 0 && (
                 <Button
                   size="sm"
                   variant="outline"
@@ -535,16 +535,18 @@ export function BaleProductsView1({ model }: { model: Model }) {
                       {product.categoryId ? categoryMap.get(product.categoryId) || "-" : "-"}
                     </TableCell>
                     <TableCell>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => bulkToggleActiveMutation.mutate({ ids: [product.id], active: true })}
-                        disabled={bulkToggleActiveMutation.isPending}
-                        data-testid={`button-unhide-product-${product.id}`}
-                      >
-                        <Eye className="h-4 w-4 mr-1" />
-                        Unhide
-                      </Button>
+                      {isAdmin && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => bulkToggleActiveMutation.mutate({ ids: [product.id], active: true })}
+                          disabled={bulkToggleActiveMutation.isPending}
+                          data-testid={`button-unhide-product-${product.id}`}
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          Unhide
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
