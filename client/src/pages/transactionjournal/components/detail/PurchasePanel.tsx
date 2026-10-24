@@ -20,6 +20,7 @@ export function PurchasePanel({
   viewPurchaseItems,
   entryBalances,
   openInCompany,
+  openComparisonInCompany,
   fmt,
   fmtNum,
 }: {
@@ -29,6 +30,7 @@ export function PurchasePanel({
   viewPurchaseItems: JournalViewEntry[];
   entryBalances: Record<number, string>;
   openInCompany: (companyId: number, path: string) => void;
+  openComparisonInCompany: (companyId: number, path: string) => void;
 } & DetailPanelFormatters) {
   const itemsTotal = viewPurchaseItems.reduce((s, r) => s + parseFloat(r.totalAmount || "0"), 0);
   const charges = [
@@ -81,13 +83,12 @@ export function PurchasePanel({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => {
-                window.open(
-                  `/containers/${po.containerId}/verification?autoCompare=true&supplierId=${po.supplierId}`,
-                  "_blank",
-                  "noopener,noreferrer"
-                );
-              }}
+              onClick={() =>
+                openComparisonInCompany(
+                  companyId,
+                  `/containers/${po.containerId}/verification?autoCompare=true&supplierId=${po.supplierId}`
+                )
+              }
               data-testid="button-compare-po"
             >
               Compare
