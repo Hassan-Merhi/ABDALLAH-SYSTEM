@@ -326,10 +326,12 @@ verify and reconcile with concurrent main changes **before** release.
   isolation and source-level consistency. Let Claude run CI/tests later
   before PR merge/deployment as instructed.
 
-### Why Phase 1 intentionally cannot post
+### Why the legacy stock import must remain separate
 
-The old bulk import writes quantity **equal to** Excel quantity, not
-**plus** purchased quantity, and does not create the supplier payable.
-Allowing the new supplier form to call it before Phase 4 would make stock
-and debt disagree. The UI therefore provides a useful preflight now without
-pretending it is already an operational supplier receipt.
+The old bulk importer sets quantity **equal to** the spreadsheet value and
+does not credit an ERP supplier. The new **Supplier Stock Import** uses a
+separate confirmed purchase API that adds quantities and creates a balanced
+supplier-targeted payable voucher in one transaction. The old importer is
+no longer shown on the Retail Inventory screen; its legacy API is retained
+for backwards compatibility and should be reviewed for deprecation
+separately.
