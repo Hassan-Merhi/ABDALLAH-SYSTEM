@@ -33,8 +33,15 @@ type CatalogDecision = {
   existingBarcode: string | null;
   messages: string[];
 };
+type BarcodePlan = {
+  rowNumber: number;
+  action: "reuse" | "supplier" | "generate";
+  barcode: string | null;
+  message: string;
+};
 type CatalogPreview = {
   decisions: CatalogDecision[];
+  barcodePlans: BarcodePlan[];
   summary: { newProducts: number; newVariants: number; existingVariants: number; conflicts: number };
 };
 const catalogLabels: Record<CatalogDecision["status"], string> = {
@@ -158,6 +165,9 @@ export function RetailSupplierImportDialog({
   const catalogByRow = useMemo(() => new Map(
     (catalogPreview?.decisions ?? []).map(decision => [decision.rowNumber, decision])
   ), [catalogPreview]);
+  const barcodeByRow = useMemo(() => new Map(
+    (catalogPreview?.barcodePlans ?? []).map(plan => [plan.rowNumber, plan])
+  ), [catalogPreview]);
   const hasMissingContext = !supplierId || !locationId || !invoiceDate.trim();
   const readyForFuturePosting = rows.length > 0 && !summary.invalidRows &&
     !imageIssueCount && !hasMissingContext && Boolean(catalogPreview) && !catalogPreview.summary.conflicts;
@@ -267,10 +277,11 @@ export function RetailSupplierImportDialog({
           </DialogTitle>
         </DialogHeader>
         <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-100">
-          <strong>Phase 2 — catalog and picture matching preview.</strong> The supplier Excel and
-          image ZIP are checked against existing brands, styles, SKUs and barcodes.
-          <strong> No products, images, stock, supplier balances, vouchers or labels are saved yet.</strong>
-          Final creation and inventory/accounting posting are enabled only after the linked purchase flow is implemented.
+          <strong>Phase 3 — barcode-ready supplier preview.</strong> Existing item barcodes remain
+          unchanged, supplier barcodes are checked for conflicts, and blank barcodes
+          will receive new company-specific EAN-13 codes on final confirmation.
+          <strong> No barcode numbers, products, images, stock or supplier balances are saved during preview.</strong>
+          Purchase posting and label printing will be enabled in the next phases.
         </div>
 
         <div className="grid gap-3 md:grid-cols-2">
@@ -385,12 +396,19 @@ export function RetailSupplierImportDialog({
               Catalog check failed; supplier import cannot be confirmed without reconciling existing items.
             </p>}
             {catalogPreview && (
-              <p className="text-xs font-medium">
-                Catalog: {catalogPreview.summary.newProducts} new styles ·
-                {" "}{catalogPreview.summary.newVariants} new variants ·
-                {" "}{catalogPreview.summary.existingVariants} existing variants ·
-                {" "}{catalogPreview.summary.conflicts} conflicts
-              </p>
+              <div className="space-y-1">
+                <p className="text-xs font-medium">
+                  Catalog: {catalogPreview.summary.newProducts} new styles ·
+                  {" "}{catalogPreview.summary.newVariants} new variants ·
+                  {" "}{catalogPreview.summary.existingVariants} existing variants ·
+                  {" "}{catalogPreview.summary.conflicts} conflicts
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Barcodes: {catalogPreview.barcodePlans.filter(plan => plan.action === "reuse").length} existing retained ·
+                  {" "}{catalogPreview.barcodePlans.filter(plan => plan.action === "supplier").length} supplier codes kept ·
+                  {" "}{catalogPreview.barcodePlans.filter(plan => plan.action === "generate").length} to generate on confirmation
+                </p>
+              </div>
             )}
             <p className="text-xs text-muted-foreground">
               Supplier: {knownSupplier?.legalName || knownSupplier?.name || "not selected"} ·
@@ -423,7 +441,16 @@ export function RetailSupplierImportDialog({
                       <td className="px-2 py-2">{row.quantity}</td>
                       <td className="px-2 py-2">{row.costPrice.toFixed(2)}</td>
                       <td className="px-2 py-2">{row.sellingPrice.toFixed(2)}</td>
-                      <td className="px-2 py-2">{row.barcode || catalogByRow.get(row.rowNumber)?.existingBarcode || "Generate later"}</td>
+                      <td className="px-2 py-2">
+                        {barcodeByRow.get(row.rowNumber)?.barcode || row.barcode || "Generate at confirmation"}
+                        {barcodeByRow.get(row.rowNumber) && (
+                          <div className="text-muted-foreground">
+                            {barcodeByRow.get(row.rowNumber)?.action === "reuse" ? "Existing · unchanged"
+                              : barcodeByRow.get(row.rowNumber)?.action === "supplier" ? "Supplier code"
+                                : "New EAN-13 (not reserved)"}
+                          </div>
+                        )}
+                      </td>
                       <td className="px-2 py-2">
                         {row.errors.length || imageMatches.get(row.rowNumber)?.errors.length ||
                           catalogByRow.get(row.rowNumber)?.status === "conflict" ? (
