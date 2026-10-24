@@ -232,7 +232,13 @@ export function RetailSupplierImportDialog({
   const previewRows = showProblemsOnly ? issueRows.map(entry => entry.row) : rows;
 
   const downloadImportErrors = () => {
-    const csvCell = (value: string | number) => `"${String(value).replace(/"/g, '""')}"`;
+    const csvCell = (value: string | number) => {
+      const raw = String(value).replace(/[\r\n]+/g, " ");
+      // Do not allow supplier-controlled product names to execute spreadsheet
+      // formulas when the diagnostic CSV is opened in Excel.
+      const safe = /^[\s]*[=+\-@]/.test(raw) ? `'${raw}` : raw;
+      return `"${safe.replace(/"/g, '""')}"`;
+    };
     const csv = [
       ["Excel Row", "Item Name", "Brand", "Problems"].map(csvCell).join(","),
       ...issueRows.map(({ row, issues }) => [
