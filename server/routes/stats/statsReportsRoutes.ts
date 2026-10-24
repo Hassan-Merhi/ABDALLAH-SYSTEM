@@ -191,7 +191,17 @@ export function registerStatsReportsRoutes(app: Express) {
         companyCondition =
           companyIds.length > 0 ? inArray(containers.companyId, companyIds) : eq(containers.companyId, companyId);
       } else if (specificCompanyId) {
-        companyCondition = eq(containers.companyId, parseInt(specificCompanyId as string));
+        const requestedCompanyId = Number(specificCompanyId);
+        if (!Number.isInteger(requestedCompanyId) || requestedCompanyId <= 0) {
+          return res.status(400).json({ message: "Invalid company selected" });
+        }
+        if (req.user?.role !== "Developer" && requestedCompanyId !== companyId) {
+          const memberships = await storage.getUserCompaniesWithRoles(req.user!.id);
+          if (!memberships.some((membership) => membership.companyId === requestedCompanyId)) {
+            return res.status(403).json({ message: "No access to the requested company" });
+          }
+        }
+        companyCondition = eq(containers.companyId, requestedCompanyId);
       } else {
         companyCondition = eq(containers.companyId, companyId);
       }
