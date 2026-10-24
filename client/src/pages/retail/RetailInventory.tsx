@@ -12,7 +12,6 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ImportDialog } from "./RetailImportDialog";
 import { ProductEditor } from "./RetailProductEditor";
 import { ProductImageGallery } from "./RetailProductImage";
-import { RetailNav } from "./RetailNav";
 import { RetailCatalogList, type RetailCatalogFilters, type RetailVariantAction } from "./RetailCatalogList";
 import { RetailLabelPrintDialog, type RetailLabelRequestItem } from "./retailLabels";
 import { confirmAction } from "@/components/ConfirmHost";
@@ -325,7 +324,6 @@ export default function RetailInventory() {
 
   return (
     <div className="mx-auto max-w-[1600px] space-y-5 p-4 pb-24 md:p-6 md:pb-24">
-      <RetailNav />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
