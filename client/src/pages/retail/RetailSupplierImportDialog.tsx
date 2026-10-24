@@ -321,9 +321,16 @@ export function RetailSupplierImportDialog({
     setRows([]);
     setFileName("");
     setDeliveryReference("");
-    if (!partialReceipt) setInvoiceReference("");
+    if (!partialReceipt) {
+      setInvoiceReference("");
+      setInvoiceFile(null);
+      uploadedInvoiceCache.current = null;
+    }
     setPhotoArchive(null);
     setPhotoArchiveName("");
+    setPhotoError("");
+    setFileError("");
+    setShowProblemsOnly(false);
     uploadedPhotoCache.current.clear();
     setPostingError("");
     setImportKey(`retail-supplier-${crypto.randomUUID()}`);
