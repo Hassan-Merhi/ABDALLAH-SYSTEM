@@ -35,7 +35,7 @@ type CatalogDecision = {
 };
 type BarcodePlan = {
   rowNumber: number;
-  action: "reuse" | "supplier" | "generate";
+  action: "reuse" | "supplier" | "generate" | "conflict";
   barcode: string | null;
   message: string;
 };
@@ -447,7 +447,8 @@ export function RetailSupplierImportDialog({
                           <div className="text-muted-foreground">
                             {barcodeByRow.get(row.rowNumber)?.action === "reuse" ? "Existing · unchanged"
                               : barcodeByRow.get(row.rowNumber)?.action === "supplier" ? "Supplier code"
-                                : "New EAN-13 (not reserved)"}
+                                : barcodeByRow.get(row.rowNumber)?.action === "conflict" ? "Barcode conflict"
+                                  : "New EAN-13 (not reserved)"}
                           </div>
                         )}
                       </td>
