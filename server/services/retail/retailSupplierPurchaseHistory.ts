@@ -98,7 +98,9 @@ export async function listRetailSupplierPurchases(companyId: number, filter: Ret
   }
   const batches = await db.select({
     id: retailStockOperations.id,
-    metadata: retailStockOperations.metadata,
+    // The list only needs summary fields; excluding the line array avoids
+    // returning many megabytes for 25 receipts of up to 5,000 items each.
+    metadata: sql<Record<string, unknown>>`${retailStockOperations.metadata} - 'items'`,
     referenceId: retailStockOperations.referenceId,
     createdAt: retailStockOperations.createdAt,
     createdBy: retailStockOperations.createdBy,
@@ -125,7 +127,6 @@ export async function listRetailSupplierPurchases(companyId: number, filter: Ret
   const byLocation = new Map(locationsList.map(row => [row.id, row.name]));
   const records: RetailSupplierPurchaseListEntry[] = current.map(op => {
     const data = metadata(op);
-    const items = savedRetailSupplierPurchaseItems(data);
     const supplierId = numericId(data.supplierId);
     const locationId = numericId(data.locationId);
     return {
@@ -140,8 +141,8 @@ export async function listRetailSupplierPurchases(companyId: number, filter: Ret
       purchaseTotal: String(data.purchaseTotal ?? "0"),
       baseTotal: String(data.baseTotal ?? "0"),
       voucherId: numericId(data.voucherId),
-      variantCount: new Set(items.map(item => item.variantId)).size,
-      unitsReceived: items.reduce((sum, item) => sum + item.quantity, 0),
+      variantCount: Math.max(0, Number(data.variantCount ?? 0)),
+      unitsReceived: Math.max(0, Number(data.unitsReceived ?? 0)),
       invoiceFileId: numericId(data.invoiceFileId) || null,
       createdAt: op.createdAt,
       createdBy: op.createdBy,
