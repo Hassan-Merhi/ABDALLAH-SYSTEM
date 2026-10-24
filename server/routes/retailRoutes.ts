@@ -27,6 +27,7 @@ import {
 import { trackRetailStockValueTx } from "../services/retail/retailInventoryJournal";
 import { previewRetailSupplierCatalog, retailSupplierCatalogPreviewRowsSchema } from "../services/retail/retailSupplierCatalogPreview";
 import { describeRetailSupplierBarcode } from "../services/retail/retailSupplierBarcodeIntake";
+import { postRetailSupplierPurchase } from "../services/retail/retailSupplierPurchaseService";
 
 const normalize = (value: string) => value.trim().toLowerCase().replace(/\s+/g, " ");
 const asNumber = (value: unknown) => Number(value ?? 0);
@@ -296,6 +297,21 @@ function filterProducts(products: Awaited<ReturnType<typeof loadProducts>>, quer
 }
 
 export function registerRetailRoutes(app: Express) {
+  // Supplier stock is NEVER passed through the legacy absolute-quantity bulk import.
+  app.post("/api/retail/supplier-import/confirm", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = await requireRetailCompany(req, res);
+      if (!companyId) return;
+      const actor = { userId: String(req.user!.id), username: req.user?.username ?? null };
+      const result = await postRetailSupplierPurchase(companyId, actor, req.body);
+      res.status(result.replayed ? 200 : 201).json(result);
+    } catch (error) {
+      const message = getErrorMessage(error);
+      res.status(/already|conflict|does not reconcile|changed during/i.test(message) ? 409 : 400)
+        .json({ message });
+    }
+  });
+
   // Phase 2: company-scoped catalog reconciliation. Read-only by design:
   // supplier inventory and payable must be posted atomically in Phase 4.
   app.post("/api/retail/supplier-import/catalog-preview", requireAuth, requireNonPOS, async (req, res) => {
