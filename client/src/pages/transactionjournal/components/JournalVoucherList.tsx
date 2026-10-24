@@ -7,6 +7,7 @@
  * set (the Amount column disappears when amounts are hidden), same empty-state
  * copy and the same three per-row actions.
  */
+import { Fragment } from "react";
 import { AlertCircle, ChevronLeft, ChevronRight, Eye, EyeOff, Pencil, RefreshCw, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,29 @@ import { companyColor, fmtDate, formatAmount } from "../utils";
 import { VoucherTypeBadge } from "./VoucherTypeBadge";
 import type { JournalVoucher } from "../types";
 import type { TransactionJournalModel } from "../useTransactionJournalModel";
+
+// The API sorts before pagination. These headers make each contiguous company
+// and voucher-type run easy to scan without changing row actions or totals.
+function voucherGroupLabel(type: string): string {
+  const normalized = type.trim().toLowerCase().replace(/\s+/g, "");
+  if (normalized === "stocktransfer") return "Stock Transfer";
+  if (normalized === "sale" || normalized === "sales") return "Sales";
+  return type.trim() || "Other";
+}
+
+function typeGroupKey(type: string): string {
+  return voucherGroupLabel(type).toLowerCase().replace(/\s+/g, "-");
+}
+
+function groupBreaks(vouchers: JournalVoucher[], index: number) {
+  const current = vouchers[index];
+  const previous = vouchers[index - 1];
+  const newCompany = !previous || previous.companyId !== current.companyId;
+  return {
+    newCompany,
+    newType: newCompany || typeGroupKey(previous.voucherType) !== typeGroupKey(current.voucherType),
+  };
+}
 
 function emptyStateText(model: TransactionJournalModel): string {
   return model.allVouchers.length > 0 && model.hiddenRowIds.size > 0
@@ -120,9 +144,27 @@ function DesktopTable({ model }: { model: TransactionJournalModel }) {
                 </TableCell>
               </TableRow>
             ) : (
-              visibleVouchers.map((v) => {
+              visibleVouchers.map((v, index) => {
                 const isHidden = model.hiddenRowIds.has(v.id);
+                const { newCompany, newType } = groupBreaks(visibleVouchers, index);
                 return (
+                  <Fragment key={`${v.entryType || "voucher"}-${v.id}`}>
+                    {newCompany && (
+                      <TableRow className="bg-muted/60 hover:bg-muted/60" data-testid={`row-company-group-${v.companyId}`}>
+                        <TableCell colSpan={hideAmounts ? 5 : 6} className="py-2">
+                          <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-sm ${companyColor(v.companyId)}`}>
+                            {v.companyName}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    {newType && (
+                      <TableRow className="bg-muted/30 hover:bg-muted/30" data-testid={`row-type-group-${v.companyId}-${typeGroupKey(v.voucherType)}`}>
+                        <TableCell colSpan={hideAmounts ? 5 : 6} className="py-1.5 pl-6 text-xs font-semibold tracking-wide text-muted-foreground">
+                          {voucherGroupLabel(v.voucherType)}
+                        </TableCell>
+                      </TableRow>
+                    )}
                   <TableRow
                     key={v.id}
                     data-testid={`row-voucher-${v.id}`}
@@ -171,6 +213,7 @@ function DesktopTable({ model }: { model: TransactionJournalModel }) {
                       </div>
                     </TableCell>
                   </TableRow>
+                  </Fragment>
                 );
               })
             )}
@@ -195,11 +238,25 @@ function MobileCards({ model }: { model: TransactionJournalModel }) {
         <div className="text-center py-12 text-muted-foreground text-sm px-4">{emptyStateText(model)}</div>
       ) : (
         <div className="divide-y">
-          {visibleVouchers.map((v) => {
+          {visibleVouchers.map((v, index) => {
             const isHidden = model.hiddenRowIds.has(v.id);
+            const { newCompany, newType } = groupBreaks(visibleVouchers, index);
             return (
+              <Fragment key={`${v.entryType || "voucher"}-${v.id}`}>
+                {newCompany && (
+                  <div className="px-3 py-2 bg-muted/60" data-testid={`card-company-group-${v.companyId}`}>
+                    <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-sm ${companyColor(v.companyId)}`}>
+                      {v.companyName}
+                    </span>
+                  </div>
+                )}
+                {newType && (
+                  <div className="px-3 py-1.5 bg-muted/30 text-xs font-semibold text-muted-foreground"
+                    data-testid={`card-type-group-${v.companyId}-${typeGroupKey(v.voucherType)}`}>
+                    {voucherGroupLabel(v.voucherType)}
+                  </div>
+                )}
               <div
-                key={v.id}
                 className={`px-3 py-3 ${isHidden && model.showHidden ? "opacity-50" : ""}`}
                 data-testid={`card-voucher-${v.id}`}
               >
@@ -239,6 +296,7 @@ function MobileCards({ model }: { model: TransactionJournalModel }) {
                   </div>
                 </div>
               </div>
+              </Fragment>
             );
           })}
         </div>
