@@ -28,6 +28,8 @@ import { getErrorMessage } from "../../lib/httpHandlers";
 import { punctuationInsensitiveSearch } from "../../lib/searchNormalization";
 import { loadSaleResponse } from "../../services/retail/retailSaleService";
 import { getCustomerBalance } from "../../storage/accounting/customer-balances";
+import { customerService } from "../customers/customerService";
+import { getCustomerAuditActor } from "../customers/customerRequestContext";
 import { ensureCompanyLocation, requireRetailCompany } from "./retailPosContext";
 
 const customerCreateSchema = z.object({
@@ -125,43 +127,28 @@ export function registerRetailCustomerRoutes(app: Express): void {
       const companyId = await requireRetailCompany(req, res);
       if (!companyId) return;
       const body = customerCreateSchema.parse(req.body);
-      const usedCodes = new Set(
-        (
-          await db
-            .select({ code: customers.code })
-            .from(customers)
-            .where(and(eq(customers.companyId, companyId), isNull(customers.deletedAt)))
-        ).map((row) => row.code)
-      );
-      let suffix = 1;
-      for (const code of usedCodes) {
-        const parsed = Number(String(code).replace(/^CUST/i, ""));
-        if (Number.isFinite(parsed)) suffix = Math.max(suffix, parsed + 1);
-      }
-      let code = `CUST${String(suffix).padStart(3, "0")}`;
-      while (usedCodes.has(code)) {
-        suffix += 1;
-        code = `CUST${String(suffix).padStart(3, "0")}`;
-      }
-      const [customer] = await db
-        .insert(customers)
-        .values({
-          companyId,
-          code,
+      // Use the canonical ERP creation path so the customer and their
+      // Accounts Receivable ledger are created and linked atomically.
+      // Retail POS users are authorized here by requireRetailCompany; they
+      // do not need access to Accounting -> Parties to add a customer.
+      const customer = await customerService.create(
+        companyId,
+        {
           legalName: body.legalName,
-          phone: body.phone?.trim() ? body.phone.trim() : null,
+          phone: body.phone?.trim() || null,
           openingBalance: "0",
           openingBalanceSide: "Dr",
           active: true,
-        })
-        .returning({
-          id: customers.id,
-          code: customers.code,
-          legalName: customers.legalName,
-          phone: customers.phone,
-          active: customers.active,
-        });
-      res.status(201).json(customer);
+        },
+        getCustomerAuditActor(req)
+      );
+      res.status(201).json({
+        id: customer.id,
+        code: customer.code,
+        legalName: customer.legalName,
+        phone: customer.phone,
+        active: customer.active,
+      });
     } catch (error) {
       res.status(400).json({ message: getErrorMessage(error) });
     }

@@ -182,6 +182,9 @@ export default function RetailPOS() {
       queryClient.invalidateQueries({ queryKey: ["retail-shift-summary"] }),
       queryClient.invalidateQueries({ queryKey: ["retail-current-shift"] }),
       queryClient.invalidateQueries({ queryKey: ["retail-pos-customer-balance"] }),
+      queryClient.invalidateQueries({ queryKey: ["retail-accounting-customer-history", selectedCompany?.id] }),
+      queryClient.invalidateQueries({ queryKey: ["/api/customers/stats", selectedCompany?.id] }),
+      queryClient.invalidateQueries({ queryKey: ["/api/customers"] }),
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] }),
     ]);
   };

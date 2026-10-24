@@ -7,7 +7,7 @@ import { SearchField } from "@/components/ui/search-field";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/contexts/CompanyContext";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { money } from "./retailPosTypes";
 import { createRetailCustomer, searchRetailCustomers } from "./retailWave2Api";
 import type { RetailCustomerSummary as Customer } from "./retailWave2Types";
@@ -60,6 +60,17 @@ export function RetailCustomerPicker({
   const createMutation = useMutation({
     mutationFn: () => createRetailCustomer({ legalName: newName.trim(), phone: newPhone.trim() || undefined }),
     onSuccess: (created) => {
+      // The Retail POS quick-create now also creates the canonical customer
+      // ledger. Refresh Accounting -> Parties and Accounts before those pages
+      // are revisited, so the new customer and zero opening show immediately.
+      void Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["/api/customers/stats", selectedCompany?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/customers", selectedCompany?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts", selectedCompany?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/accounts/all", selectedCompany?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/pos/customers"] }),
+        queryClient.invalidateQueries({ queryKey: ["retail-pos-customers", selectedCompany?.id] }),
+      ]);
       onSelect(created);
       setCreating(false);
       setNewName("");
