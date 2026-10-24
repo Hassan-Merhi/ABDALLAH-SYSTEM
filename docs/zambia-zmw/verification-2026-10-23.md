@@ -100,6 +100,13 @@ stays registered for environments that use the runner.
 Production state observed read-only before release: Zambia (company 19) is `erp`, USD base, no display currency,
 parent HADI L'SHI (1), no USD/ZMW rates, 4 purchase orders, 4 vouchers, 6 ledger accounts; Mali (9) is USD/CFA.
 
+**Release observation (2026-10-23, after PR #2446 merged and deployed):** production boots with the bulk startup pass
+disabled (`RUN_STARTUP_MIGRATIONS=false`, the kill-switch kept since the #2443 deploy deadlock), so stage 036 was skipped
+and the columns did not appear. Only the always-on guards in `server/index.ts` reach production, so
+`server/startup/ensureZambiaHistoricalPurchaseCost.ts` now applies the same thirteen stage-036 statements before HTTP
+starts (idempotent; deferred on an empty database until the purchase tables exist), proven on a pre-change table shape by
+`tests/zambia-runtime-schema.test.ts`.
+
 ## Remaining before production
 
 1. Run hosted CI on the merged branch (every check above was run locally, not on GitHub Actions).

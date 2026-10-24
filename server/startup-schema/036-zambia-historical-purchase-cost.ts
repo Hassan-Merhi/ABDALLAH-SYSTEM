@@ -26,7 +26,7 @@ export const zambiaHistoricalPurchaseCostSchema: string[] = [
   // VALID keeps historical rows as they are while enforcing future writes.
   `DO $$
   BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'purchase_orders_zmw_historical_rate_ck') THEN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'purchase_orders_zmw_historical_rate_ck' AND conrelid = 'purchase_orders'::regclass) THEN
       ALTER TABLE purchase_orders ADD CONSTRAINT purchase_orders_zmw_historical_rate_ck
         CHECK (upper(currency) <> 'ZMW' OR (
           historical_exchange_rate > 0
