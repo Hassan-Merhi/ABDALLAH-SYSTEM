@@ -40,7 +40,47 @@ Entry: Retail company > Retail Inventory > **Supplier Stock Import**.
 
 No CI, tests, merge, rebase, or deployment were run as part of this Phase 1 handoff.
 
-## Phases 2–7: contract and financial invariants
+## Phase 2 — product/variant matching and image ZIP preparation (implemented)
+
+UI: `client/src/pages/retail/RetailSupplierImportDialog.tsx`
+
+- Accept an optional image ZIP (up to 50 MB); safely inspect archive contents,
+  reject traversal/ambiguous duplicate filenames, reject oversized images or
+  ZIPs with excessive declared expanded image bytes. Allowed JPG, PNG, WEBP,
+  GIF must match image content signatures. Match by case-insensitive image
+  basename in Excel's Main Image / Extra Images columns. Reject missing and
+  duplicate photo references; limit to 4 images per color/size variant.
+- Display per-line image counts, thumbnails, and errors. Excel/ZIP remain
+  in the browser only. No image uploads or persisted catalog changes yet.
+- `POST /api/retail/supplier-import/catalog-preview` is **read only**,
+  requires Retail company context, authentication, non-POS role, and normal
+  import permission; it checks existing SKUs, barcodes, brand/style, and
+  color/size and detects mismatches and duplicate rows. Existing barcodes are
+  shown in the preview.
+- `server/services/retail/retailSupplierCatalogPreview.ts` implements a
+  pure catalog reconciler with a company-scoped DB snapshot.
+- `server/services/retail/retailSupplierCatalogWrites.ts` provides a
+  **transaction-only, currently uncalled** product/variant upsert helper.
+  Future confirmed supplier receipt will call it only as part of the same
+  transaction that receives stock and posts its payable. It preserves old
+  barcodes/SKUs and non-empty product cover photos. If a new variant is needed,
+  the resolved barcode must be supplied by Phase 3.
+- Added `jszip` as an explicit production dependency, updated the lockfile,
+  operation-permission registry, and route-manifest snapshot.
+- Reusing an existing category means preserving its existing product category
+  text; in the Retail schema categories are not a separate table. New products
+  create their category label; brand creation uses the existing normalized
+  brand service.
+
+**Safe staging boundary:** The client still does not call an accounting-unsafe
+stock importer. Phase 2 is wired for image and catalog reconciliation, but no
+new retail product is committed from this wizard until Phase 4's atomic
+supplier receipt. Image files will be uploaded to existing company file storage
+and attached to catalog rows by the finalized purchase flow.
+
+No CI, tests, merge, rebase, or deployment executed in this phase.
+
+## Phases 3–7: contract and financial invariants
 
 **Phase 2 — Product and image import engine**
 
