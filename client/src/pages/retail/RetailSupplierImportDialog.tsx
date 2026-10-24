@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { uploadRetailPhoto } from "./retailPhotoUpload";
 import { AlertTriangle, FileSpreadsheet, Image as ImageIcon, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -38,6 +39,15 @@ type BarcodePlan = {
   action: "reuse" | "supplier" | "generate" | "conflict";
   barcode: string | null;
   message: string;
+};
+type SupplierPurchaseResult = {
+  replayed: boolean;
+  operationId: number;
+  voucherId: number;
+  purchaseTotal: string;
+  baseTotal: string;
+  currency: string;
+  items: Array<{ rowNumber: number; variantId: number; barcode: string; quantity: number }>;
 };
 type CatalogPreview = {
   decisions: CatalogDecision[];
@@ -112,6 +122,12 @@ export function RetailSupplierImportDialog({
   const [supplierId, setSupplierId] = useState("");
   const [locationId, setLocationId] = useState("");
   const [currency, setCurrency] = useState("USD");
+  const [exchangeRate, setExchangeRate] = useState("1");
+  const [importKey, setImportKey] = useState(() =>
+    `retail-supplier-${typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`}`);
+  const [uploadProgress, setUploadProgress] = useState("");
+  const [purchaseResult, setPurchaseResult] = useState<SupplierPurchaseResult | null>(null);
   const [invoiceReference, setInvoiceReference] = useState("");
   const [invoiceDate, setInvoiceDate] = useState(localISODate);
   const [fileName, setFileName] = useState("");
@@ -133,6 +149,9 @@ export function RetailSupplierImportDialog({
     setPhotoError("");
     setRows([]);
     setFileError("");
+    setPurchaseResult(null);
+    setImportKey(`retail-supplier-${typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`}`);
   }, [companyId]);
 
   const { data: suppliers = [], isError: suppliersFailed } = useQuery<SupplierOption[]>({
@@ -172,9 +191,13 @@ export function RetailSupplierImportDialog({
   const barcodeByRow = useMemo(() => new Map(
     (catalogPreview?.barcodePlans ?? []).map(plan => [plan.rowNumber, plan])
   ), [catalogPreview]);
-  const hasMissingContext = !supplierId || !locationId || !invoiceDate.trim();
-  const readyForFuturePosting = rows.length > 0 && !summary.invalidRows &&
-    !imageIssueCount && !hasMissingContext && Boolean(catalogPreview) && !catalogPreview.summary.conflicts;
+  const needsRate = currency !== "USD";
+  const validRate = !needsRate || (Number.isFinite(Number(exchangeRate)) && Number(exchangeRate) > 0);
+  const hasMissingContext = !supplierId || !locationId || !invoiceDate.trim() ||
+    !invoiceReference.trim() || !validRate || photoBusy;
+  const readyForPosting = rows.length > 0 && !summary.invalidRows &&
+    !imageIssueCount && !hasMissingContext && Boolean(catalogPreview) &&
+    !catalogChecking && !catalogFailed && !catalogPreview?.summary.conflicts;
   useEffect(() => {
     const previews = new Map<number, string>();
     for (const row of rows.slice(0, 100)) {
@@ -187,10 +210,70 @@ export function RetailSupplierImportDialog({
     };
   }, [rows, imageMatches]);
 
+  const saveMutation = useMutation<SupplierPurchaseResult>({
+    mutationFn: async () => {
+      if (!readyForPosting || !catalogPreview) throw new Error("Resolve all import validation errors before confirming");
+      if (!window.confirm(`Receive ${summary.totalUnits} items from ${knownSupplier?.legalName || knownSupplier?.name || "supplier"}? This posts the inventory and supplier credit voucher.`)) {
+        throw new Error("Purchase confirmation cancelled");
+      }
+      const photoUrls = new Map<File, string>();
+      const upload = async (file: File): Promise<string> => {
+        const cached = photoUrls.get(file);
+        if (cached) return cached;
+        setUploadProgress(`Uploading picture ${photoUrls.size + 1}…`);
+        const url = await uploadRetailPhoto(file);
+        photoUrls.set(file, url);
+        return url;
+      };
+      const lines = [];
+      for (const row of rows) {
+        const matched = imageMatches.get(row.rowNumber)?.files ?? [];
+        const imageUrls = [];
+        for (const file of matched) imageUrls.push(await upload(file));
+        lines.push({
+          rowNumber: row.rowNumber, name: row.name, category: row.category, brand: row.brand,
+          color: row.color || "Default", size: row.size || "One Size", quantity: row.quantity,
+          costPrice: row.costPrice, sellingPrice: row.sellingPrice,
+          barcode: row.barcode, sku: row.sku, description: row.description,
+          imageUrls,
+        });
+      }
+      setUploadProgress("Posting supplier purchase, stock, and accounting voucher…");
+      const response = await apiRequest("POST", "/api/retail/supplier-import/confirm", {
+        idempotencyKey: importKey, supplierId: Number(supplierId), locationId: Number(locationId),
+        invoiceReference: invoiceReference.trim(), invoiceDate, currency,
+        exchangeRate: needsRate ? exchangeRate : "1", lines,
+      });
+      return response.json();
+    },
+    onSuccess: result => {
+      setPurchaseResult(result);
+      setUploadProgress("");
+      queryClient.invalidateQueries({ queryKey: ["retail-products"] });
+      queryClient.invalidateQueries({ queryKey: ["retail-catalog-navigation"] });
+      queryClient.invalidateQueries({ queryKey: ["retail-catalog-facets"] });
+      queryClient.invalidateQueries({ queryKey: ["retail-brands"] });
+      queryClient.invalidateQueries({ queryKey: ["retail-pos-items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
+      toast({ title: result.replayed ? "Purchase already recorded" : "Supplier stock purchase posted",
+        description: `Voucher #${result.voucherId} · ${result.currency} ${result.purchaseTotal} supplier payable` });
+    },
+    onError: error => {
+      setUploadProgress("");
+      if (error.message !== "Purchase confirmation cancelled") {
+        toast({ title: "Supplier purchase not posted",
+          description: error instanceof Error ? error.message : String(error), variant: "destructive" });
+      }
+    },
+  });
+
   const handlePhotoArchive = async (file?: File) => {
     setPhotoArchive(null);
     setPhotoArchiveName("");
     setPhotoError("");
+    setPurchaseResult(null);
+    setImportKey(`retail-supplier-${crypto.randomUUID()}`);
     if (!file) return;
     setPhotoBusy(true);
     try {
@@ -211,6 +294,8 @@ export function RetailSupplierImportDialog({
     setFileName("");
     setRows([]);
     setFileError("");
+    setPurchaseResult(null);
+    setImportKey(`retail-supplier-${crypto.randomUUID()}`);
     if (!file) return;
     if (!/\.(xlsx|csv)$/i.test(file.name)) {
       setFileError("Choose an .xlsx or .csv spreadsheet");
@@ -281,18 +366,17 @@ export function RetailSupplierImportDialog({
           </DialogTitle>
         </DialogHeader>
         <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-100">
-          <strong>Phase 3 — barcode-ready supplier preview.</strong> Existing item barcodes remain
-          unchanged, supplier barcodes are checked for conflicts, and blank barcodes
-          will receive new company-specific EAN-13 codes on final confirmation.
-          <strong> No barcode numbers, products, images, stock or supplier balances are saved during preview.</strong>
-          Purchase posting and label printing will be enabled in the next phases.
+          <strong>Phase 4 — supplier credit purchase.</strong> Review supplier, pictures,
+          stock and barcodes before confirming. The confirmed import receives additional stock
+          and posts a balanced inventory debit and supplier payable credit in one transaction.
+          Printing labels for received quantities comes in Phase 5.
         </div>
 
         <div className="grid gap-3 md:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="retail-import-supplier">Supplier *</Label>
             <select id="retail-import-supplier" value={supplierId}
-              onChange={event => setSupplierId(event.target.value)}
+              onChange={event => { setSupplierId(event.target.value); setPurchaseResult(null); setImportKey(`retail-supplier-${crypto.randomUUID()}`); }}
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
               <option value="">Select an existing supplier</option>
               {suppliers.map(supplier => (
@@ -306,7 +390,7 @@ export function RetailSupplierImportDialog({
           <div className="space-y-1.5">
             <Label htmlFor="retail-import-location">Receiving location *</Label>
             <select id="retail-import-location" value={locationId}
-              onChange={event => setLocationId(event.target.value)}
+              onChange={event => { setLocationId(event.target.value); setPurchaseResult(null); setImportKey(`retail-supplier-${crypto.randomUUID()}`); }}
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
               <option value="">Select a stock location</option>
               {locations.filter(location => location.active !== false).map(location => (
@@ -320,24 +404,38 @@ export function RetailSupplierImportDialog({
           <div className="space-y-1.5">
             <Label htmlFor="retail-import-invoice">Supplier invoice / reference</Label>
             <Input id="retail-import-invoice" value={invoiceReference}
-              onChange={event => setInvoiceReference(event.target.value)} placeholder="INV-0001" maxLength={100} />
+              onChange={event => { setInvoiceReference(event.target.value); setPurchaseResult(null); setImportKey(`retail-supplier-${crypto.randomUUID()}`); }} placeholder="INV-0001" maxLength={100} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="retail-import-date">Receipt date *</Label>
               <Input id="retail-import-date" type="date" value={invoiceDate}
-                onChange={event => setInvoiceDate(event.target.value)} />
+                onChange={event => { setInvoiceDate(event.target.value); setPurchaseResult(null); setImportKey(`retail-supplier-${crypto.randomUUID()}`); }} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="retail-import-currency">Invoice currency</Label>
               <select id="retail-import-currency" value={currency}
-                onChange={event => setCurrency(event.target.value)}
+                onChange={event => { setCurrency(event.target.value); setPurchaseResult(null); setImportKey(`retail-supplier-${crypto.randomUUID()}`); }}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
                 {["USD", "EUR", "CDF", "CFA", "GBP", "AUD"].map(code =>
                   <option key={code} value={code}>{code}</option>)}
               </select>
             </div>
           </div>
+          {needsRate && (
+            <div className="space-y-1.5">
+              <Label htmlFor="retail-supplier-exchange">Historical exchange rate *</Label>
+              <Input id="retail-supplier-exchange" inputMode="decimal"
+                value={exchangeRate} onChange={event => {
+                  setExchangeRate(event.target.value); setPurchaseResult(null);
+                  setImportKey(`retail-supplier-${crypto.randomUUID()}`);
+                }} placeholder="Invoice currency units per 1 USD" />
+              <p className="text-xs text-muted-foreground">
+                Enter invoice currency units for one USD (e.g. EUR per USD). The rate is saved on the voucher.
+              </p>
+              {!validRate && <p className="text-xs text-destructive">A positive exchange rate is required.</p>}
+            </div>
+          )}
         </div>
 
         <div className="space-y-2 rounded-lg border p-3">
@@ -482,15 +580,30 @@ export function RetailSupplierImportDialog({
               Displaying first 100 of {rows.length} lines; all lines were checked.
             </p>}
             <p className="text-xs text-muted-foreground">
-              {readyForFuturePosting
-                ? "All rows and image filenames match safely. This is still a non-persistent preview; stock and supplier credit posting arrive in Phase 4."
-                : "Select a supplier/location and resolve spreadsheet, image and catalog conflicts. No stock or accounting changes were made."}
+              {readyForPosting
+                ? "Ready to receive the purchase and credit the selected supplier. Confirm only after verifying the supplier's invoice."
+                : "Select a supplier/location/reference and resolve spreadsheet, image, rate and catalog conflicts before posting."}
             </p>
           </div>
         )}
-        <div className="flex justify-end">
-          <Button type="button" onClick={() => onOpenChange(false)}>
-            Close preview
+        {uploadProgress && <p className="text-xs text-muted-foreground">{uploadProgress}</p>}
+        {purchaseResult && (
+          <div className="rounded-md border p-3 text-sm">
+            <strong>Purchase successfully recorded.</strong> Voucher #{purchaseResult.voucherId} ·
+            {" "}{purchaseResult.items.length} variants ·
+            {" "}{purchaseResult.currency} {purchaseResult.purchaseTotal} credited to supplier.
+            <p className="text-xs text-muted-foreground">
+              Barcodes are saved. Automatic print popup for these received items arrives in Phase 5.
+            </p>
+          </div>
+        )}
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Close
+          </Button>
+          <Button type="button" disabled={!readyForPosting || saveMutation.isPending || Boolean(purchaseResult)}
+            onClick={() => saveMutation.mutate()}>
+            {saveMutation.isPending ? "Processing…" : purchaseResult ? "Purchase recorded" : "Confirm supplier purchase"}
           </Button>
         </div>
       </DialogContent>
