@@ -47,7 +47,14 @@ function getCustomerCurrencyBalances(customer: unknown): CustomerCurrencyBalance
   return balances && typeof balances === "object" ? (balances as CustomerCurrencyBalances) : undefined;
 }
 
+// Remount the filters on company switches, so the Retail default does not
+// inherit the previous company's hide-zero preference while context loads.
 export default function Customers() {
+  const { selectedCompany } = useCompany();
+  return <CompanyCustomers key={selectedCompany?.id ?? "loading"} />;
+}
+
+function CompanyCustomers() {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
   const { formatHistoricalBaseAmount } = useCurrencyContext();
@@ -60,8 +67,12 @@ export default function Customers() {
     resetFilters,
     hasActiveFilters,
   } = usePaginatedFilterState<{ searchQuery: string; hideZero: boolean }>({
-    createInitialFilters: () => ({ searchQuery: "", hideZero: true }),
-    storageKey: selectedCompany?.id ? `erp-customers-filters-v1:${selectedCompany.id}` : undefined,
+    // Retail customers are often first created with zero balance at checkout;
+    // show them in Parties immediately, while preserving the optional Hide Zero control.
+    createInitialFilters: () => ({ searchQuery: "", hideZero: selectedCompany?.companyType !== "retail" }),
+    storageKey: selectedCompany?.id
+      ? `${selectedCompany.companyType === "retail" ? "erp-retail-customers-filters-v1" : "erp-customers-filters-v1"}:${selectedCompany.id}`
+      : undefined,
   });
   const [statementCustomer, setStatementCustomer] = useState<
     (Customer & { balance: number; balanceSide: string }) | null
