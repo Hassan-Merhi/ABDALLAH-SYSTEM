@@ -122,7 +122,7 @@ export function RetailSupplierImportDialog({
   const [supplierId, setSupplierId] = useState("");
   const [locationId, setLocationId] = useState("");
   const [currency, setCurrency] = useState("USD");
-  const [exchangeRate, setExchangeRate] = useState("1");
+  const [exchangeRate, setExchangeRate] = useState("");
   const [importKey, setImportKey] = useState(() =>
     `retail-supplier-${typeof crypto !== "undefined" && "randomUUID" in crypto
       ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`}`);
@@ -246,7 +246,7 @@ export function RetailSupplierImportDialog({
       const response = await apiRequest("POST", "/api/retail/supplier-import/confirm", {
         idempotencyKey: importKey, supplierId: Number(supplierId), locationId: Number(locationId),
         invoiceReference: invoiceReference.trim(), invoiceDate, currency,
-        exchangeRate: needsRate ? exchangeRate : "1", lines,
+        exchangeRate: needsRate ? (1 / Number(exchangeRate)).toFixed(10) : "1", lines,
       });
       return response.json();
     },
@@ -434,9 +434,9 @@ export function RetailSupplierImportDialog({
                 value={exchangeRate} onChange={event => {
                   setExchangeRate(event.target.value); setPurchaseResult(null);
                   setImportKey(`retail-supplier-${crypto.randomUUID()}`);
-                }} placeholder="Invoice currency units per 1 USD" />
+                }} placeholder="USD value of 1 unit of invoice currency" />
               <p className="text-xs text-muted-foreground">
-                Enter invoice currency units for one USD (e.g. EUR per USD). The rate is saved on the voucher.
+                Enter USD per 1 unit of invoice currency (e.g. 1 EUR = 1.18 USD, enter 1.18). The converted historical rate is saved on the voucher.
               </p>
               {!validRate && <p className="text-xs text-destructive">A positive exchange rate is required.</p>}
             </div>
