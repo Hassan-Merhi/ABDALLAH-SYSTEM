@@ -152,6 +152,7 @@ export function RetailSupplierImportDialog({
   const [rows, setRows] = useState<RetailSupplierImportRow[]>([]);
   const [busy, setBusy] = useState(false);
   const [fileError, setFileError] = useState("");
+  const [showProblemsOnly, setShowProblemsOnly] = useState(false);
 
   useEffect(() => {
     setSupplierId("");
@@ -214,6 +215,34 @@ export function RetailSupplierImportDialog({
   const barcodeByRow = useMemo(() => new Map(
     (catalogPreview?.barcodePlans ?? []).map(plan => [plan.rowNumber, plan])
   ), [catalogPreview]);
+  const issueRows = useMemo(() => rows.map(row => {
+    const issues = [
+      ...row.errors,
+      ...(imageMatches.get(row.rowNumber)?.errors ?? []),
+      ...(catalogByRow.get(row.rowNumber)?.status === "conflict"
+        ? catalogByRow.get(row.rowNumber)?.messages ?? [] : []),
+    ];
+    return { row, issues };
+  }).filter(entry => entry.issues.length > 0), [rows, imageMatches, catalogByRow]);
+  const previewRows = showProblemsOnly ? issueRows.map(entry => entry.row) : rows;
+
+  const downloadImportErrors = () => {
+    const csvCell = (value: string | number) => `"${String(value).replace(/"/g, '""')}"`;
+    const csv = [
+      ["Excel Row", "Item Name", "Brand", "Problems"].map(csvCell).join(","),
+      ...issueRows.map(({ row, issues }) => [
+        row.rowNumber, row.name, row.brand, issues.join("; "),
+      ].map(csvCell).join(",")),
+    ].join("\\r\\n");
+    const href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const anchor = document.createElement("a");
+    anchor.href = href;
+    anchor.download = "retail_supplier_import_errors.csv";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(href);
+  };
   const needsRate = currency !== "USD";
   const validRate = !needsRate || (Number.isFinite(Number(exchangeRate)) && Number(exchangeRate) > 0);
   const hasMissingContext = !supplierId || !locationId || !invoiceDate.trim() ||
@@ -680,6 +709,18 @@ export function RetailSupplierImportDialog({
               Reference: {invoiceReference || "not provided"} · Date: {invoiceDate || "not selected"}.
               {purchaseResult ? "This purchase has been recorded." : "This is a preview until you confirm the purchase."}
             </p>
+            {issueRows.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-destructive">{issueRows.length} rows need corrections</span>
+                <Button type="button" size="sm" variant="outline"
+                  onClick={() => setShowProblemsOnly(value => !value)}>
+                  {showProblemsOnly ? "Show all rows" : "Show only error rows"}
+                </Button>
+                <Button type="button" size="sm" variant="outline" onClick={downloadImportErrors}>
+                  Download all errors (CSV)
+                </Button>
+              </div>
+            )}
             <div className="max-h-72 overflow-auto rounded-md border">
               <table className="w-full min-w-[900px] text-left text-xs">
                 <thead className="sticky top-0 bg-muted">
@@ -687,7 +728,7 @@ export function RetailSupplierImportDialog({
                     <th className="whitespace-nowrap px-2 py-2 font-semibold" key={col}>{col}</th>)}</tr>
                 </thead>
                 <tbody>
-                  {rows.slice(0, 100).map(row => (
+                  {previewRows.slice(0, 100).map(row => (
                     <tr key={row.rowNumber} className="border-t align-top">
                       <td className="px-2 py-2">{row.rowNumber}</td>
                       <td className="px-2 py-2">
@@ -738,8 +779,9 @@ export function RetailSupplierImportDialog({
                 </tbody>
               </table>
             </div>
-            {rows.length > 100 && <p className="text-xs text-muted-foreground">
-              Displaying first 100 of {rows.length} lines; all lines were checked.
+            {previewRows.length > 100 && <p className="text-xs text-muted-foreground">
+              Displaying first 100 of {previewRows.length} {showProblemsOnly ? "problem" : "total"} rows;
+              all rows were checked. Download errors for the complete list.
             </p>}
             <p className="text-xs text-muted-foreground">
               {readyForPosting
