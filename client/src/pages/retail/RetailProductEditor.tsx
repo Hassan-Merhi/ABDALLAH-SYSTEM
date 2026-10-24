@@ -285,6 +285,8 @@ export function ProductEditor({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["retail-products"] });
+      queryClient.invalidateQueries({ queryKey: ["retail-catalog-navigation"] });
+      queryClient.invalidateQueries({ queryKey: ["retail-catalog-facets"] });
       queryClient.invalidateQueries({ queryKey: ["retail-product"] });
       queryClient.invalidateQueries({ queryKey: ["retail-brands"] });
       toast({ title: product ? "Product updated" : "Product created" });

@@ -31,6 +31,9 @@ export function visibleVariants(product: RetailProduct, filters: RetailCatalogFi
       if (!filters.showArchived && (!variant.active || !product.active)) return false;
       if (filters.color && norm(variant.color) !== norm(filters.color)) return false;
       if (filters.size && norm(variant.size) !== norm(filters.size)) return false;
+      // Only show variants assigned to the chosen location; a different branch
+      // can hold other sizes/colors of the same style.
+      if (filters.locationId && !variant.stocks.some((stock) => stock.locationId === Number(filters.locationId))) return false;
       const quantity = variantQuantity(variant, filters.locationId);
       if (filters.stockStatus === "in" && quantity <= 0) return false;
       if (filters.stockStatus === "out" && quantity > 0) return false;
@@ -64,6 +67,7 @@ export function RetailCatalogList({
   onEdit,
   onArchiveProduct,
   onVariantAction,
+  showBrandHeadings = true,
 }: {
   products: RetailProduct[];
   filters: RetailCatalogFilters;
@@ -74,6 +78,7 @@ export function RetailCatalogList({
   onEdit: (product: RetailProduct) => void;
   onArchiveProduct: (product: RetailProduct, active: boolean) => void;
   onVariantAction: (action: RetailVariantAction, product: RetailProduct, variant: RetailVariant) => void;
+  showBrandHeadings?: boolean;
 }) {
   const groups: Array<{ brand: string; products: RetailProduct[] }> = [];
   for (const product of products) {
@@ -86,9 +91,11 @@ export function RetailCatalogList({
     <div className="space-y-6">
       {groups.map((group) => (
         <section key={group.brand} className="space-y-3" data-testid="brand-group">
-          <h2 className="border-b pb-1 text-lg font-bold uppercase tracking-wide" data-no-translate>
-            {group.brand}
-          </h2>
+          {showBrandHeadings && (
+            <h2 className="border-b pb-1 text-lg font-bold uppercase tracking-wide" data-no-translate>
+              {group.brand}
+            </h2>
+          )}
           {group.products.map((product) => {
             const rows = visibleVariants(product, filters);
             const rowIds = rows.map((variant) => variant.id);
@@ -189,7 +196,8 @@ export function RetailCatalogList({
                             <StockBadge quantity={quantity} lowThreshold={variant.lowStockThreshold} />
                             <div className="hidden min-w-32 text-xs text-muted-foreground md:block" data-no-translate>
                               {variant.stocks
-                                .filter((stock) => stock.quantity !== 0)
+                                .filter((stock) => stock.quantity !== 0 &&
+                                  (!filters.locationId || stock.locationId === Number(filters.locationId)))
                                 .map((stock) => `${stock.locationName}: ${stock.quantity}`)
                                 .join(" · ") || "—"}
                             </div>
