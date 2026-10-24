@@ -80,7 +80,51 @@ and attached to catalog rows by the finalized purchase flow.
 
 No CI, tests, merge, rebase, or deployment executed in this phase.
 
-## Phases 3–7: contract and financial invariants
+## Phase 3 — automatic barcode resolution (implemented)
+
+The supplier-import dialog now shows **three barcode outcomes** for each
+non-conflicting row: **reuse existing** (never change a stored variant barcode),
+**keep supplier barcode**, or **generate EAN-13 on confirmation**. Catalog
+conflicts have a separate blocked state rather than being described as eligible
+for auto-generation.
+
+- `server/services/retail/retailSupplierBarcodeIntake.ts` adds a side-effect-free
+  intent helper for preview and `resolveRetailSupplierBarcodesTx` for the
+  purchase transaction.
+- `POST /api/retail/supplier-import/catalog-preview` includes `barcodePlans`
+  with each Excel row's action, effective barcode when known, and a message.
+  **Preview does not reserve a barcode or advance any sequence.**
+- At confirmed purchase posting, `resolveRetailSupplierBarcodesTx` must be
+  called **inside the purchase transaction**, and must re-read company-scoped
+  catalog identities, reject conflicts, reserve all manually supplied barcodes,
+  and call the existing `allocateRetailBarcodes` EAN-13 generator only for
+  new variants lacking barcode values.
+- The existing per-company allocator issues valid GS1 restricted-circulation
+  EAN-13 barcodes (prefix 2 and check digit), reserves sequence blocks
+  atomically, skips used barcodes, and checks against incoming manual codes.
+- `server/services/retail/retailSupplierCatalogBatch.ts` joins those barcode
+  assignments with the Phase 2 product/variant transaction-only upsert.
+  It reuses existing variant identities and stored barcodes. The future
+  Phase 4 supplier purchase route must call this batch writer inside the
+  **same transaction** as receipt stock movements, inventory valuation,
+  supplier payable, and idempotency.
+- The existing barcode/variant IDs flow to POS scanner lookup, retail transfers,
+  and later label printing. One variant = one barcode, with one physical
+  printed label per received unit in Phase 5.
+- Supplier template SKU/Barcode Excel columns are text formatted to retain
+  leading zeros. Uploaded supplier barcodes are not silently converted.
+- `tests/retail-supplier-import-barcodes.test.ts` adds barcode intent,
+  EAN-13 formatting and range cases for later CI execution.
+
+**Safe staging boundary:** This Phase 3 adds the barcode planner and atomic
+assignment mechanism, not a standalone barcode issuance or purchase endpoint.
+No products, barcode sequences, inventory, or supplier balances are modified
+by preview. Final submission remains blocked until Phase 4 makes everything
+part of one all-or-nothing supplier receipt.
+
+No CI, tests, merge, rebase, or deployment executed as requested.
+
+## Phases 4–7: contract and financial invariants
 
 **Phase 2 — Product and image import engine**
 
@@ -93,14 +137,6 @@ No CI, tests, merge, rebase, or deployment executed in this phase.
 - Never create duplicate variants by skipping already-used identities.
 - Respect the existing generated EAN-13 implementation, rather than inventing a
   separate barcode sequence. Only use stored barcodes; no silent regenerations.
-
-**Phase 3 — Barcode and variant identity**
-
-- Generate missing variant barcodes using the existing company-scoped retail
-  barcode generator; preserve supplied/existing barcodes.
-- Import should still work without vendor barcodes. When the item already exists,
-  match its identity and reuse the existing barcode.
-- Ensure POS and stock transfer barcode lookup find the resulting variants.
 
 **Phase 4 — Supplier purchase + accounting**
 
