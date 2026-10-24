@@ -157,6 +157,11 @@ export function RetailSupplierImportDialog({
   useEffect(() => {
     setSupplierId("");
     setLocationId("");
+    setInvoiceReference("");
+    setInvoiceDate(localISODate());
+    setCurrency("USD");
+    setExchangeRate("");
+    setShowProblemsOnly(false);
     setFileName("");
     setPhotoArchiveName("");
     setPhotoArchive(null);
@@ -301,6 +306,18 @@ export function RetailSupplierImportDialog({
       }
       if (!response.ok) throw new Error("Could not check receipt status");
       const saved = await response.json() as RetailSupplierPurchaseDetail;
+      if (!saved.movementsMatch || !saved.barcodesMatch) {
+        setPostingError("Purchase was recorded, but its receipt identity or stock movements need review. See import history before reprinting.");
+        setPurchaseResult({
+          replayed: true,
+          operationId: saved.operationId, voucherId: saved.voucherId,
+          purchaseTotal: saved.purchaseTotal, baseTotal: saved.baseTotal,
+          currency: saved.currency, items: saved.items,
+        });
+        setReceiptLabelItems([]);
+        setReceiptLabelsOpen(false);
+        return;
+      }
       showSavedPurchase({
         replayed: true,
         operationId: saved.operationId, voucherId: saved.voucherId,
