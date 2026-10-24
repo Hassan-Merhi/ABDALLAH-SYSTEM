@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { uploadRetailPhoto } from "./retailPhotoUpload";
@@ -127,6 +127,7 @@ export function RetailSupplierImportDialog({
     `retail-supplier-${typeof crypto !== "undefined" && "randomUUID" in crypto
       ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`}`);
   const [uploadProgress, setUploadProgress] = useState("");
+  const uploadedPhotoCache = useRef<Map<File, string>>(new Map());
   const [purchaseResult, setPurchaseResult] = useState<SupplierPurchaseResult | null>(null);
   const [invoiceReference, setInvoiceReference] = useState("");
   const [invoiceDate, setInvoiceDate] = useState(localISODate);
@@ -147,6 +148,7 @@ export function RetailSupplierImportDialog({
     setPhotoArchiveName("");
     setPhotoArchive(null);
     setPhotoError("");
+    uploadedPhotoCache.current.clear();
     setRows([]);
     setFileError("");
     setPurchaseResult(null);
@@ -216,7 +218,9 @@ export function RetailSupplierImportDialog({
       if (!window.confirm(`Receive ${summary.totalUnits} items from ${knownSupplier?.legalName || knownSupplier?.name || "supplier"}? This posts the inventory and supplier credit voucher.`)) {
         throw new Error("Purchase confirmation cancelled");
       }
-      const photoUrls = new Map<File, string>();
+      // Reuse uploaded URLs on retry. Otherwise a lost success response would
+      // generate new file IDs and turn the same idempotency key into a changed payload.
+      const photoUrls = uploadedPhotoCache.current;
       const upload = async (file: File): Promise<string> => {
         const cached = photoUrls.get(file);
         if (cached) return cached;
@@ -272,6 +276,7 @@ export function RetailSupplierImportDialog({
     setPhotoArchive(null);
     setPhotoArchiveName("");
     setPhotoError("");
+    uploadedPhotoCache.current.clear();
     setPurchaseResult(null);
     setImportKey(`retail-supplier-${crypto.randomUUID()}`);
     if (!file) return;
