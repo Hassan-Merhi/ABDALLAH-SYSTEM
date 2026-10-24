@@ -216,6 +216,16 @@ export function registerStatsReportsRoutes(app: Express) {
           itemsTotal: containers.itemsTotal,
           chargesTotal: containers.chargesTotal,
           grandTotal: containers.grandTotal,
+          // Offload total_charges already includes all supplier-invoice/PO charges.
+          // Subtract that portion before adding offloading to grandTotal to avoid
+          // double-counting freight, documentation and other purchase charges.
+          offloadingCharges: sql<string>`COALESCE((
+            SELECT co.total_charges - COALESCE(${containers.chargesTotal}, 0)
+            FROM container_offloads co
+            WHERE co.container_id = ${containers.id}
+            ORDER BY co.id DESC
+            LIMIT 1
+          ), 0)`.as("offloading_charges"),
           companyId: containers.companyId,
           companyName: companies.name,
         })
@@ -226,13 +236,19 @@ export function registerStatsReportsRoutes(app: Express) {
         .orderBy(
           isOffloaded ? sql`${containers.offloadDate} DESC NULLS LAST` : sql`${containers.importDate} DESC NULLS LAST`
         );
+      const reportContainers = containerData.map((container) => ({
+        ...container,
+        totalContainerCost: addInventoryValues(container.grandTotal, container.offloadingCharges).toFixed(2),
+      }));
       res.json({
-        containers: containerData,
+        containers: reportContainers,
         summary: {
-          totalContainers: containerData.length,
-          totalItemsTotal: addInventoryValues(...containerData.map((container) => container.itemsTotal)).toNumber(),
-          totalChargesTotal: addInventoryValues(...containerData.map((container) => container.chargesTotal)).toNumber(),
-          totalGrandTotal: addInventoryValues(...containerData.map((container) => container.grandTotal)).toNumber(),
+          totalContainers: reportContainers.length,
+          totalItemsTotal: addInventoryValues(...reportContainers.map((container) => container.itemsTotal)).toNumber(),
+          totalChargesTotal: addInventoryValues(...reportContainers.map((container) => container.chargesTotal)).toNumber(),
+          totalGrandTotal: addInventoryValues(...reportContainers.map((container) => container.grandTotal)).toNumber(),
+          totalOffloadingCharges: addInventoryValues(...reportContainers.map((container) => container.offloadingCharges)).toNumber(),
+          totalContainerCost: addInventoryValues(...reportContainers.map((container) => container.totalContainerCost)).toNumber(),
         },
         filters: {
           status: status || null,

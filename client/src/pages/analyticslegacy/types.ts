@@ -170,6 +170,10 @@ export interface ReportContainer {
   itemsTotal: string;
   chargesTotal: string;
   grandTotal: string;
+  /** Charges added when the container was offloaded, excluding PO charges already in grandTotal. */
+  offloadingCharges: string;
+  /** Complete landed amount: original container grand total + offloading charges. */
+  totalContainerCost: string;
   companyId: number;
   companyName: string;
 }
@@ -181,6 +185,8 @@ export interface ContainerData {
     totalItemsTotal: number;
     totalChargesTotal: number;
     totalGrandTotal: number;
+    totalOffloadingCharges: number;
+    totalContainerCost: number;
   };
   filters: {
     startDate: string | null;
