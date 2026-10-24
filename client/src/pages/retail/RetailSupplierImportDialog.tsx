@@ -118,7 +118,7 @@ export function RetailSupplierImportDialog({
     setRows([]);
     setFileError("");
     if (!file) return;
-    if (!/\\.(xlsx|csv)$/i.test(file.name)) {
+    if (!/\.(xlsx|csv)$/i.test(file.name)) {
       setFileError("Choose an .xlsx or .csv spreadsheet");
       return;
     }
