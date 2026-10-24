@@ -89,6 +89,7 @@ export function planRetailSupplierCatalog(rows: RetailSupplierCatalogInput, exis
   const uploadSkus = new Set<string>();
   const uploadBarcodes = new Set<string>();
   const seenNewStyles = new Set<string>();
+  const newCodeOwners = new Map<string, string>();
   const usedExistingVariantIds = new Set<number>();
 
   const decisions: RetailSupplierCatalogDecision[] = rows.map(row => {
@@ -154,6 +155,11 @@ export function planRetailSupplierCatalog(rows: RetailSupplierCatalogInput, exis
       const generatedCode = normalize(makeProductCode(row.name, row.brand || noBrand));
       const collision = productsByCode.get(generatedCode);
       if (collision) errors.push(`Generated style code is already used by "${collision.name}"`);
+      const previousCodeOwner = newCodeOwners.get(generatedCode);
+      if (previousCodeOwner && previousCodeOwner !== identity) {
+        errors.push("Two different styles in this spreadsheet generate the same internal product code");
+      }
+      if (!previousCodeOwner) newCodeOwners.set(generatedCode, identity);
     }
     let status: RetailSupplierCatalogStatus;
     if (errors.length) status = "conflict";
