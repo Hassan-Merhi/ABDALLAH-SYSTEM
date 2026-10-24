@@ -150,6 +150,9 @@ export async function postRetailSupplierPurchase(
           input.deliveryReference.trim().toLowerCase()) {
         throw new Error("This supplier invoice delivery reference has already been received");
       }
+      if (String(old.currency ?? "").toUpperCase() !== currency) {
+        throw new Error("All partial deliveries of the same supplier invoice must use the same currency");
+      }
     }
 
     const fileIds = [...new Set(input.lines.flatMap(line => line.imageUrls.map(url => Number(url.split("/").pop()))))];
