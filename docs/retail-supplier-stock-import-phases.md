@@ -209,9 +209,67 @@ No CI/tests, merge, rebase, deployment, or production accounting mutations
 were performed. Claude should verify the UI/printing workflow, especially
 500-label batches and physical thermal-printer page formatting.
 
-## Phases 6–7: remaining implementation contract
+## Phase 6 — Import history, partial deliveries and retry recovery (implemented)
 
-**Phase 2 — Product and image import engine**
+- `server/services/retail/retailSupplierPurchaseHistory.ts` exposes read-only,
+  **company-scoped** import history and single-receipt detail. Paginated list
+  supports invoice-reference search and supplier filter. Receipt details include
+  supplier, company location, voucher ID, original invoice/date/currency,
+  posted base total, attachment, and exact saved lines, quantities, barcodes,
+  prices and unit costs. A stock-movement reconciliation flag compares
+  persisted receipt lines with actual linked stock movement rows. It does
+  **not** create a second Retail stock, accounting, or supplier ledger.
+- Protected routes in `server/routes/retailRoutes.ts`:
+  `GET /api/retail/supplier-import/history`,
+  `GET /api/retail/supplier-import/history/:id`, and
+  `GET /api/retail/supplier-import/requests/:key`. All require authenticated
+  Retail company context, a non-POS role, and the import-data operational
+  permission policy. They provide no cross-company data access.
+- `client/src/pages/retail/RetailSupplierImportHistory.tsx` adds searchable
+  history, view receipt, company-authorized invoice file download and
+  **exact-quantity label reprinting** based on saved receipt lines rather
+  than present-day stock. The existing label API loads stored variant barcodes;
+  receipt reprinting is blocked if movements do not reconcile.
+- `retailSupplierPurchaseSchema` now supports `partialReceipt` with a
+  required **unique deliveryReference** per supplier/invoice. Under a
+  company-scoped advisory transaction lock, the confirmed purchase flow
+  refuses reusing a delivery reference, mixing full and partial receipts
+  under the same supplier invoice, or switching invoice currency mid-series.
+  Every accepted delivery still receives only its own Excel units and posts
+  its own exact supplier-targeted payable voucher and movement references;
+  previous receipts are never overwritten. The UI can start the next
+  delivery while preserving the supplier/invoice context.
+- Optional supplier invoice PDF/JPG/PNG attachments are uploaded to the
+  existing **company-owned file store**, linked by `invoiceFileId` to
+  a confirmed receipt and accessible from history through the company's
+  authenticated download route. Before confirmation, server validation
+  checks company ownership, 10 MB maximum, MIME and file signature.
+- A lost response or failed submission preserves the input and imported
+  picture upload URLs in the browser. **Check whether receipt was posted**
+  queries the same company and request key read-only; a saved receipt
+  is recovered without repeating inventory, barcode or supplier accounting.
+  A retry with the same unchanged request ID remains guarded by its persisted
+  payload fingerprint; failures show a contextual message.
+- Import preflight now offers **show only rows with errors** and
+  **download all errors as CSV** (including Excel, picture and catalog errors),
+  not just the first 100 preview lines.
+- Added `tests/retail-supplier-import-phase6.test.ts` for partial delivery,
+  invoice attachment, exact saved barcode/quantity and immutable fingerprint
+  contracts, for Claude to execute during Phase 7.
+
+**Known cleanup boundary:** The file upload API commits pictures/invoice files
+separately before the stock/accounting DB transaction. If a purchase ultimately
+fails, those uploads can be unreferenced; this phase intentionally does not
+delete stored files automatically because an interrupted response cannot
+prove that files are unreferenced. Claude's Phase 7 review must reconcile
+unreferenced import uploads with the complete company media-reference graph
+before implementing safe automatic cleanup.
+
+No CI, tests, merge, rebase, deployment or database changes were run.
+
+## Phase 7: remaining implementation contract
+
+**Phase 2 reference checklist — Product and image import engine**
 
 - Map product identity to existing Retail brand/style + color/size variant.
   Group by a stable SKU when supplied; resolve to existing company-scoped SKU/
@@ -222,12 +280,6 @@ were performed. Claude should verify the UI/printing workflow, especially
 - Never create duplicate variants by skipping already-used identities.
 - Respect the existing generated EAN-13 implementation, rather than inventing a
   separate barcode sequence. Only use stored barcodes; no silent regenerations.
-
-**Phase 6 — History, reprints and resilience**
-
-- Supplier invoice attachments, import batches, resumable error presentation,
-  purchase/stock history, company-scoped permissions, duplicate supplier-invoice
-  safety, partial receipts, and exact-label reprint from batch quantities.
 
 **Phase 7 — Final integration and Claude review**
 
