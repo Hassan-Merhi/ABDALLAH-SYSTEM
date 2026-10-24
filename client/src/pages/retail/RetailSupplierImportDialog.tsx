@@ -539,7 +539,7 @@ export function RetailSupplierImportDialog({
               Supplier: {knownSupplier?.legalName || knownSupplier?.name || "not selected"} ·
               Location: {knownLocation?.name || "not selected"} ·
               Reference: {invoiceReference || "not provided"} · Date: {invoiceDate || "not selected"}.
-              These are preview details only, not a saved receipt.
+              {purchaseResult ? "This purchase has been recorded." : "This is a preview until you confirm the purchase."}
             </p>
             <div className="max-h-72 overflow-auto rounded-md border">
               <table className="w-full min-w-[900px] text-left text-xs">
