@@ -26,6 +26,7 @@ import {
 } from "../services/retail/retailProductStockWrites";
 import { trackRetailStockValueTx } from "../services/retail/retailInventoryJournal";
 import { previewRetailSupplierCatalog, retailSupplierCatalogPreviewRowsSchema } from "../services/retail/retailSupplierCatalogPreview";
+import { describeRetailSupplierBarcode } from "../services/retail/retailSupplierBarcodeIntake";
 
 const normalize = (value: string) => value.trim().toLowerCase().replace(/\s+/g, " ");
 const asNumber = (value: unknown) => Number(value ?? 0);
@@ -303,7 +304,14 @@ export function registerRetailRoutes(app: Express) {
       if (!companyId) return;
       const rows = retailSupplierCatalogPreviewRowsSchema.parse(req.body?.rows);
       const preview = await previewRetailSupplierCatalog(companyId, rows);
-      return res.json(preview);
+      const barcodePlans = rows.map((row, i) => ({
+        rowNumber: row.rowNumber,
+        ...describeRetailSupplierBarcode(row, preview.decisions[i]),
+      }));
+      // "generate" is explicitly a promise for confirmation, not a reserved
+      // number: preview must never consume the company's EAN-13 sequence.
+      res.set("Cache-Control", "no-store");
+      return res.json({ ...preview, barcodePlans });
     } catch (error) {
       return res.status(400).json({ message: getErrorMessage(error) });
     }
