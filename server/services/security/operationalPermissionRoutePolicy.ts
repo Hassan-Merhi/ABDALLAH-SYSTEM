@@ -137,6 +137,7 @@ export const OPERATIONAL_ROUTE_PERMISSIONS: Readonly<Record<OperationalPermissio
     "POST /api/stock-items/import-grade-category-template",
     "POST /api/retail/import",
     "POST /api/retail/supplier-import/catalog-preview",
+    "POST /api/retail/supplier-import/confirm",
     "POST /api/po-import/parse",
     "POST /api/sp/containers/import-excel/parse",
     "POST /api/sp/containers/import-excel/validate",
