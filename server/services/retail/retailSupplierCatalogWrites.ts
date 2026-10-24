@@ -107,7 +107,7 @@ export async function writeRetailSupplierCatalogLineTx(
     and(eq(retailProductVariants.companyId, companyId), eq(retailProductVariants.productId, product.id))
   );
   const matchedVariants = siblings.filter(v =>
-    normalize(v.color) === normalize(variantColor) && normalize(v.size) === normalize(variantSize));
+    normalize(v.color || "Default") === normalize(variantColor) && normalize(v.size || "One Size") === normalize(variantSize));
   if (matchedVariants.length > 1) throw new Error("Ambiguous color/size variant for supplier stock");
   const existing = matchedVariants[0];
   const suppliedSku = line.sku?.trim() || null;
