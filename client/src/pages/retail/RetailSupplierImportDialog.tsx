@@ -3,8 +3,9 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { uploadRetailPhoto } from "./retailPhotoUpload";
 import { RetailLabelPrintDialog } from "./retailLabels";
+import { RetailSupplierImportHistory, type RetailSupplierPurchaseDetail } from "./RetailSupplierImportHistory";
 import { buildRetailSupplierReceiptLabelItems, type RetailSupplierReceiptLabelItem } from "./retailSupplierReceiptLabels";
-import { AlertTriangle, FileSpreadsheet, Image as ImageIcon, Package, Printer } from "lucide-react";
+import { AlertTriangle, FileSpreadsheet, Image as ImageIcon, Package, Printer, History, ShieldCheck, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -134,6 +135,13 @@ export function RetailSupplierImportDialog({
   const [receiptLabelItems, setReceiptLabelItems] = useState<RetailSupplierReceiptLabelItem[]>([]);
   const [receiptLabelsOpen, setReceiptLabelsOpen] = useState(false);
   const [invoiceReference, setInvoiceReference] = useState("");
+  const [partialReceipt, setPartialReceipt] = useState(false);
+  const [deliveryReference, setDeliveryReference] = useState("");
+  const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
+  const [invoiceFileError, setInvoiceFileError] = useState("");
+  const uploadedInvoiceCache = useRef<{ file: File; id: number } | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [postingError, setPostingError] = useState("");
   const [invoiceDate, setInvoiceDate] = useState(localISODate);
   const [fileName, setFileName] = useState("");
   const [photoArchiveName, setPhotoArchiveName] = useState("");
@@ -158,6 +166,13 @@ export function RetailSupplierImportDialog({
     setPurchaseResult(null);
     setReceiptLabelItems([]);
     setReceiptLabelsOpen(false);
+    setPartialReceipt(false);
+    setDeliveryReference("");
+    setInvoiceFile(null);
+    setInvoiceFileError("");
+    uploadedInvoiceCache.current = null;
+    setHistoryOpen(false);
+    setPostingError("");
     setImportKey(`retail-supplier-${typeof crypto !== "undefined" && "randomUUID" in crypto
       ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`}`);
   }, [companyId]);
@@ -202,7 +217,8 @@ export function RetailSupplierImportDialog({
   const needsRate = currency !== "USD";
   const validRate = !needsRate || (Number.isFinite(Number(exchangeRate)) && Number(exchangeRate) > 0);
   const hasMissingContext = !supplierId || !locationId || !invoiceDate.trim() ||
-    !invoiceReference.trim() || !validRate || photoBusy;
+    !invoiceReference.trim() || !validRate || photoBusy ||
+    (partialReceipt && !deliveryReference.trim()) || Boolean(invoiceFileError);
   const readyForPosting = rows.length > 0 && !summary.invalidRows &&
     !imageIssueCount && !hasMissingContext && Boolean(catalogPreview) &&
     !catalogChecking && !catalogFailed && !catalogPreview?.summary.conflicts;
@@ -217,6 +233,71 @@ export function RetailSupplierImportDialog({
       previews.forEach(url => URL.revokeObjectURL(url));
     };
   }, [rows, imageMatches]);
+
+  const showSavedPurchase = (result: SupplierPurchaseResult) => {
+    setPurchaseResult(result);
+    setPostingError("");
+    setUploadProgress("");
+    try {
+      const labels = buildRetailSupplierReceiptLabelItems(result.items, rows);
+      setReceiptLabelItems(labels);
+      if (labels.length) setReceiptLabelsOpen(true);
+    } catch (error) {
+      toast({ title: "Purchase recorded; barcode labels need review",
+        description: error instanceof Error ? error.message : String(error), variant: "destructive" });
+    }
+    queryClient.invalidateQueries({ queryKey: ["retail-products"] });
+    queryClient.invalidateQueries({ queryKey: ["retail-catalog-navigation"] });
+    queryClient.invalidateQueries({ queryKey: ["retail-catalog-facets"] });
+    queryClient.invalidateQueries({ queryKey: ["retail-brands"] });
+    queryClient.invalidateQueries({ queryKey: ["retail-pos-items"] });
+    queryClient.invalidateQueries({ queryKey: ["retail-supplier-import-history"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
+    toast({ title: result.replayed ? "Purchase already recorded" : "Supplier stock purchase posted",
+      description: `Voucher #${result.voucherId} · ${result.currency} ${result.purchaseTotal} supplier payable` });
+  };
+
+  /** Inspect the durable receipt identity after a lost network response. Never submit stock again here. */
+  const checkPurchaseStatus = async () => {
+    try {
+      const response = await fetch(
+        `/api/retail/supplier-import/requests/${encodeURIComponent(importKey)}`,
+        { credentials: "include", cache: "no-store" }
+      );
+      if (response.status === 404) {
+        toast({ title: "No committed receipt found",
+          description: "The purchase is not recorded under this request ID. You may retry the unchanged import." });
+        return;
+      }
+      if (!response.ok) throw new Error("Could not check receipt status");
+      const saved = await response.json() as RetailSupplierPurchaseDetail;
+      showSavedPurchase({
+        replayed: true,
+        operationId: saved.operationId, voucherId: saved.voucherId,
+        purchaseTotal: saved.purchaseTotal, baseTotal: saved.baseTotal,
+        currency: saved.currency, items: saved.items,
+      });
+    } catch (error) {
+      toast({ title: "Receipt status check failed",
+        description: error instanceof Error ? error.message : String(error),
+        variant: "destructive" });
+    }
+  };
+
+  const startNextDelivery = () => {
+    setPurchaseResult(null);
+    setReceiptLabelItems([]);
+    setReceiptLabelsOpen(false);
+    setRows([]);
+    setFileName("");
+    setDeliveryReference("");
+    setPhotoArchive(null);
+    setPhotoArchiveName("");
+    uploadedPhotoCache.current.clear();
+    setPostingError("");
+    setImportKey(`retail-supplier-${crypto.randomUUID()}`);
+  };
 
   const saveMutation = useMutation<SupplierPurchaseResult>({
     mutationFn: async () => {
@@ -248,40 +329,40 @@ export function RetailSupplierImportDialog({
           imageUrls,
         });
       }
+      let invoiceFileId: number | null = null;
+      if (invoiceFile) {
+        if (uploadedInvoiceCache.current?.file === invoiceFile) {
+          invoiceFileId = uploadedInvoiceCache.current.id;
+        } else {
+          setUploadProgress("Uploading supplier invoice attachment…");
+          const formData = new FormData();
+          formData.append("file", invoiceFile);
+          const uploadResponse = await fetch("/api/files/upload", {
+            method: "POST", credentials: "include", body: formData,
+          });
+          const uploadResult = await uploadResponse.json().catch(() => ({})) as { id?: number; message?: string };
+          if (!uploadResponse.ok || !uploadResult.id) {
+            throw new Error(uploadResult.message || "Supplier invoice could not be uploaded");
+          }
+          invoiceFileId = uploadResult.id;
+          uploadedInvoiceCache.current = { file: invoiceFile, id: invoiceFileId };
+        }
+      }
       setUploadProgress("Posting supplier purchase, stock, and accounting voucher…");
       const response = await apiRequest("POST", "/api/retail/supplier-import/confirm", {
         idempotencyKey: importKey, supplierId: Number(supplierId), locationId: Number(locationId),
         invoiceReference: invoiceReference.trim(), invoiceDate, currency,
+        partialReceipt, deliveryReference: partialReceipt ? deliveryReference.trim() : "",
+        invoiceFileId,
         exchangeRate: needsRate ? (1 / Number(exchangeRate)).toFixed(10) : "1", lines,
       });
       return response.json();
     },
-    onSuccess: result => {
-      setPurchaseResult(result);
-      setUploadProgress("");
-      // Receipt units are returned by the committed backend operation. Never
-      // derive print copies from current on-hand stock or scanned Excel totals.
-      try {
-        const labels = buildRetailSupplierReceiptLabelItems(result.items, rows);
-        setReceiptLabelItems(labels);
-        if (labels.length) setReceiptLabelsOpen(true);
-      } catch (error) {
-        toast({ title: "Purchase saved; labels need attention",
-          description: error instanceof Error ? error.message : String(error), variant: "destructive" });
-      }
-      queryClient.invalidateQueries({ queryKey: ["retail-products"] });
-      queryClient.invalidateQueries({ queryKey: ["retail-catalog-navigation"] });
-      queryClient.invalidateQueries({ queryKey: ["retail-catalog-facets"] });
-      queryClient.invalidateQueries({ queryKey: ["retail-brands"] });
-      queryClient.invalidateQueries({ queryKey: ["retail-pos-items"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
-      toast({ title: result.replayed ? "Purchase already recorded" : "Supplier stock purchase posted",
-        description: `Voucher #${result.voucherId} · ${result.currency} ${result.purchaseTotal} supplier payable` });
-    },
+    onSuccess: result => showSavedPurchase(result),
     onError: error => {
       setUploadProgress("");
       if (error.message !== "Purchase confirmation cancelled") {
+        setPostingError(error instanceof Error ? error.message : String(error));
         toast({ title: "Supplier purchase not posted",
           description: error instanceof Error ? error.message : String(error), variant: "destructive" });
       }
@@ -316,6 +397,7 @@ export function RetailSupplierImportDialog({
     setRows([]);
     setFileError("");
     setPurchaseResult(null);
+    setPostingError("");
     setImportKey(`retail-supplier-${crypto.randomUUID()}`);
     if (!file) return;
     if (!/\.(xlsx|csv)$/i.test(file.name)) {
@@ -379,7 +461,7 @@ export function RetailSupplierImportDialog({
 
   return (
     <>
-    <Dialog open={open && !receiptLabelsOpen} onOpenChange={onOpenChange}>
+    <Dialog open={open && !receiptLabelsOpen && !historyOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
