@@ -279,7 +279,10 @@ export async function postRetailSupplierPurchase(
       deliveryReference: input.partialReceipt ? input.deliveryReference.trim() : "",
       invoiceFileId: input.invoiceFileId ?? null,
       currency, exchangeRate: rateString, voucherId: posting.voucher.id,
-      purchaseTotal: transactionTotal.toFixed(6), baseTotal: debit.baseDebitAmount, items,
+      purchaseTotal: transactionTotal.toFixed(6), baseTotal: debit.baseDebitAmount,
+      variantCount: new Set(items.map(line => line.variantId)).size,
+      unitsReceived: items.reduce((total, line) => total + line.quantity, 0),
+      items,
     };
     await tx.update(retailStockOperations).set({ metadata: responseMeta })
       .where(and(eq(retailStockOperations.companyId, companyId), eq(retailStockOperations.id, operation.id)));
