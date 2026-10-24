@@ -3,9 +3,8 @@
  * top pagination), the desktop table, the mobile card list and the pagination
  * footer.
  *
- * Split out of TransactionJournal.tsx unchanged — same test ids, same column
- * set (the Amount column disappears when amounts are hidden), same empty-state
- * copy and the same three per-row actions.
+ * Keeps the original test IDs, actions and conditional Amount column while
+ * displaying company and voucher-type headers over server-grouped rows.
  */
 import { Fragment } from "react";
 import { AlertCircle, ChevronLeft, ChevronRight, Eye, EyeOff, Pencil, RefreshCw, X } from "lucide-react";
@@ -165,54 +164,54 @@ function DesktopTable({ model }: { model: TransactionJournalModel }) {
                         </TableCell>
                       </TableRow>
                     )}
-                  <TableRow
-                    key={v.id}
-                    data-testid={`row-voucher-${v.id}`}
-                    className={isHidden && model.showHidden ? "opacity-50" : ""}
-                  >
-                    <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                      {fmtDate(v.voucherDate)}
-                    </TableCell>
-                    <TableCell>
-                      <span
-                        className={`inline-block text-xs font-medium px-2 py-0.5 rounded-sm truncate max-w-[140px] ${companyColor(v.companyId)}`}
-                      >
-                        {v.companyName}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1 flex-wrap">
-                        <VoucherTypeBadge type={v.voucherType} />
-                        {v.optional && (
-                          <Badge variant="outline" className="text-xs">
-                            Optional
-                          </Badge>
-                        )}
-                        {v.deletedAt && (
-                          <Badge variant="destructive" className="text-xs">
-                            Deleted
-                          </Badge>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm max-w-xs text-muted-foreground">
-                      <div className="flex items-center gap-1 truncate">
-                        <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
-                        <span className="truncate">{v.description || v.narration || "—"}</span>
-                      </div>
-                    </TableCell>
-                    {!hideAmounts && (
-                      <TableCell className="text-right text-sm font-mono">
-                        <span className="text-xs text-muted-foreground mr-1">{v.currency}</span>
-                        {formatAmount(v.totalAmount)}
+                    <TableRow
+                      key={v.id}
+                      data-testid={`row-voucher-${v.id}`}
+                      className={isHidden && model.showHidden ? "opacity-50" : ""}
+                    >
+                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                        {fmtDate(v.voucherDate)}
                       </TableCell>
-                    )}
-                    <TableCell>
-                      <div className="flex items-center justify-center gap-1">
-                        <RowActions voucher={v} model={model} suffix="" />
-                      </div>
-                    </TableCell>
-                  </TableRow>
+                      <TableCell>
+                        <span
+                          className={`inline-block text-xs font-medium px-2 py-0.5 rounded-sm truncate max-w-[140px] ${companyColor(v.companyId)}`}
+                        >
+                          {v.companyName}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <VoucherTypeBadge type={v.voucherType} />
+                          {v.optional && (
+                            <Badge variant="outline" className="text-xs">
+                              Optional
+                            </Badge>
+                          )}
+                          {v.deletedAt && (
+                            <Badge variant="destructive" className="text-xs">
+                              Deleted
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm max-w-xs text-muted-foreground">
+                        <div className="flex items-center gap-1 truncate">
+                          <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
+                          <span className="truncate">{v.description || v.narration || "—"}</span>
+                        </div>
+                      </TableCell>
+                      {!hideAmounts && (
+                        <TableCell className="text-right text-sm font-mono">
+                          <span className="text-xs text-muted-foreground mr-1">{v.currency}</span>
+                          {formatAmount(v.totalAmount)}
+                        </TableCell>
+                      )}
+                      <TableCell>
+                        <div className="flex items-center justify-center gap-1">
+                          <RowActions voucher={v} model={model} suffix="" />
+                        </div>
+                      </TableCell>
+                    </TableRow>
                   </Fragment>
                 );
               })
@@ -256,46 +255,46 @@ function MobileCards({ model }: { model: TransactionJournalModel }) {
                     {voucherGroupLabel(v.voucherType)}
                   </div>
                 )}
-              <div
-                className={`px-3 py-3 ${isHidden && model.showHidden ? "opacity-50" : ""}`}
-                data-testid={`card-voucher-${v.id}`}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                      <VoucherTypeBadge type={v.voucherType} />
-                      {v.optional && (
-                        <Badge variant="outline" className="text-xs">
-                          Optional
-                        </Badge>
-                      )}
-                      {v.deletedAt && (
-                        <Badge variant="destructive" className="text-xs">
-                          Deleted
-                        </Badge>
-                      )}
-                      <span
-                        className={`inline-block text-xs font-medium px-2 py-0.5 rounded-sm ${companyColor(v.companyId)}`}
-                      >
-                        {v.companyName}
-                      </span>
-                    </div>
-                    <div className="text-xs text-muted-foreground truncate">{v.description || v.narration || "—"}</div>
-                    <div className="text-xs text-muted-foreground mt-0.5">{fmtDate(v.voucherDate)}</div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    {!hideAmounts && (
-                      <div className="font-mono text-sm font-medium">
-                        <span className="text-xs text-muted-foreground mr-0.5">{v.currency}</span>
-                        {formatAmount(v.totalAmount)}
+                <div
+                  className={`px-3 py-3 ${isHidden && model.showHidden ? "opacity-50" : ""}`}
+                  data-testid={`card-voucher-${v.id}`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                        <VoucherTypeBadge type={v.voucherType} />
+                        {v.optional && (
+                          <Badge variant="outline" className="text-xs">
+                            Optional
+                          </Badge>
+                        )}
+                        {v.deletedAt && (
+                          <Badge variant="destructive" className="text-xs">
+                            Deleted
+                          </Badge>
+                        )}
+                        <span
+                          className={`inline-block text-xs font-medium px-2 py-0.5 rounded-sm ${companyColor(v.companyId)}`}
+                        >
+                          {v.companyName}
+                        </span>
                       </div>
-                    )}
-                    <div className="flex items-center justify-end gap-0.5 mt-1">
-                      <RowActions voucher={v} model={model} suffix="-mobile" />
+                      <div className="text-xs text-muted-foreground truncate">{v.description || v.narration || "—"}</div>
+                      <div className="text-xs text-muted-foreground mt-0.5">{fmtDate(v.voucherDate)}</div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      {!hideAmounts && (
+                        <div className="font-mono text-sm font-medium">
+                          <span className="text-xs text-muted-foreground mr-0.5">{v.currency}</span>
+                          {formatAmount(v.totalAmount)}
+                        </div>
+                      )}
+                      <div className="flex items-center justify-end gap-0.5 mt-1">
+                        <RowActions voucher={v} model={model} suffix="-mobile" />
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
               </Fragment>
             );
           })}
