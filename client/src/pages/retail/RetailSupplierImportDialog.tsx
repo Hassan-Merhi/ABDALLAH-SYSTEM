@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, FileSpreadsheet, Image as ImageIcon, Package, Upload } from "lucide-react";
+import { AlertTriangle, FileSpreadsheet, Image as ImageIcon, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -342,7 +342,7 @@ export function RetailSupplierImportDialog({
         )}
         <div className="flex justify-end">
           <Button type="button" onClick={() => onOpenChange(false)}>
-            <Upload className="mr-2 h-4 w-4" /> Close preview
+            Close preview
           </Button>
         </div>
       </DialogContent>
