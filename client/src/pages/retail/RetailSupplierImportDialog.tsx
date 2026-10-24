@@ -91,6 +91,10 @@ async function downloadSupplierTemplate() {
     cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1B365D" } };
   });
   worksheet.views = [{ state: "frozen", ySplit: 1 }];
+  // Preserve leading zeros in supplier barcodes and SKUs; never use Excel's
+  // numeric/scientific display for scanner identities.
+  worksheet.getColumn(11).numFmt = "@";
+  worksheet.getColumn(12).numFmt = "@";
   worksheet.columns.forEach((column, index) => {
     column.width = index === 0 || index === 8 || index === 9 ? 29 : 17;
   });
