@@ -1,5 +1,5 @@
 import { and, desc, eq, ilike, inArray, sql } from "drizzle-orm";
-import { locations, retailStockMovements, retailStockOperations, storedFiles } from "@shared/schema";
+import { locations, retailProductVariants, retailStockMovements, retailStockOperations, storedFiles } from "@shared/schema";
 import { companyScopedSuppliers } from "@shared/schema/supplierCompanyScope";
 import { db } from "../../db";
 
@@ -173,6 +173,15 @@ export async function getRetailSupplierPurchaseDetail(companyId: number, operati
   }).from(storedFiles).where(and(
     eq(storedFiles.companyId, companyId), eq(storedFiles.id, fileId),
   )).limit(1) : [undefined];
+  const variantIds = [...new Set(items.map(item => item.variantId))];
+  const existingVariants = variantIds.length ? await db.select({
+    id: retailProductVariants.id, barcode: retailProductVariants.barcode,
+  }).from(retailProductVariants).where(and(
+    eq(retailProductVariants.companyId, companyId),
+    inArray(retailProductVariants.id, variantIds),
+  )) : [];
+  const currentBarcodes = new Map(existingVariants.map(variant => [variant.id, variant.barcode]));
+  const barcodesMatch = items.every(item => currentBarcodes.get(item.variantId) === item.barcode);
   const movements = await db.select({
     eventKey: retailStockMovements.eventKey,
     variantId: retailStockMovements.variantId,
@@ -186,7 +195,9 @@ export async function getRetailSupplierPurchaseDetail(companyId: number, operati
   const movementByRow = new Map(movements.map(row => [row.eventKey, row]));
   const movementsMatch = items.every(item => {
     const matched = movementByRow.get(`supplier-purchase:${op.id}:${item.rowNumber}`);
-    return matched && matched.variantId === item.variantId && Number(matched.quantityDelta) === item.quantity;
+    return matched && matched.variantId === item.variantId &&
+      Number(matched.quantityDelta) === item.quantity &&
+      (matched.barcode == null || matched.barcode === item.barcode);
   }) && movements.length === items.length;
   const supplierId = numericId(data.supplierId);
   const locationId = numericId(data.locationId);
@@ -214,6 +225,8 @@ export async function getRetailSupplierPurchaseDetail(companyId: number, operati
     items,
     totalUnits: items.reduce((sum, item) => sum + item.quantity, 0),
     movementsMatch,
+    barcodesMatch,
+    reprintAllowed: movementsMatch && barcodesMatch && items.length > 0,
     invoiceFile: invoiceFile ? {
       ...invoiceFile,
       downloadUrl: `/api/files/${invoiceFile.id}/download`,
