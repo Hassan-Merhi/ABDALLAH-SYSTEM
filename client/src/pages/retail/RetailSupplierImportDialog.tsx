@@ -375,6 +375,8 @@ export function RetailSupplierImportDialog({
           stock and barcodes before confirming. The confirmed import receives additional stock
           and posts a balanced inventory debit and supplier payable credit in one transaction.
           Printing labels for received quantities comes in Phase 5.
+          The selected Retail company must have completed its inventory accounting opening
+          before importing supplier purchases.
         </div>
 
         <div className="grid gap-3 md:grid-cols-2">
