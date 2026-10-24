@@ -63,6 +63,8 @@ export interface RetailSupplierPurchaseDetail {
   }>;
   totalUnits: number;
   movementsMatch: boolean;
+  barcodesMatch: boolean;
+  reprintAllowed: boolean;
   invoiceFile: null | {
     id: number;
     fileName: string;
@@ -107,7 +109,7 @@ export function RetailSupplierImportHistory({
     retry: false,
   });
   const handleReprint = () => {
-    if (!receipt || !receipt.movementsMatch) return;
+    if (!receipt || !receipt.reprintAllowed) return;
     const lines = buildRetailSupplierReceiptLabelItems(receipt.items, receipt.items.map(item => ({
       rowNumber: item.rowNumber,
       name: item.name ?? item.barcode,
@@ -219,7 +221,7 @@ export function RetailSupplierImportHistory({
                     <FileText className="h-4 w-4" />Invoice attachment
                   </a>
                 )}
-                <Button type="button" variant="outline" disabled={!receipt.movementsMatch || !receipt.items.length}
+                <Button type="button" variant="outline" disabled={!receipt.reprintAllowed}
                   onClick={handleReprint}>
                   <Printer className="mr-2 h-4 w-4" />Reprint received labels
                 </Button>
@@ -229,6 +231,13 @@ export function RetailSupplierImportHistory({
               <div role="alert" className="flex items-center gap-2 text-sm text-destructive">
                 <AlertTriangle className="h-4 w-4" />
                 Stock movements do not reconcile with this receipt; printing is blocked pending investigation.
+              </div>
+            )}
+            {!receipt.barcodesMatch && (
+              <div role="alert" className="flex items-center gap-2 text-sm text-destructive">
+                <AlertTriangle className="h-4 w-4" />
+                One or more variant barcodes have changed since this receipt.
+                Reprinting is blocked to prevent printing a different item identity.
               </div>
             )}
             <div className="max-h-64 overflow-auto rounded-md border">
@@ -259,7 +268,8 @@ export function RetailSupplierImportHistory({
             </div>
             <p className="text-xs text-muted-foreground">
               These quantities and prices are saved receipt snapshots; they are not recalculated
-              from today's warehouse stock. Reprints use each variant's current stored barcode.
+              from today's warehouse stock. Reprints require the currently stored barcode
+              to match the barcode originally saved on this receipt.
             </p>
           </div>
         )}
