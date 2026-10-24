@@ -28,7 +28,7 @@ export const RETAIL_SUPPLIER_TEMPLATE_COLUMNS = [
 
 type SourceRow = { rowNumber: number; values: Record<string, unknown> };
 const normalizeHeader = (value: string) => value.trim().toLowerCase().replace(/[ _-]+/g, "");
-const normalizeIdentity = (value: string) => value.normalize("NFKC").trim().toLowerCase().replace(/\\s+/g, " ");
+const normalizeIdentity = (value: string) => value.normalize("NFKC").trim().toLowerCase().replace(/\s+/g, " ");
 
 function field(values: Record<string, unknown>, ...aliases: string[]): unknown {
   const keys = new Map(Object.entries(values).map(([key, value]) => [normalizeHeader(key), value]));
@@ -50,7 +50,7 @@ function validPrice(input: unknown): number | null {
   if (input === "" || input == null) return null;
   const raw = asText(input);
   // Reject formatted prices instead of guessing whether commas mean thousands or decimals.
-  if (!/^(?:\\d+)(?:\\.\\d{1,4})?$/.test(raw)) return null;
+  if (!/^(?:\d+)(?:\.\d{1,4})?$/.test(raw)) return null;
   const value = Number(raw);
   return Number.isFinite(value) && value <= 1_000_000_000 ? value : null;
 }
