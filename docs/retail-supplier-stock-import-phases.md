@@ -229,7 +229,8 @@ were performed. Claude should verify the UI/printing workflow, especially
   history, view receipt, company-authorized invoice file download and
   **exact-quantity label reprinting** based on saved receipt lines rather
   than present-day stock. The existing label API loads stored variant barcodes;
-  receipt reprinting is blocked if movements do not reconcile.
+  receipt reprinting is blocked if movements do not reconcile or the
+  current variant barcode differs from the barcode saved on the receipt.
 - `retailSupplierPurchaseSchema` now supports `partialReceipt` with a
   required **unique deliveryReference** per supplier/invoice. Under a
   company-scoped advisory transaction lock, the confirmed purchase flow
@@ -244,6 +245,8 @@ were performed. Claude should verify the UI/printing workflow, especially
   a confirmed receipt and accessible from history through the company's
   authenticated download route. Before confirmation, server validation
   checks company ownership, 10 MB maximum, MIME and file signature.
+- A company switch resets supplier/invoice/date/currency and pending receipt
+  context to prevent accidental cross-company reuse.
 - A lost response or failed submission preserves the input and imported
   picture upload URLs in the browser. **Check whether receipt was posted**
   queries the same company and request key read-only; a saved receipt
@@ -252,7 +255,9 @@ were performed. Claude should verify the UI/printing workflow, especially
   payload fingerprint; failures show a contextual message.
 - Import preflight now offers **show only rows with errors** and
   **download all errors as CSV** (including Excel, picture and catalog errors),
-  not just the first 100 preview lines.
+  not just the first 100 preview lines. The exported CSV escapes
+  supplier-controlled values so spreadsheet applications cannot evaluate
+  product names as formulas.
 - Added `tests/retail-supplier-import-phase6.test.ts` for partial delivery,
   invoice attachment, exact saved barcode/quantity and immutable fingerprint
   contracts, for Claude to execute during Phase 7.
