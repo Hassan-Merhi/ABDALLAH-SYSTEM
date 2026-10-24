@@ -163,7 +163,7 @@ No CI, tests, merge, rebase, or deployment executed as requested.
   ownership, audit, and voucher idempotency checks belong to the central engine.
 - On success the dialog shows the voucher ID, received item count, and total
   payable, and refreshes catalog and supplier/accounting query caches.
-  The printed-label popup on that saved batch is reserved for Phase 5.
+  Phase 5 now opens a printable receipt-label popup using those saved quantities.
 - Tests for schema, image references and request fingerprint are added for
   Claude to run. No CI, tests, merge, rebase, or deployment performed.
 
@@ -172,7 +172,44 @@ applied for the company before the first supplier import, to avoid posting a
 supplier purchase in the pre-opening inventory state. This is NOT a cash
 opening. Existing POS sale accounting is not modified here.
 
-## Phases 5–7: remaining implementation contract
+## Phase 5 — Automatic label printing after purchase (implemented)
+
+- Once `POST /api/retail/supplier-import/confirm` returns a committed receipt,
+  `RetailSupplierImportDialog` opens the existing `RetailLabelPrintDialog`
+  in `purpose="supplier-receipt"` mode. The background import dialog is
+  hidden while printing and returns to the saved receipt summary when closed.
+- `client/src/pages/retail/retailSupplierReceiptLabels.ts` builds print targets
+  using only the **confirmed server response** `items[{rowNumber, variantId,
+  barcode, quantity}]`. Source Excel names are display-only; lifetime
+  warehouse stock, Excel quantity, and provisional preview barcodes cannot
+  determine copies. Duplicate receipt rows for one variant combine quantities
+  only if they reference the exact same barcode.
+- Each received unit has one default label. Existing thermal **50×30 mm**,
+  **58×40 mm**, and **A4/24-up** print options remain available. Users can
+  include/exclude individual variants and print all remaining selected units
+  through successive jobs of **at most 500 physical labels**, respecting
+  `POST /api/retail/labels` maximum copy count without silently losing
+  oversized receipt quantities.
+- Printing always goes through existing company-scoped `POST /api/retail/labels`,
+  which reloads each variant's **stored barcode**, retail selling price and
+  identity; it logs a label print event and never issues a new barcode.
+  Customer labels offer optional **selling price only**, never stock cost or
+  supplier cost. Retail POS scanners can continue to use those saved barcodes.
+- The customer can select all remaining, clear selections, skip printing,
+  or return to the saved receipt summary and click **Print received labels**
+  again. Reopening starts a new reprint selection from the original receipt.
+  Receipt posting is never reversed by label dismissal or print failure.
+- On multi-batch jobs, the UI tracks quantities **prepared** for the browser
+  print dialog, not guaranteed physically printed. Browser/OS cancellation
+  cannot be reliably detected; users may reopen the receipt to print again.
+- Added `tests/retail-supplier-receipt-labels.test.ts` for committed quantity
+  source, barcode reuse, per-job limits, selected subsets and duplicate rows.
+
+No CI/tests, merge, rebase, deployment, or production accounting mutations
+were performed. Claude should verify the UI/printing workflow, especially
+500-label batches and physical thermal-printer page formatting.
+
+## Phases 6–7: remaining implementation contract
 
 **Phase 2 — Product and image import engine**
 
@@ -185,14 +222,6 @@ opening. Existing POS sale accounting is not modified here.
 - Never create duplicate variants by skipping already-used identities.
 - Respect the existing generated EAN-13 implementation, rather than inventing a
   separate barcode sequence. Only use stored barcodes; no silent regenerations.
-
-**Phase 5 — Label popup after receipt**
-
-- After success, open the existing retail label flow; copies per variant must be
-  the **received quantity**, not its lifetime balance or an arbitrary 1.
-- The cost price must never be printed on customer labels. Provide thermal/A4
-  layouts, full/selected reprints and stored-barcode scan consistency.
-- Skipping or cancelling printing never rolls back an already completed purchase.
 
 **Phase 6 — History, reprints and resilience**
 
