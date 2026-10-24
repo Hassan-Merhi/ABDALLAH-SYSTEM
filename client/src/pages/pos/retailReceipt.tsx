@@ -220,34 +220,68 @@ export function RetailReceipt({
   );
 }
 
-/** Prints an 80 mm receipt through the browser print dialog (thermal receipt printers or any printer). */
+/** Prints on thermal roll paper (80mm default, optional persistent 58mm). */
 export function useRetailReceiptPrinter(companyName?: string, locationName?: string) {
-  const [sale, setSale] = useState<RetailSale | null>(null);
+  const [job, setJob] = useState<{ sale: RetailSale; width: RetailReceiptPaperWidth } | null>(null);
+  const [paperWidth, setPaperWidth] = useState<RetailReceiptPaperWidth>(readPaperWidth);
+
+  const changePaperWidth = (width: RetailReceiptPaperWidth) => {
+    setPaperWidth(width);
+    try {
+      window.localStorage.setItem(RECEIPT_PAPER_STORAGE_KEY, String(width));
+    } catch {
+      // Printing also works if the browser prevents preference storage.
+    }
+  };
 
   useEffect(() => {
-    if (!sale) return;
+    if (!job) return;
     const style = document.createElement("style");
     style.setAttribute("data-retail-receipt-print", "true");
     style.textContent = RECEIPT_CSS;
     document.head.appendChild(style);
-    const finish = () => setSale(null);
-    window.addEventListener("afterprint", finish, { once: true });
-    const timer = window.setTimeout(() => window.print(), 100);
+
+    // A real page height is required: @page { size: 80mm auto } is invalid
+    // in Chromium, causing the browser to silently fall back to A4.
+    // The offscreen receipt has the actual thermal width for measuring wraps.
+    const finish = () => setJob((current) => (current === job ? null : current));
+    window.addEventListener("afterprint", finish);
+    const frame = window.requestAnimationFrame(() => {
+      const root = document.getElementById("retail-receipt-print-root");
+      if (!root) {
+        finish();
+        return;
+      }
+      const heightMm = root.getBoundingClientRect().height * 25.4 / 96;
+      const paperHeightMm = Math.max(45, Math.ceil(heightMm + 4));
+      style.textContent = RECEIPT_CSS + "\n@page { size: " + job.width + "mm " + paperHeightMm + "mm; margin: 0; }";
+      window.print();
+    });
+
     return () => {
-      window.clearTimeout(timer);
+      window.cancelAnimationFrame(frame);
       window.removeEventListener("afterprint", finish);
       style.remove();
     };
-  }, [sale]);
+  }, [job]);
 
-  const portal = sale
+  const printReceipt = (sale: RetailSale) => setJob({ sale, width: paperWidth });
+  const portal = job
     ? createPortal(
-        <div id="retail-receipt-print-root">
-          <RetailReceipt sale={sale} companyName={companyName} locationName={locationName} />
+        <div
+          id="retail-receipt-print-root"
+          style={{
+            "--rr-paper-width": job.width + "mm",
+            "--rr-side-padding": job.width === 80 ? "3.5mm" : "2.5mm",
+            "--rr-font-size": job.width === 80 ? "10pt" : "8.5pt",
+            "--rr-title-size": job.width === 80 ? "14pt" : "12pt",
+          } as CSSProperties}
+        >
+          <RetailReceipt sale={job.sale} companyName={companyName} locationName={locationName} />
         </div>,
         document.body
       )
     : null;
 
-  return { printReceipt: setSale, portal };
+  return { printReceipt, portal, paperWidth, setPaperWidth: changePaperWidth };
 }
