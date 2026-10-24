@@ -9,6 +9,7 @@ import { getErrorMessage } from "../lib/httpHandlers";
 interface CatalogQuery {
   search: string;
   brandId?: number;
+  noBrand: boolean;
   color: string;
   size: string;
   category: string;
@@ -72,6 +73,7 @@ function parseCatalogQuery(req: Request): CatalogQuery {
   return {
     search: normalize(req.query.search),
     brandId: positiveInteger(req.query.brandId),
+    noBrand: req.query.brandId === "none",
     color: normalize(req.query.color),
     size: normalize(req.query.size),
     category: normalize(req.query.category),
@@ -152,8 +154,13 @@ function buildCatalogWhere(companyId: number, query: CatalogQuery) {
       )
     )`);
   }
-  if (query.brandId) where.push(`p.brand_id = ${add(query.brandId)}`);
-  if (query.category) where.push(`LOWER(COALESCE(p.category, '')) = ${add(query.category)}`);
+  if (query.noBrand) where.push("p.brand_id IS NULL");
+  else if (query.brandId) where.push(`p.brand_id = ${add(query.brandId)}`);
+  if (query.category === "__uncategorized__") {
+    where.push("NULLIF(BTRIM(p.category), '') IS NULL");
+  } else if (query.category) {
+    where.push(`LOWER(BTRIM(p.category)) = ${add(query.category)}`);
+  }
   if (query.color) {
     where.push(`EXISTS (
       SELECT 1
@@ -377,6 +384,64 @@ export function registerRetailCatalogRoutes(app: Express): void {
       return;
     } catch (error: unknown) {
       return res.status(500).json({ message: getErrorMessage(error) });
+    }
+  });
+
+  // Location → category → brand browsing. Group the complete filtered catalog on the
+  // server, not a paginated slice, so brands and categories never disappear on page 2.
+  app.get("/api/retail/catalog-navigation", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = await requireRetailCompany(req, res);
+      if (!companyId) return;
+      const query = parseCatalogQuery(req);
+      // Category and brand are drill-down selections; navigation must enumerate all
+      // matches at the selected location under the other active search/stock filters.
+      const where = buildCatalogWhere(companyId, { ...query, category: "", brandId: undefined, noBrand: false });
+      const result = await pool.query<{
+        category_key: string;
+        category_name: string;
+        brand_id: number | null;
+        brand_name: string;
+        product_count: string;
+      }>(
+        `SELECT
+           COALESCE(LOWER(NULLIF(BTRIM(p.category), '')), '__uncategorized__') AS category_key,
+           COALESCE(MIN(NULLIF(BTRIM(p.category), '')), 'Uncategorized') AS category_name,
+           p.brand_id AS brand_id,
+           COALESCE(b.name, 'Other / No Brand') AS brand_name,
+           COUNT(*)::text AS product_count
+         FROM retail_products p
+         LEFT JOIN retail_brands b ON b.id = p.brand_id AND b.company_id = p.company_id
+         WHERE ${where.text}
+         GROUP BY COALESCE(LOWER(NULLIF(BTRIM(p.category), '')), '__uncategorized__'),
+                  p.brand_id, b.name
+         ORDER BY category_name, brand_name`,
+        where.params
+      );
+      const categories = new Map<string, {
+        key: string;
+        name: string;
+        productCount: number;
+        brands: Array<{ key: string; id: number | null; name: string; productCount: number }>;
+      }>();
+      for (const row of result.rows) {
+        let category = categories.get(row.category_key);
+        if (!category) {
+          category = { key: row.category_key, name: row.category_name, productCount: 0, brands: [] };
+          categories.set(row.category_key, category);
+        }
+        const count = Number(row.product_count);
+        category.productCount += count;
+        category.brands.push({
+          key: row.brand_id === null ? "none" : String(row.brand_id),
+          id: row.brand_id,
+          name: row.brand_name,
+          productCount: count,
+        });
+      }
+      res.json({ categories: [...categories.values()] });
+    } catch (error) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
