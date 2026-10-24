@@ -87,10 +87,12 @@ export default function RetailPOS() {
   const locations = (locationsQuery.data ?? [])
     .filter((location) => location.id > 0)
     .filter((location) => !isPosRole || location.id === assignedLocationId);
-  const { printReceipt, portal: receiptPortal } = useRetailReceiptPrinter(
-    selectedCompany?.name,
-    selectedLocation?.name
-  );
+  const {
+    printReceipt,
+    portal: receiptPortal,
+    paperWidth: receiptPaperWidth,
+    setPaperWidth: setReceiptPaperWidth,
+  } = useRetailReceiptPrinter(selectedCompany?.name, selectedLocation?.name);
 
   const focusScan = useCallback(() => {
     window.setTimeout(() => scanInputRef.current?.focus({ preventScroll: true }), 30);
@@ -702,7 +704,14 @@ export default function RetailPOS() {
             >
               {saleMutation.isPending ? "Completing sale…" : "Complete Sale"}
             </Button>
-            {lastSale && <RetailLastSaleSummary sale={lastSale} onPrint={() => printReceipt(lastSale)} />}
+            {lastSale && (
+              <RetailLastSaleSummary
+                sale={lastSale}
+                onPrint={() => printReceipt(lastSale)}
+                paperWidth={receiptPaperWidth}
+                onPaperWidthChange={setReceiptPaperWidth}
+              />
+            )}
           </div>
         </div>
         <RetailErpPosItemPicker
