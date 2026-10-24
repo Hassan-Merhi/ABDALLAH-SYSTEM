@@ -8,7 +8,7 @@ import {
   type RetailSupplierCatalogInput,
 } from "./retailSupplierCatalogPreview";
 
-export type RetailSupplierBarcodeAction = "reuse" | "supplier" | "generate";
+export type RetailSupplierBarcodeAction = "reuse" | "supplier" | "generate" | "conflict";
 export interface RetailSupplierBarcodeIntent {
   action: RetailSupplierBarcodeAction;
   /** Existing or supplied literal barcode; null means reserved at confirmation only. */
@@ -32,7 +32,7 @@ export function describeRetailSupplierBarcode(
   decision: RetailSupplierCatalogDecision
 ): RetailSupplierBarcodeIntent {
   if (decision.status === "conflict") {
-    return { action: "generate", barcode: null, message: "Resolve catalog conflicts before assigning a barcode" };
+    return { action: "conflict", barcode: null, message: "Resolve catalog conflicts before assigning a barcode" };
   }
   if (decision.status === "existing-variant") {
     return {
