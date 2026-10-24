@@ -303,8 +303,8 @@ describeWithDatabase("Retail Wave 2 — customers, pricing, discounts and tax", 
       companyId,
       code: `CUST-${created.body.code}`,
       accountType: "Asset",
-      openingBalance: "0",
     });
+    expect(Number(linkedAccount?.openingBalance)).toBe(0);
 
     const partyStats = await manager.get("/api/customers/stats");
     expect(partyStats.status).toBe(200);
