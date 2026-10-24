@@ -99,7 +99,7 @@ export function RetailShiftPanel({
   const shift = currentQuery.data ?? null;
   // When a shift is open its drawer account is fixed; otherwise the selected
   // POS Cash account (or configured location default) determines the balance.
-  const drawerAccountId = shift?.cashAccountId ?? cashAccountId ?? null;
+  const drawerAccountId = shift ? shift.cashAccountId : cashAccountId ?? null;
   const ledgerBalanceQuery = useQuery<DrawerLedgerBalance>({
     queryKey: ["retail-shift-ledger-balance", locationId, drawerAccountId],
     queryFn: async () => json<DrawerLedgerBalance>(
