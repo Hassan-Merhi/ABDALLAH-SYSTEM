@@ -4,7 +4,7 @@ import type { RetailSupplierImportRow } from "./retailSupplierImportDraft";
 
 const MAX_ZIP_BYTES = 50 * 1024 * 1024;
 const MAX_ZIP_UNCOMPRESSED_BYTES = 100 * 1024 * 1024;
-const MAX_ZIP_ENTRIES = 2000;
+const MAX_ZIP_ENTRIES = 6000;
 const VALID_EXTENSIONS = /\.(jpe?g|png|webp|gif)$/i;
 const MIME: Record<string, string> = {
   jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png",
@@ -44,12 +44,12 @@ export async function readRetailSupplierImageZip(file: File): Promise<RetailSupp
   const zip = await JSZip.loadAsync(await file.arrayBuffer(), { createFolders: false });
   const entries = Object.values(zip.files).filter(entry => !entry.dir &&
     !entry.name.startsWith("__MACOSX/") && !entry.name.endsWith(".DS_Store"));
-  if (entries.length > MAX_ZIP_ENTRIES) throw new Error("ZIP contains too many files (maximum 2,000).");
+  if (entries.length > MAX_ZIP_ENTRIES) throw new Error("ZIP contains too many files (maximum 6,000).");
   const images = new Map<string, File>();
   let declaredBytes = 0;
   for (const entry of entries) {
     // JSZip sanitizes paths. Reject originally unsafe paths instead of allowing ambiguous names.
-    const original = entry.unsafeOriginalName ?? entry.name;
+    const original = (entry as typeof entry & { unsafeOriginalName?: string }).unsafeOriginalName ?? entry.name;
     if (/^(?:\/|[a-z]:)/i.test(original) || original.split(/[\\/]/).some(part => part === ".." || !part)) {
       throw new Error(`Unsafe image path in ZIP: ${entry.name}`);
     }
