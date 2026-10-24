@@ -233,7 +233,7 @@ export function RetailSupplierImportDialog({
       ...issueRows.map(({ row, issues }) => [
         row.rowNumber, row.name, row.brand, issues.join("; "),
       ].map(csvCell).join(",")),
-    ].join("\\r\\n");
+    ].join("\r\n");
     const href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const anchor = document.createElement("a");
     anchor.href = href;
