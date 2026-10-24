@@ -272,7 +272,40 @@ before implementing safe automatic cleanup.
 
 No CI, tests, merge, rebase, deployment or database changes were run.
 
-## Phase 7: remaining implementation contract
+## Phase 7 — Final source-level integration and handoff (committed)
+
+- Reconciled the supplier-import confirmation path with the existing Retail
+  product/variant catalog, company-scoped EAN-13 allocation, POS scanner,
+  Retail stock movement and weighted-average cost ledger, central ERP voucher
+  posting, supplier balance and standard ERP Payment workflow.
+- Removed the **Legacy Import** button from Retail Inventory, preventing casual
+  bypass of supplier credit accounting. The legacy endpoint remains available
+  for backward compatibility; review its access controls before deployment.
+- Hardened confirmation: transaction valuation and historical accounting
+  entries now use the exchange rate **rounded to the voucher schema's stored
+  six decimal places**, avoiding disagreement between the persisted voucher
+  rate and stock/accounting calculations. Out-of-range rates/totals fail.
+- Aligned client import field limits with server validation; numeric Excel
+  SKU/Barcode cells are rejected to prevent corruption of leading zeroes.
+- Made Retail POS selling-price currency explicitly **USD**, separate from
+  supplier invoice **Cost Price** currency. Receipt labels show USD for price.
+- Validated company-owned invoice/media upload file signatures server-side
+  using bounded database header reads instead of trusting the stored MIME.
+- Added compact persisted supplier receipt list totals, avoiding fetching
+  thousands of full lines when listing import history; full receipt detail
+  retains immutable line metadata for reconciliation and reprinting.
+- Added `tests/retail-supplier-import-final-integration.test.ts` for later
+  Claude execution (barcode text safety, schema limits and media signatures).
+- Prepared the integration checklist, current branch-drift precautions,
+  remaining upload cleanup boundary and precise Claude validation instructions
+  in `docs/retail-supplier-stock-import-phase7-handoff.md`.
+
+**Status:** All seven phases have source changes committed to
+`feature/retail-supplier-stock-import-20261024`. No CI, tests, merge, rebase,
+deployment or production accounting mutations were performed. Claude must
+verify and reconcile with concurrent main changes **before** release.
+
+## Reference checklist and deferred checks
 
 **Phase 2 reference checklist — Product and image import engine**
 
