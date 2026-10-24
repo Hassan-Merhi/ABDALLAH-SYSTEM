@@ -292,6 +292,7 @@ export function RetailSupplierImportDialog({
     setRows([]);
     setFileName("");
     setDeliveryReference("");
+    if (!partialReceipt) setInvoiceReference("");
     setPhotoArchive(null);
     setPhotoArchiveName("");
     uploadedPhotoCache.current.clear();
@@ -464,10 +465,15 @@ export function RetailSupplierImportDialog({
     <Dialog open={open && !receiptLabelsOpen && !historyOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <FileSpreadsheet className="h-5 w-5" />
-            Supplier Stock Import
-          </DialogTitle>
+          <div className="flex items-center justify-between gap-2">
+            <DialogTitle className="flex items-center gap-2">
+              <FileSpreadsheet className="h-5 w-5" />
+              Supplier Stock Import
+            </DialogTitle>
+            <Button type="button" size="sm" variant="outline" onClick={() => setHistoryOpen(true)}>
+              <History className="mr-2 h-4 w-4" />Import history
+            </Button>
+          </div>
         </DialogHeader>
         <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-100">
           <strong>Supplier stock import.</strong> Confirming receives additional units,
@@ -527,6 +533,57 @@ export function RetailSupplierImportDialog({
               </select>
             </div>
           </div>
+          <div className="space-y-2 md:col-span-2">
+            <label htmlFor="retail-supplier-partial" className="flex cursor-pointer items-start gap-2 text-sm">
+              <input id="retail-supplier-partial" type="checkbox" className="mt-1"
+                checked={partialReceipt} onChange={event => {
+                  setPartialReceipt(event.target.checked); setDeliveryReference("");
+                  setPurchaseResult(null);
+                  setPostingError("");
+                  setImportKey(`retail-supplier-${crypto.randomUUID()}`);
+                }} />
+              <span>
+                <strong>Partial delivery against this supplier invoice</strong>
+                <span className="block text-xs text-muted-foreground">
+                  Use only the actually received units in this Excel file. Each shipment
+                  needs a unique delivery reference; earlier delivered stock and debt remain unchanged.
+                </span>
+              </span>
+            </label>
+            {partialReceipt && (
+              <div className="space-y-1">
+                <Label htmlFor="retail-supplier-delivery">Delivery / packing list reference *</Label>
+                <Input id="retail-supplier-delivery" value={deliveryReference} maxLength={100}
+                  placeholder="DELIVERY-001" onChange={event => {
+                    setDeliveryReference(event.target.value); setPurchaseResult(null);
+                    setPostingError("");
+                    setImportKey(`retail-supplier-${crypto.randomUUID()}`);
+                  }} />
+              </div>
+            )}
+          </div>
+          <div className="space-y-1.5 md:col-span-2">
+            <Label htmlFor="retail-supplier-invoice-file">Supplier invoice attachment (optional)</Label>
+            <Input id="retail-supplier-invoice-file" type="file" accept=".pdf,.jpg,.jpeg,.png"
+              onChange={event => {
+                const file = event.target.files?.[0] ?? null;
+                const valid = !file || (
+                  /\.(pdf|jpe?g|png)$/i.test(file.name) &&
+                  ["application/pdf", "image/jpeg", "image/png"].includes(file.type) &&
+                  file.size > 0 && file.size <= 10 * 1024 * 1024
+                );
+                setInvoiceFile(valid ? file : null);
+                setInvoiceFileError(valid ? "" : "Use a PDF, JPG or PNG invoice, maximum 10 MB.");
+                uploadedInvoiceCache.current = null;
+                setPurchaseResult(null);
+                setPostingError("");
+                setImportKey(`retail-supplier-${crypto.randomUUID()}`);
+              }} />
+            {invoiceFile && <p className="text-xs text-muted-foreground">
+              <FileText className="mr-1 inline h-3 w-3" />{invoiceFile.name} — saved with the receipt
+            </p>}
+            {invoiceFileError && <p role="alert" className="text-xs text-destructive">{invoiceFileError}</p>}
+          </div>
           {needsRate && (
             <div className="space-y-1.5">
               <Label htmlFor="retail-supplier-exchange">Historical exchange rate *</Label>
@@ -561,13 +618,13 @@ export function RetailSupplierImportDialog({
           <div className="grid gap-3 md:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="retail-supplier-excel">2. Upload Excel / CSV *</Label>
-              <Input id="retail-supplier-excel" type="file" accept=".xlsx,.csv"
+              <Input key={importKey} id="retail-supplier-excel" type="file" accept=".xlsx,.csv"
                 onChange={event => void handleSpreadsheet(event.target.files?.[0])} disabled={busy} />
               {fileName && <p className="text-xs text-muted-foreground">{fileName}</p>}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="retail-supplier-photos">3. Product image ZIP (optional)</Label>
-              <Input id="retail-supplier-photos" type="file" accept=".zip" disabled={photoBusy}
+              <Input key={importKey} id="retail-supplier-photos" type="file" accept=".zip" disabled={photoBusy}
                 onChange={event => void handlePhotoArchive(event.target.files?.[0])} />
               <p className="text-xs text-muted-foreground">
                 <ImageIcon className="mr-1 inline h-3 w-3" />
@@ -692,6 +749,24 @@ export function RetailSupplierImportDialog({
           </div>
         )}
         {uploadProgress && <p className="text-xs text-muted-foreground">{uploadProgress}</p>}
+        {postingError && !purchaseResult && (
+          <div role="alert" className="space-y-2 rounded-md border border-destructive/40 p-3 text-sm">
+            <div className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <strong>Supplier import needs attention</strong>
+            </div>
+            <p>{postingError}</p>
+            <p className="text-xs text-muted-foreground">
+              Your Excel and uploaded pictures are retained for retry. If the request lost
+              its response after posting, check the saved receipt before retrying. Do not
+              change the invoice or request key until you know its status.
+            </p>
+            <Button type="button" size="sm" variant="outline"
+              onClick={() => void checkPurchaseStatus()}>
+              <ShieldCheck className="mr-2 h-4 w-4" />Check whether receipt was posted
+            </Button>
+          </div>
+        )}
         {purchaseResult && (
           <div className="rounded-md border p-3 text-sm">
             <strong>Purchase successfully recorded.</strong> Voucher #{purchaseResult.voucherId} ·
@@ -707,6 +782,11 @@ export function RetailSupplierImportDialog({
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Close
           </Button>
+          {purchaseResult && (
+            <Button type="button" variant="outline" onClick={startNextDelivery}>
+              {partialReceipt ? "Start next delivery" : "New supplier import"}
+            </Button>
+          )}
           {purchaseResult && receiptLabelItems.length > 0 && (
             <Button type="button" variant="outline"
               onClick={() => setReceiptLabelsOpen(true)}>
@@ -720,6 +800,16 @@ export function RetailSupplierImportDialog({
         </div>
       </DialogContent>
     </Dialog>
+    <RetailSupplierImportHistory
+      open={historyOpen}
+      onOpenChange={setHistoryOpen}
+      companyId={companyId}
+      onReprint={items => {
+        setReceiptLabelItems(items);
+        setHistoryOpen(false);
+        setReceiptLabelsOpen(true);
+      }}
+    />
     <RetailLabelPrintDialog
       open={receiptLabelsOpen}
       onOpenChange={setReceiptLabelsOpen}
