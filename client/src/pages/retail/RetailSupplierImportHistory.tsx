@@ -182,7 +182,7 @@ export function RetailSupplierImportHistory({
             </div>
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted-foreground">
-                Showing {offset + 1}–{offset + data.rows.length} of matching records
+                Showing {data.rows.length ? offset + 1 : 0}–{offset + data.rows.length} of matching records
                 {data.nextOffset !== null ? " (more available)" : ""}
               </span>
               <div className="flex gap-2">
