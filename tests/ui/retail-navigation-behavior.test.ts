@@ -39,7 +39,7 @@ describe("Retail navigation", () => {
 
   it("redirects legacy Transfer Order links to Retail Vouchers, for Retail only", () => {
     expect(route("/stock-transfer-order", "retail")).toEqual({ kind: "redirect", to: "/vouchers?tab=transfer" });
-    expect(route("/stock-transfer-order/12", "retail")).toEqual({ kind: "redirect", to: "/retail/stock" });
+    expect(route("/stock-transfer-order/12", "retail")).toEqual({ kind: "redirect", to: "/vouchers?tab=transfer" });
     expect(route("/stock-transfer-order", "erp")).toEqual({ kind: "continue" });
   });
 });
