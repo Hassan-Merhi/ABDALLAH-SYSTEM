@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { ImportDialog } from "./RetailImportDialog";
+
 import { RetailSupplierImportDialog } from "./RetailSupplierImportDialog";
 import { ProductEditor } from "./RetailProductEditor";
 import { ProductImageGallery } from "./RetailProductImage";
@@ -35,7 +35,6 @@ export default function RetailInventory() {
   const [, navigate] = useLocation();
   const [detailMatch, detailParams] = useRoute("/retail/products/:id");
   const [editorOpen, setEditorOpen] = useState(false);
-  const [importOpen, setImportOpen] = useState(false);
   const [supplierImportOpen, setSupplierImportOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<RetailProduct | null>(null);
   const [search, setSearch] = useState("");
@@ -369,9 +368,6 @@ export default function RetailInventory() {
           <Button onClick={() => setSupplierImportOpen(true)}>
             <Upload className="mr-2 h-4 w-4" /> Supplier Stock Import
           </Button>
-          <Button variant="outline" onClick={() => setImportOpen(true)} title="Legacy direct stock import: does not post supplier payable">
-            <Upload className="mr-2 h-4 w-4" /> Legacy Import
-          </Button>
           <Button
             variant="outline"
             onClick={() => {
@@ -652,7 +648,6 @@ export default function RetailInventory() {
         brands={brands}
         locations={locations}
       />
-      <ImportDialog open={importOpen} onOpenChange={setImportOpen} />
       <RetailSupplierImportDialog open={supplierImportOpen} onOpenChange={setSupplierImportOpen} />
       {bulkBar}
       {actionDialogs}
