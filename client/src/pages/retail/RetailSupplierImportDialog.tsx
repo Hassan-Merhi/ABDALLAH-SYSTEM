@@ -663,7 +663,11 @@ export function RetailSupplierImportDialog({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <h3 className="text-sm font-semibold">1. Download the supplier Excel template</h3>
-              <p className="text-xs text-muted-foreground">One line per product color/size, with unit quantity and cost.</p>
+              <p className="text-xs text-muted-foreground">
+                One line per product color/size. Cost Price is in the supplier invoice currency;
+                Selling Price is the Retail POS price in USD. Keep SKU and Barcode columns
+                formatted as Text to preserve leading zeros.
+              </p>
             </div>
             <Button type="button" variant="outline" size="sm" onClick={() =>
               downloadSupplierTemplate().catch(error => toast({
@@ -815,7 +819,7 @@ export function RetailSupplierImportDialog({
             </p>}
             <p className="text-xs text-muted-foreground">
               {readyForPosting
-                ? "Ready to receive the purchase and credit the selected supplier. Confirm only after verifying the supplier's invoice."
+                ? "Ready to receive the purchase and credit the selected supplier. Verify invoice-currency costs and USD retail selling prices before confirming."
                 : "Select a supplier/location/reference and resolve spreadsheet, image, rate and catalog conflicts before posting."}
             </p>
           </div>
@@ -893,6 +897,7 @@ export function RetailSupplierImportDialog({
       open={receiptLabelsOpen}
       onOpenChange={setReceiptLabelsOpen}
       items={receiptLabelItems}
+      currency="USD"
       purpose="supplier-receipt"
     />
     </>
