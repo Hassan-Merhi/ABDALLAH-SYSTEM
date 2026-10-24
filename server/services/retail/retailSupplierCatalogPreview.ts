@@ -29,7 +29,7 @@ export interface RetailSupplierCatalogDecision {
   existingBarcode: string | null;
   messages: string[];
 }
-type Snapshot = {
+export type RetailSupplierCatalogSnapshot = {
   productId: number;
   productCode: string;
   productName: string;
@@ -52,7 +52,7 @@ function makeProductCode(name: string, brand: string) {
 }
 
 /** Pure catalog resolver; no writes, so duplicate/conflict decisions can be previewed safely. */
-export function planRetailSupplierCatalog(rows: RetailSupplierCatalogInput, existing: Snapshot[]) {
+export function planRetailSupplierCatalog(rows: RetailSupplierCatalogInput, existing: RetailSupplierCatalogSnapshot[]) {
   const products = new Map<number, Product>();
   const variants = new Map<number, Variant>();
   const productsByIdentity = new Map<string, Product[]>();
@@ -186,9 +186,15 @@ export function planRetailSupplierCatalog(rows: RetailSupplierCatalogInput, exis
   };
 }
 
-/** Read-only company-scoped catalog snapshot; final transactional receiving must re-resolve it. */
-export async function previewRetailSupplierCatalog(companyId: number, rows: RetailSupplierCatalogInput) {
-  const existing = await db
+/**
+ * Shared catalog reader: Phase 3 finalization uses the SAME logic inside its
+ * future purchase transaction. Preview results must never be trusted at posting time.
+ */
+export async function loadRetailSupplierCatalogSnapshot(
+  executor: Pick<typeof db, "select">,
+  companyId: number
+): Promise<RetailSupplierCatalogSnapshot[]> {
+  return executor
     .select({
       productId: retailProducts.id, productCode: retailProducts.code,
       productName: retailProducts.name, category: retailProducts.category,
@@ -200,5 +206,10 @@ export async function previewRetailSupplierCatalog(companyId: number, rows: Reta
     .leftJoin(retailBrands, eq(retailProducts.brandId, retailBrands.id))
     .leftJoin(retailProductVariants, eq(retailProductVariants.productId, retailProducts.id))
     .where(eq(retailProducts.companyId, companyId));
+}
+
+/** Read-only company-scoped catalog preview, no barcode sequences reserved. */
+export async function previewRetailSupplierCatalog(companyId: number, rows: RetailSupplierCatalogInput) {
+  const existing = await loadRetailSupplierCatalogSnapshot(db, companyId);
   return planRetailSupplierCatalog(rows, existing);
 }
