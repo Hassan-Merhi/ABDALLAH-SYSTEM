@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { uploadRetailPhoto } from "./retailPhotoUpload";
-import { AlertTriangle, FileSpreadsheet, Image as ImageIcon, Package } from "lucide-react";
+import { RetailLabelPrintDialog } from "./retailLabels";
+import { buildRetailSupplierReceiptLabelItems, type RetailSupplierReceiptLabelItem } from "./retailSupplierReceiptLabels";
+import { AlertTriangle, FileSpreadsheet, Image as ImageIcon, Package, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -129,6 +131,8 @@ export function RetailSupplierImportDialog({
   const [uploadProgress, setUploadProgress] = useState("");
   const uploadedPhotoCache = useRef<Map<File, string>>(new Map());
   const [purchaseResult, setPurchaseResult] = useState<SupplierPurchaseResult | null>(null);
+  const [receiptLabelItems, setReceiptLabelItems] = useState<RetailSupplierReceiptLabelItem[]>([]);
+  const [receiptLabelsOpen, setReceiptLabelsOpen] = useState(false);
   const [invoiceReference, setInvoiceReference] = useState("");
   const [invoiceDate, setInvoiceDate] = useState(localISODate);
   const [fileName, setFileName] = useState("");
@@ -152,6 +156,8 @@ export function RetailSupplierImportDialog({
     setRows([]);
     setFileError("");
     setPurchaseResult(null);
+    setReceiptLabelItems([]);
+    setReceiptLabelsOpen(false);
     setImportKey(`retail-supplier-${typeof crypto !== "undefined" && "randomUUID" in crypto
       ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`}`);
   }, [companyId]);
@@ -253,6 +259,16 @@ export function RetailSupplierImportDialog({
     onSuccess: result => {
       setPurchaseResult(result);
       setUploadProgress("");
+      // Receipt units are returned by the committed backend operation. Never
+      // derive print copies from current on-hand stock or scanned Excel totals.
+      try {
+        const labels = buildRetailSupplierReceiptLabelItems(result.items, rows);
+        setReceiptLabelItems(labels);
+        if (labels.length) setReceiptLabelsOpen(true);
+      } catch (error) {
+        toast({ title: "Purchase saved; labels need attention",
+          description: error instanceof Error ? error.message : String(error), variant: "destructive" });
+      }
       queryClient.invalidateQueries({ queryKey: ["retail-products"] });
       queryClient.invalidateQueries({ queryKey: ["retail-catalog-navigation"] });
       queryClient.invalidateQueries({ queryKey: ["retail-catalog-facets"] });
@@ -362,7 +378,8 @@ export function RetailSupplierImportDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <>
+    <Dialog open={open && !receiptLabelsOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -371,10 +388,9 @@ export function RetailSupplierImportDialog({
           </DialogTitle>
         </DialogHeader>
         <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-100">
-          <strong>Phase 4 — supplier credit purchase.</strong> Review supplier, pictures,
-          stock and barcodes before confirming. The confirmed import receives additional stock
-          and posts a balanced inventory debit and supplier payable credit in one transaction.
-          Printing labels for received quantities comes in Phase 5.
+          <strong>Supplier stock import.</strong> Confirming receives additional units,
+          posts the inventory debit and supplier payable credit together, then opens the
+          barcode label dialog with one label per unit received (in printable batches).
           The selected Retail company must have completed its inventory accounting opening
           before importing supplier purchases.
         </div>
@@ -600,7 +616,8 @@ export function RetailSupplierImportDialog({
             {" "}{purchaseResult.items.length} variants ·
             {" "}{purchaseResult.currency} {purchaseResult.purchaseTotal} credited to supplier.
             <p className="text-xs text-muted-foreground">
-              Barcodes are saved. Automatic print popup for these received items arrives in Phase 5.
+              Barcodes are saved. You can print or skip received-unit labels without
+              affecting the posted stock or supplier balance.
             </p>
           </div>
         )}
@@ -608,6 +625,12 @@ export function RetailSupplierImportDialog({
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Close
           </Button>
+          {purchaseResult && receiptLabelItems.length > 0 && (
+            <Button type="button" variant="outline"
+              onClick={() => setReceiptLabelsOpen(true)}>
+              <Printer className="mr-2 h-4 w-4" />Print received labels
+            </Button>
+          )}
           <Button type="button" disabled={!readyForPosting || saveMutation.isPending || Boolean(purchaseResult)}
             onClick={() => saveMutation.mutate()}>
             {saveMutation.isPending ? "Processing…" : purchaseResult ? "Purchase recorded" : "Confirm supplier purchase"}
@@ -615,5 +638,12 @@ export function RetailSupplierImportDialog({
         </div>
       </DialogContent>
     </Dialog>
+    <RetailLabelPrintDialog
+      open={receiptLabelsOpen}
+      onOpenChange={setReceiptLabelsOpen}
+      items={receiptLabelItems}
+      purpose="supplier-receipt"
+    />
+    </>
   );
 }
