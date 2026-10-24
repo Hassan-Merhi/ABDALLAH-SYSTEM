@@ -278,10 +278,10 @@ a 390×844 touch phone viewport:
 
 - ~~Per-location authorization~~ — resolved: non-manager roles may only ship from,
   receive at, or immediately move between their assigned Retail locations.
-- **Receivables paid later through ERP receipts:** returns reverse the sale's own unpaid
-  credit tender first even if the customer has since paid their account through an ERP
-  Receipt voucher; the customer then holds an account credit rather than receiving cash.
-  Accounting stays correct; a cashier may still need to pay cash manually.
+- ~~Receivables paid later through ERP receipts~~ — owner decision (2026-10-24): keep
+  it. The return credits the customer's account; a cash payout, if wanted, is an ERP
+  Payment voucher to the customer. Documented in `retail-pos-inventory-workflow.md`
+  (Phase 4).
 - ~~Repository-wide toolchain and `wave17c-rates` failures~~ — resolved by merging
   `main`, which aligned `render.yaml` on Node 24.22.1; both now pass on this branch.
 - A physical camera scanner and receipt printer still need a check on real hardware.

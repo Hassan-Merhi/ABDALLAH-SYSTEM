@@ -115,6 +115,15 @@ guards and existing ERP POS behavior before merging or deployment.
   cash receipts are introduced.
 - A credit return/cancellation reverses uncollected receivables first, then returns
   any remaining real payment amount, using the same original sale's customer ID.
+- **Owner decision (2026-10-24): returns on credit sales settled through ERP.** The
+  "uncollected" amount is the sale's own credit tender, not the customer's live ERP
+  balance. If the customer has since paid their account with an ERP Receipt voucher,
+  a later return still reverses that sale's credit tender (Cr customer), so the
+  customer's account moves into credit by the returned value. No cash leaves the
+  Retail drawer. This is intended: the books stay correct and the customer can use
+  the credit on later purchases. If the customer wants cash instead, staff record it
+  with a normal ERP **Payment** voucher to that customer (Dr customer, Cr cash/bank),
+  which clears the account credit.
   Changing a posted credit sale's customer ID through the existing receipt-edit
   API is blocked; it would otherwise leave accounting on the old customer.
 - Retail payment validation accepts `null` cash-tendered amount on credit, card
