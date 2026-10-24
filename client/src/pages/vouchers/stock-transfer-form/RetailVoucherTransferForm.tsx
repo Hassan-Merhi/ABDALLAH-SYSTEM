@@ -42,6 +42,7 @@ export function RetailVoucherTransferForm({ isPOS = false }: { isPOS?: boolean }
   const [scanning, setScanning] = useState(false);
   const scanInput = useRef<HTMLInputElement>(null);
   const scanInFlight = useRef(false);
+  const pendingBarcodes = useRef<string[]>([]);
 
   const { data: locations = [], isLoading: locationsLoading } = useQuery<Location[]>({
     queryKey: ["/api/locations", selectedCompany?.id],
@@ -80,15 +81,11 @@ export function RetailVoucherTransferForm({ isPOS = false }: { isPOS?: boolean }
         toast({ title: "Out of stock at the selected source", description: item.name, variant: "destructive" });
         return;
       }
-      let limitReached = false;
       setLines((current) => {
         const existing = current.find((line) => line.item.variantId === item.variantId);
+        if (existing && existing.quantity + 1 > stock) return current;
         if (!existing) {
           return [...current, { item, quantity: 1, requestKey: makeKey("retail-voucher-transfer") }];
-        }
-        if (existing.quantity + 1 > stock) {
-          limitReached = true;
-          return current;
         }
         return current.map((line) =>
           line.item.variantId === item.variantId
@@ -96,9 +93,6 @@ export function RetailVoucherTransferForm({ isPOS = false }: { isPOS?: boolean }
             : line
         );
       });
-      if (limitReached) {
-        toast({ title: "Not enough stock at source", description: `Available: ${stock}`, variant: "destructive" });
-      }
     },
     [sourceId, toast]
   );
@@ -106,29 +100,38 @@ export function RetailVoucherTransferForm({ isPOS = false }: { isPOS?: boolean }
   const handleScan = useCallback(
     async (raw: string) => {
       const barcode = raw.trim();
-      if (!barcode || !sourceId || saving || scanInFlight.current) return;
+      if (!barcode || !sourceId || saving) return;
+      // Queue quick back-to-back scans instead of silently dropping a second
+      // barcode while the first request is still in flight.
+      pendingBarcodes.current.push(barcode);
+      if (scanInFlight.current) return;
       scanInFlight.current = true;
       setScanning(true);
       try {
-        const result = await lookupRetailBarcode(barcode, sourceId);
-        if (result.kind === "unknown") {
-          scanBeep(false);
-          toast({ title: "Barcode not found", description: barcode, variant: "destructive" });
-        } else if (result.kind === "inactive") {
-          scanBeep(false);
-          toast({ title: "This variant is archived", description: barcode, variant: "destructive" });
-        } else {
-          addItem(result.item);
-          scanBeep(availableQty(result.item) >= 1);
-          setSearch("");
+        while (pendingBarcodes.current.length) {
+          const nextBarcode = pendingBarcodes.current.shift()!;
+          try {
+            const result = await lookupRetailBarcode(nextBarcode, sourceId);
+            if (result.kind === "unknown") {
+              scanBeep(false);
+              toast({ title: "Barcode not found", description: nextBarcode, variant: "destructive" });
+            } else if (result.kind === "inactive") {
+              scanBeep(false);
+              toast({ title: "This variant is archived", description: nextBarcode, variant: "destructive" });
+            } else {
+              addItem(result.item);
+              scanBeep(availableQty(result.item) >= 1);
+              setSearch("");
+            }
+          } catch (error) {
+            scanBeep(false);
+            toast({
+              title: "Couldn't scan the item",
+              description: error instanceof Error ? error.message : "Try again.",
+              variant: "destructive",
+            });
+          }
         }
-      } catch (error) {
-        scanBeep(false);
-        toast({
-          title: "Couldn't scan the item",
-          description: error instanceof Error ? error.message : "Try again.",
-          variant: "destructive",
-        });
       } finally {
         scanInFlight.current = false;
         setScanning(false);
@@ -233,7 +236,7 @@ export function RetailVoucherTransferForm({ isPOS = false }: { isPOS?: boolean }
               setLines([]);
               setSearch("");
             }}
-            disabled={saving}
+            disabled={saving || scanning}
           >
             <SelectTrigger className="w-40" data-testid="retail-transfer-source">
               <SelectValue placeholder="Source location" />
