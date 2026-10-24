@@ -74,8 +74,10 @@ export function parseRetailSupplierImportRows(sources: SourceRow[]): RetailSuppl
     const mainImage = asText(field(values, "Main Image", "Image", "ImageUrl", "VariantImageUrl"));
     const extraImageInput = asText(field(values, "Extra Images"));
     const extraImages = extraImageInput.split(/[;,|]/).map(value => value.trim()).filter(Boolean);
-    const sku = asText(field(values, "SKU", "Code"));
-    const barcode = asText(field(values, "Barcode"));
+    const rawSku = field(values, "SKU", "Code");
+    const rawBarcode = field(values, "Barcode");
+    const sku = asText(rawSku);
+    const barcode = asText(rawBarcode);
     const description = asText(field(values, "Description"));
     const quantity = Number(qtyInput);
     const costPrice = validPrice(costInput);
@@ -83,6 +85,10 @@ export function parseRetailSupplierImportRows(sources: SourceRow[]): RetailSuppl
 
     if (!name) errors.push("Item Name is required");
     if (!category) errors.push("Category is required");
+    // Excel numeric cells silently remove leading zeroes and can round long
+    // identifiers. Require explicit text for all scanner identities.
+    if (typeof rawSku === "number") errors.push("SKU was stored as a number in Excel; format the column as Text and restore its original digits");
+    if (typeof rawBarcode === "number") errors.push("Barcode was stored as a number in Excel; format the column as Text and restore its original digits");
     if (!Number.isSafeInteger(quantity) || quantity <= 0 || quantity > 100000) {
       errors.push("Quantity must be an integer from 1 to 100,000");
     }
@@ -92,10 +98,11 @@ export function parseRetailSupplierImportRows(sources: SourceRow[]): RetailSuppl
       errors.push("Barcode must be 4–191 letters, digits or hyphens");
     }
     if (sku.length > 191) errors.push("SKU must be 191 characters or fewer");
-    if (name.length > 255) errors.push("Item Name must be 255 characters or fewer");
-    if (brand.length > 150) errors.push("Brand must be 150 characters or fewer");
-    if (category.length > 150) errors.push("Category must be 150 characters or fewer");
+    if (name.length > 240) errors.push("Item Name must be 240 characters or fewer");
+    if (brand.length > 120) errors.push("Brand must be 120 characters or fewer");
+    if (category.length > 160) errors.push("Category must be 160 characters or fewer");
     if (size.length > 100 || color.length > 100) errors.push("Size and Color must be 100 characters or fewer");
+    if (description.length > 5000) errors.push("Description must be 5000 characters or fewer");
 
     const variantKey = [sku ? normalizeIdentity(sku) : normalizeIdentity(brand) + "/" + normalizeIdentity(name),
       normalizeIdentity(color), normalizeIdentity(size)].join("|");
