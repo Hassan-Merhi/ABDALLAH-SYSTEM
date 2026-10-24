@@ -279,18 +279,9 @@ export function ContainersSectionPanel({ analytics }: { analytics: AnalyticsLega
                                   {isAllCompanies ? `${container.companyName} · ` : ""}
                                   {getDate(container)}
                                 </span>
-                              </div>
-                              <div className="flex justify-between gap-2 text-sm">
-                                <span className="text-muted-foreground">Grand Total</span>
-                                <span className="font-mono">{formatAmount(parseFloat(container.grandTotal || "0"))}</span>
-                              </div>
-                              <div className="flex justify-between gap-2 text-sm">
-                                <span className="text-muted-foreground">Offloading & Extras</span>
-                                <span className="font-mono">{formatAmount(parseFloat(container.offloadingCharges || "0"))}</span>
-                              </div>
-                              <div className="flex justify-between gap-2 border-t pt-2 text-sm font-semibold">
-                                <span>Total Container Cost</span>
-                                <span className="font-mono">{formatAmount(parseFloat(container.totalContainerCost || "0"))}</span>
+                                <span className="font-mono font-semibold">
+                                  {formatAmount(parseFloat(container.grandTotal))}
+                                </span>
                               </div>
                             </CardContent>
                           </Card>
@@ -300,7 +291,7 @@ export function ContainersSectionPanel({ analytics }: { analytics: AnalyticsLega
                             <span className="text-sm font-semibold">
                               {sg.supplierName} ({sg.containers.length})
                             </span>
-                            <span className="font-mono font-semibold text-sm">{formatAmount(sg.totalContainerCost)}</span>
+                            <span className="font-mono font-semibold text-sm">{formatAmount(sg.grandTotal)}</span>
                           </CardContent>
                         </Card>
                       </div>
@@ -308,7 +299,7 @@ export function ContainersSectionPanel({ analytics }: { analytics: AnalyticsLega
                     <Card className="bg-muted/50">
                       <CardContent className="p-4 flex items-center justify-between gap-2">
                         <span className="font-bold text-sm">TOTALS ({visibleContainers.length} containers)</span>
-                        <span className="font-mono font-semibold">{formatAmount(visibleTotalCost)}</span>
+                        <span className="font-mono font-semibold">{formatAmount(visibleGrandTotal)}</span>
                       </CardContent>
                     </Card>
                   </div>
