@@ -80,14 +80,23 @@ export async function postRetailSupplierPurchase(
 ) {
   const input = retailSupplierPurchaseSchema.parse(raw);
   const currency = normalizeCurrencyCode(input.currency);
-  const rate = currency === "USD" ? new Decimal(1) :
+  // vouchers.exchange_rate is NUMERIC(20,6); normalize entries and stock
+  // valuation against the exact rate that the voucher itself can persist.
+  // Otherwise a 10dp entry rate can disagree with the stored 6dp voucher rate.
+  const sourceRate = currency === "USD" ? new Decimal(1) :
     validateHistoricalRate(input.exchangeRate, "Supplier invoice currency units per USD");
-  const rateString = rate.toDecimalPlaces(10).toFixed(10);
+  const rate = sourceRate.toDecimalPlaces(6, Decimal.ROUND_HALF_UP);
+  if (!rate.isFinite() || rate.lte(0) || rate.gte("100000000000000")) {
+    throw new Error("Supplier exchange rate is outside the supported accounting voucher precision");
+  }
+  const rateString = rate.toFixed(6);
   const fingerprint = retailSupplierPurchaseFingerprint(input);
   const transactionTotal = input.lines.reduce(
     (sum, line) => sum.plus(new Decimal(line.quantity).times(line.costPrice)), new Decimal(0)
   ).toDecimalPlaces(6, Decimal.ROUND_HALF_UP);
-  if (transactionTotal.lte(0)) throw new Error("Supplier purchase total must be greater than zero");
+  if (transactionTotal.lte(0) || transactionTotal.gte("100000000000000")) {
+    throw new Error("Supplier purchase amount must be positive and fit the accounting ledger precision");
+  }
   const debit = normalizeVoucherEntryAmounts({
     transactionCurrency: currency, baseCurrency: "USD",
     transactionDebitAmount: transactionTotal.toFixed(6),
