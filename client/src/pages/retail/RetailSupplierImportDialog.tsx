@@ -815,22 +815,29 @@ export function RetailSupplierImportDialog({
           </div>
         )}
         {uploadProgress && <p className="text-xs text-muted-foreground">{uploadProgress}</p>}
-        {postingError && !purchaseResult && (
+        {postingError && (
           <div role="alert" className="space-y-2 rounded-md border border-destructive/40 p-3 text-sm">
             <div className="flex items-center gap-2 text-destructive">
               <AlertTriangle className="h-4 w-4" />
-              <strong>Supplier import needs attention</strong>
+              <strong>{purchaseResult ? "Posted receipt needs reconciliation" : "Supplier import needs attention"}</strong>
             </div>
             <p>{postingError}</p>
-            <p className="text-xs text-muted-foreground">
-              Your Excel and uploaded pictures are retained for retry. If the request lost
-              its response after posting, check the saved receipt before retrying. Do not
-              change the invoice or request key until you know its status.
-            </p>
-            <Button type="button" size="sm" variant="outline"
-              onClick={() => void checkPurchaseStatus()}>
-              <ShieldCheck className="mr-2 h-4 w-4" />Check whether receipt was posted
-            </Button>
+            {purchaseResult ? (
+              <p className="text-xs text-muted-foreground">
+                The purchase is recorded. Do not re-import this invoice; review its stock movements and barcodes in import history.
+              </p>
+            ) : (
+              <>
+                <p className="text-xs text-muted-foreground">
+                  Your Excel and uploaded pictures are retained for retry. Check whether the
+                  previous request posted before retrying with the same invoice and request ID.
+                </p>
+                <Button type="button" size="sm" variant="outline"
+                  onClick={() => void checkPurchaseStatus()}>
+                  <ShieldCheck className="mr-2 h-4 w-4" />Check whether receipt was posted
+                </Button>
+              </>
+            )}
           </div>
         )}
         {purchaseResult && (
