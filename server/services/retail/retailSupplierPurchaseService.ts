@@ -167,7 +167,7 @@ export async function postRetailSupplierPurchase(
 
     if (input.invoiceFileId) {
       const [attachment] = await tx.select({
-        id: storedFiles.id, fileType: storedFiles.fileType, fileSize: storedFiles.fileSize,
+        id: storedFiles.id, fileType: storedFiles.fileType, fileSize: storedFiles.fileSize, fileData: storedFiles.fileData,
       }).from(storedFiles).where(and(
         eq(storedFiles.companyId, companyId),
         eq(storedFiles.id, input.invoiceFileId),
@@ -176,6 +176,14 @@ export async function postRetailSupplierPurchase(
           attachment.fileSize < 1 || attachment.fileSize > 10 * 1024 * 1024) {
         throw new Error("Invoice attachment must be a company-owned PDF, JPG or PNG up to 10 MB");
       }
+      const signature = Buffer.from(attachment.fileData.slice(0, 40), "base64");
+      const validSignature = attachment.fileType === "application/pdf"
+        ? signature.subarray(0, 5).toString("ascii") === "%PDF-"
+        : attachment.fileType === "image/jpeg"
+          ? signature.length >= 3 && signature[0] === 0xff && signature[1] === 0xd8 && signature[2] === 0xff
+          : signature.length >= 8 &&
+            [137, 80, 78, 71, 13, 10, 26, 10].every((byte, index) => signature[index] === byte);
+      if (!validSignature) throw new Error("Invoice attachment content does not match its file type");
     }
     const [operation] = await tx.insert(retailStockOperations).values({
       companyId, operationType: "supplier_purchase", idempotencyKey: input.idempotencyKey,
