@@ -163,7 +163,14 @@ export function ContainersSectionPanel({ analytics }: { analytics: AnalyticsLega
               // Group by supplierId, sorted alphabetically; within each group sort by date DESC
               const supplierMap = new Map<
                 number,
-                { supplierId: number; supplierName: string; containers: ReportContainer[]; total: number }
+                {
+                  supplierId: number;
+                  supplierName: string;
+                  containers: ReportContainer[];
+                  grandTotal: number;
+                  offloadingCharges: number;
+                  totalContainerCost: number;
+                }
               >();
               for (const c of visibleContainers) {
                 if (!supplierMap.has(c.supplierId)) {
@@ -171,12 +178,16 @@ export function ContainersSectionPanel({ analytics }: { analytics: AnalyticsLega
                     supplierId: c.supplierId,
                     supplierName: c.supplierName,
                     containers: [],
-                    total: 0,
+                    grandTotal: 0,
+                    offloadingCharges: 0,
+                    totalContainerCost: 0,
                   });
                 }
                 const g = supplierMap.get(c.supplierId)!;
                 g.containers.push(c);
-                g.total += parseFloat(c.grandTotal || "0");
+                g.grandTotal += parseFloat(c.grandTotal || "0");
+                g.offloadingCharges += parseFloat(c.offloadingCharges || "0");
+                g.totalContainerCost += parseFloat(c.totalContainerCost || "0");
               }
               const supplierGroups = Array.from(supplierMap.values()).sort((a, b) =>
                 a.supplierName.localeCompare(b.supplierName)
@@ -184,8 +195,10 @@ export function ContainersSectionPanel({ analytics }: { analytics: AnalyticsLega
               for (const g of supplierGroups) {
                 g.containers.sort((a, b) => getDate(b).localeCompare(getDate(a)));
               }
-              const visibleTotal = visibleContainers.reduce((s, c) => s + parseFloat(c.grandTotal || "0"), 0);
-              const colSpan = isAllCompanies ? 6 : 5;
+              const visibleGrandTotal = visibleContainers.reduce((s, c) => s + parseFloat(c.grandTotal || "0"), 0);
+              const visibleOffloadingCharges = visibleContainers.reduce((s, c) => s + parseFloat(c.offloadingCharges || "0"), 0);
+              const visibleTotalCost = visibleContainers.reduce((s, c) => s + parseFloat(c.totalContainerCost || "0"), 0);
+              const colSpan = isAllCompanies ? 8 : 7;
 
               return (
                 <div className="space-y-4">
@@ -199,6 +212,8 @@ export function ContainersSectionPanel({ analytics }: { analytics: AnalyticsLega
                           <TableHead>Status</TableHead>
                           <TableHead>{dateCol}</TableHead>
                           <TableHead className="text-right">Grand Total</TableHead>
+                          <TableHead className="text-right">Offloading & Extras</TableHead>
+                          <TableHead className="text-right">Total Container Cost</TableHead>
                         </TableRow>
                       </TableHeader>
                       {supplierGroups.map((sg) => (
@@ -212,26 +227,36 @@ export function ContainersSectionPanel({ analytics }: { analytics: AnalyticsLega
                                 <TableCell className="text-sm">{container.status}</TableCell>
                                 <TableCell className="text-sm">{getDate(container)}</TableCell>
                                 <TableCell className="text-right font-mono text-sm">
-                                  {formatAmount(parseFloat(container.grandTotal))}
+                                  {formatAmount(parseFloat(container.grandTotal || "0"))}
+                                </TableCell>
+                                <TableCell className="text-right font-mono text-sm">
+                                  {formatAmount(parseFloat(container.offloadingCharges || "0"))}
+                                </TableCell>
+                                <TableCell className="text-right font-mono text-sm font-semibold">
+                                  {formatAmount(parseFloat(container.totalContainerCost || "0"))}
                                 </TableCell>
                               </TableRow>
                             ))}
                           </TableBody>
                           <TableBody>
                             <TableRow className="bg-muted/40 font-semibold">
-                              <TableCell colSpan={colSpan - 1} className="text-sm">
+                              <TableCell colSpan={colSpan - 3} className="text-sm">
                                 {sg.supplierName} — {sg.containers.length} container
                                 {sg.containers.length !== 1 ? "s" : ""}
                               </TableCell>
-                              <TableCell className="text-right font-mono text-sm">{formatAmount(sg.total)}</TableCell>
+                              <TableCell className="text-right font-mono text-sm">{formatAmount(sg.grandTotal)}</TableCell>
+                              <TableCell className="text-right font-mono text-sm">{formatAmount(sg.offloadingCharges)}</TableCell>
+                              <TableCell className="text-right font-mono text-sm">{formatAmount(sg.totalContainerCost)}</TableCell>
                             </TableRow>
                           </TableBody>
                         </Fragment>
                       ))}
                       <TableBody>
                         <TableRow className="font-bold border-t-2">
-                          <TableCell colSpan={colSpan - 1}>TOTALS ({visibleContainers.length} containers)</TableCell>
-                          <TableCell className="text-right font-mono">{formatAmount(visibleTotal)}</TableCell>
+                          <TableCell colSpan={colSpan - 3}>TOTALS ({visibleContainers.length} containers)</TableCell>
+                          <TableCell className="text-right font-mono">{formatAmount(visibleGrandTotal)}</TableCell>
+                          <TableCell className="text-right font-mono">{formatAmount(visibleOffloadingCharges)}</TableCell>
+                          <TableCell className="text-right font-mono">{formatAmount(visibleTotalCost)}</TableCell>
                         </TableRow>
                       </TableBody>
                     </Table>
@@ -254,9 +279,18 @@ export function ContainersSectionPanel({ analytics }: { analytics: AnalyticsLega
                                   {isAllCompanies ? `${container.companyName} · ` : ""}
                                   {getDate(container)}
                                 </span>
-                                <span className="font-mono font-semibold">
-                                  {formatAmount(parseFloat(container.grandTotal))}
-                                </span>
+                              </div>
+                              <div className="flex justify-between gap-2 text-sm">
+                                <span className="text-muted-foreground">Grand Total</span>
+                                <span className="font-mono">{formatAmount(parseFloat(container.grandTotal || "0"))}</span>
+                              </div>
+                              <div className="flex justify-between gap-2 text-sm">
+                                <span className="text-muted-foreground">Offloading & Extras</span>
+                                <span className="font-mono">{formatAmount(parseFloat(container.offloadingCharges || "0"))}</span>
+                              </div>
+                              <div className="flex justify-between gap-2 border-t pt-2 text-sm font-semibold">
+                                <span>Total Container Cost</span>
+                                <span className="font-mono">{formatAmount(parseFloat(container.totalContainerCost || "0"))}</span>
                               </div>
                             </CardContent>
                           </Card>
@@ -266,7 +300,7 @@ export function ContainersSectionPanel({ analytics }: { analytics: AnalyticsLega
                             <span className="text-sm font-semibold">
                               {sg.supplierName} ({sg.containers.length})
                             </span>
-                            <span className="font-mono font-semibold text-sm">{formatAmount(sg.total)}</span>
+                            <span className="font-mono font-semibold text-sm">{formatAmount(sg.totalContainerCost)}</span>
                           </CardContent>
                         </Card>
                       </div>
@@ -274,7 +308,7 @@ export function ContainersSectionPanel({ analytics }: { analytics: AnalyticsLega
                     <Card className="bg-muted/50">
                       <CardContent className="p-4 flex items-center justify-between gap-2">
                         <span className="font-bold text-sm">TOTALS ({visibleContainers.length} containers)</span>
-                        <span className="font-mono font-semibold">{formatAmount(visibleTotal)}</span>
+                        <span className="font-mono font-semibold">{formatAmount(visibleTotalCost)}</span>
                       </CardContent>
                     </Card>
                   </div>
