@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull, or, sql } from "drizzle-orm";
 import {
   retailImageUrlSchema,
   retailProductVariants, retailProducts,
@@ -68,7 +68,10 @@ export async function writeRetailSupplierCatalogLineTx(
     id: retailProducts.id, name: retailProducts.name, code: retailProducts.code,
     category: retailProducts.category, imageUrls: retailProducts.imageUrls,
   }).from(retailProducts).where(
-    and(eq(retailProducts.companyId, companyId), eq(retailProducts.brandId, brand.id))
+    and(eq(retailProducts.companyId, companyId),
+      normalize(brandName) === normalize("Other / No Brand")
+        ? or(eq(retailProducts.brandId, brand.id), isNull(retailProducts.brandId))
+        : eq(retailProducts.brandId, brand.id))
   );
   const matched = brandStyles.filter(style => normalize(style.name) === normalize(styleName));
   if (matched.length > 1) throw new Error(`Ambiguous retail style: ${brandName} / ${styleName}`);
@@ -115,13 +118,13 @@ export async function writeRetailSupplierCatalogLineTx(
   if (suppliedSku) {
     const [skuOwner] = await tx.select({ id: retailProductVariants.id })
       .from(retailProductVariants).where(
-        and(eq(retailProductVariants.companyId, companyId), eq(retailProductVariants.sku, suppliedSku))
+        and(eq(retailProductVariants.companyId, companyId), sql`lower(${retailProductVariants.sku}) = ${suppliedSku.toLowerCase()}`)
       ).limit(1);
     if (skuOwner && skuOwner.id !== existing?.id) throw new Error(`SKU already belongs to another variant: ${suppliedSku}`);
   }
   const [barcodeOwner] = await tx.select({ id: retailProductVariants.id })
     .from(retailProductVariants).where(
-      and(eq(retailProductVariants.companyId, companyId), eq(retailProductVariants.barcode, line.barcode.trim()))
+      and(eq(retailProductVariants.companyId, companyId), sql`lower(${retailProductVariants.barcode}) = ${line.barcode.trim().toLowerCase()}`)
     ).limit(1);
   if (barcodeOwner && barcodeOwner.id !== existing?.id) {
     throw new Error(`Barcode already belongs to another variant: ${line.barcode}`);
