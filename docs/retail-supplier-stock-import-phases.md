@@ -124,7 +124,55 @@ part of one all-or-nothing supplier receipt.
 
 No CI, tests, merge, rebase, or deployment executed as requested.
 
-## Phases 4–7: contract and financial invariants
+## Phase 4 — Confirmed supplier purchase and payable posting (implemented)
+
+- Added `POST /api/retail/supplier-import/confirm` (Retail company only,
+  authenticated, non-POS, operational import permission).
+- The import dialog collects a required supplier invoice reference, date,
+  location, and purchase currency. USD invoices need no FX. Non-USD requires
+  an explicit positive rate entered as **USD per unit of foreign currency**;
+  the client sends its reciprocal to the ERP accounting normalization layer,
+  which stores transaction units per USD with the posted historic voucher.
+  All voucher and supplier entry amounts retain transaction and base values.
+- The client uploads validated company pictures via the existing Retail media
+  service and reuses those uploaded URLs on an interrupted-request retry.
+  **Pictures persist independently of the DB purchase transaction**;
+  orphan-photo cleanup is deferred to Phase 6.
+- `server/services/retail/retailSupplierPurchaseService.ts` validates the
+  supplier and receiving location belong to the active company, picture IDs
+  belong to the company, the invoice date is not future, and the inventory
+  accounting opening has been applied.
+- The service serializes purchase confirmation for one company via a database
+  transaction advisory lock. Duplicate invoice number for the same supplier
+  is refused (case-insensitive); duplicate request keys return their original
+  saved result only if the payload fingerprint matches.
+- Product/variant creation and final EAN-13 reservations reuse the Phase 2/3
+  transaction-only catalog service. Stock is **received in addition to**
+  existing quantities, with weighted-average inventory cost; append-only
+  `retail_stock_movements` entries are written per Excel line. A durable
+  `retail_stock_operations` batch stores purchase totals, supplier id, FX
+  rate, voucher id, and received row/variant/barcode/quantity mapping.
+- The same transaction uses the central balanced posting engine to book
+  **Dr Retail inventory account / Cr ERP supplier** (supplier_id target).
+  It never creates a second Retail supplier ledger or uses GRNI/Inventory
+  Adjustment for this invoiced purchase. Supplier payments later continue
+  through the standard ERP Payment voucher, debiting that exact supplier.
+- If inventory value fails to reconcile with the invoice at 2 decimal places,
+  confirmation is refused and the **entire DB transaction rolls back**;
+  nothing is silently pushed to an adjustment/suspense account. Closed-period,
+  ownership, audit, and voucher idempotency checks belong to the central engine.
+- On success the dialog shows the voucher ID, received item count, and total
+  payable, and refreshes catalog and supplier/accounting query caches.
+  The printed-label popup on that saved batch is reserved for Phase 5.
+- Tests for schema, image references and request fingerprint are added for
+  Claude to run. No CI, tests, merge, rebase, or deployment performed.
+
+**Operational prerequisite:** Retail inventory accounting opening must be
+applied for the company before the first supplier import, to avoid posting a
+supplier purchase in the pre-opening inventory state. This is NOT a cash
+opening. Existing POS sale accounting is not modified here.
+
+## Phases 5–7: remaining implementation contract
 
 **Phase 2 — Product and image import engine**
 
@@ -137,25 +185,6 @@ No CI, tests, merge, rebase, or deployment executed as requested.
 - Never create duplicate variants by skipping already-used identities.
 - Respect the existing generated EAN-13 implementation, rather than inventing a
   separate barcode sequence. Only use stored barcodes; no silent regenerations.
-
-**Phase 4 — Supplier purchase + accounting**
-
-- Do **not** reuse `POST /api/retail/import` for supplier receiving:
-  it sets absolute stock and books adjustments rather than supplier payable.
-- Create a *new*, transactional, company-scoped supplier purchase/receipt API.
-- Validate supplier membership, location, unit costs, accepted quantities,
-  duplicates, idempotency, permissions, invoice currency/rates and account mappings
-  on the server, with a preflight and explicit confirm step.
-- Receive **additional units** (not absolute overwrite), update weighted-average
-  inventory cost, write append-only stock movements and persist purchase rows.
-- For credit purchases, Dr Retail Inventory Asset / Cr linked Supplier Payable at
-  properly converted historical values, in the **same database transaction**.
-  Supplier balance, journal and stock must reconcile; an error rolls all back.
-- Replayed request keys cannot duplicate either quantity or debt. A supplier
-  purchase must never route through Inventory Adjustment/Suspense instead of AP.
-- Later full/partial payments reduce the supplier payable through selected cash
-  or bank accounts. Use existing account ledgers, not a separate retail balance.
-- Support returns/credit notes using reversals; never rewrite posted vouchers.
 
 **Phase 5 — Label popup after receipt**
 
