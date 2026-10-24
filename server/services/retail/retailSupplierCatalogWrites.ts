@@ -138,11 +138,15 @@ export async function writeRetailSupplierCatalogLineTx(
     for (const url of line.imageUrls) {
       if (!appended.includes(url) && appended.length < 4) appended.push(url);
     }
-    if (appended.length !== existing.imageUrls.length) {
-      await tx.update(retailProductVariants).set({
-        imageUrls: appended, updatedAt: new Date(),
-      }).where(and(eq(retailProductVariants.companyId, companyId), eq(retailProductVariants.id, existing.id)));
-    }
+    await tx.update(retailProductVariants).set({
+      imageUrls: appended,
+      // The supplier's current price list refreshes future selling settings.
+      // Historical sale-line prices/cost snapshots are never modified.
+      sellingPrice: String(line.sellingPrice),
+      cost: String(line.costPrice),
+      ...(!existing.sku && suppliedSku ? { sku: suppliedSku } : {}),
+      updatedAt: new Date(),
+    }).where(and(eq(retailProductVariants.companyId, companyId), eq(retailProductVariants.id, existing.id)));
     return { productId: product.id, variantId: existing.id, newProduct, newVariant: false };
   }
   const [created] = await tx.insert(retailProductVariants).values({
