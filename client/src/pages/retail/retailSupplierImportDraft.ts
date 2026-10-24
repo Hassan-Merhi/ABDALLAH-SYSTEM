@@ -115,8 +115,8 @@ export function parseRetailSupplierImportRows(sources: SourceRow[]): RetailSuppl
       if (prior !== undefined) errors.push(`Duplicate SKU (also Excel row ${prior})`);
       else seenSkus.set(normalizeIdentity(sku), rowNumber);
     }
-    if (!barcode) warnings.push("Barcode will be generated in Phase 3");
-    if (mainImage || extraImages.length) warnings.push("Images will be linked in Phase 2");
+    if (!barcode) warnings.push("A barcode will be assigned when the supplier purchase is confirmed");
+    if (mainImage || extraImages.length) warnings.push("Image filenames will be verified against the ZIP before the purchase is posted");
 
     return {
       rowNumber, name, category, brand, size, color,
