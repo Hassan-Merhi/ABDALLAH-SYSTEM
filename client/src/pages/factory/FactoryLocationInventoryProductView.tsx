@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -36,6 +36,42 @@ import { createFactoryLocationProductMetrics } from "./factorylocationinventory/
 import { FactoryLocationInventoryProductFooterDialogs } from "./factorylocationinventory/ProductFooterDialogs";
 
 type FactoryLocationInventoryModel = ReturnType<typeof useFactoryLocationInventory>;
+
+type BreakdownStatCardProps = {
+  icon: ReactNode;
+  label: string;
+  total: string;
+  regular: string;
+  special: string;
+  unit: string;
+  accent: string;
+};
+
+function BreakdownStatCard({ icon, label, total, regular, special, unit, accent }: BreakdownStatCardProps) {
+  return (
+    <div className="min-w-0 rounded-xl border bg-card/40 shadow-xs">
+      <div className="flex items-start gap-3 px-3.5 py-3">
+        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${accent}`}>
+          {icon}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
+          <div className="text-xl font-bold leading-tight tracking-tight tabular-nums">{total}</div>
+          <div className="mt-2 grid grid-cols-2 gap-2 border-t pt-2">
+            <div className="min-w-0">
+              <div className="text-[11px] leading-tight text-muted-foreground">Regular {unit}</div>
+              <div className="mt-0.5 text-sm font-semibold tabular-nums">{regular}</div>
+            </div>
+            <div className="min-w-0 border-l pl-2">
+              <div className="text-[11px] leading-tight text-muted-foreground">Wipers &amp; Garbage {unit}</div>
+              <div className="mt-0.5 text-sm font-semibold tabular-nums">{special}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function FactoryLocationInventoryProductView({ inventory }: { inventory: FactoryLocationInventoryModel }) {
   const [categorySearch, setCategorySearch] = useState("");
@@ -188,36 +224,26 @@ export function FactoryLocationInventoryProductView({ inventory }: { inventory: 
         </div>
       </div>
 
-      {/* KPI cards */}
+      {/* KPI cards: each stock quantity shows the combined total and both categories. */}
       {!inventoryLoading && (
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
-          <StatCard
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <BreakdownStatCard
             icon={<Package className="h-4 w-4 text-blue-400" />}
             label="Total Bales"
-            value={regularBales.toLocaleString()}
-            sub={`${regularProductCount} products · excluding wipers/garbage`}
+            total={(regularBales + specialBales).toLocaleString()}
+            regular={regularBales.toLocaleString()}
+            special={specialBales.toLocaleString()}
+            unit="Bales"
             accent="bg-blue-500/10"
           />
-          <StatCard
-            icon={<Package className="h-4 w-4 text-orange-400" />}
-            label="Wipers & Garbage Bales"
-            value={specialBales.toLocaleString()}
-            sub={`${specialProductCount} products`}
-            accent="bg-orange-500/10"
-          />
-          <StatCard
+          <BreakdownStatCard
             icon={<Weight className="h-4 w-4 text-emerald-400" />}
             label="Total KG"
-            value={fmt(regularKg)}
-            sub={regularBales > 0 ? `~${fmt(regularKg / regularBales)} KG / bale · regular` : "Excluding wipers/garbage"}
+            total={fmt(regularKg + specialKg)}
+            regular={fmt(regularKg)}
+            special={fmt(specialKg)}
+            unit="KG"
             accent="bg-emerald-500/10"
-          />
-          <StatCard
-            icon={<Weight className="h-4 w-4 text-orange-400" />}
-            label="Wipers & Garbage KG"
-            value={fmt(specialKg)}
-            sub={specialBales > 0 ? `~${fmt(specialKg / specialBales)} KG / bale` : undefined}
-            accent="bg-orange-500/10"
           />
           <StatCard
             icon={<Layers className="h-4 w-4 text-purple-400" />}
