@@ -13,6 +13,7 @@ import { ensureRetailAccountingSettingsTx } from "./retailAccountingSettingsServ
 import { retailInventoryOpeningTx } from "./retailInventoryJournal";
 import { addMovement, lockInventoryRow, setInventoryQuantity } from "./retailStockLedger";
 import { writeRetailSupplierCatalogBatchTx } from "./retailSupplierCatalogBatch";
+import type { RetailSupplierPurchaseItem } from "./retailSupplierPurchaseHistory";
 
 const price = z.coerce.number().finite().nonnegative().max(1_000_000_000);
 export const retailSupplierPurchaseSchema = z.object({
@@ -66,7 +67,7 @@ function responseOf(meta: Record<string, unknown>) {
     supplierId: Number(meta.supplierId), locationId: Number(meta.locationId),
     invoiceReference: String(meta.invoiceReference), currency: String(meta.currency),
     purchaseTotal: String(meta.purchaseTotal), baseTotal: String(meta.baseTotal),
-    items: meta.items as Array<{ rowNumber: number; variantId: number; barcode: string; quantity: number }>,
+    items: meta.items as RetailSupplierPurchaseItem[],
     deliveryReference: typeof meta.deliveryReference === "string" ? meta.deliveryReference : "",
     partialReceipt: meta.partialReceipt === true,
     invoiceFileId: meta.invoiceFileId ? Number(meta.invoiceFileId) : null,
@@ -197,7 +198,7 @@ export async function postRetailSupplierPurchase(
         ...line, costPrice: new Decimal(line.costPrice).div(rate).toDecimalPlaces(6).toNumber(),
       }))
     );
-    const items: Array<{ rowNumber: number; variantId: number; barcode: string; quantity: number }> = [];
+    const items: RetailSupplierPurchaseItem[] = [];
     let stockValueBefore = new Decimal(0), stockValueAfter = new Decimal(0);
     for (const [index, line] of input.lines.entries()) {
       const assigned = catalog.rows[index];
@@ -221,6 +222,7 @@ export async function postRetailSupplierPurchase(
           supplierId: input.supplierId, invoiceReference: input.invoiceReference,
           invoiceCurrency: currency, invoiceUnitCost: line.costPrice,
           unitCostBase: unitCost.toDecimalPlaces(6).toFixed(6),
+          barcode: assigned.barcode,
         },
       });
       items.push({
