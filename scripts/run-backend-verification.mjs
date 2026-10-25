@@ -16,8 +16,10 @@ const coverage = process.argv.includes("--coverage");
 // a workflow that pins its own matrix can still set BACKEND_TEST_SHARDS. At
 // 1029 files (2026-10-14) a 1/12 shard of ~86 files no longer fit the 210s
 // plain budget either, so sixteen shards return each to ~64 files, the same
-// load per shard that twelve gave at 745.
-const SHARD_COUNT = Number(process.env.BACKEND_TEST_SHARDS ?? 16);
+// load per shard that twelve gave at 745. At 1104 files (2026-10-25) a 1/16
+// shard of ~69 files took 236s on its own, so twenty shards bring each back to
+// ~55 files.
+const SHARD_COUNT = Number(process.env.BACKEND_TEST_SHARDS ?? 20);
 // The budget belongs to the pass being run, not to the command line. --complete
 // runs a plain pass and then a coverage pass, and coverage instrumentation is
 // measurably slower: in one certification run the same shard took 127.5s plain
