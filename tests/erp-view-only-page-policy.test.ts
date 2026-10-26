@@ -18,6 +18,7 @@ describe("ERP View Only company-role page access", () => {
 
   it("respects explicit View Only page restrictions", () => {
     expect(effectiveErpPageKeys("View Only", ["accounts"])).toEqual(["accounts"]);
+    expect(effectiveErpPageKeys("View Only", ["settings", "create", "dashboard"])).toEqual(["dashboard"]);
   });
 
   it("does not change page access defaults for other roles", () => {
