@@ -33,6 +33,7 @@ import { useErpPhoneLayout } from "@/hooks/use-erp-phone-layout";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useApplicationLanguage } from "@/contexts/ApplicationLanguageContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
+import { shouldShowFactoryCustomerDestination } from "./customerDestinationVisibility";
 
 interface AccountStatementRow extends Transaction {
   totalDebit: number;
@@ -59,6 +60,7 @@ interface AccountStatementViewProps {
   periodFilter: PeriodFilterValue;
   setPeriodFilter: Dispatch<SetStateAction<PeriodFilterValue>>;
   vouchersWithBalance: AccountStatementRow[];
+  statementCustomerId: number | null;
   closingBalance: number;
   openingBalance: number;
   transactionsLoading: boolean;
@@ -89,6 +91,7 @@ export function AccountStatementView({
   periodFilter,
   setPeriodFilter,
   vouchersWithBalance,
+  statementCustomerId,
   closingBalance,
   openingBalance,
   transactionsLoading,
@@ -136,10 +139,16 @@ export function AccountStatementView({
     periodFilter.fromDate || null,
     periodFilter.toDate || null,
   ]);
-  // Linked customer accounts are typed "ledger" in Accounts Overview. The
-  // statement API identifies the customer association independently of its label.
-  const showCustomerDestination = appMode === "factory" &&
-    (selectedAccount.type === "customer" || typeof statementMetadata?.customerId === "number");
+  // Linked Factory customer accounts still appear as type "ledger". Use the
+  // current statement's reactive customer identity, not a non-subscribed React
+  // Query cache snapshot. Keep the column visible if returned customer rows
+  // already carry destination metadata during query/cache transitions.
+  const showCustomerDestination = shouldShowFactoryCustomerDestination({
+    appMode,
+    accountType: selectedAccount.type,
+    statementCustomerId,
+    destinations: vouchersWithBalance.map((row) => row.destination),
+  });
   const [destinationFilter, setDestinationFilter] = useState("all");
   useEffect(() => {
     setDestinationFilter("all");
