@@ -557,6 +557,16 @@ export function useAccountsLegacyModel() {
     );
   }, [rawTransactionData]);
 
+  // Expose customer ownership from the active statement query reactively. A linked
+  // Factory customer account has type "ledger", so name/type alone cannot
+  // reliably identify it. Passing this value as a prop avoids reading a
+  // non-subscribed query-cache snapshot in AccountStatementView.
+  const statementCustomerId: number | null =
+    rawTransactionData && !Array.isArray(rawTransactionData) &&
+    Number.isSafeInteger(rawTransactionData.customerId) && rawTransactionData.customerId > 0
+      ? rawTransactionData.customerId
+      : null;
+
   // broughtForwardBalance = stored account opening balance + net of all entries before the period start.
   // openingBalance from the API is always an unsigned positive number; openingBalanceSide carries the sign.
   // Cr opening balances must be negated (convention: positive = Dr, negative = Cr).
