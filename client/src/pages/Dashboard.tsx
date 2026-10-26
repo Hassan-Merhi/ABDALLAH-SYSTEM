@@ -167,7 +167,7 @@ export default function Dashboard() {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>}
-      {/* ── Top KPI row ── */
+      {/* ── Top KPI row ── */}
       <div
         className={cn(
           "grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4",
