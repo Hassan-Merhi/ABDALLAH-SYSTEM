@@ -194,9 +194,13 @@ export async function runCustomerBalanceStatement(options: {
       hasMore,
       nextCursor,
     });
-    return cursor
-      ? { ...response, customerId }
-      : { ...response, customerId, notInLedger: await loadNotInLedger() };
+    if (cursor) return { ...response, customerId };
+    const notInLedger = await loadNotInLedger();
+    return {
+      ...response,
+      customerId,
+      notInLedger: { ...notInLedger, rows: await enrichCustomerLedgerDestinations(companyId, customerId, notInLedger.rows) },
+    };
   }
 
   const pageQuery = `WITH ${cte}
