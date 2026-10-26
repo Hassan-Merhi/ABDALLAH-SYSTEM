@@ -7,6 +7,7 @@ import { requireAuth, requireRole } from "../../auth";
 import { logAudit } from "../_helpers";
 import { closedPeriodErrorResponse } from "../../lib/closedPeriodError";
 import { sessionRetirementActor } from "../../services/accounting/voucherRetirement";
+import { effectiveErpPageKeys } from "../../services/security/erpViewerPagePolicy";
 import {
   LegacyEmployeeAccountRefusal,
   migrateLegacyEmployeeAccountTx,
@@ -631,17 +632,13 @@ export function registerUserManagementRoutes(app: Express) {
       const pageKeys = await storage.getErpUserPageAccess(companyId, userId);
       // Analytics is part of the Owner role even for existing owners whose
       // per-user page list was saved before this permission was added.
+      const effectivePageKeys = effectiveErpPageKeys(role, pageKeys);
       const visiblePageKeys =
-        role === "View Only" && pageKeys.length === 0
-          // An empty page allow-list means unrestricted *read* access for this
-          // company role. Write requests remain blocked by blockViewOnlyWrites.
-          // Settings is not a business-data viewer and stays inaccessible.
-          ? FEATURE_KEYS.filter((key) => key !== "settings")
-          : role === "Owner"
-            ? [...new Set([...pageKeys, "analytics"])]
-            : role === "ERP Tester"
-              ? pageKeys.filter((key) => key !== "settings")
-              : pageKeys;
+        role === "Owner"
+          ? [...new Set([...effectivePageKeys, "analytics"])]
+          : role === "ERP Tester"
+            ? effectivePageKeys.filter((key) => key !== "settings")
+            : effectivePageKeys;
       res.json({ pageKeys: visiblePageKeys, fullAccess: false, hiddenErpCostFields });
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
