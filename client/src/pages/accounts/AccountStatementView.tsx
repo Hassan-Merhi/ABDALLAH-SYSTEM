@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Dispatch, RefObject, SetStateAction } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PeriodFilter } from "@/components/ui/period-filter";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { PeriodFilterValue } from "@/components/ui/period-filter";
 import type { Account, Transaction, WaRule } from "./accountTypes";
 import { AccountTransactionRows } from "./AccountTransactionRows";
@@ -40,6 +41,7 @@ interface AccountStatementRow extends Transaction {
 }
 
 interface AccountStatementPageMetadata {
+  customerId?: number;
   total?: number;
   periodDebitTotal?: number;
   periodCreditTotal?: number;
@@ -134,6 +136,38 @@ export function AccountStatementView({
     periodFilter.fromDate || null,
     periodFilter.toDate || null,
   ]);
+  // Linked customer accounts are typed "ledger" in Accounts Overview. The
+  // statement API identifies the customer association independently of its label.
+  const showCustomerDestination = appMode === "factory" &&
+    (selectedAccount.type === "customer" || Number.isInteger(statementMetadata?.customerId));
+  const [destinationFilter, setDestinationFilter] = useState("all");
+  useEffect(() => {
+    setDestinationFilter("all");
+  }, [selectedCompany?.id, selectedAccount.type, selectedAccount.accountId]);
+  const destinationOptions = useMemo(() =>
+    [...new Set(vouchersWithBalance.map((row) => row.destination?.trim()).filter((s): s is string => !!s))]
+      .sort((a, b) => a.localeCompare(b)),
+    [vouchersWithBalance]
+  );
+  const filteredCount = !showCustomerDestination || destinationFilter === "all"
+    ? vouchersWithBalance.length
+    : vouchersWithBalance.filter((row) => destinationFilter === "__none__"
+      ? !row.destination?.trim()
+      : row.destination?.trim() === destinationFilter).length;
+  const destinationSelect = showCustomerDestination ? (
+    <Select value={destinationFilter} onValueChange={setDestinationFilter}>
+      <SelectTrigger className="w-[190px] h-9" aria-label="Filter customer ledger by destination" data-testid="filter-customer-destination">
+        <SelectValue placeholder="All destinations" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all">All destinations</SelectItem>
+        {destinationOptions.map((destination) => (
+          <SelectItem key={destination} value={destination}>{destination}</SelectItem>
+        ))}
+        <SelectItem value="__none__">No destination</SelectItem>
+      </SelectContent>
+    </Select>
+  ) : null;
   const rawOpeningBalance = Number.parseFloat(String(selectedAccount.openingBalance ?? 0)) || 0;
   const signedStoredOpening = selectedAccount.openingBalanceSide === "Cr" ? -rawOpeningBalance : rawOpeningBalance;
   const hasServerClosing = Number.isFinite(statementMetadata?.closingNetBalance);
@@ -378,6 +412,7 @@ export function AccountStatementView({
           </div>
           <div className="*:w-full">
             <PeriodFilter value={periodFilter} onChange={setPeriodFilter} />
+            {destinationSelect}
           </div>
         </div>
       ) : (
@@ -493,6 +528,7 @@ export function AccountStatementView({
                 </Button>
               )}
               <PeriodFilter value={periodFilter} onChange={setPeriodFilter} />
+              {destinationSelect}
               {!isEurTab && <Button
                 variant={showDeletedVouchers ? "secondary" : "outline"}
                 size="sm"
@@ -544,6 +580,12 @@ export function AccountStatementView({
         <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           Failed to load this account period: {transactionError}
         </div>
+      )}
+
+      {showCustomerDestination && destinationFilter !== "all" && (
+        <p className="text-xs text-muted-foreground" data-testid="customer-destination-filter-status">
+          Showing {filteredCount} of {vouchersWithBalance.length} transactions. Destination filter only changes visible rows; running and closing balances remain for the entire account.
+        </p>
       )}
 
       {/* Stats row */}
@@ -625,6 +667,8 @@ export function AccountStatementView({
             closingBalance={displayClosingBalance}
             selectedAccount={selectedAccount}
             formatDisplayDate={formatDisplayDate}
+            showCustomerDestination={showCustomerDestination}
+            destinationFilter={destinationFilter}
           />
         </div>
       )}
@@ -640,6 +684,8 @@ export function AccountStatementView({
           closingBalance={displayClosingBalance}
           selectedAccount={selectedAccount}
           formatDisplayDate={formatDisplayDate}
+          showCustomerDestination={showCustomerDestination}
+          destinationFilter={destinationFilter}
         />
       )}
     </div>
