@@ -9,6 +9,8 @@ import {
 } from "../../lib/inventoryMath";
 import { db } from "../../db";
 import { companyStockValue } from "../../services/inventory/stockValuation";
+import { isPerpetualInventoryActive } from "../../services/accounting/perpetualInventory/cutover";
+import { describeInventoryCostBridge } from "../../services/accounting/costBridgeInterpretation";
 import { storage } from "../../storage";
 import { getAccessibleCompanyIds } from "../../security/companyAccessBoundary";
 import { requireAuth, requireNonPOS } from "../../auth";
@@ -269,6 +271,11 @@ export function registerStatsDataRoutes(app: Express) {
       // Closing stock: the one stock valuation (stockValuation.ts, wave 11),
       // SUM(total_value), not quantity × the rounded average rate.
       const closingStock = dec(await companyStockValue(db, companyId));
+      const perpetualInventoryActive = await isPerpetualInventoryActive(
+        db,
+        companyId,
+        new Date().toISOString().slice(0, 10)
+      );
       const totalSales = dec(row?.total_sales);
       const storedCogs = dec(row?.stored_cogs);
       const reconciledCogs = openingStock
@@ -289,6 +296,7 @@ export function registerStatsDataRoutes(app: Express) {
         reconciliation: subtractInventoryValues(storedCogs, reconciledCogs).toNumber(),
         storedCostProfit: subtractInventoryValues(totalSales, storedCogs).toNumber(),
         adjustedCostProfit: subtractInventoryValues(totalSales, reconciledCogs).toNumber(),
+        ...describeInventoryCostBridge(perpetualInventoryActive),
         formula:
           "Opening Stock + Stock Received + Net Credit/Debit Note Inventory + Stock Adjustment Net - Closing Stock",
       });
