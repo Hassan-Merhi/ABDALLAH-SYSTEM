@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { AlertTriangle, FileX, Building2 } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { AgentCard } from "./AgentCard";
+import { AgentCardReadOnly } from "./AgentCardReadOnly";
 import type {
   CompanyViewMode,
   AgentDutyResponse,
@@ -246,17 +247,20 @@ export function TabAgentDuty() {
                   (agent.openBalance === null || agent.openBalance !== 0)
               )
               .map((agent) => (
-                <AgentCard
-                  key={`${section.companyId}-${agent.agentName}`}
-                  agent={agent}
-                  readOnly={isViewer}
-                  companyId={section.companyId}
-                  waGroupChatId={
-                    !restrictedViewer ? (waSettings?.groups?.[agent.agentName] ||
-                    waSettings?.groups?.[agent.agentName.toUpperCase()] ||
-                    undefined) : undefined
-                  }
-                />
+                isViewer ? (
+                  <AgentCardReadOnly key={`${section.companyId}-${agent.agentName}`} agent={agent} />
+                ) : (
+                  <AgentCard
+                    key={`${section.companyId}-${agent.agentName}`}
+                    agent={agent}
+                    companyId={section.companyId}
+                    waGroupChatId={
+                      !restrictedViewer ? (waSettings?.groups?.[agent.agentName] ||
+                      waSettings?.groups?.[agent.agentName.toUpperCase()] ||
+                      undefined) : undefined
+                    }
+                  />
+                )
               ))
           )}
         </div>
