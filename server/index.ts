@@ -66,6 +66,7 @@ import { runApprovedAboSobhiGoods82 } from "./startup/runApprovedAboSobhiGoods82
 import { runApprovedAboJaberPayableFix } from "./startup/runApprovedAboJaberPayableFix";
 import { runApprovedUkBasma38 } from "./startup/runApprovedUkBasma38";
 import { runApprovedHmdEurogulfFreightRepair } from "./startup/runApprovedHmdEurogulfFreightRepair";
+import { runApprovedFactoryDestinationNormalization } from "./startup/runApprovedFactoryDestinationNormalization";
 import { ensureFactorySheetsSacksSchema } from "./startup/factorySheetsSacksSchema";
 import { ensureSpGitTracking } from "./lib/spGitTracking";
 import { ensureRecurringJournalSchema } from "./services/accounting/ensureRecurringJournalSchema";
@@ -362,6 +363,9 @@ let migrationsDone = false;
       await runApprovedUkBasma38();
       // Owner-approved EUROGULF freight reclass; no-op without exact Render opt-in.
       await runApprovedHmdEurogulfFreightRepair();
+      // Owner-approved Factory customer order destination spelling consolidation.
+      // Opt-in only; exact company, database, before-images and audit are verified.
+      await runApprovedFactoryDestinationNormalization(pool);
       if (migrationsEnabled) {
         try {
           await runMigrations();
