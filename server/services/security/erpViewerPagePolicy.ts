@@ -6,8 +6,10 @@ import { FEATURE_KEYS } from "@shared/schema";
  * The global View Only HTTP middleware separately rejects every business write.
  */
 export function effectiveErpPageKeys(role: string, savedPageKeys: readonly string[]): string[] {
-  if (role === "View Only" && savedPageKeys.length === 0) {
-    return FEATURE_KEYS.filter((key) => key !== "settings" && key !== "create");
+  if (role === "View Only") {
+    // Even an explicit allow-list must never expose mutation-only or admin pages.
+    const visible = savedPageKeys.length === 0 ? FEATURE_KEYS : savedPageKeys;
+    return visible.filter((key) => key !== "settings" && key !== "create");
   }
   return [...savedPageKeys];
 }
