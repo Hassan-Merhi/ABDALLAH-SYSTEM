@@ -334,7 +334,7 @@ export function AccountTransactionRows({
               <TableRow className="bg-muted/20 text-xs font-medium text-muted-foreground">
                 <TableCell className="py-2 print:hidden" />
                 <TableCell colSpan={colSpanMid} className="py-2 text-right pr-4 text-xs text-muted-foreground">
-                  Period Total
+                  {showDestination && destinationFilter !== "all" ? "Period Total (all destinations)" : "Period Total"}
                 </TableCell>
                 <TableCell className="py-2 text-right font-mono tabular-nums text-sm">
                   {totalDebit > 0 ? fmt(totalDebit) : "—"}
