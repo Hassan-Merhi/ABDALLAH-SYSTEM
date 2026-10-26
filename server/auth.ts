@@ -464,6 +464,15 @@ export async function requirePasswordConfirmation(req: Request, res: Response, n
   }
 }
 
+const VIEW_ONLY_AUTH_LIFECYCLE_WRITES = new Set([
+  "POST /api/auth/login",
+  "POST /api/auth/logout",
+  "POST /api/auth/set-company",
+  "POST /api/auth/confirm-password",
+  "POST /api/auth/passkey/authenticate/options",
+  "POST /api/auth/passkey/authenticate/verify",
+]);
+
 const VIEW_ONLY_PASSIVE_LIFECYCLE_WRITES = new Set([
   "PATCH /api/user-presence",
   "DELETE /api/user-presence",
@@ -515,7 +524,9 @@ export function blockViewOnlyWrites(req: Request, res: Response, next: NextFunct
   const method = req.method.toUpperCase();
   if (method === "GET" || method === "HEAD" || method === "OPTIONS") return next();
   if (!req.path.startsWith("/api")) return next();
-  if (req.path.startsWith("/api/auth/")) return next();
+  // Auth lifecycle remains usable, but passkey registration/deletion and other
+  // account-changing /api/auth requests are NOT exempt from View Only.
+  if (VIEW_ONLY_AUTH_LIFECYCLE_WRITES.has(`${method} ${req.path}`)) return next();
   if (isViewOnlyPassiveLifecycleWrite(req)) return next();
 
   const role = req.session?.currentRole;
