@@ -13,7 +13,7 @@ import { getLockedSupplierRatesReadOnlyBulk } from "../../../services/factory/ra
 import {
   BatchRateDecimal,
   calculateProductionProfit,
-  calculateProducedBaleMaterialCost,
+  calculateProductionWeightCost,
 } from "./production-value-math";
 import {
   factoryCategories,
@@ -128,9 +128,6 @@ export function registerFactoryProductionValueReportRoutes(app: Express) {
           articleCode: factoryBales.articleCode,
           productName: factoryBales.productName,
           weightKg: factoryBales.weightKg,
-          // Recorded material values, not the product catalogue's per-bale price.
-          costPerKg: factoryBales.costPerKg,
-          totalCost: factoryBales.totalCost,
           stockEntryDate: factoryBales.stockEntryDate,
           productionPrice: factoryBaleProducts.productionPrice,
           sellingPrice: factoryBaleProducts.sellingPrice,
@@ -180,7 +177,6 @@ export function registerFactoryProductionValueReportRoutes(app: Express) {
               .select({
                 id: factoryMixBatches.id,
                 totalWeightKg: factoryMixBatches.totalWeightKg,
-                costPerKg: factoryMixBatches.costPerKg,
               })
               .from(factoryMixBatches)
               .where(
@@ -421,27 +417,17 @@ export function registerFactoryProductionValueReportRoutes(app: Express) {
 
       // Same source and exact rounding as Factory Net Position.
       const balanceSnapshot = await getFactoryBalanceOnTableSnapshot(companyId, to);
+      const balanceBatchRateDecimal = balanceSnapshot.batchRateDecimal;
       const balanceWeightKg = balanceSnapshot.weightKg;
       const balanceCostPerKg = balanceSnapshot.costPerKg;
       const balanceValue = balanceSnapshot.value;
 
-      // Monthly/selected-period profitability uses the ACTUAL cost attached to
-      // each regular bale (falling back to its own stored rate / linked batch),
-      // never the cumulative Balance on Table rate or another month's average.
-      // Wipers and garbage are excluded here, as they are from totalBaleWeightKg.
-      const batchRateById = new Map(linkedBatchRows.map((row) => [row.id, row.costPerKg]));
-      const periodMaterialCost = calculateProducedBaleMaterialCost(
-        baleRows
-          .filter((bale) => !isWiperOrGarbage(bale.categoryName || "Uncategorized"))
-          .map((bale) => ({
-            weightKg: bale.weightKg,
-            totalCost: bale.totalCost,
-            costPerKg: bale.costPerKg,
-            linkedBatchCostPerKg:
-              bale.mixBatchId == null ? null : (batchRateById.get(bale.mixBatchId) ?? null),
-          }))
-      );
-      const weightCostDecimal = periodMaterialCost.weightCost;
+      // Weight Cost follows the same historical batch-rate cutoff shown in Balance on Table:
+      // bales produced in the selected period × cumulative batch rate through that period's end.
+      const weightCostDecimal = calculateProductionWeightCost({
+        producedWeightKg: totalBaleWeightKg,
+        batchRateCost: balanceBatchRateDecimal,
+      });
       // Profit follows the active valuation mode:
       // Cost Price: cost production value - Weight Cost
       // Selling Price: selling production value - Weight Cost
@@ -664,12 +650,6 @@ export function registerFactoryProductionValueReportRoutes(app: Express) {
           missingSelectedPriceBales: hideReportCosts ? 0 : missingSelectedPriceBales,
           missingCostPriceBales: hideReportCosts ? 0 : missingCostPriceBales,
           missingSellingPriceBales: hideReportCosts ? 0 : missingSellingPriceBales,
-          materialCostUnresolvedBales: hideReportCosts ? 0 : periodMaterialCost.unresolvedBales,
-          materialCostUnresolvedKg: hideReportCosts ? 0 : periodMaterialCost.unresolvedKg,
-          materialCostStoredBales: hideReportCosts ? 0 : periodMaterialCost.storedCostBales,
-          materialCostRateFallbackBales: hideReportCosts
-            ? 0
-            : periodMaterialCost.baleRateFallbackBales + periodMaterialCost.batchRateFallbackBales,
         },
         kgComparison: {
           producedKg: totalBaleWeightKg,
