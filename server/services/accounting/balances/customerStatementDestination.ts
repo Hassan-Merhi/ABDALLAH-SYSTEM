@@ -51,7 +51,7 @@ export async function enrichCustomerLedgerDestinations<T extends DestinationStat
     const narration = (row.narration ?? "").trim().toUpperCase();
 
     // Canonical perpetual-inventory invoice voucher: INV-GL-{companyId}-{orderId}
-    const glInvoice = /^INV-GL-(\\d+)-(\\d+)$/.exec(voucherNumber);
+    const glInvoice = /^INV-GL-(\d+)-(\d+)$/.exec(voucherNumber);
     const canonicalDestination = glInvoice && Number(glInvoice[1]) === companyId
       ? byOrderId.get(Number(glInvoice[2]))
       : undefined;
@@ -66,7 +66,7 @@ export async function enrichCustomerLedgerDestinations<T extends DestinationStat
         value.startsWith("CHARGE-")
       )
       .join(" ");
-    const invoiceIds = invoiceReference.match(/INV-\\d+/g) ?? [];
+    const invoiceIds = invoiceReference.match(/INV-\d+/g) ?? [];
     const matchedDestinations = new Set(
       invoiceIds.map((id) => byInvoiceNumber.get(id)).filter((v): v is string => !!v)
     );
