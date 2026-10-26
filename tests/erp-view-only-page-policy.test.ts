@@ -7,7 +7,7 @@ describe("ERP View Only company-role page access", () => {
     expect(insertUserCompanyRoleSchema.shape.role.safeParse("View Only").success).toBe(true);
   });
 
-  it("grants all non-Settings ERP viewer pages if no page allow-list was configured", () => {
+  it("grants ERP data pages but not Settings or Create when no allow-list was configured", () => {
     const pages = effectiveErpPageKeys("View Only", []);
     expect(pages).toEqual([...FEATURE_KEYS].filter((key) => key !== "settings" && key !== "create"));
     expect(pages).toContain("accounts");
