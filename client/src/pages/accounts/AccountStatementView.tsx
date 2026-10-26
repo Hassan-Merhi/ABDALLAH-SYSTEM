@@ -155,7 +155,11 @@ export function AccountStatementView({
       ? !row.destination?.trim()
       : row.destination?.trim() === destinationFilter).length;
   const destinationSelect = showCustomerDestination ? (
-    <Select value={destinationFilter} onValueChange={setDestinationFilter}>
+    <Select value={destinationFilter} onValueChange={(value) => {
+      // A new filter must not retain bulk-delete selections from hidden rows.
+      for (const voucherId of selectedVoucherIds) toggleVoucherSelection(voucherId);
+      setDestinationFilter(value);
+    }}>
       <SelectTrigger className="w-[190px] h-9" aria-label="Filter customer ledger by destination" data-testid="filter-customer-destination">
         <SelectValue placeholder="All destinations" />
       </SelectTrigger>
