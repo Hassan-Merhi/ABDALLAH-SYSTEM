@@ -548,6 +548,7 @@ export function useAccountsLegacyModel() {
         voucherDate: row.voucherDate,
         voucherDescription: row.voucherDescription,
         narration: row.voucherDescription,
+        destination: row.destination ?? null,
         debitAmount: row.debitAmount,
         creditAmount: row.creditAmount,
       }));
