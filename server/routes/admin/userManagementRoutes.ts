@@ -632,11 +632,16 @@ export function registerUserManagementRoutes(app: Express) {
       // Analytics is part of the Owner role even for existing owners whose
       // per-user page list was saved before this permission was added.
       const visiblePageKeys =
-        role === "Owner"
-          ? [...new Set([...pageKeys, "analytics"])]
-          : role === "ERP Tester"
-            ? pageKeys.filter((key) => key !== "settings")
-            : pageKeys;
+        role === "View Only" && pageKeys.length === 0
+          // An empty page allow-list means unrestricted *read* access for this
+          // company role. Write requests remain blocked by blockViewOnlyWrites.
+          // Settings is not a business-data viewer and stays inaccessible.
+          ? FEATURE_KEYS.filter((key) => key !== "settings")
+          : role === "Owner"
+            ? [...new Set([...pageKeys, "analytics"])]
+            : role === "ERP Tester"
+              ? pageKeys.filter((key) => key !== "settings")
+              : pageKeys;
       res.json({ pageKeys: visiblePageKeys, fullAccess: false, hiddenErpCostFields });
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
