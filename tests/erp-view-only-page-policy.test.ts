@@ -9,10 +9,11 @@ describe("ERP View Only company-role page access", () => {
 
   it("grants all non-Settings ERP viewer pages if no page allow-list was configured", () => {
     const pages = effectiveErpPageKeys("View Only", []);
-    expect(pages).toEqual([...FEATURE_KEYS].filter((key) => key !== "settings"));
+    expect(pages).toEqual([...FEATURE_KEYS].filter((key) => key !== "settings" && key !== "create"));
     expect(pages).toContain("accounts");
     expect(pages).toContain("daybook");
     expect(pages).not.toContain("settings");
+    expect(pages).not.toContain("create");
   });
 
   it("respects explicit View Only page restrictions", () => {
