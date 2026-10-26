@@ -139,7 +139,7 @@ export function AccountStatementView({
   // Linked customer accounts are typed "ledger" in Accounts Overview. The
   // statement API identifies the customer association independently of its label.
   const showCustomerDestination = appMode === "factory" &&
-    (selectedAccount.type === "customer" || Number.isInteger(statementMetadata?.customerId));
+    (selectedAccount.type === "customer" || typeof statementMetadata?.customerId === "number");
   const [destinationFilter, setDestinationFilter] = useState("all");
   useEffect(() => {
     setDestinationFilter("all");
