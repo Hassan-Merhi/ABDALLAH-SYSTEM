@@ -43,6 +43,7 @@ export default function Dashboard() {
     modePrefix,
     setLocation,
     isFactoryMode,
+    isViewer,
     importCycleExpanded,
     setImportCycleExpanded,
     profitData,
@@ -91,7 +92,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── Quick Actions dropdown ── */}
-      <div className="flex gap-2">
+      {!isViewer && <div className="flex gap-2">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button size="sm" variant="outline" data-testid="button-quick-actions">
@@ -165,8 +166,8 @@ export default function Dashboard() {
             )}
           </DropdownMenuContent>
         </DropdownMenu>
-      </div>
-      {/* ── Top KPI row ── */}
+      </div>}
+      {/* ── Top KPI row ── */
       <div
         className={cn(
           "grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4",
