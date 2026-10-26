@@ -18,7 +18,10 @@ const CONF_RANK: Record<AgentDutySummary["matchConfidence"], number> = { exact: 
 
 export function TabAgentDuty() {
   const { data: viewer } = useQuery(authenticatedUserQueryOptions());
-  const isTester = (viewer?.currentRole ?? viewer?.role) === "ERP Tester";
+  const role = viewer?.currentRole ?? viewer?.role;
+  const isTester = role === "ERP Tester";
+  const isViewer = role === "View Only";
+  const restrictedViewer = isTester || isViewer;
   const [companyMode, setCompanyMode] = useState<CompanyViewMode>("session");
 
   const queryUrl =
@@ -32,7 +35,7 @@ export function TabAgentDuty() {
 
   const { data: waSettings } = useQuery<AgentDutyWaSettings>({
     queryKey: ["/api/git/agent-duty-wa-settings"],
-    enabled: !isTester,
+    enabled: !restrictedViewer,
     staleTime: 120_000,
   });
 
@@ -149,7 +152,7 @@ export function TabAgentDuty() {
       >
         My Company
       </Button>
-      {!isTester && (
+      {!restrictedViewer && (
         <Button
         size="sm"
         variant={companyMode === "all" ? "default" : "outline"}
@@ -246,9 +249,10 @@ export function TabAgentDuty() {
                 <AgentCard
                   key={`${section.companyId}-${agent.agentName}`}
                   agent={agent}
+                  readOnly={isViewer}
                   companyId={section.companyId}
                   waGroupChatId={
-                    !isTester ? (waSettings?.groups?.[agent.agentName] ||
+                    !restrictedViewer ? (waSettings?.groups?.[agent.agentName] ||
                     waSettings?.groups?.[agent.agentName.toUpperCase()] ||
                     undefined) : undefined
                   }
