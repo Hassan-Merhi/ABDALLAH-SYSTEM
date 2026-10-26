@@ -746,6 +746,7 @@ export function useAccountsLegacyModel() {
     periodFilter,
     setPeriodFilter,
     vouchersWithBalance,
+    statementCustomerId,
     notInLedger: readNotInLedger(rawTransactionData),
     broughtForwardBalance,
     closingBalance,
