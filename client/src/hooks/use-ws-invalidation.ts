@@ -208,7 +208,9 @@ function mergePendingInvalidation(message: RealtimeInvalidationMessage): void {
  */
 function bandwidthScopeFor(invalidation: PendingInvalidation): BandwidthInvalidationScope {
   if (invalidation.blanket) return "all";
-  return invalidation.topics.has("reference") ? "all" : "live";
+  // A rate revision may reprice cached account/customer reference reads as
+  // well as live financial snapshots. Flush both browser cache layers.
+  return invalidation.topics.has("reference") || invalidation.topics.has("fx") ? "all" : "live";
 }
 
 function invalidateActiveQueries(invalidation: PendingInvalidation): void {
