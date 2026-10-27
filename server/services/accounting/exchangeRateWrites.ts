@@ -19,6 +19,7 @@
  */
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import Decimal from "decimal.js";
+import { datedMonetaryRateTx, MonetaryFxError } from "./monetaryFxRates";
 import { exchangeRates, factoryFxRates, type ExchangeRate, type FactoryFxRate } from "@shared/schema";
 
 import { db, type DbTransaction } from "../../db";
@@ -52,7 +53,18 @@ export async function saveCompanyExchangeRate(actor: RateActor, input: CompanyRa
       eq(exchangeRates.fromCurrency, input.fromCurrency),
       eq(exchangeRates.toCurrency, input.toCurrency)
     );
-    const [existing] = await tx.select().from(exchangeRates).where(match).orderBy(asc(exchangeRates.id)).limit(1);
+    const sameDayRows = await tx.select().from(exchangeRates).where(match).orderBy(asc(exchangeRates.id)).limit(2);
+    // Some deployments predate the unique index. Updating the earliest row
+    // while the latest (highest id) controls reporting looks like a successful
+    // save that never changes the USD balances. Fail closed until reconciled.
+    if (sameDayRows.length > 1) {
+      throw new MonetaryFxError(
+        "FX_RATE_DUPLICATE_ROWS",
+        "More than one rate exists for this company/date/pair. Reconcile the duplicate rates before saving.",
+        409
+      );
+    }
+    const [existing] = sameDayRows;
     // A repeated submission of the same numerical rate is not a new revision.
     // Do not rewrite the row or create another audit event for a no-op.
     if (existing && new Decimal(String(existing.rate)).eq(new Decimal(input.rate))) {
@@ -64,6 +76,12 @@ export async function saveCompanyExchangeRate(actor: RateActor, input: CompanyRa
           .insert(exchangeRates)
           .values({ ...input, companyId: actor.companyId })
           .returning();
+    // A stored opposite-direction quote on this business date must agree.
+    // Reject and roll back both the rate save and its audit rather than
+    // recording a successful rate that the read-time resolver rejects.
+    if (input.fromCurrency === "USD") {
+      await datedMonetaryRateTx(tx, actor.companyId, input.toCurrency, input.effectiveDate);
+    }
     await writeAuditEvent(
       {
         ...actor,
