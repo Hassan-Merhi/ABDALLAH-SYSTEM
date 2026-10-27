@@ -16,7 +16,7 @@ import "./factoryTrackingModern.css";
 
 import { StockEntryTab } from "./bale-stock-entry/StockEntryTab";
 import { DailyStockSummary } from "./bale-stock-entry/DailyStockSummary";
-import type { FactoryMyAccess } from "@shared/apiTypes";
+import type { AuthMe, FactoryMyAccess } from "@shared/apiTypes";
 import { canUseFactorySurface } from "@/lib/factoryClientAccess";
 
 export default function BaleStockEntry() {
@@ -41,6 +41,7 @@ export default function BaleStockEntry() {
   });
 
   const { data: myAccess } = useQuery<FactoryMyAccess>({ queryKey: ["/api/factory/my-access"], staleTime: 5 * 60000 });
+  const { data: session } = useQuery<AuthMe>({ queryKey: ["/api/auth/me"], staleTime: 60000 });
   const hiddenTabs = myAccess?.hiddenCostFields ?? [];
 
   const showEntry = settings?.stockEntryTabEntryEnabled !== false && !hiddenTabs.includes("hide_tab_stockentry_entry");
@@ -53,6 +54,12 @@ export default function BaleStockEntry() {
   const canReadProductionSession = canUseFactorySurface(myAccess, "factory/stock-entry", [
     "hide_tab_stockentry_production_targets",
   ]);
+  // With pressing as the only granted Stock Entry section, workers should
+  // enter directly into the two-button scanner instead of stock KPI/print UI.
+  const role = session?.currentRole ?? session?.role;
+  const isPressingOnlyWorker = !!session && role !== "Admin" && role !== "Owner" &&
+    showPressingMachines && !showEntry && !showHistory && !showGroundScan &&
+    !showDailyScan && !showProductionTargets;
 
   const defaultTab = showEntry
     ? "entry"
@@ -93,6 +100,14 @@ export default function BaleStockEntry() {
     staleTime: 30000,
     enabled: canReadProductionSession,
   });
+
+  if (isPressingOnlyWorker) {
+    return (
+      <FactoryMobilePage>
+        <PressingMachineManagement active />
+      </FactoryMobilePage>
+    );
+  }
 
   return (
     <FactoryMobilePage>

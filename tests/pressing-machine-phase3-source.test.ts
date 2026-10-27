@@ -32,7 +32,8 @@ describe("Pressing Machine Phase 3 integration contract", () => {
     expect(manager).toContain("onBarcode={cameraRead}");
     expect(manager).toContain("Scan bale reference / barcode...");
     expect(scanner).toContain("Server confirmed:");
-    expect(scanner).toContain("Stock finalization is a separate workflow");
+    expect(scanner).not.toContain("Stock finalization is a separate workflow");
+    expect(scanner).not.toContain("The camera stays open between reads.");
     expect(scanner).not.toContain("POST /api/factory/finalize");
   });
 });

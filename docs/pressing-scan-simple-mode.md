@@ -4,9 +4,11 @@ This specification supersedes the previously implemented complicated Phase 2 and
 
 ## What workers see
 
-Factory > Stock Entry > Pressing Machines works like Ground Scan: barcode input, Enter/Scan button, optional continuous phone camera, simple scan status, server-confirmed bale list, total bales and KG, date/user filters, and Excel export.
+Factory > Stock Entry > Pressing Machines uses a simplified role-specific layout:
+- **Admin / Owner:** full barcode input, Scan action, continuous camera, scan status/sync details, full-company date/user/status filters, corrections and Excel export.
+- **All other roles:** **Open Camera / Close Camera** and their own scanned-bale list with totals. No manual barcode field, sync/settings panel, report filters, export, or supervisor actions. When Pressing Machines is their only Stock Entry section, omit the Stock Entry header, print settings, daily production KPIs and tab switcher as well. The camera starts on Open Camera and releases on Close Camera; confirmations appear in the camera panel. The worker's list defaults to all time, with pagination for long histories.
 
-Only the existing user/page permission must be configured. A permitted employee opens the page, and the server automatically creates an internal station and assignment if needed. Every accepted scan records the authenticated user, not a configured shift operator. Workers can see their own results; supervisors can filter by employee.
+Only the existing user/page permission must be configured. A permitted employee opens the page, and the server automatically creates an internal station and assignment if needed. Every accepted scan records the authenticated user, not a configured shift operator. Workers can see only their own results. Admin and Owner can filter by employee; Manager and Developer do not receive elevated pressing history access.
 
 ## Removed from the active system
 
@@ -32,4 +34,4 @@ Updated tests include simplified permission and user initialization contracts, o
 
 Local TypeScript checks, Vitest tests, isolated PostgreSQL tests and real-phone camera verification remain required before merging/deploying.
 
-Branch: feature/pressing-machine-tracking. Do not merge or deploy without explicit instruction.
+October 27, 2026 follow-up: feature/pressing-worker-camera-only-20261027 narrows the operator UI and Admin/Owner-only report/correction authorization.

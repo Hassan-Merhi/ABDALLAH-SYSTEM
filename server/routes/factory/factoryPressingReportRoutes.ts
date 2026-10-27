@@ -13,7 +13,8 @@ import { logger } from "../../lib/logger";
 import { pressingReportFiltersSchema, pressingSavedViewSchema, type PressingReportFilters } from "@shared/pressingReportContracts";
 import { factoryLocalDate, settingsTimezone } from "../../services/factory/pressingShiftTime";
 
-const MANAGER_ROLES = new Set(["Developer", "Admin", "Owner", "Manager"]);
+// Worker history is always restricted to the authenticated user, including Manager and Developer.
+const MANAGER_ROLES = new Set(["Admin", "Owner"]);
 type QueryCtx = { companyId: number; userId: string; supervisor: boolean };
 type Param = string | number;
 class ReportPermissionError extends Error {

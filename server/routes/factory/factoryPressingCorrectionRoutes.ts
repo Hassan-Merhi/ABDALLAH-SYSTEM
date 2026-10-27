@@ -22,7 +22,7 @@ import {
 import { logAudit } from "../helpers/auditHelpers";
 import { logger } from "../../lib/logger";
 
-const SUPERVISORS = new Set(["Developer", "Admin", "Owner", "Manager"]);
+const SUPERVISORS = new Set(["Admin", "Owner"]);
 const correctionRequest = z.object({
   reason: z.string().trim().min(10, "A detailed reason of at least 10 characters is required").max(1000),
 }).strict();

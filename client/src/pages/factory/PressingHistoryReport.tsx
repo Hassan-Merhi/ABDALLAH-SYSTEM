@@ -24,12 +24,13 @@ const today = () => {
 const formatError = (error: unknown) =>
   error instanceof Error ? error.message : "Could not load pressing scans";
 
-export default function PressingHistoryReport({ active, companyId, userId }: {
-  active: boolean; companyId: number; userId: string;
+export default function PressingHistoryReport({ active, companyId, userId, simpleMode = false }: {
+  active: boolean; companyId: number; userId: string; simpleMode?: boolean;
 }) {
   const { toast } = useToast();
   const [filters, setFilters] = useState<PressingReportFilters>({
-    from: today(), to: today(), status: "active", mode: "detailed", page: 1, limit: 100,
+    from: simpleMode ? undefined : today(), to: simpleMode ? undefined : today(),
+    status: "active", mode: "detailed", page: 1, limit: 100,
   });
   const [search, setSearch] = useState("");
   const [exporting, setExporting] = useState(false);
@@ -50,10 +51,10 @@ export default function PressingHistoryReport({ active, companyId, userId }: {
   });
   useEffect(() => {
     const day = options.data?.serverToday;
-    if (!day || initialDate) return;
+    if (simpleMode || !day || initialDate) return;
     setInitialDate(true);
     setFilters(current => ({ ...current, from: day, to: day, page: 1 }));
-  }, [options.data?.serverToday, initialDate]);
+  }, [options.data?.serverToday, initialDate, simpleMode]);
 
   const report = useQuery({
     queryKey: [...key, filters],
@@ -84,12 +85,12 @@ export default function PressingHistoryReport({ active, companyId, userId }: {
     <section className="min-w-0 space-y-3" data-testid="pressing-history-report">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="font-semibold text-base">Scanned Bales</h3>
-        <Button size="sm" variant="outline" disabled={exporting || invalidDates}
+        {!simpleMode && <Button size="sm" variant="outline" disabled={exporting || invalidDates}
           onClick={() => void excel()}>
           <Download className="mr-2 h-4 w-4" />{exporting ? "Exporting…" : "Export Excel"}
-        </Button>
+        </Button>}
       </div>
-      <div className="flex flex-wrap gap-2">
+      {!simpleMode && <div className="flex flex-wrap gap-2">
         <Button size="sm" variant="outline" onClick={() => {
           const day = options.data?.serverToday || today();
           update({ from: day, to: day });
@@ -104,8 +105,8 @@ export default function PressingHistoryReport({ active, companyId, userId }: {
           void queryClient.invalidateQueries({ queryKey: key })}>
           <RefreshCw className="mr-1 h-4 w-4" />Refresh
         </Button>
-      </div>
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+      </div>}
+      {!simpleMode && <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
         <label className="text-xs space-y-1">From
           <Input type="date" value={filters.from || ""}
             onChange={e => update({ from: e.target.value || undefined })} />
@@ -141,7 +142,7 @@ export default function PressingHistoryReport({ active, companyId, userId }: {
             <option value="all">All</option>
           </select>
         </label>}
-      </div>
+      </div>}
       {invalidDates && <p role="alert" className="text-sm text-destructive">From date cannot exceed To date.</p>}
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border p-3 text-sm">
         <span><strong className="text-lg">{Number(total?.totalBales || 0).toLocaleString()}</strong> bales scanned</span>
@@ -174,7 +175,7 @@ export default function PressingHistoryReport({ active, companyId, userId }: {
           </tbody>
         </table>
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+      {(!simpleMode || pageCount > 1) && <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
         <span>{report.data?.total || 0} scans · Page {filters.page} / {pageCount}</span>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" disabled={filters.page <= 1}
@@ -182,8 +183,8 @@ export default function PressingHistoryReport({ active, companyId, userId }: {
           <Button size="sm" variant="outline" disabled={filters.page >= pageCount}
             onClick={() => setFilters(current => ({ ...current, page: current.page + 1 }))}>Next</Button>
         </div>
-      </div>
-      {canSeeEveryone && (
+      </div>}
+      {!simpleMode && canSeeEveryone && (
         <div className="pt-2">
           <Button size="sm" variant="ghost" onClick={() => setShowCorrections(v => !v)}>
             <ShieldCheck className="mr-2 h-4 w-4" />
