@@ -99,6 +99,7 @@ export function registerStatsMultiCurrencyRoutes(app: Express) {
           skippedAccountKeys: translated.skipped,
           unresolvedAccountCount: valuation.unresolvedAccountCount,
           needsReviewCount: valuation.needsReviewCount,
+          rateErrorsByCurrency: valuation.rateErrorsByCurrency,
           appliedToCurrentSnapshotOnly: true,
           reportTotalsProvisional: Boolean(previous.reportTotalsProvisional) ||
             valuation.unresolvedAccountCount > 0 || valuation.needsReviewCount > 0,
