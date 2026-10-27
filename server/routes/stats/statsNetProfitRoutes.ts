@@ -64,7 +64,7 @@ export function registerStatsNetProfitRoutes(app: Express) {
       // Dated historical snapshots use locked posted USD and may remain cached.
       const _cached = toDate ? _getCached(_cacheKey) : null;
       if (_cached) return res.json(_cached);
-      if (!toDate) res.setHeader("Cache-Control", "private, no-store");
+      if (!toDate) res.setHeader?.("Cache-Control", "private, no-store");
 
       // All the report's raw inputs - company row, ledger accounts and the three
       // grouped balance maps - are loaded in ./netProfitDataLoad.
