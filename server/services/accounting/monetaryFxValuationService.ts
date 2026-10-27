@@ -18,7 +18,7 @@ import { openingSideOf } from "./balances/openingSide";
 import { customerLinksBody, noNonCustomerTarget } from "./balances/partyLineRules";
 import {
   canonicalMonetaryCurrency, monetaryFxEligibility, translateMonetaryFxBalance,
-  type MonetaryFxCategory, type MonetaryFxEligibility, type MonetaryFxKind, type MonetaryFxRate,
+  type MonetaryFxCategory, type MonetaryFxEligibility, type MonetaryFxEligibilityOptions, type MonetaryFxKind, type MonetaryFxRate,
   type MonetaryFxRateMap,
 } from "./monetaryFxValuationCore";
 
@@ -251,7 +251,11 @@ function decimal(input: string | number | null | undefined): Decimal {
 }
 
 /** Primary Phase 2 read model. No rate writes or posting side effects. */
-export async function getMonetaryFxValuation(companyId: number): Promise<MonetaryFxValuationResult> {
+export async function getMonetaryFxValuation(
+  companyId: number,
+  // Only trusted server-side policy data may approve additional monetary assets.
+  policy: MonetaryFxEligibilityOptions = {}
+): Promise<MonetaryFxValuationResult> {
   if (!Number.isSafeInteger(companyId) || companyId <= 0) throw new Error("A selected company is required.");
   return db.transaction(async (tx) => {
     await assertTransactionCompanyScope(tx, companyId);
@@ -271,7 +275,7 @@ export async function getMonetaryFxValuation(companyId: number): Promise<Monetar
       const policy = monetaryFxEligibility({
         kind: master.kind, id: Number(master.id), code: master.code,
         name: master.name, accountType: master.account_type, subType: master.sub_type,
-      });
+      }, policy);
       if (policy === "excluded" || policy === "needs_review") continue;
       eligibleKeys.add(`${master.kind}:${master.id}`);
       const currency = canonicalMonetaryCurrency(master.opening_balance_currency);
@@ -300,7 +304,7 @@ export async function getMonetaryFxValuation(companyId: number): Promise<Monetar
     const eligibility = monetaryFxEligibility({
       kind: master.kind, id: Number(master.id), code: master.code,
       name: master.name, accountType: master.account_type, subType: master.sub_type,
-    });
+    }, policy);
     if (eligibility === "excluded") {
       excludedMasters++;
       continue;
