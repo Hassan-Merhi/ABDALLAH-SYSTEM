@@ -68,6 +68,11 @@ export async function saveCompanyExchangeRate(actor: RateActor, input: CompanyRa
     // A repeated submission of the same numerical rate is not a new revision.
     // Do not rewrite the row or create another audit event for a no-op.
     if (existing && new Decimal(String(existing.rate)).eq(new Decimal(input.rate))) {
+      // A no-op rate must not disguise a conflicting reverse-direction
+      // rate already stored for that day.
+      if (input.fromCurrency === "USD") {
+        await datedMonetaryRateTx(tx, actor.companyId, input.toCurrency, input.effectiveDate);
+      }
       return existing;
     }
     const [saved] = existing
