@@ -348,6 +348,18 @@ export async function getMonetaryFxValuation(
     }
 
     const opening = decimal(master.opening_balance);
+    // A zero historical opening cannot quietly carry a nonzero *native*
+    // opening. Such a discrepancy needs review, not a newly invented USD
+    // balance after a rate change.
+    if (opening.isZero() && (
+      (master.opening_balance_base_amount != null &&
+        decimal(master.opening_balance_base_amount).abs().gt("0.03")) ||
+      (master.opening_balance_native_amount != null &&
+        !decimal(master.opening_balance_native_amount).isZero())
+    )) {
+      unresolvedOpening = true;
+      openingBookMismatch = true;
+    }
     if (!opening.isZero()) {
       const currency = canonicalMonetaryCurrency(master.opening_balance_currency);
       if (
