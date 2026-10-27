@@ -241,3 +241,59 @@ export function applyCurrentAccountsFxOverlay<
     };
   });
 }
+
+/**
+ * Customer-list/Factory Parties presentation projection. It cannot reprice
+ * nonledger operational memos or held-unfinalized charges; those rows keep
+ * their existing historical USD and expose provisional metadata.
+ */
+export function applyCurrentCustomerFxOverlay<
+  T extends { id: number; balance: number; balanceSide: string; notInLedgerTotal?: number; heldUnfinalizedCharges?: number }
+>(
+  rows: T[],
+  valuation: MonetaryFxValuationResult
+): Array<T & {
+  historicalBalanceUsd?: string;
+  currentTranslatedUsd?: string;
+  nativeBalancesByCurrency?: Record<string, string>;
+  monetaryFxProvisional?: boolean;
+  currencyRevalued?: boolean;
+}> {
+  const customers = new Map(
+    valuation.accounts.filter((val) => val.accountKind === "customer")
+      .map((val) => [val.id, val])
+  );
+  return rows.map((row) => {
+    const val = customers.get(row.id);
+    if (!val) return row;
+    if (
+      val.provisional || val.currentTranslatedUsd === null || val.historicalBaseUsd === null ||
+      Math.abs(row.notInLedgerTotal ?? 0) >= 0.005 ||
+      Math.abs(row.heldUnfinalizedCharges ?? 0) >= 0.005
+    ) return { ...row, monetaryFxProvisional: true };
+    const signedBook = new Decimal(row.balance).mul(row.balanceSide === "Cr" ? -1 : 1);
+    if (!signedBook.isFinite() || signedBook.minus(val.historicalBaseUsd).abs().gt("0.03")) {
+      return { ...row, monetaryFxProvisional: true };
+    }
+    const translated = new Decimal(val.currentTranslatedUsd);
+    const nextBalance = translated.abs().toDecimalPlaces(2).toNumber();
+    const nextSide = translated.isNegative() ? "Cr" : "Dr";
+    return {
+      ...row,
+      balance: nextBalance,
+      balanceSide: nextSide,
+      // Factory Party ledger components share this single book ownership;
+      // operational memo stays zero on the eligible path.
+      ...("ledgerBalance" in row ? {
+        ledgerBalance: nextBalance,
+        ledgerBalanceSide: nextSide,
+        generalLedgerBalance: nextBalance,
+        generalLedgerBalanceSide: nextSide,
+      } : {}),
+      historicalBalanceUsd: signedBook.toDecimalPlaces(6).toFixed(6),
+      currentTranslatedUsd: val.currentTranslatedUsd,
+      nativeBalancesByCurrency: val.nativeBalancesByCurrency,
+      currencyRevalued: true,
+    };
+  });
+}
