@@ -37,6 +37,7 @@ function account(
     deleted: false,
     nativeBalancesByCurrency: { CFA: "61200.000000" },
     historicalBaseUsd,
+    bookClosingUsd: new Decimal(historicalBaseUsd).toDecimalPlaces(2).toFixed(6),
     currentTranslatedUsd,
     translationDifferenceUsd: currentTranslatedUsd === null ? null
       : new Decimal(currentTranslatedUsd).minus(historicalBaseUsd).toFixed(6),
@@ -149,7 +150,9 @@ describe("Phase 6 signed net-position reconciliation", () => {
       { key: "ledger:33", reason: "missing_in_report" },
       { key: "ledger:11", reason: "unresolved" },
     ]);
-    expect(result.payload.forUsTotal).toBe(70);
+    // Nothing applied: the source report is returned untouched (no totals rewritten).
+    expect(result.payload.forUsTotal).toBeUndefined();
+    expect(result.payload.forUs?.total).toBe(70);
   });
 
   it("uses only configured monetary account types, with no supplier or inventory translation", () => {

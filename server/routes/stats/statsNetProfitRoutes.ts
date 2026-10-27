@@ -364,6 +364,12 @@ export function registerStatsNetProfitRoutes(app: Express) {
           (side === "asset" ? forUsAccounts : onUsAccounts).push({
             ...(line.id !== undefined ? { id: line.id } : {}),
             ...(line.bankAccountId !== undefined ? { bankAccountId: line.bankAccountId } : {}),
+            // The owner identity of the party row. The current-rate monetary
+            // translation replaces customer rows by customer:id; without it a
+            // customer could only be found by its linked ledger id, which the
+            // valuation deliberately never keys (it belongs to the customer).
+            partyKind: line.partyKind,
+            partyId: line.partyId,
             name: line.name,
             code: line.code,
             value: line.value,

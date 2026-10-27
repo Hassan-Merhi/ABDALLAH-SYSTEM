@@ -21,6 +21,8 @@ export const FX_RATE_REFRESH_PATHS = [
   "/api/stats/ratios",
   "/api/stats/import-cycle-balance",
   "/api/reports/net-position",
+  "/api/reports/balance-sheet",
+  "/api/reports/ratios",
   "/api/balance-sheet",
   "/api/factory/net-position",
   "/api/dashboard",

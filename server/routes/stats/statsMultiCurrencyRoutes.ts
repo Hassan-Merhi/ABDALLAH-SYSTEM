@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import Decimal from "decimal.js";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { requireAuth, requireNonPOS } from "../../auth";
@@ -83,16 +84,53 @@ export function registerStatsMultiCurrencyRoutes(app: Express) {
         if (adjusted.equity && adjusted.equity.includedInNetPosition == null) {
           adjusted.equity.includedInNetPosition = false;
         }
+        const isCashBankKey = (key: string) => key.startsWith("ledger:") || key.startsWith("bank:");
+        const cashBankApplied = translated.appliedKeys.some(isCashBankKey);
         if (adjusted.currency) {
-          adjusted.currency.currentCashBankTranslationApplied = translated.appliedKeys.some((key) =>
-            key.startsWith("ledger:") || key.startsWith("bank:")
-          );
+          if (cashBankApplied) adjusted.currency.currentCashBankTranslationApplied = true;
+          else adjusted.currency.currentCashBankTranslationApplied = false;
           adjusted.currency.currentMonetaryTranslationApplied = translated.appliedKeys.length > 0;
         }
+        // Compatibility figures of the former cash/bank-only translation: the
+        // company's current CFA / ZMW quotes (foreign per USD) and the cash/bank
+        // share of the translation difference, both read from the same
+        // valuation so no second rate lookup can disagree with it.
+        const quoteForeignPerUsd = (currency: string): string | null => {
+          const quote = valuation.rates.find((rate) => rate.currency === currency);
+          if (!quote) return null;
+          const rate = new Decimal(quote.rate);
+          if (!rate.isFinite() || rate.lte(0)) return null;
+          return (quote.direction === "FOREIGN_PER_USD" ? rate : new Decimal(1).div(rate))
+            .toDecimalPlaces(10).toFixed(10);
+        };
+        const appliedKeySet = new Set(translated.appliedKeys);
+        const cashBankDifference = valuation.accounts
+          .filter((account) => appliedKeySet.has(account.accountKey) && isCashBankKey(account.accountKey))
+          .reduce((sum, account) => sum.plus(account.translationDifferenceUsd ?? 0), new Decimal(0));
+        const unresolvedAccounts = valuation.accounts
+          .filter((account) => account.provisional && account.eligibility !== "needs_review")
+          .map((account) => ({
+            accountKind: account.accountKind,
+            accountKey: account.accountKey,
+            id: account.id,
+            name: account.name,
+            category: account.category,
+            openingBalanceCurrencyUnresolved: account.unresolvedOpening,
+            openingBookMismatch: account.openingBookMismatch,
+            unresolvedLegacyEntryCount: account.unresolvedEntryCount,
+            currentRateMissing: account.unresolvedCurrencies.some(
+              (currency) => valuation.rateErrorsByCurrency[currency] !== undefined
+            ),
+            unresolvedTranslationCurrencies: account.unresolvedCurrencies,
+          }));
         const previous = adjusted.currencyRevaluation ?? {};
         adjusted.currencyRevaluation = {
           ...previous,
           valuationMode: "CURRENT",
+          currentCfaPerUsd: quoteForeignPerUsd("CFA"),
+          currentZmwPerUsd: quoteForeignPerUsd("ZMW"),
+          currentCashBankTranslationDifference: cashBankDifference.toDecimalPlaces(2).toNumber(),
+          unresolvedAccounts,
           currentMonetaryTranslationApplied: translated.appliedKeys.length > 0,
           currentMonetaryTranslationDifferenceUsd: translated.currentMonetaryTranslationDifferenceUsd,
           appliedAccountKeys: translated.appliedKeys,

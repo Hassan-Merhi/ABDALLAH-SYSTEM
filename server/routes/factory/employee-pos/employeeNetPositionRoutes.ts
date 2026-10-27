@@ -852,7 +852,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       // monetary ledger/customer rows, never its inventory/supplier/operational
       // memo rows. Pinned secondary companies need a separate authorized
       // reporting scope; never borrow the ERP session's exchange rate.
-      if (!asOfContext.isHistorical && Number(req.session.currentCompanyId) === companyId) {
+      if (!asOfContext.isHistorical && Number(req.session?.currentCompanyId) === companyId) {
         try {
           const valuation = await getMonetaryFxValuation(companyId);
           const projected = applyVerifiedMonetaryFxOverlay(

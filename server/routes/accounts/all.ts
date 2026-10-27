@@ -379,7 +379,7 @@ export async function serveAccountListForCompany(req: Request, res: Response, co
     // A Factory-pinned secondary tenant is a separate authorized scope, so
     // this overlay runs only when it matches the active session company.
     let currentUsdAccounts = accounts;
-    if (!balStartDate && !effectiveEndDate && req.session.currentCompanyId === companyId) {
+    if (!balStartDate && !effectiveEndDate && Number(req.session?.currentCompanyId) === companyId) {
       try {
         const valuation = await getMonetaryFxValuation(companyId);
         currentUsdAccounts = applyCurrentAccountsFxOverlay(accounts, valuation);

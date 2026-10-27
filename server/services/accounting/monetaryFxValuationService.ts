@@ -44,6 +44,8 @@ type NativeMovementRow = {
   entry_currency: string;
   native_net: string;
   historical_base_net: string;
+  /** Posted book USD (debit_amount - credit_amount), the balance engine's `closing` basis. */
+  posted_net: string;
   unresolved_count: string;
 };
 
@@ -58,7 +60,15 @@ export interface MonetaryFxValuationRow {
   eligibility: MonetaryFxEligibility;
   deleted: boolean;
   nativeBalancesByCurrency: Record<string, string>;
+  /** Signed book USD on the historical base-amount basis (base_debit/base_credit, 6 dp). */
   historicalBaseUsd: string | null;
+  /**
+   * Signed book USD on the posted-amount basis (debit_amount/credit_amount, 2 dp
+   * per line): the balance engine's `closing`, which the Accounts list, the
+   * Customers list and the Factory Net Position present. Always known; it is
+   * the figure a consumer must match before replacing a row.
+   */
+  bookClosingUsd: string;
   currentTranslatedUsd: string | null;
   translationDifferenceUsd: string | null;
   unresolvedCurrencies: string[];
@@ -178,7 +188,8 @@ async function loadNativeMovements(tx: DbTransaction, companyId: number, busines
                  THEN COALESCE(ve.base_debit_amount,ve.debit_amount,0)::numeric -
                       COALESCE(ve.base_credit_amount,ve.credit_amount,0)::numeric
                ELSE 0::numeric
-             END AS historical_base_net
+             END AS historical_base_net,
+             COALESCE(ve.debit_amount, 0)::numeric - COALESCE(ve.credit_amount, 0)::numeric AS posted_net
         FROM voucher_entries ve JOIN vouchers v ON v.id = ve.voucher_id
        WHERE v.company_id = $1 AND v.optional = false AND v.deleted_at IS NULL
          AND COALESCE(v.effective_date,v.voucher_date) <= $2::date
@@ -201,7 +212,7 @@ async function loadNativeMovements(tx: DbTransaction, companyId: number, busines
              ELSE COALESCE(p.ledger_account_id,p.bank_account_id,p.fixed_asset_id,
                            p.supplier_id,p.employee_id,p.factory_supplier_id,p.customer_id)
         END AS target_id,
-        p.entry_currency, p.native_net, p.historical_base_net
+        p.entry_currency, p.native_net, p.historical_base_net, p.posted_net
       FROM posted p
       LEFT JOIN ledger_accounts la ON la.id = p.ledger_account_id AND la.company_id = $1
       LEFT JOIN customer_links cl ON cl.ledger_account_id = la.id
@@ -209,6 +220,7 @@ async function loadNativeMovements(tx: DbTransaction, companyId: number, busines
     SELECT kind, target_id, entry_currency,
            SUM(native_net)::text AS native_net,
            SUM(historical_base_net)::text AS historical_base_net,
+           SUM(posted_net)::text AS posted_net,
            COUNT(*) FILTER (WHERE entry_currency = '__UNRESOLVED__')::text AS unresolved_count
     FROM attributed
     WHERE kind IN ('ledger', 'bank', 'customer') AND target_id IS NOT NULL
@@ -330,10 +342,14 @@ export async function getMonetaryFxValuation(
     const accountKey = `${master.kind}:${master.id}`;
     const native = new Map<string, Decimal>();
     let historical = new Decimal(0);
+    // The engine's book closing: signed master opening + every posted line's
+    // debit_amount - credit_amount, unresolved currency evidence included.
+    let bookClosing = new Decimal(0);
     let unresolvedOpening = false;
     let openingBookMismatch = false;
     let unresolvedEntryCount = 0;
     for (const movement of movementsByKey.get(accountKey) ?? []) {
+      bookClosing = bookClosing.plus(decimal(movement.posted_net));
       if (movement.entry_currency === "__UNRESOLVED__") {
         unresolvedEntryCount += Number(movement.unresolved_count) || 0;
         continue;
@@ -348,6 +364,9 @@ export async function getMonetaryFxValuation(
     }
 
     const opening = decimal(master.opening_balance);
+    const openingSign =
+      openingSideOf(master.kind, master.account_type, master.opening_balance_side).side === "Cr" ? -1 : 1;
+    bookClosing = bookClosing.plus(opening.mul(openingSign));
     // A zero historical opening cannot quietly carry a nonzero *native*
     // opening. Such a discrepancy needs review, not a newly invented USD
     // balance after a rate change.
@@ -368,8 +387,7 @@ export async function getMonetaryFxValuation(
       ) {
         unresolvedOpening = true;
       } else {
-        const side = openingSideOf(master.kind, master.account_type, master.opening_balance_side).side;
-        const sign = side === "Cr" ? -1 : 1;
+        const sign = openingSign;
         const nativeOpening = decimal(master.opening_balance_native_amount);
         const baseOpening = decimal(master.opening_balance_base_amount);
         // The balance engine's immutable/book opening is opening_balance.
@@ -403,6 +421,7 @@ export async function getMonetaryFxValuation(
       deleted: Boolean(master.deleted),
       nativeBalancesByCurrency: calculation.nativeBalancesByCurrency,
       historicalBaseUsd: calculation.historicalBaseUsd,
+      bookClosingUsd: bookClosing.toDecimalPlaces(6).toFixed(6),
       // Unapproved generic assets must never receive an automatic valuation.
       currentTranslatedUsd: eligibility === "needs_review" ? null : calculation.currentTranslatedUsd,
       translationDifferenceUsd: eligibility === "needs_review" ? null : calculation.translationDifferenceUsd,

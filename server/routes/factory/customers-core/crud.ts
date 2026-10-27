@@ -50,7 +50,7 @@ export function registerFactoryCustomerCrudRoutes(app: Express) {
       // Only the active company's verified posted customer balance may be
       // translated. Factory operational memo/held charges have no single
       // proven original currency and remain at their current USD book basis.
-      if (Number(req.session.currentCompanyId) === companyId) {
+      if (Number(req.session?.currentCompanyId) === companyId) {
         try {
           const valuation = await getMonetaryFxValuation(companyId);
           return res.json(applyCurrentCustomerFxOverlay(customersWithBalances, valuation));
