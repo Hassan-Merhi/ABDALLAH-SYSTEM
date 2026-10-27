@@ -76,6 +76,8 @@ export interface MonetaryReportOverlayResult {
   appliedKeys: string[];
   skipped: MonetaryReportOverlayDiagnostic[];
   currentMonetaryTranslationDifferenceUsd: string;
+  ledgerForUsDelta: number;
+  ledgerOnUsDelta: number;
 }
 
 /** Mutates only the caller's disposable/JSON-cloned report, not its cached source. */
@@ -86,7 +88,7 @@ export function applyVerifiedMonetaryFxOverlay(
   const appliedKeys: string[] = [];
   const skipped: MonetaryReportOverlayDiagnostic[] = [];
   if (!payload?.forUs || !payload.onUs) {
-    return { payload, appliedKeys, skipped, currentMonetaryTranslationDifferenceUsd: "0.000000" };
+    return { payload, appliedKeys, skipped, currentMonetaryTranslationDifferenceUsd: "0.000000", ledgerForUsDelta: 0, ledgerOnUsDelta: 0 };
   }
   const sides = { forUs: payload.forUs, onUs: payload.onUs };
   const totals = {
@@ -94,6 +96,8 @@ export function applyVerifiedMonetaryFxOverlay(
     onUs: new Decimal(payload.onUs.total ?? payload.onUsTotal ?? 0),
   };
   let appliedDifference = new Decimal(0);
+  let ledgerForUsDelta = new Decimal(0);
+  let ledgerOnUsDelta = new Decimal(0);
   for (const val of valuation.accounts) {
     if (val.eligibility === "needs_review") continue;
     const current = val.currentTranslatedUsd;
@@ -127,6 +131,10 @@ export function applyVerifiedMonetaryFxOverlay(
     }
     sides[oldSide].accounts = sides[oldSide].accounts.filter((row) => row !== oldRow);
     totals[oldSide] = totals[oldSide].minus(oldRow.value);
+    if (val.accountKind !== "customer") {
+      if (oldSide === "forUs") ledgerForUsDelta = ledgerForUsDelta.minus(oldRow.value);
+      else ledgerOnUsDelta = ledgerOnUsDelta.minus(oldRow.value);
+    }
     if (!translated.isZero()) {
       const targetSide: PositionSide = translated.gte(0) ? "forUs" : "onUs";
       const value = money(translated.abs());
@@ -141,11 +149,20 @@ export function applyVerifiedMonetaryFxOverlay(
         translationDifference: val.translationDifferenceUsd,
       });
       totals[targetSide] = totals[targetSide].plus(value);
+      if (val.accountKind !== "customer") {
+        if (targetSide === "forUs") ledgerForUsDelta = ledgerForUsDelta.plus(value);
+        else ledgerOnUsDelta = ledgerOnUsDelta.plus(value);
+      }
     }
     appliedDifference = appliedDifference.plus(translated.minus(historical));
     appliedKeys.push(val.accountKey);
   }
 
+  // No successful replacements: preserve the source report exactly, including
+  // specialized operational breakdowns, labels and signed category rules.
+  if (appliedKeys.length === 0) {
+    return { payload, appliedKeys, skipped, currentMonetaryTranslationDifferenceUsd: "0.000000", ledgerForUsDelta: 0, ledgerOnUsDelta: 0 };
+  }
   for (const side of ["forUs", "onUs"] as const) {
     const entry = sides[side];
     entry.total = money(totals[side]);
@@ -175,6 +192,8 @@ export function applyVerifiedMonetaryFxOverlay(
     appliedKeys,
     skipped,
     currentMonetaryTranslationDifferenceUsd: appliedDifference.toDecimalPlaces(6).toFixed(6),
+    ledgerForUsDelta: money(ledgerForUsDelta),
+    ledgerOnUsDelta: money(ledgerOnUsDelta),
   };
 }
 
