@@ -263,14 +263,24 @@ export async function getMonetaryFxValuation(companyId: number): Promise<Monetar
     const baseCurrency = canonicalMonetaryCurrency(company.base_currency) ?? "USD";
     const masters = await loadMonetaryMasters(tx, companyId);
     const movements = await loadNativeMovements(tx, companyId, businessDate);
+    // Only rate-check eligible accounts. A malformed or unrelated currency on
+    // a supplier/nonmonetary/ambiguous Asset must not poison every valuation.
+    const eligibleKeys = new Set<string>();
     const currencies = new Set<string>();
     for (const master of masters) {
+      const policy = monetaryFxEligibility({
+        kind: master.kind, id: Number(master.id), code: master.code,
+        name: master.name, accountType: master.account_type, subType: master.sub_type,
+      });
+      if (policy === "excluded" || policy === "needs_review") continue;
+      eligibleKeys.add(`${master.kind}:${master.id}`);
       const currency = canonicalMonetaryCurrency(master.opening_balance_currency);
       if (currency) currencies.add(currency);
     }
     for (const movement of movements) {
+      if (!eligibleKeys.has(`${movement.kind}:${movement.target_id}`)) continue;
       const currency = canonicalMonetaryCurrency(movement.entry_currency);
-      if (currency && currency !== "__UNRESOLVED__") currencies.add(currency);
+      if (currency) currencies.add(currency);
     }
     const rates = baseCurrency === "USD"
       ? await resolveValuationRates(tx, companyId, businessDate, currencies)
@@ -284,7 +294,7 @@ export async function getMonetaryFxValuation(companyId: number): Promise<Monetar
   }
 
   let excludedMasters = 0;
-  let customerLinkedLedgerMasters = masters.filter((m) => m.kind === "customer" && m.linked_ledger_id != null).length;
+  const customerLinkedLedgerMasters = masters.filter((m) => m.kind === "customer" && m.linked_ledger_id != null).length;
   const accounts: MonetaryFxValuationRow[] = [];
   for (const master of masters) {
     const eligibility = monetaryFxEligibility({
