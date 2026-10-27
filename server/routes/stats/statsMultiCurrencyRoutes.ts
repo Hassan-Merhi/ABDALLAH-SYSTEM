@@ -3,6 +3,8 @@ import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { requireAuth, requireNonPOS } from "../../auth";
 import { getMonetaryFxValuation } from "../../services/accounting/monetaryFxValuationService";
+import { getMonetaryFxHistoricalRatePreview } from "../../services/accounting/monetaryFxHistoricalRatePreview";
+import { MonetaryFxError } from "../../services/accounting/monetaryFxRates";
 import {
   applyVerifiedMonetaryFxOverlay,
   type MonetaryNetPositionPayload,
@@ -18,6 +20,29 @@ import {
  * not need the separate Analytics-module permission to view cash/bank balances.
  */
 export function registerStatsMultiCurrencyRoutes(app: Express) {
+  // Phase 5: audit-friendly effective rates for a selected company-local date.
+  // Historical ACCOUNT balances remain booked at their original USD basis.
+  // A rate from today must never be applied to today's balances and passed
+  // off as a historical balance-sheet snapshot.
+  app.get("/api/accounts/multi-currency/rates-as-of", requireAuth, requireNonPOS, async (req, res) => {
+    const companyId = req.session.currentCompanyId;
+    if (!companyId) return res.status(400).json({ code: "FX_COMPANY_INVALID", message: "No company selected" });
+    const asOf = req.query.asOf;
+    if (typeof asOf !== "string") {
+      return res.status(400).json({ code: "FX_DATE_INVALID", message: "Provide asOf in YYYY-MM-DD format" });
+    }
+    res.setHeader("Cache-Control", "private, no-store");
+    try {
+      return res.json(await getMonetaryFxHistoricalRatePreview(companyId, asOf));
+    } catch (error: unknown) {
+      if (error instanceof MonetaryFxError) {
+        return res.status(error.status).json({ code: error.code, message: error.message });
+      }
+      logger.error("Historical company FX rate preview failed", { companyId, error });
+      return res.status(500).json({ code: "FX_AS_OF_PREVIEW_FAILED", message: getErrorMessage(error) });
+    }
+  });
+
   // Phase 2: read-only four-category valuation. This does NOT adjust report
   // totals yet; later phases will integrate uniquely attributed rows.
   app.get("/api/accounts/multi-currency/monetary-valuation", requireAuth, requireNonPOS, async (req, res) => {
