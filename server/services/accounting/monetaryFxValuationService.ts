@@ -12,7 +12,7 @@ import { db, type DbTransaction } from "../../db";
 import { sql } from "drizzle-orm";
 import { resultRows } from "../../lib/queryResult";
 import { assertTransactionCompanyScope } from "../security/transactionCompanyScope";
-import { datedMonetaryRateTx, fxDay } from "./monetaryFxRates";
+import { datedMonetaryRateTx, fxDay, MonetaryFxError } from "./monetaryFxRates";
 import { companyBusinessDate } from "./companyBusinessDate";
 import { openingSideOf } from "./balances/openingSide";
 import { customerLinksBody, noNonCustomerTarget } from "./balances/partyLineRules";
@@ -64,6 +64,7 @@ export interface MonetaryFxValuationRow {
   unresolvedCurrencies: string[];
   unresolvedEntryCount: number;
   unresolvedOpening: boolean;
+  openingBookMismatch: boolean;
   provisional: boolean;
 }
 
@@ -76,6 +77,8 @@ export interface MonetaryFxValuationResult {
   fxVouchersPosted: false;
   accounts: MonetaryFxValuationRow[];
   rates: MonetaryFxRate[];
+  /** Saved-rate conflicts do not suppress other currency translations. */
+  rateErrorsByCurrency: Record<string, string>;
   eligibleAccountCount: number;
   unresolvedAccountCount: number;
   needsReviewCount: number;
@@ -230,20 +233,32 @@ function readSql(query: string, companyId: number, businessDate?: string) {
 /** The existing audited datedMonetaryRateTx is authoritative for directions/conflicts. */
 async function resolveValuationRates(
   tx: DbTransaction, companyId: number, day: string, currencies: ReadonlySet<string>
-): Promise<MonetaryFxRateMap> {
+): Promise<{ rates: MonetaryFxRateMap; errors: Record<string, string> }> {
   const rates = new Map<string, MonetaryFxRate>();
+  const errors: Record<string, string> = {};
   for (const code of [...currencies].sort()) {
     if (code === "USD") continue;
-    const quote = await datedMonetaryRateTx(tx, companyId, code, day);
-    if (!quote) continue;
-    rates.set(code, {
-      currency: code,
-      rate: quote.source === "DIRECT_RECORDED" ? quote.rateUnitPerBase : quote.rateBasePerUnit,
-      direction: quote.source === "DIRECT_RECORDED" ? "FOREIGN_PER_USD" : "USD_PER_FOREIGN",
-      effectiveDate: quote.effectiveDate,
-    });
+    try {
+      const quote = await datedMonetaryRateTx(tx, companyId, code, day);
+      if (!quote) {
+        errors[code] = "FX_RATE_MISSING";
+        continue;
+      }
+      rates.set(code, {
+        currency: code,
+        rate: quote.source === "DIRECT_RECORDED" ? quote.rateUnitPerBase : quote.rateBasePerUnit,
+        direction: quote.source === "DIRECT_RECORDED" ? "FOREIGN_PER_USD" : "USD_PER_FOREIGN",
+        effectiveDate: quote.effectiveDate,
+      });
+    } catch (error) {
+      if (!(error instanceof MonetaryFxError)) throw error;
+      // A conflicting stored EUR rate must not prevent a valid CFA account
+      // from being valued. It does, however, make all affected EUR rows
+      // provisional until an audited rate-history repair is approved.
+      errors[code] = error.code;
+    }
   }
-  return rates;
+  return { rates, errors };
 }
 
 function decimal(input: string | number | null | undefined): Decimal {
@@ -288,9 +303,10 @@ export async function getMonetaryFxValuation(
       const currency = canonicalMonetaryCurrency(movement.entry_currency);
       if (currency) currencies.add(currency);
     }
-    const rates = baseCurrency === "USD"
+    const rateResolution = baseCurrency === "USD"
       ? await resolveValuationRates(tx, companyId, businessDate, currencies)
-      : new Map<string, MonetaryFxRate>();
+      : { rates: new Map<string, MonetaryFxRate>(), errors: {} as Record<string, string> };
+    const rates = rateResolution.rates;
   const movementsByKey = new Map<string, NativeMovementRow[]>();
   for (const movement of movements) {
     const key = `${movement.kind}:${movement.target_id}`;
@@ -315,6 +331,7 @@ export async function getMonetaryFxValuation(
     const native = new Map<string, Decimal>();
     let historical = new Decimal(0);
     let unresolvedOpening = false;
+    let openingBookMismatch = false;
     let unresolvedEntryCount = 0;
     for (const movement of movementsByKey.get(accountKey) ?? []) {
       if (movement.entry_currency === "__UNRESOLVED__") {
@@ -341,9 +358,20 @@ export async function getMonetaryFxValuation(
       } else {
         const side = openingSideOf(master.kind, master.account_type, master.opening_balance_side).side;
         const sign = side === "Cr" ? -1 : 1;
-        native.set(currency, (native.get(currency) ?? new Decimal(0))
-          .plus(decimal(master.opening_balance_native_amount).mul(sign)));
-        historical = historical.plus(decimal(master.opening_balance_base_amount).mul(sign));
+        const nativeOpening = decimal(master.opening_balance_native_amount);
+        const baseOpening = decimal(master.opening_balance_base_amount);
+        // The balance engine's immutable/book opening is opening_balance.
+        // If the supplemental currency metadata disagrees with the actual
+        // book, we cannot safely translate the account. Preserve book USD.
+        if (!nativeOpening.isFinite() || !baseOpening.isFinite() ||
+            baseOpening.minus(opening.abs()).abs().gt("0.03")) {
+          openingBookMismatch = true;
+          unresolvedOpening = true;
+        } else {
+          native.set(currency, (native.get(currency) ?? new Decimal(0))
+            .plus(nativeOpening.mul(sign)));
+          historical = historical.plus(baseOpening.mul(sign));
+        }
       }
     }
 
@@ -369,6 +397,7 @@ export async function getMonetaryFxValuation(
       unresolvedCurrencies: calculation.unresolvedCurrencies,
       unresolvedEntryCount,
       unresolvedOpening,
+      openingBookMismatch,
       provisional: eligibility === "needs_review" || calculation.provisional,
     });
   }
@@ -378,6 +407,7 @@ export async function getMonetaryFxValuation(
     bookBalancesModified: false, fxVouchersPosted: false,
     accounts,
     rates: [...rates.values()].sort((a,b)=>a.currency.localeCompare(b.currency)),
+    rateErrorsByCurrency: rateResolution.errors,
     eligibleAccountCount: accounts.filter(a=>a.eligibility!=="needs_review").length,
     unresolvedAccountCount: accounts.filter(a=>a.provisional && a.eligibility!=="needs_review").length,
     needsReviewCount: accounts.filter(a=>a.eligibility==="needs_review").length,
