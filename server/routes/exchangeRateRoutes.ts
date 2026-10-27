@@ -15,6 +15,7 @@ import { normalizeAccountingCurrencyAlias } from "@shared/currencyCatalog";
 import { companyRateValueSchema, companyRateDateSchema } from "@shared/companyRatePolicy";
 import { saveCompanyExchangeRate } from "../services/accounting/exchangeRateWrites";
 import { invalidateCompanyFxRateCaches } from "../services/accounting/invalidateCompanyFxRateCaches";
+import { MonetaryFxError } from "../services/accounting/monetaryFxRates";
 
 type CompanyCurrencyPair = { fromCurrency: string; toCurrency: string };
 
@@ -231,6 +232,9 @@ export function registerExchangeRateRoutes(app: Express) {
       res.setHeader("Cache-Control", "private, no-store");
       res.json(rate);
     } catch (error: unknown) {
+      if (error instanceof MonetaryFxError) {
+        return res.status(error.status).json({ code: error.code, message: error.message });
+      }
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });
