@@ -2,7 +2,7 @@
 
 **Branch:** `feature/fx-monetary-valuation`  
 **Date:** 2026-10-27  
-**Status:** SOURCE CORRECTIONS AND REGRESSION FIXTURES COMMITTED; **NOT PRODUCTION-CERTIFIED**. Do not merge or deploy until automated verification and read-only tenant reconciliation succeed.
+**Status:** SOURCE CORRECTIONS AND REGRESSION FIXTURES COMMITTED. Superseded by `phase-7-verification-and-fixes.md`, which records the automated verification actually executed on this branch, the defects it found in Phases 1–6 and their fixes. **Still NOT PRODUCTION-CERTIFIED**: read-only tenant reconciliation has not been run.
 
 ## Completed implementation and source-level review
 
