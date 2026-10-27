@@ -137,10 +137,16 @@ export function FixedProductionPlannerDialog({
   }, [open, planQuery.refetch, otwQuery.refetch, categoryQuery.refetch]);
 
   useEffect(() => {
-    if (!open || rawStockLoading || suppliersLoading || rawStockError || suppliersError || stockSnapshot !== null)
-      return;
-    setStockSnapshot(rawStock);
-    setSupplierSnapshot(suppliers);
+    if (!open || stockSnapshot !== null) return;
+    // The parent Raw Materials page can already be background-refetching when
+    // this popup opens. Use its last complete cache value instead of waiting
+    // for that unrelated refresh to finish (or capturing a placeholder []).
+    const cachedStock = queryClient.getQueryData<RawStockRow[]>(["/api/factory/raw-stock"]);
+    const cachedSuppliers = queryClient.getQueryData<OffloadSupplierOption[]>(["/api/factory/suppliers"]);
+    if ((rawStockLoading || rawStockError) && !cachedStock) return;
+    if ((suppliersLoading || suppliersError) && !cachedSuppliers) return;
+    setStockSnapshot(cachedStock ?? rawStock);
+    setSupplierSnapshot(cachedSuppliers ?? suppliers);
   }, [open, rawStock, suppliers, rawStockLoading, suppliersLoading, rawStockError, suppliersError, stockSnapshot]);
 
   const planCategories = useMemo(() => categoryQuery.data ?? [], [categoryQuery.data]);
