@@ -117,12 +117,12 @@ databaseDescribe("Pressing Scan — simplified user-based PostgreSQL integration
       VALUES(${"PRB"+suffix},'Pressing B','factory') RETURNING id`);
     await db.execute(sql`INSERT INTO factory_settings(company_id,extra_settings)
       VALUES(${companies.a},${JSON.stringify({pressingTimezone:"Africa/Lubumbashi"})}::jsonb)`);
-    await fixtureUser("supA",companies.a,"Manager");
+    await fixtureUser("supA",companies.a,"Admin");
     await fixtureUser("opA1",companies.a,"Worker");
     await fixtureUser("opA2",companies.a,"Worker");
     await fixtureUser("viewA",companies.a,"View Only");
     await fixtureUser("posA",companies.a,"Manager",{posViewOnly:true});
-    await fixtureUser("supB",companies.b,"Manager");
+    await fixtureUser("supB",companies.b,"Admin");
     await fixtureUser("opB1",companies.b,"Worker");
     for(const [key,company,status,deleted] of [
       ["one",companies.a,"PENDING_PRESSING",false],
