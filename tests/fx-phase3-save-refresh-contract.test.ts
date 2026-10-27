@@ -16,6 +16,8 @@ const realtimeClient = source("client/src/hooks/use-ws-invalidation.ts");
 const realtimeServer = source("server/routes/writeInvalidationSignal.ts");
 const groupReport = source("server/routes/stats/groupNetPositionRoutes.ts");
 const monetaryService = source("server/services/accounting/monetaryFxValuationService.ts");
+const readMicrocache = source("server/routes/performance/readMicrocache.ts");
+const serverCacheReset = source("server/services/accounting/invalidateCompanyFxRateCaches.ts");
 
 describe("Phase 3 rate-change propagation", () => {
   it("invalidates only after the server confirms its audited rate transaction", () => {
@@ -50,6 +52,15 @@ describe("Phase 3 rate-change propagation", () => {
   it("prevents a live group snapshot being held at a stale company FX rate", () => {
     expect(groupReport).toContain("forceRefresh || useCurrentSnapshot ? null : _getCached(cacheKey)");
     expect(groupReport).toContain("if (!useCurrentSnapshot) _setCached(cacheKey");
+  });
+
+  it("clears both server microcache and browser response cache dependencies", () => {
+    expect(readMicrocache).toContain('isFxRateDependentPath(req.path)');
+    expect(readMicrocache).toContain('[...(baseTopics ?? []), "fx"]');
+    expect(serverCacheReset).toContain('net-profit:${companyId}:');
+    expect(serverCacheReset).toContain('group-net-position:');
+    expect(refresh).toContain('invalidateBandwidthReadCaches("all")');
+    expect(realtimeClient).toContain('invalidation.topics.has("fx") ? "all" : "live"');
   });
 
   it("retains report-only monetary valuation and no policy parameter shadowing", () => {
