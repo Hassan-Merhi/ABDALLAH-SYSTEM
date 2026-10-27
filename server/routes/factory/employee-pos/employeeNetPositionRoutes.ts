@@ -871,6 +871,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
             skippedAccountKeys: projected.skipped,
             unresolvedAccountCount: valuation.unresolvedAccountCount,
             needsReviewCount: valuation.needsReviewCount,
+            rateErrorsByCurrency: valuation.rateErrorsByCurrency,
             currentMonetaryTranslationDifferenceUsd: projected.currentMonetaryTranslationDifferenceUsd,
           };
           return res.json(report);
