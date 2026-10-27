@@ -120,6 +120,7 @@ databaseDescribe("Pressing Scan — simplified user-based PostgreSQL integration
     await fixtureUser("supA",companies.a,"Admin");
     await fixtureUser("opA1",companies.a,"Worker");
     await fixtureUser("opA2",companies.a,"Worker");
+    await fixtureUser("managerA",companies.a,"Manager");
     await fixtureUser("viewA",companies.a,"View Only");
     await fixtureUser("posA",companies.a,"Manager",{posViewOnly:true});
     await fixtureUser("supB",companies.b,"Admin");
@@ -311,6 +312,15 @@ databaseDescribe("Pressing Scan — simplified user-based PostgreSQL integration
     expect(options.body.operators.map((x:any)=>x.userId)).toContain(actors.opA1.userId);
     expect(options.body.machines).toBeUndefined();
     expect((await call("GET /api/factory/pressing-machines/report/options",actors.opA1)).body.canViewAll).toBe(false);
+    // Manager is not an Admin/Owner: their report and correction access must
+    // remain restricted even if they can use other Factory management pages.
+    const managerHistory=await call("GET /api/factory/pressing-machines/report",actors.managerA,{
+      query:{userId:actors.opA2.userId},
+    });
+    expect(managerHistory.statusCode).toBe(403);
+    expect((await call("GET /api/factory/pressing-machines/report/options",actors.managerA)).body.canViewAll).toBe(false);
+    expect((await call("GET /api/factory/pressing-machines/me",actors.managerA)).body.canManage).toBe(false);
+    expect((await call("GET /api/factory/pressing-machines/me",actors.supA)).body.canManage).toBe(true);
   });
 
   it("requires a supervisor reason, leaves an immutable void, then links the replacement",async()=>{
@@ -319,6 +329,7 @@ databaseDescribe("Pressing Scan — simplified user-based PostgreSQL integration
     const route="POST /api/factory/pressing-machines/confirmations/:id/void";
     const options={params:{id:String(first.body.id)},body:{reason:"Wrong bale reference confirmed in error"}};
     expect((await call(route,actors.opA1,options)).statusCode).toBe(403);
+    expect((await call(route,actors.managerA,options)).statusCode).toBe(403);
     expect((await call(route,actors.posA,options)).statusCode).toBe(403);
     expect((await call(route,actors.supB,options)).statusCode).toBe(404);
     expect((await call(route,actors.supA,{...options,body:{reason:"short"}})).statusCode).toBe(400);
