@@ -69,13 +69,16 @@ function cameraErrorMessage(error: unknown): string {
 }
 
 export function ContinuousPressingScanner({
-  assignment, active, onBarcode,
+  assignment, active, onBarcode, simpleControls = false,
 }: {
   assignment: PressingScannerAssignment | null;
   active: boolean;
   onBarcode: (capture: PressingScanCapture) => Promise<PressingScanOutcome>;
+  simpleControls?: boolean;
 }) {
-  const [requested, setRequested] = useState(false);
+  // The worker's "Open Camera" action mounts this scanner and begins capture.
+  // The parent "Close Camera" unmounts it, releasing the camera stream.
+  const [requested, setRequested] = useState(simpleControls);
   const [retryAttempt, setRetryAttempt] = useState(0);
   const [visible, setVisible] = useState(() => typeof document === "undefined" || !document.hidden);
   const [status, setStatus] = useState<ScannerStatus>("idle");
@@ -358,9 +361,6 @@ export function ContinuousPressingScanner({
               activeStatus === "manual" ? "Manual mode" : requested && !visible ? "Paused in background" : "Camera stopped"}
           </Badge>
         </div>
-        <p className="text-xs text-muted-foreground">
-          {assignment ? "Scans are recorded under your logged-in user" : "Pressing access not initialized"}
-        </p>
       </CardHeader>
       <CardContent className="space-y-3">
         {!usable && (
@@ -384,8 +384,8 @@ export function ContinuousPressingScanner({
             )}
           </div>
         )}
-        {error && running && <p role="alert" className="rounded-md bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-200">{error}</p>}
-        {running && (
+        {error && running && <p role="alert" className="rounded-md bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-200">{simpleControls && activeStatus === "manual" ? "Camera scanning is unavailable on this device. Close and reopen the camera, or allow camera access in your browser." : error}</p>}
+        {!simpleControls && running && (
           <form onSubmit={submitManual} className="flex flex-wrap items-center gap-2">
             <Keyboard className="h-4 w-4 shrink-0 text-muted-foreground" />
             <Input aria-label="Manual bale barcode" placeholder="Manual barcode entry" autoComplete="off"
@@ -396,7 +396,7 @@ export function ContinuousPressingScanner({
             </Button>
           </form>
         )}
-        <div className="flex flex-wrap gap-2">
+        {!simpleControls && <div className="flex flex-wrap gap-2">
           {!requested ? (
             <Button type="button" disabled={!usable} onClick={() => {
               unlockAudio();
@@ -427,7 +427,7 @@ export function ContinuousPressingScanner({
             onClick={() => setVibration(v => !v)}>
             <Vibrate className={vibration ? "h-4 w-4" : "h-4 w-4 opacity-40"} />
           </Button>
-        </div>
+        </div>}
         {last && (
           <div role="status" aria-live="polite" className={`rounded-lg border p-3 ${badgeColor}`}>
             <div className="flex flex-wrap justify-between gap-1">
@@ -453,17 +453,7 @@ export function ContinuousPressingScanner({
             )}
           </div>
         )}
-        <p className="text-xs text-muted-foreground">
-          The camera stays open between reads. Move each bale's barcode into view;
-          repeated frames will not submit the same code again. Leaving this tab,
-          locking the phone, or stopping the scanner releases camera access.
-        </p>
-        <p className="text-xs text-muted-foreground">
-          A green confirmation means the server has saved physical pressing completion with the
-          machine, operator, and exact timestamp. Stock finalization is a separate workflow.
-          Offline scans stay amber until they receive server confirmation. Permanent history and filters are below.
-        </p>
-        {running && engine && (
+        {!simpleControls && running && engine && (
           <p className="text-xs text-muted-foreground" data-testid="pressing-decoder-engine">
             Decoder: {engine === "native" ? "browser native BarcodeDetector" : "bundled ZXing (cross-platform)"}.
           </p>
