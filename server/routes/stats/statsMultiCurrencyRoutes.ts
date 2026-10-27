@@ -3,6 +3,7 @@ import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import Decimal from "decimal.js";
 import { requireAuth, requireNonPOS } from "../../auth";
+import { getMonetaryFxValuation } from "../../services/accounting/monetaryFxValuationService";
 import {
   getCashBankAccountSummary,
   getCashBankRevaluation,
@@ -168,6 +169,24 @@ function applyCurrentCashTranslation(payload: NetPositionPayload, summaries: Cas
  * not need the separate Analytics-module permission to view cash/bank balances.
  */
 export function registerStatsMultiCurrencyRoutes(app: Express) {
+  // Phase 2: read-only four-category valuation. This does NOT adjust report
+  // totals yet; later phases will integrate uniquely attributed rows.
+  app.get("/api/accounts/multi-currency/monetary-valuation", requireAuth, requireNonPOS, async (req, res) => {
+    const companyId = req.session.currentCompanyId;
+    if (!companyId) return res.status(400).json({ message: "No company selected" });
+    res.setHeader("Cache-Control", "private, no-store");
+    try {
+      return res.json(await getMonetaryFxValuation(companyId));
+    } catch (error: unknown) {
+      logger.error("Unable to calculate read-only monetary FX valuation", { companyId, error });
+      return res.status(500).json({
+        code: "MONETARY_FX_VALUATION_FAILED",
+        message: getErrorMessage(error),
+      });
+    }
+  });
+
+
   // Register before /api/stats/net-profit. It post-processes the live snapshot so
   // only actual cash/bank accounts are translated at the current rate. Historical
   // or date-filtered snapshots remain based on their stored historical amounts.
