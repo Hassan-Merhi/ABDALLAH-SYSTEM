@@ -58,8 +58,13 @@ export function registerStatsNetProfitRoutes(app: Express) {
       const localPart = (key: string) => localDateParts.find((part) => part.type === key)?.value || "";
       const businessToday = `${localPart("year")}-${localPart("month")}-${localPart("day")}`;
       const _cacheKey = `net-profit:${companyId}:${toDate || ""}:${toDate ? "historical" : businessToday.slice(0, 7)}`;
-      const _cached = _getCached(_cacheKey);
+      // Live financial USD presentation depends on a company-specific dated
+      // rate that may have been saved on another Render worker. A process-
+      // local TTL is not a reliable rate revision fence; rebuild live reads.
+      // Dated historical snapshots use locked posted USD and may remain cached.
+      const _cached = toDate ? _getCached(_cacheKey) : null;
       if (_cached) return res.json(_cached);
+      if (!toDate) res.setHeader("Cache-Control", "private, no-store");
 
       // All the report's raw inputs - company row, ledger accounts and the three
       // grouped balance maps - are loaded in ./netProfitDataLoad.
@@ -630,7 +635,7 @@ export function registerStatsNetProfitRoutes(app: Express) {
           reportTotalsProvisional: netPositionCurrency.totalsProvisional,
         },
       };
-      _setCached(_cacheKey, _result);
+      if (toDate) _setCached(_cacheKey, _result);
       res.json(_result);
     } catch (error: unknown) {
       logger.error("[/api/stats/net-profit] Unhandled error:", { error: error });
