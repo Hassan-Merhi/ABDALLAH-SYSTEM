@@ -274,11 +274,11 @@ export async function getMonetaryFxValuation(
     const eligibleKeys = new Set<string>();
     const currencies = new Set<string>();
     for (const master of masters) {
-      const policy = monetaryFxEligibility({
+      const eligibility = monetaryFxEligibility({
         kind: master.kind, id: Number(master.id), code: master.code,
         name: master.name, accountType: master.account_type, subType: master.sub_type,
       }, policy);
-      if (policy === "excluded" || policy === "needs_review") continue;
+      if (eligibility === "excluded" || eligibility === "needs_review") continue;
       eligibleKeys.add(`${master.kind}:${master.id}`);
       const currency = canonicalMonetaryCurrency(master.opening_balance_currency);
       if (currency) currencies.add(currency);
