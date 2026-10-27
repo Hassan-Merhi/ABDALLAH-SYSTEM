@@ -48,6 +48,7 @@ export default function PressingMachineManagement({ active }: { active: boolean 
   const userId = access.data?.userId;
   const validCompany = companyId === selectedCompany?.id;
   const assignment = validCompany ? access.data?.assignment ?? null : null;
+  const fullControls = validCompany && access.data?.canManage === true;
   const scanner = usePressingOfflineSync(
     active && validCompany && companyId !== undefined && userId
       ? { companyId, userId } : null, active,
@@ -123,12 +124,8 @@ export default function PressingMachineManagement({ active }: { active: boolean 
       <div className="flex flex-wrap items-center gap-2">
         <ScanLine className="h-5 w-5 text-emerald-500" />
         <h2 className="text-lg font-semibold">Pressing Scan</h2>
-        <Badge variant="secondary">Recorded by logged-in user</Badge>
+        {fullControls && <Badge variant="secondary">Recorded by logged-in user</Badge>}
       </div>
-      <p className="text-sm text-muted-foreground">
-        Scan a bale like Ground Scan. Each accepted bale is recorded under your user automatically.
-        No shifts or machine assignments to set up. Scanning does not finalize stock.
-      </p>
 
       {access.isLoading && <p className="text-sm">Checking pressing access…</p>}
       {access.isError && <p className="text-sm text-destructive" role="alert">{problem(access.error)}</p>}
@@ -148,7 +145,7 @@ export default function PressingMachineManagement({ active }: { active: boolean 
 
       <div className="rounded-lg border bg-card p-3 space-y-3">
         <div className="flex flex-col gap-2 sm:flex-row">
-          <div className="relative min-w-0 flex-1">
+          {fullControls && <><div className="relative min-w-0 flex-1">
             <ScanLine className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input ref={inputRef} autoComplete="off" data-testid="input-pressing-scan"
               className="h-11 pl-10 font-mono" placeholder="Scan bale reference / barcode..."
@@ -160,13 +157,13 @@ export default function PressingMachineManagement({ active }: { active: boolean 
             onClick={() => void scanOne(barcode)}>
             <ScanLine className="mr-2 h-4 w-4" />
             {submitting ? "Saving…" : "Scan"}
-          </Button>
-          <Button className="h-11" variant="outline" onClick={() => setShowCamera(v => !v)}
+          </Button></>}
+          <Button data-testid="button-pressing-camera" className={fullControls ? "h-11" : "h-12 w-full sm:w-auto"} variant={showCamera ? "destructive" : "default"} onClick={() => setShowCamera(v => !v)}
             disabled={!assignment}>
-            <Camera className="mr-2 h-4 w-4" />{showCamera ? "Hide Camera" : "Phone Camera"}
+            <Camera className="mr-2 h-4 w-4" />{showCamera ? "Close Camera" : "Open Camera"}
           </Button>
         </div>
-        {last && (
+        {fullControls && last && (
           <div className={"rounded-md border p-3 text-sm " +
             (last.outcome.kind === "confirmed" ? "border-emerald-500/50 bg-emerald-500/10" :
               last.outcome.kind === "queued" ? "border-amber-500/50 bg-amber-500/10" :
@@ -177,12 +174,12 @@ export default function PressingMachineManagement({ active }: { active: boolean 
             <strong>{last.barcode}</strong> — {last.outcome.message}
           </div>
         )}
-        {outstanding > 0 && (
+        {fullControls && outstanding > 0 && (
           <p className="text-sm text-amber-700 dark:text-amber-300" role="status">
             {outstanding} scan{outstanding === 1 ? "" : "s"} saved locally, waiting for server verification.
           </p>
         )}
-        <div className="flex flex-wrap items-center gap-2">
+        {fullControls && <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" variant="ghost" onClick={() => setShowSync(v => !v)}>
             {showSync ? <ChevronUp className="mr-1 h-4 w-4" /> : <ChevronDown className="mr-1 h-4 w-4" />}
             Scan sync {outstanding ? "(" + outstanding + " pending)" : ""}
@@ -191,17 +188,17 @@ export default function PressingMachineManagement({ active }: { active: boolean 
             onClick={() => void scanner.retryNow()}>
             <RefreshCw className="mr-1 h-4 w-4" />Retry
           </Button>}
-        </div>
+        </div>}
       </div>
       {showCamera && assignment && (
-        <ContinuousPressingScanner active={active} assignment={assignment} onBarcode={cameraRead} />
+        <ContinuousPressingScanner active={active} assignment={assignment} onBarcode={cameraRead} simpleControls={!fullControls} />
       )}
-      {showSync && <PressingOfflineQueueStatus snapshot={scanner.snapshot}
+      {fullControls && showSync && <PressingOfflineQueueStatus snapshot={scanner.snapshot}
         retryNow={scanner.retryNow} />}
 
       {active && validCompany && companyId !== undefined && userId && (
         <PressingHistoryReport key={companyId + ":" + userId}
-          active={active} companyId={companyId} userId={userId} />
+          active={active} companyId={companyId} userId={userId} simpleMode={!fullControls} />
       )}
     </div>
   );
