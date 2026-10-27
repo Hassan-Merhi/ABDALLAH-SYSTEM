@@ -8,9 +8,11 @@
  * values to the book balances; they replace only their uniquely keyed rows.
  */
 import Decimal from "decimal.js";
-import { pool } from "../../db";
-import { storage } from "../../storage";
-import { getExchangeRates } from "../../storage/accounting/exchange-rates";
+import { db, type DbTransaction } from "../../db";
+import { sql } from "drizzle-orm";
+import { resultRows } from "../../lib/queryResult";
+import { assertTransactionCompanyScope } from "../security/transactionCompanyScope";
+import { datedMonetaryRateTx, fxDay } from "./monetaryFxRates";
 import { companyBusinessDate } from "./companyBusinessDate";
 import { openingSideOf } from "./balances/openingSide";
 import { customerLinksBody, noNonCustomerTarget } from "./balances/partyLineRules";
@@ -91,8 +93,8 @@ export interface MonetaryFxValuationResult {
  * Do not filter soft-deleted master rows here: the balance engine does not
  * drop their still-posted financial history. Expose their deleted state.
  */
-async function loadMonetaryMasters(companyId: number): Promise<MonetaryMasterRow[]> {
-  const result = await pool.query<MonetaryMasterRow>(`
+async function loadMonetaryMasters(tx: DbTransaction, companyId: number): Promise<MonetaryMasterRow[]> {
+  const result = await tx.execute(readSql(`
     WITH customer_links AS (${customerLinksBody("$1")})
     SELECT 'ledger'::text AS kind, la.id, la.code, la.name, la.account_type,
            la.sub_type, (la.deleted_at IS NOT NULL) AS deleted,
@@ -122,8 +124,8 @@ async function loadMonetaryMasters(companyId: number): Promise<MonetaryMasterRow
       FROM customers c
       LEFT JOIN customer_links cl ON cl.customer_id = c.id
      WHERE c.company_id = $1
-  `, [companyId]);
-  return result.rows;
+  `, companyId));
+  return resultRows<MonetaryMasterRow & Record<string, unknown>>(result);
 }
 
 /**
@@ -136,8 +138,8 @@ async function loadMonetaryMasters(companyId: number): Promise<MonetaryMasterRow
  * current-day valuation. This function must not be used for historic-report
  * reconstruction without enforcing historical created/deleted knowledge.
  */
-async function loadNativeMovements(companyId: number, businessDate: string): Promise<NativeMovementRow[]> {
-  const result = await pool.query<NativeMovementRow>(`
+async function loadNativeMovements(tx: DbTransaction, companyId: number, businessDate: string): Promise<NativeMovementRow[]> {
+  const result = await tx.execute(readSql(`
     WITH customer_links AS (${customerLinksBody("$1")}),
     posted AS (
       SELECT ve.ledger_account_id, ve.bank_account_id, ve.fixed_asset_id,
@@ -208,33 +210,37 @@ async function loadNativeMovements(companyId: number, businessDate: string): Pro
     FROM attributed
     WHERE kind IN ('ledger', 'bank', 'customer') AND target_id IS NOT NULL
     GROUP BY kind, target_id, entry_currency
-  `, [companyId, businessDate]);
-  return result.rows;
+  `, companyId, businessDate));
+  return resultRows<NativeMovementRow & Record<string, unknown>>(result);
 }
 
-/** Accept only explicit *company-scoped* USD/foreign or foreign/USD quotes. */
-function resolveValuationRates(
-  rateRows: Awaited<ReturnType<typeof getExchangeRates>>,
-  businessDate: string
-): MonetaryFxRateMap {
-  const rates = new Map<string, MonetaryFxRate>();
-  const ordered = [...rateRows].sort((a, b) =>
-    String(b.effectiveDate).localeCompare(String(a.effectiveDate)) || b.id - a.id
+/**
+ * Parameterize the two static report queries as Drizzle SQL fragments.
+ * Every $1 / $2 is converted into a bound parameter, not interpolated SQL.
+ * This keeps tenant RLS context and every SELECT on the same transaction.
+ */
+function readSql(query: string, companyId: number, businessDate?: string) {
+  const chunks = query.split(/(\$1|\$2)/g).filter(Boolean).map((chunk) =>
+    chunk === "$1" ? sql`${companyId}` :
+    chunk === "$2" ? sql`${businessDate}` : sql.raw(chunk)
   );
-  for (const rate of ordered) {
-    const date = typeof rate.effectiveDate === "string"
-      ? rate.effectiveDate.slice(0, 10)
-      : new Date(rate.effectiveDate).toISOString().slice(0, 10);
-    if (date > businessDate) continue;
-    const from = canonicalMonetaryCurrency(rate.fromCurrency);
-    const to = canonicalMonetaryCurrency(rate.toCurrency);
-    const foreign = from === "USD" ? to : to === "USD" ? from : null;
-    if (!foreign || foreign === "USD" || rates.has(foreign)) continue;
-    rates.set(foreign, {
-      currency: foreign,
-      rate: String(rate.rate),
-      direction: from === "USD" ? "FOREIGN_PER_USD" : "USD_PER_FOREIGN",
-      effectiveDate: date,
+  return sql.join(chunks, sql``);
+}
+
+/** The existing audited datedMonetaryRateTx is authoritative for directions/conflicts. */
+async function resolveValuationRates(
+  tx: DbTransaction, companyId: number, day: string, currencies: ReadonlySet<string>
+): Promise<MonetaryFxRateMap> {
+  const rates = new Map<string, MonetaryFxRate>();
+  for (const code of [...currencies].sort()) {
+    if (code === "USD") continue;
+    const quote = await datedMonetaryRateTx(tx, companyId, code, day);
+    if (!quote) continue;
+    rates.set(code, {
+      currency: code,
+      rate: quote.source === "DIRECT_RECORDED" ? quote.rateUnitPerBase : quote.rateBasePerUnit,
+      direction: quote.source === "DIRECT_RECORDED" ? "FOREIGN_PER_USD" : "USD_PER_FOREIGN",
+      effectiveDate: quote.effectiveDate,
     });
   }
   return rates;
@@ -247,18 +253,28 @@ function decimal(input: string | number | null | undefined): Decimal {
 /** Primary Phase 2 read model. No rate writes or posting side effects. */
 export async function getMonetaryFxValuation(companyId: number): Promise<MonetaryFxValuationResult> {
   if (!Number.isSafeInteger(companyId) || companyId <= 0) throw new Error("A selected company is required.");
-  const [company, businessDate] = await Promise.all([
-    storage.getCompanyById(companyId),
-    companyBusinessDate(companyId),
-  ]);
-  if (!company) throw new Error("Company not found.");
-  const baseCurrency = canonicalMonetaryCurrency(company.baseCurrency) ?? "USD";
-  const [masters, movements, rateRows] = await Promise.all([
-    loadMonetaryMasters(companyId),
-    loadNativeMovements(companyId, businessDate),
-    getExchangeRates(companyId),
-  ]);
-  const rates = resolveValuationRates(rateRows, businessDate);
+  return db.transaction(async (tx) => {
+    await assertTransactionCompanyScope(tx, companyId);
+    const [company] = resultRows<{ base_currency: string | null } & Record<string, unknown>>(
+      await tx.execute(sql`SELECT base_currency FROM companies WHERE id = ${companyId}`)
+    );
+    if (!company) throw new Error("Company not found.");
+    const businessDate = fxDay(await companyBusinessDate(companyId, tx));
+    const baseCurrency = canonicalMonetaryCurrency(company.base_currency) ?? "USD";
+    const masters = await loadMonetaryMasters(tx, companyId);
+    const movements = await loadNativeMovements(tx, companyId, businessDate);
+    const currencies = new Set<string>();
+    for (const master of masters) {
+      const currency = canonicalMonetaryCurrency(master.opening_balance_currency);
+      if (currency) currencies.add(currency);
+    }
+    for (const movement of movements) {
+      const currency = canonicalMonetaryCurrency(movement.entry_currency);
+      if (currency && currency !== "__UNRESOLVED__") currencies.add(currency);
+    }
+    const rates = baseCurrency === "USD"
+      ? await resolveValuationRates(tx, companyId, businessDate, currencies)
+      : new Map<string, MonetaryFxRate>();
   const movementsByKey = new Map<string, NativeMovementRow[]>();
   for (const movement of movements) {
     const key = `${movement.kind}:${movement.target_id}`;
@@ -351,4 +367,5 @@ export async function getMonetaryFxValuation(companyId: number): Promise<Monetar
     needsReviewCount: accounts.filter(a=>a.eligibility==="needs_review").length,
     excludedLedgerAndPartyCounts: { excludedMasters, customerLinkedLedgerMasters },
   };
+  });
 }
