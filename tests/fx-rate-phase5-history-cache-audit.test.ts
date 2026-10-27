@@ -57,6 +57,11 @@ describe("Phase 5 effective-date, historical-lock, company and cache safety", ()
   it("audits only actual revised rates in the SAME transaction, with no journal posting", () => {
     expect(rateSave).toContain("new Decimal(String(existing.rate)).eq(new Decimal(input.rate))");
     expect(rateSave).toContain("return existing;");
+    expect(rateSave).toContain("sameDayRows.length > 1");
+    expect(rateSave).toContain("FX_RATE_DUPLICATE_ROWS");
+    expect(rateSave).toContain("await datedMonetaryRateTx(tx, actor.companyId, input.toCurrency, input.effectiveDate)");
+    expect(rateRoutes).toContain("error instanceof MonetaryFxError");
+    expect(rateRoutes).toContain("error.status");
     expect(rateSave).toContain("writeAuditEvent(");
     expect(rateSave).toContain("effectiveDate: { old:");
     expect(rateSave).toContain("CURRENT_MANAGEMENT_USD_ONLY");
