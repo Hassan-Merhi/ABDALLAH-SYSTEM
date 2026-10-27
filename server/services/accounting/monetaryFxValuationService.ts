@@ -258,6 +258,8 @@ export async function getMonetaryFxValuation(
 ): Promise<MonetaryFxValuationResult> {
   if (!Number.isSafeInteger(companyId) || companyId <= 0) throw new Error("A selected company is required.");
   return db.transaction(async (tx) => {
+    // One consistent account/rate snapshot; never hold a writable transaction.
+    await tx.execute(sql`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY`);
     await assertTransactionCompanyScope(tx, companyId);
     const [company] = resultRows<{ base_currency: string | null } & Record<string, unknown>>(
       await tx.execute(sql`SELECT base_currency FROM companies WHERE id = ${companyId}`)
