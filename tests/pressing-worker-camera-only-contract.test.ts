@@ -1,0 +1,47 @@
+import { readFileSync } from "node:fs";
+import { describe, expect, it } from "vitest";
+
+const read = (file: string) => readFileSync(file, "utf8");
+const manager = read("client/src/pages/factory/PressingMachineManagement.tsx");
+const camera = read("client/src/pages/factory/ContinuousPressingScanner.tsx");
+const history = read("client/src/pages/factory/PressingHistoryReport.tsx");
+const stockEntry = read("client/src/pages/factory/BaleStockEntry.tsx");
+const access = read("server/routes/factory/factoryPressingMachineManagementRoutes.ts");
+const report = read("server/routes/factory/factoryPressingReportRoutes.ts");
+const corrections = read("server/routes/factory/factoryPressingCorrectionRoutes.ts");
+
+describe("Pressing worker camera-only access", () => {
+  it("grants full scanner UI only to Admin and Owner using the authenticated company role", () => {
+    expect(access).toContain('canManage: (ctx.role === "Admin" || ctx.role === "Owner") && !ctx.posViewOnly');
+    expect(manager).toContain("access.data?.canManage === true");
+    expect(manager).toContain('{fullControls && <><div className="relative min-w-0 flex-1">');
+    expect(manager).toContain('data-testid="button-pressing-camera"');
+    expect(manager).toContain('showCamera ? "Close Camera" : "Open Camera"');
+    expect(manager).toContain("simpleControls={!fullControls}");
+    expect(manager).not.toContain("Scan a bale like Ground Scan. Each accepted bale");
+  });
+
+  it("mounts workers' continuously scanning camera from the Open action without inner settings", () => {
+    expect(camera).toContain("useState(simpleControls)");
+    expect(camera).toContain("{!simpleControls && running && (");
+    expect(camera).toContain("{!simpleControls && <div className=\"flex flex-wrap gap-2\">");
+    expect(camera).toContain("stream?.getTracks().forEach(track => track.stop())");
+    expect(camera).not.toContain("The camera stays open between reads.");
+    expect(camera).not.toContain("Permanent history and filters are below.");
+  });
+
+  it("shows only the worker's list, without history filtering or Excel controls", () => {
+    expect(manager).toContain("simpleMode={!fullControls}");
+    expect(history).toContain("from: simpleMode ? undefined : today()");
+    expect(history).toContain("{!simpleMode && <Button");
+    expect(history).toContain('{!simpleMode && <div className="grid grid-cols-2');
+    expect(stockEntry).toContain("isPressingOnlyWorker");
+    expect(stockEntry).toContain("<PressingMachineManagement active />");
+  });
+
+  it("prevents all non-Admin/Owner roles from accessing other workers' report or correction data", () => {
+    expect(report).toContain('const MANAGER_ROLES = new Set(["Admin", "Owner"])');
+    expect(report).toContain('push("c.user_id = ?", ctx.userId)');
+    expect(corrections).toContain('const SUPERVISORS = new Set(["Admin", "Owner"])');
+  });
+});
