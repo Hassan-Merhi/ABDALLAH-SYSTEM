@@ -311,6 +311,10 @@ export function FixedProductionPlannerDialog({
     }
   };
 
+  // Ignore background query errors after the original values have been
+  // captured. Only the explicit Refresh button may replace these snapshots.
+  const snapshotError = (stockSnapshot === null && rawStockError) ||
+    (supplierSnapshot === null && suppliersError);
   const locked = planQuery.data?.locked ?? false;
   const ready =
     !!planQuery.data &&
@@ -323,10 +327,6 @@ export function FixedProductionPlannerDialog({
     !categoryQuery.isFetching &&
     !snapshotError;
   const pending = saveMutation.isPending || unlockMutation.isPending || whatsappMutation.isPending;
-  // Ignore transient errors from live parent queries once their values are
-  // captured; later background failures must not blank a planner snapshot.
-  const snapshotError = (stockSnapshot === null && rawStockError) ||
-    (supplierSnapshot === null && suppliersError);
 
   const saveAndLock = () => {
     if (locked || pending || !ready) return;
