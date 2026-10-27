@@ -76,7 +76,9 @@ export type MonetaryFxRateMap = ReadonlyMap<string, MonetaryFxRate>;
 
 export function canonicalMonetaryCurrency(value: string | null | undefined): string | null {
   if (!value?.trim()) return null;
-  return normalizeAccountingCurrencyAlias(value) || null;
+  const normalized = normalizeAccountingCurrencyAlias(value);
+  // Unsupported or unparseable currency evidence is not a rate lookup request.
+  return /^[A-Z]{3}$/.test(normalized) ? normalized : null;
 }
 
 export interface MonetaryFxCalculation {
