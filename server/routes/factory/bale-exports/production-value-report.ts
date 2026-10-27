@@ -14,6 +14,7 @@ import {
   BatchRateDecimal,
   calculateProductionProfit,
   calculateProductionWeightCost,
+  calculatePeriodTableBalance,
 } from "./production-value-math";
 import {
   factoryCategories,
@@ -422,10 +423,20 @@ export function registerFactoryProductionValueReportRoutes(app: Express) {
       const balanceCostPerKg = balanceSnapshot.costPerKg;
       const balanceValue = balanceSnapshot.value;
 
+      // Preserve the original cumulative Balance on Table snapshot in full.
+      // Separately value only the ACTIVE original batches selected by the report's
+      // from/to filter. All Time naturally includes all original batch dates.
+      // These are two DIFFERENT read-only KPIs; neither changes production costs.
+      const filteredTable = calculatePeriodTableBalance({
+        remainingPeriodKg: periodOnTableKg,
+        mixedPeriodWeightKg: totalMixWeightDecimal,
+        mixedPeriodCost: totalMixCostDecimal,
+      });
+
       // Weight Cost includes all material converted during the selected period:
       // regular bales plus wipers and garbage. Those groups are mutually exclusive
-      // in baleRows, so each kilogram is charged once at the historical batch rate
-      // through the selected period's end (matching Balance on Table).
+      // in baleRows, so each kilogram is charged once at the historical cumulative
+      // batch rate. This stays separate from the period-only Balance on Table rate.
       const weightCostDecimal = calculateProductionWeightCost({
         producedWeightKg: new BatchRateDecimal(totalBaleWeightKg).plus(totalWgWeightKg),
         batchRateCost: balanceBatchRateDecimal,
@@ -629,12 +640,17 @@ export function registerFactoryProductionValueReportRoutes(app: Express) {
           blendedCostPerKg: hideReportCosts ? 0 : blendedCostPerKg,
           batches: safeBatchRows,
         },
+        // Original overall as-of balance: unchanged and independent of the start filter.
         balanceOnTable: {
           weightKg: balanceWeightKg,
-          // Historical as-of snapshot through the selected end date. The Selling / Cost
-          // toggle only changes finished-production valuation; table material stays at cost.
           costPerKg: hideReportCosts ? 0 : balanceCostPerKg,
           value: hideReportCosts ? 0 : balanceValue,
+        },
+        // NEW, additional filtered balance: only original batches in [from, to].
+        filteredBalanceOnTable: {
+          weightKg: filteredTable.weightKg,
+          costPerKg: hideReportCosts ? 0 : filteredTable.costPerKg,
+          value: hideReportCosts ? 0 : filteredTable.value,
         },
         summary: {
           // Keep batchCost as a compatibility alias for older clients. It now carries the
