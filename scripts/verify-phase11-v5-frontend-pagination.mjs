@@ -14,6 +14,7 @@ const [main, client, server, plugin, source] = await Promise.all([
   read("build/viteHeavyListPaginationPlugin.ts"),
   read("client/src/pages/factory/FactoryStockAllocationV5.tsx"),
 ]);
+const createPage = await read("client/src/pages/factory/FactoryStockAllocationV5CreateProforma.tsx");
 
 assert.match(main, /import "\.\/lib\/v5AllocationPaginationClient";/, "main.tsx must install V5 pagination");
 assert.match(client, /const ENDPOINT = "\/api\/factory\/v5\/stock-allocation";/, "V5 endpoint must be targeted");
@@ -58,7 +59,8 @@ assert.match(
   "Vite plugin must target the split V5 allocation screen"
 );
 assert.match(plugin, /fetchAllV5AllocationData/, "V5 transform must import the complete-data loader");
-assert.match(plugin, /openCreateDrawerWithAllRows/, "create drawer must wait for complete rows");
+assert.match(createPage, /fetchAllV5AllocationData\(\)/, "create page must load every V5 allocation page");
+assert.match(source, /\/factory\/stock-allocation-v5\/proformas\/new/, "create must navigate to a new page");
 assert.match(plugin, /openEditDrawerWithAllRows/, "edit drawer must wait for complete rows");
 assert.match(plugin, /const currentRows = actionRows \?\? \(await loadAllActionRows\(\)\)/, "draft quantity editing must use complete rows");
 assert.match(plugin, /const complete = await fetchAllV5AllocationData\(exportParams\)/, "Excel must load all filtered pages");
@@ -70,9 +72,7 @@ const exactSourceMarkers = [
   'import { apiRequest, queryClient } from "@/lib/queryClient";',
   'function openEditDraft(proformaId: number, proformaName: string, currentRows: V5Row[]) {',
   'const filtered = rows.filter((r) => {',
-  'onClick={() => setCreateDrawerOpen(true)}',
   'onClick={() => setEditDrawerProformaId(proforma.proformaId)}',
-  'onClose={() => setCreateDrawerOpen(false)}',
   'onClose={() => setEditDrawerProformaId(null)}',
 ];
 const sourceWithModel = `${source}\n${await read("client/src/pages/factory/factorystockallocationv5/useFactoryStockAllocationV5Model.tsx")}`;
@@ -102,7 +102,8 @@ console.log(
         "focused deep-link bypass",
         "global Negative Only preservation",
         "route-state reset",
-        "complete create/edit/draft rows",
+        "full-page create with complete catalog rows",
+        "complete edit/draft rows",
         "complete filtered Excel export",
         "large action-reference cleanup",
         "fail-loud source transforms",
