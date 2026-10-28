@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertTriangle, Loader2, CheckCircle2, Save, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
@@ -15,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 interface ArticleRow {
   articleCode: string;
   productName: string;
+  categoryName?: string;
   stockAvailable: number;
   totalLoaded: number;
   expectedToLoad: number;
@@ -70,6 +72,8 @@ export default function EditProformaV5Drawer({ open, onClose, proformaId, articl
   const [showZeroItems, setShowZeroItems] = useState(false);
   const [hideNonPositive, setHideNonPositive] = useState(false);
   const [showGarbageWipers, setShowGarbageWipers] = useState(false);
+  const [catalogFilter, setCatalogFilter] = useState("__all__");
+  const catalogCategories = Array.from(new Set(articleRows.map((r) => r.categoryName?.trim()).filter((v): v is string => Boolean(v)))).sort((a, b) => a.localeCompare(b));
   const [appliedPrice, setAppliedPrice] = useState<"sell" | "prod" | null>(null);
   const [initialized, setInitialized] = useState(false);
   const qtyRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -141,6 +145,7 @@ export default function EditProformaV5Drawer({ open, onClose, proformaId, articl
       setShowZeroItems(false);
       setHideNonPositive(false);
       setShowGarbageWipers(false);
+      setCatalogFilter("__all__");
     }
   }, [open]);
 
@@ -312,6 +317,7 @@ export default function EditProformaV5Drawer({ open, onClose, proformaId, articl
           existingLineCodes.has(r.articleCode) ||
           (quantities[r.articleCode] && parseInt(quantities[r.articleCode]) > 0)
       );
+    if (catalogFilter !== "__all__") base = base.filter((r) => (r.categoryName?.trim() || "__uncategorized__") === catalogFilter);
     return base.slice().sort((a, b) => a.productName.localeCompare(b.productName));
   })();
 
@@ -403,6 +409,22 @@ export default function EditProformaV5Drawer({ open, onClose, proformaId, articl
                   />
                   <span className="text-sm text-muted-foreground">{isActive ? "Active" : "Inactive"}</span>
                 </div>
+              </div>
+
+              <div className="w-full sm:w-56">
+                <Label className="mb-1 block text-xs font-medium">Catalog</Label>
+                <Select value={catalogFilter} onValueChange={setCatalogFilter}>
+                  <SelectTrigger className="h-9" data-testid="select-v5-edit-catalog"><SelectValue placeholder="All Catalogs" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">All Catalogs</SelectItem>
+                    {catalogCategories.map((category) => (
+                      <SelectItem key={category} value={category}>{category}</SelectItem>
+                    ))}
+                    {articleRows.some((row) => !row.categoryName?.trim()) && (
+                      <SelectItem value="__uncategorized__">Uncategorized</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
               </div>
 
               {zeroItemCount > 0 && (

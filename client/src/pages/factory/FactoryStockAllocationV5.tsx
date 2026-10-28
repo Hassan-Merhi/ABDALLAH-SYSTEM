@@ -1,4 +1,5 @@
 import { Fragment } from "react";
+import { useLocation } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Loader2,
@@ -21,7 +22,6 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import CreateProformaV5Drawer from "./CreateProformaV5Drawer";
 import EditProformaV5Drawer from "./EditProformaV5Drawer";
 import { PageHeader } from "@/components/PageHeader";
 import { STATUS_LABELS } from "./factorystockallocationv5/utils";
@@ -38,11 +38,10 @@ import { FactoryStockAllocationV5Dialog8 } from "./factorystockallocationv5/comp
 
 export default function FactoryStockAllocationV5() {
   const model = useFactoryStockAllocationV5Model();
+  const [, setLocation] = useLocation();
   const {
     focusProformaId,
     firstMatchRef,
-    createDrawerOpen,
-    setCreateDrawerOpen,
     editDrawerProformaId,
     setEditDrawerProformaId,
     expandedRows,
@@ -107,7 +106,7 @@ export default function FactoryStockAllocationV5() {
             <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
             Restore Cancelled
           </Button>
-          <Button size="sm" onClick={() => setCreateDrawerOpen(true)} data-testid="button-v5-open-create-proforma">
+          <Button size="sm" onClick={() => setLocation("/factory/stock-allocation-v5/proformas/new")} data-testid="button-v5-open-create-proforma">
             <Plus className="h-4 w-4 mr-1.5" />
             Create Proforma
           </Button>
@@ -641,14 +640,6 @@ export default function FactoryStockAllocationV5() {
           </div>
         </>
       )}
-
-      {/* Create drawer */}
-      <CreateProformaV5Drawer
-        open={createDrawerOpen}
-        onClose={() => setCreateDrawerOpen(false)}
-        articleRows={drawerRows}
-        onSuccess={() => query.refetch()}
-      />
 
       {/* Edit Proforma drawer */}
       {editDrawerProformaId !== null && (
