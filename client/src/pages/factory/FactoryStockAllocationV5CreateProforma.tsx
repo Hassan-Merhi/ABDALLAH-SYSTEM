@@ -5,7 +5,7 @@ import { AlertTriangle, ArrowLeft, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/PageHeader";
 import CreateProformaV5Drawer from "./CreateProformaV5Drawer";
-import type { V5Data } from "./factorystockallocationv5/types";
+import { fetchAllV5AllocationData, type V5AllocationData } from "@/lib/v5AllocationPaginationClient";
 
 /**
  * Full-page proforma creation reuses the exact V5 stock allocation figures,
@@ -15,18 +15,9 @@ export default function FactoryStockAllocationV5CreateProforma() {
   const [, navigate] = useLocation();
   const back = () => navigate("/factory/stock-allocation-v5");
 
-  const query = useQuery<V5Data>({
-    queryKey: ["/api/factory/v5/stock-allocation", false, undefined],
-    queryFn: async () => {
-      const response = await fetch("/api/factory/v5/stock-allocation?hideZero=false", {
-        credentials: "include",
-      });
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        throw new Error(body.message || "Failed to load available stock");
-      }
-      return response.json();
-    },
+  const query = useQuery<V5AllocationData>({
+    queryKey: ["/api/factory/v5/stock-allocation/all-for-create"],
+    queryFn: () => fetchAllV5AllocationData(),
     staleTime: 2 * 60 * 1000,
     retry: 1,
     refetchOnWindowFocus: false,
