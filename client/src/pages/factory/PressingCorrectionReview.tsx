@@ -45,6 +45,7 @@ export default function PressingCorrectionReview({
   const { toast } = useToast();
   const [filterRef, setFilterRef] = useState("");
   const [showAudit, setShowAudit] = useState(false);
+  const [tab, setTab] = useState<"active" | "voided">("active");
   const correctionKey = [ROOT, "corrections", companyId, userId];
   // Voided bales remain directly returnable even when the main list is
   // filtered to active scans. Include them without requiring a status change.
@@ -113,7 +114,9 @@ export default function PressingCorrectionReview({
     (row): row is PressingDetailRow => "id" in row,
   );
   const seen = new Set<number>();
-  const visibleRows = [...rows, ...recentActiveRows, ...archivedRows].filter(row => {
+  const currentRows = rows.filter(row => tab === "voided" ? !!row.voidedAt : !row.voidedAt);
+  const recentRows = tab === "voided" ? archivedRows : recentActiveRows;
+  const visibleRows = [...currentRows, ...recentRows].filter(row => {
     if (seen.has(row.id)) return false;
     seen.add(row.id);
     return true;
@@ -126,11 +129,17 @@ export default function PressingCorrectionReview({
           <ShieldCheck className="h-5 w-5" />Manage Pressing Scans
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          Click X to remove an active scan, or Return to bring a voided bale back.
-          Changes update pressing counts immediately. Original history stays in the audit.
+          Click X to remove a scan, or open Voided and click Return to bring it back.
+          No explanation or rescanning required. Original history stays in the audit.
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
+        <div className="flex flex-wrap gap-2" aria-label="Pressing scan status">
+          <Button type="button" size="sm" variant={tab === "active" ? "secondary" : "outline"}
+            aria-pressed={tab === "active"} onClick={() => setTab("active")}>Active scans</Button>
+          <Button type="button" size="sm" variant={tab === "voided" ? "secondary" : "outline"}
+            aria-pressed={tab === "voided"} onClick={() => setTab("voided")}>Voided bales</Button>
+        </div>
         <div className="overflow-x-auto rounded-lg border">
           <table className="w-full min-w-[540px] text-sm">
             <thead className="bg-muted text-left"><tr>
@@ -175,7 +184,7 @@ export default function PressingCorrectionReview({
           Some pressing scans could not load. Try Refresh or use the Detailed status filter.
         </p>}
         <p className="text-xs text-muted-foreground">
-          Showing current detailed records plus the 100 most recent active and voided scans.
+          Showing up to 100 recent scans for the selected status, plus matching detailed records.
           X removes a scan from pressing results only; it does not delete inventory or accounting records.
         </p>
         <div className="flex flex-wrap gap-2 items-center">
