@@ -74,6 +74,9 @@ describe("Pressing Machines Phase 8 correction and audit controls", () => {
     expect(report).toContain("SUM(c.weight_kg) FILTER (WHERE c.voided_at IS NULL)");
     expect(routes).not.toContain("registerFactoryPressingOperationsRoutes(app)");
     expect(report).toContain('"c.voided_at IS NOT NULL"');
+    expect(report).toContain('AND active.voided_at IS NULL');
+    expect(report).toContain('AS "canReturn"');
+    expect(ui).toContain('row.canReturn !== false');
     expect(report).toContain('c.voided_at AS "voidedAt"');
     expect(queue).toContain("supervisors may subsequently void them");
   });
