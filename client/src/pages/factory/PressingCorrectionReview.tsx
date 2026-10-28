@@ -114,8 +114,10 @@ export default function PressingCorrectionReview({
     (row): row is PressingDetailRow => "id" in row,
   );
   const seen = new Set<number>();
-  const currentRows = rows.filter(row => tab === "voided" ? !!row.voidedAt : !row.voidedAt);
-  const recentRows = tab === "voided" ? archivedRows : recentActiveRows;
+  const currentRows = rows.filter(row => tab === "voided"
+    ? !!row.voidedAt && row.canReturn !== false : !row.voidedAt);
+  const recentRows = tab === "voided"
+    ? archivedRows.filter(row => row.canReturn !== false) : recentActiveRows;
   const visibleRows = [...currentRows, ...recentRows].filter(row => {
     if (seen.has(row.id)) return false;
     seen.add(row.id);
