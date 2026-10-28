@@ -33,6 +33,8 @@ const countText = (value: number | string | null | undefined) =>
   Number(value || 0).toLocaleString();
 const kgText = (value: number | string | null | undefined) =>
   Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 3 });
+const approx40KgText = (kg: number) =>
+  (kg / 40).toLocaleString(undefined, { maximumFractionDigits: 2 });
 const workerName = (name: string | null | undefined) =>
   name?.trim() || "Display name not set";
 
@@ -49,7 +51,10 @@ export default function PressingHistoryReport({ active, companyId, userId, simpl
   const [exporting, setExporting] = useState(false);
   const [showCorrections, setShowCorrections] = useState(false);
   const [initialDate, setInitialDate] = useState(false);
-  const invalidDates = Boolean(filters.from && filters.to && filters.from > filters.to);
+  const invalidDates = Boolean(filters.from && filters.to && (
+    filters.from > filters.to || (filters.from === filters.to &&
+      !!filters.fromTime && !!filters.toTime && filters.fromTime > filters.toTime)
+  ));
   const key = [ROOT, "data", companyId, userId];
 
   const options = useQuery<PressingReportOptions>({
@@ -168,6 +173,9 @@ export default function PressingHistoryReport({ active, companyId, userId, simpl
                 <Weight className="h-3.5 w-3.5 text-muted-foreground" />
                 <strong className="text-sm tabular-nums">{kgText(worker.kg)} KG</strong>
               </div>
+              <div className="mt-1.5 text-sm text-muted-foreground" data-testid={"pressing-kpi-approx-" + worker.slot.toLowerCase()}>
+                Approx. (KG ÷ 40): <span className="font-semibold tabular-nums text-foreground">{approx40KgText(worker.kg)}</span>
+              </div>
             </button>
           );
         })}
@@ -185,6 +193,9 @@ export default function PressingHistoryReport({ active, companyId, userId, simpl
             <Weight className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
             <strong className="text-sm tabular-nums">{kgText(allWorkerKg)} KG</strong>
           </div>
+          <div className="mt-1.5 text-sm text-muted-foreground" data-testid="pressing-kpi-approx-all">
+            Approx. (KG ÷ 40): <span className="font-semibold tabular-nums text-foreground">{approx40KgText(allWorkerKg)}</span>
+          </div>
         </button>
       </div>
 
@@ -197,25 +208,43 @@ export default function PressingHistoryReport({ active, companyId, userId, simpl
             <div className="flex flex-wrap gap-1.5">
               <Button size="sm" variant="outline" className="h-8" onClick={() => {
                 const day = options.data?.serverToday || today();
-                update({ from: day, to: day });
+                update({ from: day, to: day, fromTime: undefined, toTime: undefined });
               }}><CalendarDays className="mr-1 h-3.5 w-3.5" />Today</Button>
               <Button size="sm" variant="outline" className="h-8" onClick={() => {
                 const day = options.data?.serverToday || today();
-                update({ from: day.slice(0, 7) + "-01", to: day });
+                update({ from: day.slice(0, 7) + "-01", to: day, fromTime: undefined, toTime: undefined });
               }}>This Month</Button>
               <Button size="sm" variant="outline" className="h-8"
-                onClick={() => update({ from: undefined, to: undefined })}>All Time</Button>
+                onClick={() => update({ from: undefined, to: undefined, fromTime: undefined, toTime: undefined })}>All Time</Button>
             </div>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            <label className="space-y-1 text-xs font-medium text-muted-foreground">From
-              <Input type="date" className="h-10 text-foreground" value={filters.from || ""}
-                onChange={e => update({ from: e.target.value || undefined })} />
-            </label>
-            <label className="space-y-1 text-xs font-medium text-muted-foreground">To
-              <Input type="date" className="h-10 text-foreground" value={filters.to || ""}
-                onChange={e => update({ to: e.target.value || undefined })} />
-            </label>
+            <div className="min-w-0 space-y-1">
+              <div className="text-xs font-medium text-muted-foreground">From <span className="font-normal">(Beirut time)</span></div>
+              <div className="flex min-w-0 gap-1.5">
+                <Input type="date" aria-label="From date" className="h-10 min-w-0 flex-[3] text-foreground"
+                  value={filters.from || ""}
+                  onChange={e => update({ from: e.target.value || undefined,
+                    ...(e.target.value ? {} : { fromTime: undefined }) })} />
+                <Input type="time" step={60} aria-label="From time (Beirut)" title="From hour and minute, Beirut local time"
+                  className="h-10 min-w-0 flex-[2] px-1.5 text-foreground"
+                  value={filters.fromTime || ""} disabled={!filters.from}
+                  onChange={e => update({ fromTime: e.target.value || undefined })} />
+              </div>
+            </div>
+            <div className="min-w-0 space-y-1">
+              <div className="text-xs font-medium text-muted-foreground">To <span className="font-normal">(Beirut time)</span></div>
+              <div className="flex min-w-0 gap-1.5">
+                <Input type="date" aria-label="To date" className="h-10 min-w-0 flex-[3] text-foreground"
+                  value={filters.to || ""}
+                  onChange={e => update({ to: e.target.value || undefined,
+                    ...(e.target.value ? {} : { toTime: undefined }) })} />
+                <Input type="time" step={60} aria-label="To time (Beirut)" title="To hour and minute, Beirut local time"
+                  className="h-10 min-w-0 flex-[2] px-1.5 text-foreground"
+                  value={filters.toTime || ""} disabled={!filters.to}
+                  onChange={e => update({ toTime: e.target.value || undefined })} />
+              </div>
+            </div>
             {canSeeEveryone && (
               <label className="space-y-1 text-xs font-medium text-muted-foreground">Worker
                 <select aria-label="Pressing user filter" value={filters.userId || ""}
@@ -259,7 +288,7 @@ export default function PressingHistoryReport({ active, companyId, userId, simpl
               </label>
             )}
           </div>
-          {invalidDates && <p role="alert" className="mt-2 text-sm text-destructive">From date cannot exceed To date.</p>}
+          {invalidDates && <p role="alert" className="mt-2 text-sm text-destructive">From date/time cannot exceed To date/time.</p>}
           {filters.status !== "active" && (
             <p className="mt-2 text-xs text-muted-foreground">
               KPI totals count confirmed bales only. The history below follows your selected status.
