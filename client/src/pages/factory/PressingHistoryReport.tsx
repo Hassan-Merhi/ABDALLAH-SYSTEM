@@ -393,11 +393,11 @@ export default function PressingHistoryReport({ active, companyId, userId, simpl
                   onClick={() => setFilters(current => ({ ...current, page: current.page + 1 }))}>Next</Button>
               </div>
             </div>
-            {canCorrect && filters.mode === "detailed" && !simpleMode && (
+            {canCorrect && !simpleMode && (
               <div className="border-t pt-2">
                 <Button size="sm" variant="ghost" onClick={() => setShowCorrections(value => !value)}>
                   <ShieldCheck className="mr-2 h-4 w-4" />
-                  {showCorrections ? "Hide corrections" : "Supervisor corrections"}
+                  {showCorrections ? "Hide scan actions" : "Manage scans"}
                 </Button>
                 {showCorrections && <PressingCorrectionReview companyId={companyId} userId={userId} rows={detail} />}
               </div>
