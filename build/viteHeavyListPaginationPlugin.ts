@@ -164,25 +164,9 @@ function transformV5AllocationPresentation(source: string, seen: Set<string>): s
 
   code = replaceIfPresent(
     code,
-    `          <Button size="sm" onClick={() => setCreateDrawerOpen(true)} data-testid="button-v5-open-create-proforma">`,
-    `          <Button\n            size="sm"\n            onClick={() => void model.openCreateDrawerWithAllRows()}\n            disabled={model.isLoadingActionRows}\n            data-testid="button-v5-open-create-proforma"\n          >`,
-    "V5 create drawer full-data opener",
-    seen
-  );
-
-  code = replaceIfPresent(
-    code,
     `                                    onClick={() => setEditDrawerProformaId(proforma.proformaId)}`,
     `                                    onClick={() => void model.openEditDrawerWithAllRows(proforma.proformaId)}`,
     "V5 edit drawer full-data opener",
-    seen
-  );
-
-  code = replaceIfPresent(
-    code,
-    `        onClose={() => setCreateDrawerOpen(false)}\n        articleRows={drawerRows}\n        onSuccess={() => query.refetch()}`,
-    `        onClose={() => {\n          setCreateDrawerOpen(false);\n          model.setActionRows(null);\n        }}\n        articleRows={drawerRows}\n        onSuccess={() => {\n          model.setActionRows(null);\n          query.refetch();\n        }}`,
-    "V5 create drawer cleanup",
     seen
   );
 
@@ -274,9 +258,7 @@ export function heavyListPaginationPlugin(): Plugin {
   const legacyBuildEnd = legacy.buildEnd;
   const v5PresentationSeen = new Set<string>();
   const expectedV5PresentationPatches = [
-    "V5 create drawer full-data opener",
     "V5 edit drawer full-data opener",
-    "V5 create drawer cleanup",
     "V5 edit drawer cleanup",
     "V5 draft dialog cleanup",
   ];
