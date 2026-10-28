@@ -585,6 +585,7 @@ export function useFactoryStockAllocationV5Model() {
       allRows.map((r) => ({
         articleCode: r.articleCode,
         productName: r.productName,
+        categoryName: r.categoryName,
         stockAvailable: r.stockAvailable,
         totalLoaded: r.totalLoaded,
         expectedToLoad: r.expectedToLoad,
