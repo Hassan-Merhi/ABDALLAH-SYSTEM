@@ -98,6 +98,9 @@ async function report(ctx: QueryCtx, filters: PressingReportFilters) {
     'c.shift_id AS "shiftId"', 'c.production_date::text AS "productionDate"',
     'c.confirmed_at AS "confirmedAt"', 'c.device_captured_at AS "deviceCapturedAt"',
     'c.voided_at AS "voidedAt"', 'c.timezone_name AS "timezoneName"',
+    '(c.voided_at IS NOT NULL AND NOT EXISTS (SELECT 1 FROM factory_pressing_confirmations active ' +
+      'WHERE active.company_id = c.company_id AND active.bale_id = c.bale_id ' +
+      'AND active.voided_at IS NULL)) AS "canReturn"',
     // Previous accepted bale on the same machine is independent of current
     // date/employee/article filters; voided confirmations are excluded.
     '(SELECT FLOOR(EXTRACT(EPOCH FROM (c.confirmed_at - p.confirmed_at)))::bigint ' +

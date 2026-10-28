@@ -18,6 +18,7 @@ export interface PressingDetailRow {
   confirmedAt: string;
   deviceCapturedAt: string | null;
   voidedAt: string | null;
+  canReturn?: boolean;
   timezoneName: string;
   secondsSincePrevious: string | null;
 }
