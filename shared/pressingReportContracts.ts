@@ -23,7 +23,7 @@ const dateFilter = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(value =>
   !Number.isNaN(Date.parse(value + "T00:00:00Z")) &&
   new Date(value + "T00:00:00Z").toISOString().slice(0,10) === value,
   "Use a valid YYYY-MM-DD calendar date");
-const minuteFilter = z.string().regex(/^([01]\\d|2[0-3]):[0-5]\\d$/, "Use a valid HH:mm 24-hour time");
+const minuteFilter = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use a valid HH:mm 24-hour time");
 const positiveInt = z.coerce.number().int().positive();
 export const pressingReportFiltersSchema = z.object({
   from: dateFilter.optional(),
