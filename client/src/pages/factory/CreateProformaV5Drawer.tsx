@@ -1,5 +1,5 @@
 import type React from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -59,6 +59,9 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
     setShowGarbageWipers,
     articleSearch,
     setArticleSearch,
+    catalogFilter,
+    setCatalogFilter,
+    catalogCategories,
     qtyRefs,
     customersQuery,
     productsQuery,
@@ -89,16 +92,7 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
   } = useCreateProformaV5Model({ open, onClose, articleRows, onSuccess });
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(v) => {
-        if (!v) onClose();
-      }}
-    >
-      <DialogContent
-        className="max-w-[98vw] w-[98vw] h-[85dvh] sm:h-[96dvh] flex flex-col p-0 gap-0"
-        data-testid="dialog-create-proforma-v5"
-      >
+    <div className="flex h-full min-h-0 min-w-0 flex-col bg-background" data-testid="page-create-proforma-v5">
         <DialogHeader className="px-5 py-4 border-b shrink-0">
           <DialogTitle className="text-base flex items-center gap-2">
             Create Proforma
@@ -392,8 +386,8 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
         )}
 
         {/* Search bar */}
-        <div className="px-5 py-2 border-b shrink-0">
-          <div className="relative max-w-xs">
+        <div className="px-5 py-2 border-b shrink-0 flex flex-wrap items-end gap-3">
+          <div className="relative w-full sm:w-72">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
             <Input
               value={articleSearch}
@@ -411,6 +405,23 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
                 <X className="h-3.5 w-3.5" />
               </button>
             )}
+          </div>
+          <div className="w-full sm:w-56">
+            <Label className="mb-1 block text-xs font-medium">Catalog</Label>
+            <Select value={catalogFilter} onValueChange={setCatalogFilter}>
+              <SelectTrigger className="h-8" data-testid="select-v5-create-catalog">
+                <SelectValue placeholder="All Catalogs" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">All Catalogs</SelectItem>
+                {catalogCategories.map((category) => (
+                  <SelectItem key={category} value={category}>{category}</SelectItem>
+                ))}
+                {articleRows.some((row) => !row.categoryName?.trim()) && (
+                  <SelectItem value="__uncategorized__">Uncategorized</SelectItem>
+                )}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
@@ -726,7 +737,6 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
             </Button>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+    </div>
   );
 }
