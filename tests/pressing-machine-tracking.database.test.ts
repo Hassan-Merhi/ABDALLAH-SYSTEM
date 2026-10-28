@@ -81,6 +81,8 @@ databaseDescribe("Pressing Scan — simplified user-based PostgreSQL integration
       VALUES(${id},${key+suffix},'x',${options.active??true})`);
     await db.execute(sql`INSERT INTO user_company_roles(user_id,company_id,role,pos_view_only)
       VALUES(${id},${companyId},${role},${options.posViewOnly??false})`);
+    await db.execute(sql`INSERT INTO factory_user_profiles(company_id,user_id,display_name)
+      VALUES(${companyId},${id},${"Display "+key})`);
     actors[key]={userId:id,companyId,username:key+suffix};
   }
   async function fixtureBale(key:string,companyId:number,status="PENDING_PRESSING",deleted=false){
@@ -159,7 +161,7 @@ databaseDescribe("Pressing Scan — simplified user-based PostgreSQL integration
         "factory_pressing_downtime","factory_pressing_sessions",
         "factory_pressing_assignments","factory_pressing_shifts",
         "factory_pressing_saved_views","factory_pressing_machines",
-        "factory_bales","factory_settings","user_company_roles",
+        "factory_bales","factory_settings","factory_user_profiles","user_company_roles",
       ]){
         await conn.query("DELETE FROM "+table+" WHERE company_id = ANY($1::int[])",[ids]);
       }
@@ -244,7 +246,7 @@ databaseDescribe("Pressing Scan — simplified user-based PostgreSQL integration
     expect(duplicate.statusCode).toBe(409);
     expect(duplicate.body.code).toBe("PRESSING_ALREADY_CONFIRMED");
     expect(duplicate.body.previous).toMatchObject({
-      operatorName:actors.opA1.username,
+      operatorName:"Display opA1",
       operatorUserId:actors.opA1.userId,
       referenceNumber:bales.one.ref,
     });
@@ -260,6 +262,24 @@ databaseDescribe("Pressing Scan — simplified user-based PostgreSQL integration
     expect(unauthorized.body.code).toBe("PRESSING_WRITE_DENIED");
     const stolen=await scan(actors.opA2,"two",randomUUID(),a);
     expect(stolen.body.code).toBe("PRESSING_ASSIGNMENT_CHANGED");
+  });
+
+  it("shows updated Factory display names in old history, totals, and duplicate alerts",async()=>{
+    await db.execute(sql`UPDATE factory_user_profiles SET display_name=${"Updated Operator One"}
+      WHERE company_id=${companies.a} AND user_id=${actors.opA1.userId}`);
+    const history=await call("GET /api/factory/pressing-machines/report",actors.supA,{
+      query:{mode:"detailed",status:"active"},
+    });
+    expect(history.statusCode).toBe(200);
+    const entry=history.body.rows.find((row:any)=>row.operatorUserId===actors.opA1.userId);
+    expect(entry.operatorName).toBe("Updated Operator One");
+    expect(history.body.summary.byOperator.find((row:any)=>row.userId===actors.opA1.userId).name)
+      .toBe("Updated Operator One");
+    const duplicate=await scan(actors.opA2,"one");
+    expect(duplicate.statusCode).toBe(409);
+    expect(duplicate.body.previous.operatorName).toBe("Updated Operator One");
+    await db.execute(sql`UPDATE factory_user_profiles SET display_name=${"Display opA1"}
+      WHERE company_id=${companies.a} AND user_id=${actors.opA1.userId}`);
   });
 
   it("records a first pressing scan at every non-deleted inventory stage without stock writes",async()=>{
