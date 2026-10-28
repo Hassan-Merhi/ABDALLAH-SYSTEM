@@ -35,7 +35,7 @@ const countText = (value: number | string | null | undefined) =>
 const kgText = (value: number | string | null | undefined) =>
   Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 3 });
 const approx40KgText = (kg: number) =>
-  (kg / 40).toLocaleString(undefined, { maximumFractionDigits: 2 });
+  (Math.round(kg / 40 / 10) * 10).toLocaleString(undefined, { maximumFractionDigits: 0 });
 const workerName = (name: string | null | undefined) =>
   name?.trim() || "Display name not set";
 
