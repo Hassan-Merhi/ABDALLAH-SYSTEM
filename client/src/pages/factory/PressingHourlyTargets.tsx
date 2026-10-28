@@ -44,6 +44,7 @@ export default function PressingHourlyTargets({ active, companyId, serverToday }
   active: boolean; companyId: number; serverToday?: string;
 }) {
   const { toast } = useToast();
+  // Worker-only screens obtain today's Beirut date from the endpoint itself.
   const [day, setDay] = useState(serverToday || "");
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
@@ -51,9 +52,9 @@ export default function PressingHourlyTargets({ active, companyId, serverToday }
   useEffect(() => { setDay(serverToday || ""); }, [companyId, serverToday]);
   const hourly = useQuery<HourlyResponse>({
     queryKey: [ENDPOINT, companyId, day],
-    enabled: active && Boolean(day),
+    enabled: active,
     queryFn: async () => {
-      const response = await fetch(ENDPOINT + "?day=" + encodeURIComponent(day), {
+      const response = await fetch(ENDPOINT + (day ? "?day=" + encodeURIComponent(day) : ""), {
         credentials: "include", cache: "no-store",
       });
       if (!response.ok) throw new Error("Could not load hourly targets (" + response.status + ")");
@@ -63,6 +64,17 @@ export default function PressingHourlyTargets({ active, companyId, serverToday }
     refetchOnWindowFocus: false,
   });
   const data = hourly.data;
+  // The worker page does not load the admin-only report options. Derive the
+  // date-picker limit from the API server clock in the same Beirut timezone.
+  const serverDate = data?.serverNow
+    ? new Intl.DateTimeFormat("en-GB", {
+        timeZone: ZONE, year: "numeric", month: "2-digit", day: "2-digit",
+      }).formatToParts(new Date(data.serverNow))
+    : [];
+  const datePart = (type: string) => serverDate.find(part => part.type === type)?.value;
+  const maxDay = serverToday || (serverDate.length
+    ? [datePart("year"), datePart("month"), datePart("day")].join("-")
+    : undefined);
   const now = data ? new Date(data.serverNow).getTime() : 0;
   // The UTC timestamps keep repeated Beirut DST hours separate.
   const hours = [...new Set((data?.hours || []).map(row => row.hourStart))]
@@ -105,8 +117,8 @@ export default function PressingHourlyTargets({ active, companyId, serverToday }
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Input aria-label="Hourly target date" type="date" max={serverToday}
-            className="h-8 w-[145px] text-xs" value={day}
+          <Input aria-label="Hourly target date" type="date" max={maxDay}
+            className="h-8 w-[145px] text-xs" value={day || data?.day || ""}
             onChange={event => setDay(event.target.value)} />
           <Button size="sm" variant="outline" className="h-8" disabled={hourly.isFetching}
             onClick={() => void hourly.refetch()}>
