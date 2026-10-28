@@ -177,8 +177,10 @@ export async function exportPressingReport(
   ws.getCell(1, 1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF182638" } };
   ws.getRow(1).height = 28;
   ws.mergeCells(2, 1, 2, safeColumnCount);
-  ws.getCell(2, 1).value = "Period: " + (filters.from || "All time") + " to " +
-    (filters.to || "All time") + " | As of " + pressingDisplayDateTime(first.asOf);
+  ws.getCell(2, 1).value = "Period (Beirut): " +
+    (filters.from ? filters.from + (filters.fromTime ? " " + filters.fromTime : "") : "All time") +
+    " to " + (filters.to ? filters.to + (filters.toTime ? " " + filters.toTime : "") : "All time") +
+    " | As of " + pressingDisplayDateTime(first.asOf);
   ws.mergeCells(3, 1, 3, safeColumnCount);
   ws.getCell(3, 1).value = "Accepted bales: " + first.summary.totalBales +
     " | Accepted KG: " + first.summary.totalKg + " | Voided: " + first.summary.voidedBales;

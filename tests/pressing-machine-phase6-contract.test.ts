@@ -17,6 +17,12 @@ describe("pressing machine Phase 6 reporting contracts", () => {
   it("rejects invalid dates, excessive pagination and unknown filter fields", () => {
     expect(pressingReportFiltersSchema.safeParse({ from: "2026-02-30" }).success).toBe(false);
     expect(pressingReportFiltersSchema.safeParse({ from: "2026-10-27" }).success).toBe(true);
+    expect(pressingReportFiltersSchema.safeParse({
+      from: "2026-10-28", fromTime: "08:05", to: "2026-10-28", toTime: "17:45",
+    }).success).toBe(true);
+    expect(pressingReportFiltersSchema.safeParse({ fromTime: "24:00" }).success).toBe(false);
+    expect(pressingReportFiltersSchema.safeParse({ toTime: "12:60" }).success).toBe(false);
+    expect(pressingReportFiltersSchema.safeParse({ fromTime: "9:05" }).success).toBe(false);
     expect(pressingReportFiltersSchema.safeParse({ limit: "251" }).success).toBe(false);
     expect(pressingReportFiltersSchema.safeParse({ page: "0" }).success).toBe(false);
     expect(pressingReportFiltersSchema.safeParse({ companyId: 999 }).success).toBe(false);
@@ -33,6 +39,9 @@ describe("pressing machine Phase 6 reporting contracts", () => {
       visibleColumns: [...PRESSING_DEFAULT_COLUMNS],
     };
     expect(pressingSavedViewSchema.safeParse(view).success).toBe(true);
+    expect(pressingSavedViewSchema.safeParse({ ...view,
+      filters: { ...view.filters, fromTime: "08:00", toTime: "10:30" },
+    }).success).toBe(true);
     expect(pressingSavedViewSchema.safeParse({ ...view, visibleColumns: ["random_sql_column"] }).success).toBe(false);
     expect(PRESSING_REPORT_COLUMNS).toContain("secondsSincePrevious");
     expect(PRESSING_REPORT_COLUMNS).toContain("bales");
@@ -69,6 +78,11 @@ describe("pressing machine Phase 6 reporting contracts", () => {
   it("uses filtered date, shift, article, search and machine with stable page anchor", () => {
     expect(server).toContain('c.confirmed_at >= (?::date::timestamp AT TIME ZONE');
     expect(server).toContain('c.confirmed_at < ((?::date + 1)::timestamp AT TIME ZONE');
+    expect(server).toContain("if (filters.fromTime)");
+    expect(server).toContain("if (filters.toTime)");
+    expect(server).toContain('c.confirmed_at >= (?::timestamp AT TIME ZONE');
+    expect(server).toContain("interval '1 minute'");
+    expect(server).toContain("invalidDateTimeRange(body.filters)");
     expect(server).toContain('const PRESSING_LOCAL_DATE_SQL');
     expect(server).toContain("GROUP BY ' + PRESSING_LOCAL_DATE_SQL");
     expect(server).toContain('push("c.machine_id = ?", filters.machineId)');
@@ -95,6 +109,12 @@ describe("pressing machine Phase 6 reporting contracts", () => {
     expect(parent).toContain('key={companyId + ":" + userId}');
     expect(page).toContain("This Month");
     expect(page).toContain("All Time");
+    expect(page).toContain('aria-label="From time (Beirut)"');
+    expect(page).toContain('aria-label="To time (Beirut)"');
+    expect(page).toContain("pressing-kpi-approx-all");
+    expect(page).toContain("approx40KgText(worker.kg)");
+    expect(page).toContain("approx40KgText(allWorkerKg)");
+    expect(client).toContain('filters.fromTime ? " " + filters.fromTime');
     expect(page).toContain('aria-label="Pressing user filter"');
     expect(page).toContain("All users");
     expect(page).toContain("Scanned Bales");

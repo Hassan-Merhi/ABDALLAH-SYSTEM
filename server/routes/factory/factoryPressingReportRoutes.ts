@@ -68,8 +68,23 @@ function conditions(ctx: QueryCtx, filters: PressingReportFilters) {
   // Calculate inclusive Beirut dates with timezone-aware boundaries. These
   // remain correct across the winter UTC+2 / summer UTC+3 DST transition
   // and preserve use of the confirmed_at index for large histories.
-  if (filters.from) push("c.confirmed_at >= (?::date::timestamp AT TIME ZONE '" + PRESSING_TIME_ZONE + "')", filters.from);
-  if (filters.to) push("c.confirmed_at < ((?::date + 1)::timestamp AT TIME ZONE '" + PRESSING_TIME_ZONE + "')", filters.to);
+  if (filters.from) {
+    if (filters.fromTime) {
+      push("c.confirmed_at >= (?::timestamp AT TIME ZONE '" + PRESSING_TIME_ZONE + "')",
+        filters.from + " " + filters.fromTime);
+    } else {
+      push("c.confirmed_at >= (?::date::timestamp AT TIME ZONE '" + PRESSING_TIME_ZONE + "')", filters.from);
+    }
+  }
+  if (filters.to) {
+    if (filters.toTime) {
+      // Inclusive ending minute: 14:30 includes scans through 14:30:59.999.
+      push("c.confirmed_at < ((?::timestamp + interval '1 minute') AT TIME ZONE '" + PRESSING_TIME_ZONE + "')",
+        filters.to + " " + filters.toTime);
+    } else {
+      push("c.confirmed_at < ((?::date + 1)::timestamp AT TIME ZONE '" + PRESSING_TIME_ZONE + "')", filters.to);
+    }
+  }
   if (filters.asOf) push("c.confirmed_at <= ?::timestamptz", filters.asOf);
   if (filters.machineId) push("c.machine_id = ?", filters.machineId);
   if (filters.weightKg !== undefined) push("c.weight_kg = ?::numeric", filters.weightKg);
@@ -82,6 +97,15 @@ function conditions(ctx: QueryCtx, filters: PressingReportFilters) {
       " OR c.product_name ILIKE " + ref + ")");
   }
   return { args, where };
+}
+function invalidDateTimeRange(filters: PressingReportFilters): boolean {
+  return Boolean(
+    (filters.fromTime && !filters.from) ||
+    (filters.toTime && !filters.to) ||
+    (filters.from && filters.to && (filters.from > filters.to ||
+      (filters.from === filters.to && filters.fromTime && filters.toTime &&
+        filters.fromTime > filters.toTime)))
+  );
 }
 function statusPredicate(status: PressingReportFilters["status"]): string | null {
   if (status === "active") return "c.voided_at IS NULL";
@@ -249,8 +273,9 @@ export function registerFactoryPressingReportRoutes(app: Express): void {
     try {
       const ctx = await context(req);
       const filters = pressingReportFiltersSchema.parse(req.query);
-      if (filters.from && filters.to && filters.from > filters.to) {
-        return res.status(400).json({ code: "PRESSING_INVALID_DATES", message: "From date cannot exceed To date" });
+      if (invalidDateTimeRange(filters)) {
+        return res.status(400).json({ code: "PRESSING_INVALID_DATES",
+          message: "Start date/time cannot exceed end date/time; time filters require a date" });
       }
       return res.json(await report(ctx, filters));
     } catch (error) { return handleError(res, error); }
@@ -309,8 +334,9 @@ export function registerFactoryPressingReportRoutes(app: Express): void {
     try {
       const ctx = await context(req);
       const body = pressingSavedViewSchema.parse(req.body);
-      if (body.filters.from && body.filters.to && body.filters.from > body.filters.to) {
-        return res.status(400).json({ code: "PRESSING_INVALID_DATES", message: "Saved view has an invalid date range" });
+      if (invalidDateTimeRange(body.filters)) {
+        return res.status(400).json({ code: "PRESSING_INVALID_DATES",
+          message: "Saved view has an invalid date/time range" });
       }
       if (!ctx.supervisor && body.filters.userId && body.filters.userId !== ctx.userId) {
         throw new ReportPermissionError(403, "PRESSING_REPORT_FORBIDDEN", "Cannot save filters for another operator");
