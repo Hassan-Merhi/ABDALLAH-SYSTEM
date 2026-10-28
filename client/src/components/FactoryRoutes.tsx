@@ -121,6 +121,7 @@ import {
 const AccountGroups = lazy(() => import("@/pages/AccountGroups"));
 const FactoryInvoiceDetailBilingual = lazy(() => import("@/pages/factory/FactoryInvoiceDetailBilingual"));
 const WasteDispatchPage = lazy(() => import("@/pages/factory/WasteDispatchOptimized"));
+const FactoryStockAllocationV5CreateProforma = lazy(() => import("@/pages/factory/FactoryStockAllocationV5CreateProforma"));
 
 interface FactoryRoutesProps {
   user: ShellUser;
@@ -241,6 +242,7 @@ export function FactoryRoutes({ user, myAccess, factoryDefaultPage }: FactoryRou
       <Route path="/factory/invoicing" component={FactoryInvoicing} />
       <Route path="/factory/stock-allocation" component={FactoryStockAllocation} />
       <Route path="/factory/stock-allocation-v3" component={FactoryStockAllocationV3} />
+      <Route path="/factory/stock-allocation-v5/proformas/new" component={FactoryStockAllocationV5CreateProforma} />
       <Route path="/factory/stock-allocation-v5" component={FactoryStockAllocationV5} />
       <Route path="/factory/parties" component={FactoryPartiesHub} />
       <Route path="/factory/customers/:id" component={FactoryCustomerStatement} />
