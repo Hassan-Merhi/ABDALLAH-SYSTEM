@@ -48,6 +48,13 @@ export default function PressingCorrectionReview({
   const correctionKey = [ROOT, "corrections", companyId, userId];
   // Voided bales remain directly returnable even when the main list is
   // filtered to active scans. Include them without requiring a status change.
+  const active = useQuery<PressingReportResponse>({
+    queryKey: [ROOT, "active", companyId, userId],
+    queryFn: () => fetchPressingReport({
+      mode: "detailed", status: "active", page: 1, limit: 100,
+    }),
+    staleTime: Infinity, refetchOnWindowFocus: false,
+  });
   const voided = useQuery<PressingReportResponse>({
     queryKey: [ROOT, "voided", companyId, userId],
     queryFn: () => fetchPressingReport({
@@ -79,6 +86,7 @@ export default function PressingCorrectionReview({
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: [ROOT, "data", companyId, userId] }),
         queryClient.invalidateQueries({ queryKey: [ROOT, "voided", companyId, userId] }),
+        queryClient.invalidateQueries({ queryKey: [ROOT, "active", companyId, userId] }),
         queryClient.invalidateQueries({ queryKey: [ROOT, "options", companyId, userId] }),
         queryClient.invalidateQueries({ queryKey: [ROOT, "analytics"] }),
         queryClient.invalidateQueries({ queryKey: correctionKey }),
@@ -94,14 +102,18 @@ export default function PressingCorrectionReview({
       // A stale record may have been changed from another device.
       void queryClient.invalidateQueries({ queryKey: [ROOT, "data", companyId, userId] });
       void queryClient.invalidateQueries({ queryKey: [ROOT, "voided", companyId, userId] });
+      void queryClient.invalidateQueries({ queryKey: [ROOT, "active", companyId, userId] });
       toast({ title: "Pressing change failed", description: explanation(error), variant: "destructive" });
     },
   });
   const archivedRows = (voided.data?.rows || []).filter(
     (row): row is PressingDetailRow => "id" in row,
   );
+  const recentActiveRows = (active.data?.rows || []).filter(
+    (row): row is PressingDetailRow => "id" in row,
+  );
   const seen = new Set<number>();
-  const visibleRows = [...rows, ...archivedRows].filter(row => {
+  const visibleRows = [...rows, ...recentActiveRows, ...archivedRows].filter(row => {
     if (seen.has(row.id)) return false;
     seen.add(row.id);
     return true;
@@ -153,17 +165,17 @@ export default function PressingCorrectionReview({
                 </tr>
               ))}
               {visibleRows.length === 0 && <tr><td className="p-3 text-center text-muted-foreground" colSpan={5}>
-                No pressing scans to manage. Select Detailed view to see active scans.
+                No pressing scans to manage.
               </td></tr>}
             </tbody>
           </table>
         </div>
-        {voided.isLoading && <p className="text-xs text-muted-foreground">Loading voided bales…</p>}
-        {voided.isError && <p role="alert" className="text-xs text-destructive">
-          Could not load voided bales. Select the Voided status filter to find them.
+        {(active.isLoading || voided.isLoading) && <p className="text-xs text-muted-foreground">Loading recent bales…</p>}
+        {(active.isError || voided.isError) && <p role="alert" className="text-xs text-destructive">
+          Some pressing scans could not load. Try Refresh or use the Detailed status filter.
         </p>}
         <p className="text-xs text-muted-foreground">
-          Showing current detailed records and the 100 most recent voided scans.
+          Showing current detailed records plus the 100 most recent active and voided scans.
           X removes a scan from pressing results only; it does not delete inventory or accounting records.
         </p>
         <div className="flex flex-wrap gap-2 items-center">
