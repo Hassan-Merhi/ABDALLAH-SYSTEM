@@ -13,9 +13,9 @@ import { logger } from "../../lib/logger";
 import { pressingReportFiltersSchema, pressingSavedViewSchema, type PressingReportFilters } from "@shared/pressingReportContracts";
 import { factoryLocalDate, settingsTimezone } from "../../services/factory/pressingShiftTime";
 
-// Worker history is always restricted to the authenticated user, including Manager and Developer.
-const MANAGER_ROLES = new Set(["Admin", "Owner"]);
-type QueryCtx = { companyId: number; userId: string; supervisor: boolean };
+// Individual worker history stays scoped; Admin, Owner and Developer can view company reports.
+const MANAGER_ROLES = new Set(["Admin", "Owner", "Developer"]);
+type QueryCtx = { companyId: number; userId: string; supervisor: boolean; canCorrect: boolean };
 type Param = string | number;
 class ReportPermissionError extends Error {
   constructor(readonly status: number, readonly code: string, message: string) { super(message); }
@@ -40,7 +40,8 @@ function handleError(res: Response, error: unknown) {
 async function context(req: Request): Promise<QueryCtx> {
   const ctx = await getActiveCompanyPermissionContext(req);
   return { companyId: ctx.companyId, userId: ctx.userId,
-    supervisor: MANAGER_ROLES.has(ctx.role) && !ctx.posViewOnly };
+    supervisor: MANAGER_ROLES.has(ctx.role) && !ctx.posViewOnly,
+    canCorrect: (ctx.role === "Admin" || ctx.role === "Owner") && !ctx.posViewOnly };
 }
 function escapeLike(text: string): string {
   return text.replace(/[\\%_]/g, c => "\\" + c);
@@ -64,6 +65,7 @@ function conditions(ctx: QueryCtx, filters: PressingReportFilters) {
   if (filters.to) push("c.production_date <= ?::date", filters.to);
   if (filters.asOf) push("c.confirmed_at <= ?::timestamptz", filters.asOf);
   if (filters.machineId) push("c.machine_id = ?", filters.machineId);
+  if (filters.weightKg !== undefined) push("c.weight_kg = ?::numeric", filters.weightKg);
   if (filters.shiftId) push("c.shift_id = ?", filters.shiftId);
   if (filters.articleCode) push("c.article_code ILIKE ?", "%" + escapeLike(filters.articleCode) + "%");
   if (filters.search) {
@@ -129,19 +131,48 @@ async function report(ctx: QueryCtx, filters: PressingReportFilters) {
   // Production KPIs count only non-voided records even when the history
   // filter displays voided audit rows.
   const sumConditions = conditions(ctx, filters);
-  const sumSql = 'SELECT COUNT(*) FILTER (WHERE c.voided_at IS NULL)::integer AS "totalBales",' +
+  const sumSqlFor = (where: string[]) =>
+    'SELECT COUNT(*) FILTER (WHERE c.voided_at IS NULL)::integer AS "totalBales",' +
     'COALESCE(SUM(c.weight_kg) FILTER (WHERE c.voided_at IS NULL),0)::numeric(18,3) AS "totalKg",' +
     'COUNT(*) FILTER (WHERE c.voided_at IS NOT NULL)::integer AS "voidedBales"' +
-    ' FROM factory_pressing_confirmations c WHERE ' + sumConditions.where.join(" AND ");
-  const [rows, count, summary] = await Promise.all([
+    ' FROM factory_pressing_confirmations c WHERE ' + where.join(" AND ");
+  // Always aggregate server-side across all matching records, never the 50
+  // current groups on screen. Voided confirmations do not inflate the KPIs.
+  const byOperatorSqlFor = (where: string[]) =>
+    'SELECT c.user_id AS "userId",' +
+    'MAX(c.user_name_snapshot) AS "name",' +
+    'COUNT(*)::integer AS "totalBales",' +
+    'COALESCE(SUM(c.weight_kg),0)::numeric(18,3) AS "totalKg"' +
+    ' FROM factory_pressing_confirmations c WHERE ' + where.join(" AND ") +
+    ' AND c.voided_at IS NULL GROUP BY c.user_id ORDER BY c.user_id';
+  const sumSql = sumSqlFor(sumConditions.where);
+  const perOperatorSql = byOperatorSqlFor(sumConditions.where);
+  const [rows, count, summary, byOperator] = await Promise.all([
     pool.query(sqlPage, pageArgs),
     pool.query(countSql, args),
     pool.query(sumSql, sumConditions.args),
+    pool.query(perOperatorSql, sumConditions.args),
   ]);
+  const filteredSummary = { ...(summary.rows[0] ?? { totalBales: 0, totalKg: "0", voidedBales: 0 }),
+    byOperator: byOperator.rows };
+  // Filtering the table to P2 should not make P1/P3 or ALL WORKERS show
+  // zero. Keep the dashboard across all operators for the selected date,
+  // barcode, status and KG, while the history/export obey userId.
+  let overview = filteredSummary;
+  if (ctx.supervisor && filters.userId) {
+    const allConditions = conditions(ctx, { ...filters, userId: undefined });
+    const [allSummary, allOperators] = await Promise.all([
+      pool.query(sumSqlFor(allConditions.where), allConditions.args),
+      pool.query(byOperatorSqlFor(allConditions.where), allConditions.args),
+    ]);
+    overview = { ...(allSummary.rows[0] ?? { totalBales: 0, totalKg: "0", voidedBales: 0 }),
+      byOperator: allOperators.rows };
+  }
   return {
     rows: rows.rows,
     total: Number(count.rows[0]?.total || 0),
-    summary: summary.rows[0] ?? { totalBales: 0, totalKg: "0", voidedBales: 0 },
+    summary: filteredSummary,
+    overview,
     page: filters.page, limit: filters.limit, mode: filters.mode,
     asOf,
   };
@@ -194,19 +225,40 @@ export function registerFactoryPressingReportRoutes(app: Express): void {
   app.get("/api/factory/pressing-machines/report/options", requireAuth, async (req: Request, res: Response) => {
     try {
       const ctx = await context(req);
+      // Include assigned operators with zero scans so P1/P2/P3 filters are usable
+      // before any production is recorded.
       const operators = ctx.supervisor
         ? (await pool.query(
-          'SELECT c.user_id AS "userId",COALESCE(MAX(c.user_name_snapshot),c.user_id) AS name ' +
-          'FROM factory_pressing_confirmations c WHERE c.company_id=$1 ' +
-          'GROUP BY c.user_id ORDER BY name LIMIT 1500', [ctx.companyId]
+          'WITH operator_ids AS (SELECT a.user_id FROM factory_pressing_assignments a WHERE a.company_id = $1 ' +
+          'UNION SELECT c.user_id FROM factory_pressing_confirmations c WHERE c.company_id = $1 ' +
+          'UNION SELECT u.id FROM users u JOIN user_company_roles r ON r.user_id = u.id ' +
+          "AND r.company_id = $1 AND r.role IN ('User', 'Normal User') " +
+          "WHERE UPPER(BTRIM(u.username)) IN ('P1', 'P2', 'P3')) " +
+          'SELECT o.user_id AS "userId", MAX(u.username) AS username, ' +
+          "EXISTS (SELECT 1 FROM user_company_roles r WHERE r.company_id = $1 " +
+          "AND r.user_id = o.user_id AND r.role IN ('User', 'Normal User')) AS \"isPressingWorker\", " +
+          "COALESCE(NULLIF(MAX(p.display_name), ''), NULLIF(MAX(u.username), ''), " +
+          "NULLIF(MAX(c.user_name_snapshot), ''), o.user_id) AS name " +
+          'FROM operator_ids o LEFT JOIN users u ON u.id = o.user_id ' +
+          'LEFT JOIN factory_user_profiles p ON p.company_id = $1 AND p.user_id = o.user_id ' +
+          'LEFT JOIN factory_pressing_confirmations c ON c.company_id = $1 AND c.user_id = o.user_id ' +
+          'GROUP BY o.user_id ORDER BY name LIMIT 1500', [ctx.companyId]
         )).rows
         : [];
+      const weights = await pool.query(
+        'SELECT DISTINCT c.weight_kg AS kg FROM factory_pressing_confirmations c ' +
+        'WHERE c.company_id = $1 AND c.voided_at IS NULL' +
+        (ctx.supervisor ? '' : ' AND c.user_id = $2') +
+        ' ORDER BY kg ASC LIMIT 200',
+        ctx.supervisor ? [ctx.companyId] : [ctx.companyId, ctx.userId],
+      );
       const [settings] = await db.select({ extraSettings: factorySettings.extraSettings })
         .from(factorySettings).where(eq(factorySettings.companyId, ctx.companyId)).limit(1);
       // One production date basis: company settings only; no shifts.
       const timeZone = settingsTimezone(settings?.extraSettings);
       const serverToday = factoryLocalDate(new Date(), timeZone);
-      return res.json({ operators, canViewAll: ctx.supervisor, serverToday, timeZone });
+      return res.json({ operators, canViewAll: ctx.supervisor, canCorrect: ctx.canCorrect,
+        weightsKg: weights.rows.map(row => String(row.kg)), serverToday, timeZone });
     } catch (error) { return handleError(res, error); }
   });
 
