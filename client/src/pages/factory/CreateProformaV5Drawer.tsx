@@ -1,5 +1,4 @@
 import type React from "react";
-import { DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -93,14 +92,14 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col bg-background" data-testid="page-create-proforma-v5">
-        <DialogHeader className="px-5 py-4 border-b shrink-0">
-          <DialogTitle className="text-base flex items-center gap-2">
+        <div className="px-5 py-4 border-b shrink-0">
+          <h1 className="text-base font-semibold flex items-center gap-2">
             Create Proforma
             <Badge variant="secondary" className="text-[11px] font-semibold tracking-wide">
               v5
             </Badge>
-          </DialogTitle>
-        </DialogHeader>
+          </h1>
+        </div>
 
         {/* Top fields */}
         <div className="px-5 pt-3 pb-2 border-b shrink-0 flex flex-col gap-2">
