@@ -20,6 +20,7 @@ failure, so a correct document cannot quietly become undiscoverable.
 |---|---|
 | [what-is-this.md](what-is-this.md) | What the system is, in one page |
 | [onboarding.md](onboarding.md) | First login through first transaction |
+| [cloud-run-free-tier.md](cloud-run-free-tier.md) | Google Cloud Run and Aiven Free PostgreSQL isolated test deployment |
 | [architecture.md](architecture.md) | How the codebase fits together |
 | [core-concepts.md](core-concepts.md) | Companies, modes, tenancy, the vocabulary |
 | [contributing.md](contributing.md) | Project layout and how to work in it |
