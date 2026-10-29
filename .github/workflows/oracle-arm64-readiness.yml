@@ -1,0 +1,66 @@
+name: Oracle ARM64 readiness
+
+# Native ARM64 verification for the private ABDALLAH-SYSTEM repository.
+# No Oracle credentials and no production database access are involved.
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/oracle-arm64-readiness.yml"
+      - "deploy/oracle/**"
+      - "docs/oracle-always-free.md"
+      - "scripts/oracle-*.mjs"
+      - "package.json"
+      - "package-lock.json"
+      - ".node-version"
+      - "server/**"
+      - "shared/**"
+      - "drizzle.config.ts"
+      - "vite.config.ts"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-arm64:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 45
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_oracle_check
+      PGSSLMODE: disable
+      NODE_ENV: test
+      SESSION_SECRET: arm64-ci-temporary-only
+      ENABLE_SCHEDULERS: "false"
+      NODE_OPTIONS: --max-old-space-size=4096
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: erp_oracle_check
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d erp_oracle_check"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - name: Install architecture-specific optional dependencies
+        run: npm ci --include=optional --no-audit
+      - name: Exercise Node native libraries on Linux ARM64
+        run: node scripts/oracle-arm64-check.mjs
+      - name: Build frontend and backend natively on ARM64
+        run: npm run build
+      - name: Verify PostgreSQL scratch database starts empty
+        run: node scripts/oracle-db-preflight.mjs --empty
+      - name: Provision declared schema in a DISPOSABLE CI database only
+        run: npx drizzle-kit push --force
+      - name: Verify core tables exist after disposable schema creation
+        run: node scripts/oracle-db-preflight.mjs --ready
