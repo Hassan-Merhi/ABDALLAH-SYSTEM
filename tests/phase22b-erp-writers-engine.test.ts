@@ -367,28 +367,6 @@ describe("rental accrual and payment", () => {
     expect(second.accrued).toBe(0);
     expect(await postedFor(ctx.companyId, "rental-accrual")).toHaveLength(1);
   });
-
-  it("posts a guarantee payment once per request id, with its family number", async () => {
-    const body = {
-      amount: "75.25",
-      cashAccountId: ctx.cashAccountId,
-      paymentDate: "2026-04-20",
-      clientRequestId: `${PREFIX}-guar-${process.pid}`,
-    };
-    const first = await agent.post(`/api/erp/rental/contracts/${contractId}/guarantee-to-cash`).send(body);
-    expect(first.status, JSON.stringify(first.body)).toBe(200);
-    const again = await agent.post(`/api/erp/rental/contracts/${contractId}/guarantee-to-cash`).send(body);
-    expect(again.status).toBe(200);
-
-    const posted = await postedFor(ctx.companyId, "rental-guarantee-cash");
-    expect(posted).toHaveLength(1);
-    expect(posted[0].voucher_number).toBe(`GUAR-CASH-1-${contractId}`);
-    await expectBalanced(posted[0].id, "75.25");
-    const { rows: payments } = await pool.query(`SELECT id FROM property_payments WHERE voucher_id = $1`, [
-      posted[0].id,
-    ]);
-    expect(payments).toHaveLength(1);
-  });
 });
 
 describe("ERP payroll", () => {

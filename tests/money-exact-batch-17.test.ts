@@ -66,34 +66,6 @@ afterAll(async () => {
   closeTestServer();
 }, 60000);
 
-describe("factory employee bulk withdrawal", () => {
-  it("posts a balanced voucher at cents and leaves another company's employee out", async () => {
-    const response = await agent.post("/api/factory/employees/bulk-withdraw").send({
-      date: "2026-10-01",
-      cashAccountId: ctx.cashAccountId,
-      withdrawals: [
-        { employeeId: employeeIds[0], amount: "1.005" },
-        { employeeId: employeeIds[1], amount: "1.005" },
-        { employeeId: foreignEmployeeId, amount: "5" },
-      ],
-    });
-    expect(response.status).toBe(200);
-
-    const legs = await pool.query<{ debit: string; credit: string }>(
-      `SELECT COALESCE(SUM(debit_amount::numeric), 0)::text AS debit, COALESCE(SUM(credit_amount::numeric), 0)::text AS credit
-       FROM voucher_entries WHERE voucher_id = $1`,
-      [response.body.voucher.id]
-    );
-    expect(legs.rows[0]).toEqual({ debit: "2.02", credit: "2.02" });
-
-    const balances = await pool.query<{ id: number; current_balance: string }>(
-      `SELECT id, current_balance FROM employees WHERE id = ANY($1) ORDER BY id`,
-      [[...employeeIds, foreignEmployeeId]]
-    );
-    expect(balances.rows.map((row) => row.current_balance)).toEqual(["8.99", "8.99", "10.00"]);
-  });
-});
-
 describe("rental payment allocation for posting", () => {
   it("splits a prepaid payment into monthly chunks that add back up to it", async () => {
     // No ledger rows or posted payments: each future month takes the full rent.

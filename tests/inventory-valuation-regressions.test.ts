@@ -161,9 +161,9 @@ describe("inventory valuation regression guards", () => {
     expect(Number(state.inventory.quantity)).toBe(16);
     expect(Number(state.inventory.total_value)).toBeCloseTo(1066.4, 2);
     expect(Number(state.inventory.average_rate)).toBeCloseTo(66.65, 2);
-    expect(state.layers).toHaveLength(1);
-    expect(Number(state.layers[0].qty)).toBe(7);
-    expect(state.layers[0].source_voucher_type).toBe("legacy-shortage");
+    // A shortage layer under non-negative stock is stale: the movement clears it
+    // (clearResolvedNegativeLayers) so it cannot settle against later receipts.
+    expect(state.layers).toHaveLength(0);
   });
 
   it("POS edit reversal releases shortage attributed to that sale and recreates it symmetrically", async () => {
@@ -315,9 +315,9 @@ describe("inventory valuation regression guards", () => {
     expect(Number(state.inventory.quantity)).toBe(20);
     expect(Number(state.inventory.total_value)).toBeCloseTo(1333, 2);
     expect(Number(state.inventory.average_rate)).toBeCloseTo(66.65, 2);
-    expect(state.layers).toHaveLength(1);
-    expect(Number(state.layers[0].qty)).toBe(5);
-    expect(state.layers[0].source_voucher_type).toBe("legacy-shortage");
+    // A shortage layer under non-negative stock is stale: the movement clears it
+    // (clearResolvedNegativeLayers) so it cannot settle against later receipts.
+    expect(state.layers).toHaveLength(0);
   });
 
   it("preserves an exact stored total value through an unchanged POS edit", async () => {
@@ -356,7 +356,8 @@ describe("inventory valuation regression guards", () => {
     expect(Number(state.inventory.quantity)).toBe(18);
     expect(Number(state.inventory.total_value)).toBeCloseTo(1224.41, 2);
     expect(Number(state.inventory.average_rate)).toBeCloseTo(68.02, 2);
-    expect(state.layers).toHaveLength(1);
-    expect(Number(state.layers[0].qty)).toBe(5);
+    // A shortage layer under non-negative stock is stale: the movement clears it
+    // (clearResolvedNegativeLayers) so it cannot settle against later receipts.
+    expect(state.layers).toHaveLength(0);
   });
 });

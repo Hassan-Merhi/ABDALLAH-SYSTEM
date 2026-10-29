@@ -47,7 +47,6 @@
       "tests/container-offload-historical-cost-immutability.test.ts",
       "tests/recurring-journal-scheduling.test.ts",
       "tests/startup-preload-manifest.test.ts",
-      "tests/wave18a-scheduler-rental.test.ts",
       "tests/factory-broker-fx-double-count-regression.test.ts",
       "tests/customer-loading-returned-date-repair.test.ts",
       "tests/customer-order-analytics-loading-date.test.ts",

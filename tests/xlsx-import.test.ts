@@ -1,8 +1,8 @@
 /**
  * Phase 4 — Real XLSX Import Tests
  * ----------------------------------
- * Tests the POS and stock-transfer import parse endpoints using real XLSX files
- * built in-memory via ExcelJS.  Exercises:
+ * Tests the POS import parse endpoints using real XLSX files built in-memory
+ * via ExcelJS (stock-transfer import is retired in ABDALLAH-SYSTEM). Exercises:
  *   - Valid XLSX file is parsed and returns structured items
  *   - Totals/quantities are summed correctly
  *   - Zero-quantity rows are skipped by the parser
@@ -15,12 +15,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
 import ExcelJS from "exceljs";
-import {
-  seedTestData,
-  cleanupTestData,
-  closeTestServer,
-  type TestContext,
-} from "./setup";
+import { seedTestData, cleanupTestData, closeTestServer, type TestContext } from "./setup";
 import { pool } from "../server/db";
 
 const TEST_PREFIX = "xlsimp";
@@ -31,10 +26,7 @@ let agent: request.SuperAgentTest;
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Build a minimal XLSX buffer via ExcelJS and return it as a Buffer. */
-async function buildXlsx(
-  headers: string[],
-  rows: (string | number | null)[][],
-): Promise<Buffer> {
+async function buildXlsx(headers: string[], rows: (string | number | null)[][]): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet("Sheet1");
   ws.addRow(headers);
@@ -43,16 +35,10 @@ async function buildXlsx(
 }
 
 /** Supertest multipart XLSX upload helper. */
-function attachXlsx(
-  req: request.Test,
-  buf: Buffer,
-  fieldName = "file",
-  filename = "test.xlsx",
-): request.Test {
+function attachXlsx(req: request.Test, buf: Buffer, fieldName = "file", filename = "test.xlsx"): request.Test {
   return req.attach(fieldName, buf, {
     filename,
-    contentType:
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   });
 }
 
@@ -86,13 +72,10 @@ describe("XLSX Import — POS parse: valid file", () => {
       [
         ["ABC-001", 2, 10.5],
         ["ABC-002", 3, 5.0],
-      ],
+      ]
     );
 
-    const res = await attachXlsx(
-      agent.post("/api/pos-import/parse"),
-      buf,
-    );
+    const res = await attachXlsx(agent.post("/api/pos-import/parse"), buf);
 
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body.items)).toBe(true);
@@ -111,10 +94,10 @@ describe("XLSX Import — POS parse: valid file", () => {
     const buf = await buildXlsx(
       ["Barcode", "Quantity", "Rate"],
       [
-        ["ITEM-A", 4, 2.5],  // 10.00
-        ["ITEM-B", 1, 7.0],  // 7.00
-        ["ITEM-C", 2, 3.0],  // 6.00
-      ],
+        ["ITEM-A", 4, 2.5], // 10.00
+        ["ITEM-B", 1, 7.0], // 7.00
+        ["ITEM-C", 2, 3.0], // 6.00
+      ]
     );
 
     const res = await attachXlsx(agent.post("/api/pos-import/parse"), buf);
@@ -127,10 +110,10 @@ describe("XLSX Import — POS parse: valid file", () => {
     const buf = await buildXlsx(
       ["Barcode", "Quantity", "Rate"],
       [
-        ["SKIP-ZERO", 0, 10],  // zero qty → skipped
+        ["SKIP-ZERO", 0, 10], // zero qty → skipped
         ["KEEP-ME", 1, 5],
         ["SKIP-NOQTY", null, 8], // null qty → skipped
-      ],
+      ]
     );
 
     const res = await attachXlsx(agent.post("/api/pos-import/parse"), buf);
@@ -143,9 +126,9 @@ describe("XLSX Import — POS parse: valid file", () => {
     const buf = await buildXlsx(
       ["Barcode", "Quantity", "Rate"],
       [
-        ["NO-RATE", 2, 0],   // zero rate → skipped
+        ["NO-RATE", 2, 0], // zero rate → skipped
         ["WITH-RATE", 1, 9],
-      ],
+      ]
     );
 
     const res = await attachXlsx(agent.post("/api/pos-import/parse"), buf);
@@ -161,7 +144,7 @@ describe("XLSX Import — POS parse: valid file", () => {
         ["DUP-CODE", 1, 5],
         ["DUP-CODE", 2, 5],
         ["DUP-CODE", 3, 5],
-      ],
+      ]
     );
 
     const res = await attachXlsx(agent.post("/api/pos-import/parse"), buf);
@@ -170,10 +153,7 @@ describe("XLSX Import — POS parse: valid file", () => {
   });
 
   it("row number (rowNum) is 1-based starting at 2 (header = row 1)", async () => {
-    const buf = await buildXlsx(
-      ["Barcode", "Quantity", "Rate"],
-      [["ROWNUM-TEST", 1, 10]],
-    );
+    const buf = await buildXlsx(["Barcode", "Quantity", "Rate"], [["ROWNUM-TEST", 1, 10]]);
 
     const res = await attachXlsx(agent.post("/api/pos-import/parse"), buf);
     expect(res.status).toBe(200);
@@ -181,10 +161,7 @@ describe("XLSX Import — POS parse: valid file", () => {
   });
 
   it("accepts lowercase column aliases (barcode, quantity, rate)", async () => {
-    const buf = await buildXlsx(
-      ["barcode", "quantity", "rate"],
-      [["LOWER-001", 5, 2]],
-    );
+    const buf = await buildXlsx(["barcode", "quantity", "rate"], [["LOWER-001", 5, 2]]);
 
     const res = await attachXlsx(agent.post("/api/pos-import/parse"), buf);
     expect(res.status).toBe(200);
@@ -203,12 +180,7 @@ describe("XLSX Import — POS parse: error cases", () => {
   it("bad binary (not XLSX) returns 400 not 500", async () => {
     // Random bytes that are not a valid ZIP/XLSX
     const badBuf = Buffer.from("this is definitely not an excel file ABCDEF 12345");
-    const res = await attachXlsx(
-      agent.post("/api/pos-import/parse"),
-      badBuf,
-      "file",
-      "bad.xlsx",
-    );
+    const res = await attachXlsx(agent.post("/api/pos-import/parse"), badBuf, "file", "bad.xlsx");
     // Corrupt file is a client error — must be 400, not 500
     expect(res.status).toBe(400);
   });
@@ -225,129 +197,7 @@ describe("XLSX Import — POS parse: error cases", () => {
 
   it("parse endpoint requires authenticated session (unauthenticated returns 401)", async () => {
     const buf = await buildXlsx(["Barcode", "Quantity", "Rate"], [["X", 1, 1]]);
-    const res = await attachXlsx(
-      request(ctx.app).post("/api/pos-import/parse"),
-      buf,
-    );
-    expect(res.status).toBe(401);
-  });
-});
-
-// ── Stock Transfer Import — parse ─────────────────────────────────────────────
-
-describe("XLSX Import — Stock Transfer parse: valid file", () => {
-  it("parses a valid XLSX with Barcode/Quantity columns and returns items", async () => {
-    const buf = await buildXlsx(
-      ["Barcode", "Quantity"],
-      [
-        ["ST-ITEM-001", 10],
-        ["ST-ITEM-002", 25],
-      ],
-    );
-
-    const res = await attachXlsx(
-      agent.post("/api/stock-transfer-import/parse"),
-      buf,
-    );
-
-    expect(res.status).toBe(200);
-    expect(Array.isArray(res.body.items)).toBe(true);
-    expect(res.body.items).toHaveLength(2);
-    expect(res.body.items[0].barcode).toBe("ST-ITEM-001");
-    expect(res.body.items[0].quantity).toBe(10);
-    expect(res.body.totalItems).toBe(2);
-    expect(typeof res.body.fileName).toBe("string");
-  });
-
-  it("totalItems matches the number of valid (non-zero) rows", async () => {
-    const buf = await buildXlsx(
-      ["Barcode", "Quantity"],
-      [
-        ["A", 5],
-        ["B", 0],  // zero qty → skipped
-        ["C", 3],
-      ],
-    );
-
-    const res = await attachXlsx(
-      agent.post("/api/stock-transfer-import/parse"),
-      buf,
-    );
-    expect(res.status).toBe(200);
-    expect(res.body.totalItems).toBe(2);
-    expect(res.body.items).toHaveLength(2);
-  });
-
-  it("accepts lowercase column aliases (barcode, quantity)", async () => {
-    const buf = await buildXlsx(
-      ["barcode", "quantity"],
-      [["LOWER-ST", 7]],
-    );
-
-    const res = await attachXlsx(
-      agent.post("/api/stock-transfer-import/parse"),
-      buf,
-    );
-    expect(res.status).toBe(200);
-    expect(res.body.items).toHaveLength(1);
-    expect(res.body.items[0].barcode).toBe("LOWER-ST");
-  });
-
-  it("duplicate barcodes in the same file are all returned", async () => {
-    const buf = await buildXlsx(
-      ["Barcode", "Quantity"],
-      [
-        ["DUP-ST", 5],
-        ["DUP-ST", 3],
-      ],
-    );
-
-    const res = await attachXlsx(
-      agent.post("/api/stock-transfer-import/parse"),
-      buf,
-    );
-    expect(res.status).toBe(200);
-    expect(res.body.items).toHaveLength(2);
-    expect(res.body.totalItems).toBe(2);
-  });
-});
-
-describe("XLSX Import — Stock Transfer parse: error cases", () => {
-  it("no file uploaded returns 400", async () => {
-    const res = await agent.post("/api/stock-transfer-import/parse");
-    expect(res.status).toBe(400);
-  });
-
-  it("bad binary returns 400 not 500", async () => {
-    const badBuf = Buffer.from("not a real xlsx file — garbage bytes 9999");
-    const res = await attachXlsx(
-      agent.post("/api/stock-transfer-import/parse"),
-      badBuf,
-      "file",
-      "broken.xlsx",
-    );
-    // Corrupt file is a client error — must be 400, not 500
-    expect(res.status).toBe(400);
-  });
-
-  it("empty XLSX (no rows) returns 400", async () => {
-    const wb = new ExcelJS.Workbook();
-    wb.addWorksheet("Empty");
-    const buf = Buffer.from(await wb.xlsx.writeBuffer());
-
-    const res = await attachXlsx(
-      agent.post("/api/stock-transfer-import/parse"),
-      buf,
-    );
-    expect(res.status).toBe(400);
-  });
-
-  it("parse endpoint requires auth (unauthenticated returns 401)", async () => {
-    const buf = await buildXlsx(["Barcode", "Quantity"], [["X", 1]]);
-    const res = await attachXlsx(
-      request(ctx.app).post("/api/stock-transfer-import/parse"),
-      buf,
-    );
+    const res = await attachXlsx(request(ctx.app).post("/api/pos-import/parse"), buf);
     expect(res.status).toBe(401);
   });
 });
@@ -366,10 +216,7 @@ describe("XLSX Import — Stock Transfer parse: error cases", () => {
 describe("XLSX Import — Company isolation", () => {
   it("parse succeeds when the session has a valid company context", async () => {
     // Verifies that the parse endpoint works end-to-end in an authenticated session
-    const buf = await buildXlsx(
-      ["Barcode", "Quantity", "Rate"],
-      [["ISO-ITEM", 1, 10]],
-    );
+    const buf = await buildXlsx(["Barcode", "Quantity", "Rate"], [["ISO-ITEM", 1, 10]]);
     const res = await attachXlsx(agent.post("/api/pos-import/parse"), buf);
     expect(res.status).toBe(200);
     expect(res.body.items).toHaveLength(1);
@@ -377,19 +224,7 @@ describe("XLSX Import — Company isolation", () => {
 
   it("unauthenticated caller cannot parse files (no session → 401)", async () => {
     const buf = await buildXlsx(["Barcode", "Quantity", "Rate"], [["X", 1, 5]]);
-    const res = await attachXlsx(
-      request(ctx.app).post("/api/pos-import/parse"),
-      buf,
-    );
-    expect(res.status).toBe(401);
-  });
-
-  it("stock transfer parse also requires an authenticated session (→ 401)", async () => {
-    const buf = await buildXlsx(["Barcode", "Quantity"], [["X", 1]]);
-    const res = await attachXlsx(
-      request(ctx.app).post("/api/stock-transfer-import/parse"),
-      buf,
-    );
+    const res = await attachXlsx(request(ctx.app).post("/api/pos-import/parse"), buf);
     expect(res.status).toBe(401);
   });
 });
@@ -460,7 +295,7 @@ describe("XLSX Import — POS import (commit) endpoint", () => {
       `SELECT quantity FROM inventory
         WHERE location_id = $1 AND stock_item_id = $2
         LIMIT 1`,
-      [ctx.locationId, ctx.stockItemIds[1]],
+      [ctx.locationId, ctx.stockItemIds[1]]
     );
     const qtyBefore = parseFloat(before.rows[0]?.quantity ?? "0");
 
@@ -476,7 +311,7 @@ describe("XLSX Import — POS import (commit) endpoint", () => {
       `SELECT quantity FROM inventory
         WHERE location_id = $1 AND stock_item_id = $2
         LIMIT 1`,
-      [ctx.locationId, ctx.stockItemIds[1]],
+      [ctx.locationId, ctx.stockItemIds[1]]
     );
     const qtyAfter = parseFloat(after.rows[0]?.quantity ?? "0");
     expect(qtyAfter).toBeCloseTo(qtyBefore - 3, 2);
@@ -505,7 +340,7 @@ describe("XLSX Import — POS import (commit) endpoint", () => {
     // Count existing sales vouchers before the failed commit
     const before = await pool.query<{ count: string }>(
       `SELECT COUNT(*) FROM vouchers WHERE company_id = $1 AND voucher_type = 'Sales'`,
-      [ctx.companyId],
+      [ctx.companyId]
     );
     const countBefore = parseInt(before.rows[0].count);
 
@@ -522,184 +357,22 @@ describe("XLSX Import — POS import (commit) endpoint", () => {
     // Transaction must have rolled back — voucher count unchanged
     const after = await pool.query<{ count: string }>(
       `SELECT COUNT(*) FROM vouchers WHERE company_id = $1 AND voucher_type = 'Sales'`,
-      [ctx.companyId],
+      [ctx.companyId]
     );
     const countAfter = parseInt(after.rows[0].count);
     expect(countAfter).toBe(countBefore);
   });
 
   it("requires authentication (unauthenticated → 401)", async () => {
-    const res = await request(ctx.app).post("/api/pos-import/import").send({
-      locationId: ctx.locationId,
-      saleDate: "2024-06-01",
-      cashAccountId: ctx.cashAccountId,
-      items: [{ barcode: `${TEST_PREFIX}-ITEM1`, quantity: 1, rate: 10 }],
-    });
+    const res = await request(ctx.app)
+      .post("/api/pos-import/import")
+      .send({
+        locationId: ctx.locationId,
+        saleDate: "2024-06-01",
+        cashAccountId: ctx.cashAccountId,
+        items: [{ barcode: `${TEST_PREFIX}-ITEM1`, quantity: 1, rate: 10 }],
+      });
     expect(res.status).toBe(401);
-  });
-});
-
-// ── Stock Transfer Import — validate endpoint ─────────────────────────────────
-
-describe("XLSX Import — Stock Transfer validate endpoint", () => {
-  it("returns errors for an unrecognised barcode", async () => {
-    const res = await agent.post("/api/stock-transfer-import/validate").send({
-      sourceLocationId: ctx.locationId,
-      destinationLocationId: ctx.location2Id,
-      items: [{ barcode: "NO-SUCH-ITEM-XYZ", quantity: 5, rowNum: 2 }],
-    });
-    expect(res.status).toBe(200);
-    expect(res.body.errors.length).toBeGreaterThan(0);
-  });
-
-  it("validates a known barcode and returns stockItemId", async () => {
-    const barcode = `${TEST_PREFIX}-ITEM3`;
-    const res = await agent.post("/api/stock-transfer-import/validate").send({
-      sourceLocationId: ctx.locationId,
-      destinationLocationId: ctx.location2Id,
-      items: [{ barcode, quantity: 5, rowNum: 2 }],
-    });
-    expect(res.status).toBe(200);
-    expect(res.body.errors).toHaveLength(0);
-    expect(res.body.validatedItems[0].stockItemId).toBe(ctx.stockItemIds[2]);
-  });
-
-  it("returns 400 when source === destination location", async () => {
-    const res = await agent.post("/api/stock-transfer-import/validate").send({
-      sourceLocationId: ctx.locationId,
-      destinationLocationId: ctx.locationId, // same!
-      items: [{ barcode: `${TEST_PREFIX}-ITEM1`, quantity: 1 }],
-    });
-    expect(res.status).toBe(400);
-  });
-});
-
-// ── Stock Transfer Import — full commit flow with DB assertions ───────────────
-
-describe("XLSX Import — Stock Transfer import (commit) endpoint", () => {
-  it("creates a transfer record and returns success with itemsCount", async () => {
-    const barcode = `${TEST_PREFIX}-ITEM3`;
-    const res = await agent.post("/api/stock-transfer-import/import").send({
-      sourceLocationId: ctx.locationId,
-      destinationLocationId: ctx.location2Id,
-      transferDate: "2024-06-03",
-      items: [{ barcode, quantity: 5 }],
-    });
-
-    expect(res.status).toBe(200);
-    expect(res.body.success).toBe(true);
-    expect(res.body.itemsCount).toBe(1);
-  });
-
-  it("inventory moves from source to destination after transfer", async () => {
-    const barcode = `${TEST_PREFIX}-ITEM1`;
-
-    const beforeSrc = await pool.query<{ quantity: string }>(
-      `SELECT quantity FROM inventory WHERE location_id = $1 AND stock_item_id = $2 LIMIT 1`,
-      [ctx.locationId, ctx.stockItemIds[0]],
-    );
-    const srcQtyBefore = parseFloat(beforeSrc.rows[0]?.quantity ?? "0");
-
-    const beforeDst = await pool.query<{ quantity: string }>(
-      `SELECT quantity FROM inventory WHERE location_id = $1 AND stock_item_id = $2 LIMIT 1`,
-      [ctx.location2Id, ctx.stockItemIds[0]],
-    );
-    const dstQtyBefore = parseFloat(beforeDst.rows[0]?.quantity ?? "0");
-
-    const res = await agent.post("/api/stock-transfer-import/import").send({
-      sourceLocationId: ctx.locationId,
-      destinationLocationId: ctx.location2Id,
-      transferDate: "2024-06-04",
-      items: [{ barcode, quantity: 8 }],
-    });
-    expect(res.status).toBe(200);
-
-    const afterSrc = await pool.query<{ quantity: string }>(
-      `SELECT quantity FROM inventory WHERE location_id = $1 AND stock_item_id = $2 LIMIT 1`,
-      [ctx.locationId, ctx.stockItemIds[0]],
-    );
-    const srcQtyAfter = parseFloat(afterSrc.rows[0]?.quantity ?? "0");
-
-    const afterDst = await pool.query<{ quantity: string }>(
-      `SELECT quantity FROM inventory WHERE location_id = $1 AND stock_item_id = $2 LIMIT 1`,
-      [ctx.location2Id, ctx.stockItemIds[0]],
-    );
-    const dstQtyAfter = parseFloat(afterDst.rows[0]?.quantity ?? "0");
-
-    expect(srcQtyAfter).toBeCloseTo(srcQtyBefore - 8, 2);
-    expect(dstQtyAfter).toBeCloseTo(dstQtyBefore + 8, 2);
-  });
-
-  it("missing required fields returns 400", async () => {
-    const res = await agent.post("/api/stock-transfer-import/import").send({
-      sourceLocationId: ctx.locationId,
-      // destinationLocationId omitted
-      transferDate: "2024-06-03",
-      items: [{ barcode: `${TEST_PREFIX}-ITEM1`, quantity: 1 }],
-    });
-    expect(res.status).toBe(400);
-  });
-
-  it("requires authentication (unauthenticated → 401)", async () => {
-    const res = await request(ctx.app).post("/api/stock-transfer-import/import").send({
-      sourceLocationId: ctx.locationId,
-      destinationLocationId: ctx.location2Id,
-      transferDate: "2024-06-03",
-      items: [{ barcode: `${TEST_PREFIX}-ITEM1`, quantity: 1 }],
-    });
-    expect(res.status).toBe(401);
-  });
-
-  it("unknown barcode returns 400 (not 500), no voucher created", async () => {
-    // The route validates every barcode before starting the DB transaction, so
-    // an unknown barcode is user input error → 400 with no partial state.
-    const before = await pool.query<{ count: string }>(
-      `SELECT COUNT(*) FROM vouchers WHERE company_id = $1 AND voucher_type = 'Stock Transfer'`,
-      [ctx.companyId],
-    );
-    const countBefore = parseInt(before.rows[0].count);
-
-    const res = await agent.post("/api/stock-transfer-import/import").send({
-      sourceLocationId: ctx.locationId,
-      destinationLocationId: ctx.location2Id,
-      transferDate: "2024-06-05",
-      items: [{ barcode: "NO-SUCH-BARCODE-XYZ", quantity: 2 }],
-    });
-    expect(res.status).toBe(400);
-    expect(res.body.message).toMatch(/NO-SUCH-BARCODE-XYZ/);
-
-    const after = await pool.query<{ count: string }>(
-      `SELECT COUNT(*) FROM vouchers WHERE company_id = $1 AND voucher_type = 'Stock Transfer'`,
-      [ctx.companyId],
-    );
-    expect(parseInt(after.rows[0].count)).toBe(countBefore);
-  });
-
-  it("no partial state when second item has unknown barcode (rollback guard)", async () => {
-    // First item is valid, second is not. The route detects the bad barcode
-    // BEFORE opening any transaction, so no voucher or inventory row is written.
-    const before = await pool.query<{ count: string }>(
-      `SELECT COUNT(*) FROM vouchers WHERE company_id = $1 AND voucher_type = 'Stock Transfer'`,
-      [ctx.companyId],
-    );
-    const countBefore = parseInt(before.rows[0].count);
-
-    const res = await agent.post("/api/stock-transfer-import/import").send({
-      sourceLocationId: ctx.locationId,
-      destinationLocationId: ctx.location2Id,
-      transferDate: "2024-06-06",
-      items: [
-        { barcode: `${TEST_PREFIX}-ITEM1`, quantity: 1 },
-        { barcode: "TOTALLY-UNKNOWN-BARCODE", quantity: 1 },
-      ],
-    });
-    expect(res.status).toBe(400);
-
-    const after = await pool.query<{ count: string }>(
-      `SELECT COUNT(*) FROM vouchers WHERE company_id = $1 AND voucher_type = 'Stock Transfer'`,
-      [ctx.companyId],
-    );
-    expect(parseInt(after.rows[0].count)).toBe(countBefore);
   });
 });
 
@@ -746,7 +419,7 @@ describe("PO Import — validate endpoint", () => {
     // suppliers table has no companyId, so this is a global insert.
     const supRes = await pool.query<{ id: number }>(
       `INSERT INTO suppliers (code, legal_name, email) VALUES ($1, $2, $3) RETURNING id`,
-      [`${TEST_PREFIX}-SUP-001`, `${TEST_PREFIX} Test Supplier`, `${TEST_PREFIX}@test.example`],
+      [`${TEST_PREFIX}-SUP-001`, `${TEST_PREFIX} Test Supplier`, `${TEST_PREFIX}@test.example`]
     );
     const supplierId = supRes.rows[0].id;
 
@@ -757,9 +430,7 @@ describe("PO Import — validate endpoint", () => {
         preview: [
           {
             containerNumber: `${TEST_PREFIX}-CONT-002`,
-            items: [
-              { barcode: "DOES-NOT-EXIST-BC", itemName: "Unknown Item", poNumber: "PO-1" },
-            ],
+            items: [{ barcode: "DOES-NOT-EXIST-BC", itemName: "Unknown Item", poNumber: "PO-1" }],
             charges: {},
             itemsTotal: 0,
             chargesTotal: 0,
@@ -770,9 +441,7 @@ describe("PO Import — validate endpoint", () => {
       expect(res.status).toBe(200);
       expect(res.body.valid).toBe(false);
       // Must report the unknown barcode/item specifically — not just supplier error
-      expect(
-        res.body.errors.some((e: string) => /DOES-NOT-EXIST-BC|Item not found/i.test(e)),
-      ).toBe(true);
+      expect(res.body.errors.some((e: string) => /DOES-NOT-EXIST-BC|Item not found/i.test(e))).toBe(true);
     } finally {
       await pool.query(`DELETE FROM suppliers WHERE id = $1`, [supplierId]);
     }
@@ -804,18 +473,6 @@ describe("PO Import — validate endpoint", () => {
  * - POS import/commit: inventory decreases at source location (DB assertion)
  * - POS import/commit: unknown barcode → 400 (not 500); transaction rolls back
  * - POS import/commit: missing cashAccountId/locationId → 400; requires auth
- * - Stock transfer parse: valid XLSX → items + totalItems
- * - Stock transfer parse: zero qty rows skipped; lowercase aliases accepted
- * - Stock transfer parse: duplicate rows all returned
- * - Stock transfer parse: no file → 400; bad binary → 400; empty XLSX → 400
- * - Stock transfer parse: requires auth
- * - Stock transfer validate: known barcode → stockItemId; unknown barcode → error
- * - Stock transfer validate: same source/destination → 400
- * - Stock transfer import/commit: returns success + itemsCount (DB record created)
- * - Stock transfer import/commit: source inventory decreases, destination increases (DB assertion)
- * - Stock transfer import/commit: missing fields → 400; requires auth
- * - Stock transfer import/commit: unknown barcode → 400, no voucher created
- * - Stock transfer import/commit: mixed valid+invalid items → 400, no partial state
  * - PO validate: missing required fields → 400; unknown supplier → validation error
  * - PO validate: unknown item barcode → validation error reported; requires auth
  * - Company isolation: parse with no company set returns 400

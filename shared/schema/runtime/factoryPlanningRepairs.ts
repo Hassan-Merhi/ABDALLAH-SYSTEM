@@ -1,8 +1,9 @@
 /**
- * Fixed Production Planner plans (migrations/20261015_001_factory_fixed_production_planner.sql)
- * and the one-time customer loading-date repair audit trails
+ * Fixed Production Planner plans (migrations/20261015_001_factory_fixed_production_planner.sql),
+ * the one-time customer loading-date repair audit trails
  * (server/startup/runApprovedCustomerLoadingDateRepair.ts and
- * runApprovedReturnedLoadingDateRepair.ts).
+ * runApprovedReturnedLoadingDateRepair.ts) and the one-time destination
+ * normalisation audit trail.
  *
  * These tables are created by runtime DDL (CREATE TABLE IF NOT EXISTS). They
  * are declared here so drizzle-kit and the type system see the real schema;
@@ -80,6 +81,30 @@ export const factoryCustomerReturnedLoadingDateRepairAudit = pgTable(
     primaryKey({
       name: "factory_customer_returned_loading_date_repair_audit_pkey",
       columns: [table.companyId, table.orderId],
+    }),
+  ]
+);
+
+/**
+ * One-time Factory customer-order destination normalisation audit trail
+ * (server/startup/runApprovedFactoryDestinationNormalization.ts and
+ * runApprovedMali53DestinationNormalization.ts).
+ */
+export const factoryDestinationNormalizationAudit = pgTable(
+  "factory_destination_normalization_audit",
+  {
+    companyId: integer("company_id").notNull(),
+    customerId: integer("customer_id").notNull(),
+    orderId: integer("order_id").notNull(),
+    runKey: text("run_key").notNull(),
+    oldDestination: text("old_destination").notNull(),
+    newDestination: text("new_destination").notNull(),
+    changedAt: timestamp("changed_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({
+      name: "factory_destination_normalization_audit_pkey",
+      columns: [table.companyId, table.orderId, table.runKey],
     }),
   ]
 );

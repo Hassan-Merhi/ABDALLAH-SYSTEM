@@ -1,11 +1,12 @@
 /**
  * Backend coverage — non-Factory validation/failure write paths.
  *
- * Parameterized writes and Factory parameterless writes already have broad
- * safety matrices. This closes the complementary ERP/Supplier Partner/
- * Properties gap. Requests carry an intentionally empty body in isolated
- * tenants, maintenance/external operations are excluded, and before/after
- * fingerprints prove rejected probes never create financial or operational rows.
+ * Parameterized writes already have broad safety matrices. This closes the
+ * complementary ERP parameterless-write gap; ABDALLAH-SYSTEM retires the
+ * Supplier Partner and Properties modes, so their routes are not swept.
+ * Requests carry an intentionally empty body in an isolated tenant,
+ * maintenance/external operations are excluded, and before/after fingerprints
+ * prove rejected probes never create financial or operational rows.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -14,12 +15,12 @@ import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { pool } from "../server/db";
+import { isRetiredAbdallahApiRequest } from "../server/middleware/abdallahErpRetiredFeatureBoundary";
 import { cleanupTestData, closeTestServer, seedTestData, type TestContext } from "./setup";
 
-type Mode = "erp" | "properties" | "supplier_partner";
 type Method = "DELETE" | "PATCH" | "POST" | "PUT";
 type Manifest = { routes: string[] };
-type RouteCase = { mode: Mode; method: Method; path: string };
+type RouteCase = { method: Method; path: string };
 type Failure = { route: string; status: number; detail: string };
 type Fingerprint = Record<string, string>;
 
@@ -40,19 +41,11 @@ const EXCLUDED: RegExp[] = [
 
 let ctx: TestContext;
 let agent: request.SuperAgentTest;
-let companies: Record<Mode, number>;
 let routes: RouteCase[] = [];
-let before: Record<Mode, Fingerprint>;
-let sequence = 0;
+let before: Fingerprint;
 
 function isWriteMethod(value: string): value is Method {
   return value === "DELETE" || value === "PATCH" || value === "POST" || value === "PUT";
-}
-
-function modeForPath(routePath: string): Mode {
-  if (routePath.startsWith("/api/sp/")) return "supplier_partner";
-  if (routePath.startsWith("/api/properties/") || routePath.startsWith("/api/rental/")) return "properties";
-  return "erp";
 }
 
 export function selectNonFactoryValidationWrites(manifest: Manifest): RouteCase[] {
@@ -64,40 +57,18 @@ export function selectNonFactoryValidationWrites(manifest: Manifest): RouteCase[
     if (!isWriteMethod(method) || !routePath?.startsWith("/api/")) continue;
     if (routePath.includes(":") || routePath.includes("*")) continue;
     if (EXCLUDED.some((pattern) => pattern.test(routePath))) continue;
+    // ABDALLAH-SYSTEM refuses retired modes and features before any handler runs.
+    if (isRetiredAbdallahApiRequest(method, routePath)) continue;
+    // The Properties rental routes belonged to a retired company mode.
+    if (routePath.startsWith("/api/rental/")) continue;
 
-    const mode = modeForPath(routePath);
-    const key = `${mode} ${method} ${routePath}`;
+    const key = `${method} ${routePath}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    selected.push({ mode, method, path: routePath });
+    selected.push({ method, path: routePath });
   }
 
   return selected;
-}
-
-async function createCompany(mode: Exclude<Mode, "erp">): Promise<number> {
-  sequence += 1;
-  const result = await pool.query<{ id: number }>(
-    `INSERT INTO companies (code, name, company_type, parent_company_id, active, base_currency)
-     VALUES ($1, $2, $3, $4, true, 'USD') RETURNING id`,
-    [`CNFW-${mode.slice(0, 3)}-${sequence}`, `${TEST_PREFIX}_${mode}_${sequence}`, mode, ctx.companyId]
-  );
-  const companyId = result.rows[0].id;
-  await pool.query(
-    `INSERT INTO user_company_roles
-       (user_id, company_id, role, can_delete_records, can_sell_negative_stock)
-     VALUES ($1, $2, 'Developer', true, true)`,
-    [ctx.userId, companyId]
-  );
-  await pool.query(
-    `INSERT INTO user_security_permissions (user_id, company_id, permission, granted_by)
-     SELECT user_id, $2, permission, granted_by
-       FROM user_security_permissions
-      WHERE user_id = $1 AND company_id = $3
-     ON CONFLICT (user_id, company_id, permission) DO NOTHING`,
-    [ctx.userId, companyId, ctx.companyId]
-  );
-  return companyId;
 }
 
 async function fingerprint(companyId: number): Promise<Fingerprint> {
@@ -175,17 +146,8 @@ beforeAll(async () => {
   });
   if (login.status !== 200) throw new Error(`Login failed: ${login.status} ${login.text}`);
 
-  companies = {
-    erp: ctx.companyId,
-    properties: await createCompany("properties"),
-    supplier_partner: await createCompany("supplier_partner"),
-  };
   routes = selectNonFactoryValidationWrites(JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8")) as Manifest);
-  before = {
-    erp: await fingerprint(companies.erp),
-    properties: await fingerprint(companies.properties),
-    supplier_partner: await fingerprint(companies.supplier_partner),
-  };
+  before = await fingerprint(ctx.companyId);
 }, 120000);
 
 afterAll(async () => {
@@ -198,14 +160,12 @@ describe("non-Factory validation write coverage", () => {
     expect(routes.length).toBeGreaterThan(40);
     const failures: Failure[] = [];
 
-    for (const mode of ["erp", "properties", "supplier_partner"] as Mode[]) {
-      const selected = await agent.post("/api/auth/set-company").send({ companyId: companies[mode] });
-      expect(selected.status, `set-company ${mode}`).toBe(200);
+    const selected = await agent.post("/api/auth/set-company").send({ companyId: ctx.companyId });
+    expect(selected.status, "set-company erp").toBe(200);
 
-      for (const route of routes.filter((candidate) => candidate.mode === mode)) {
-        const failure = await exercise(route);
-        if (failure) failures.push(failure);
-      }
+    for (const route of routes) {
+      const failure = await exercise(route);
+      if (failure) failures.push(failure);
     }
 
     const report = failures
@@ -214,9 +174,7 @@ describe("non-Factory validation write coverage", () => {
     expect(failures, `${failures.length} malformed write probe(s) failed unsafely:\n${report}`).toEqual([]);
   }, 300000);
 
-  it("leaves every isolated tenant unchanged", async () => {
-    for (const [mode, companyId] of Object.entries(companies) as [Mode, number][]) {
-      expect(await fingerprint(companyId), `${mode} changed during validation sweep`).toEqual(before[mode]);
-    }
+  it("leaves the isolated tenant unchanged", async () => {
+    expect(await fingerprint(ctx.companyId), "erp changed during validation sweep").toEqual(before);
   });
 });

@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { RETIRED_ABDALLAH_ERP_API_PREFIXES, isRetiredAbdallahErpRequest } from "./abdallahErpRetiredFeatureBoundary";
+import {
+  RETIRED_ABDALLAH_ERP_API_PREFIXES,
+  RETIRED_ABDALLAH_MODE_API_PREFIXES,
+  isRetiredAbdallahApiRequest,
+  isRetiredAbdallahErpRequest,
+} from "./abdallahErpRetiredFeatureBoundary";
 
 describe("Abdallah ERP retired feature boundary", () => {
   it.each(RETIRED_ABDALLAH_ERP_API_PREFIXES)("blocks direct API access to %s (including child URLs)", (prefix) => {
@@ -48,5 +53,18 @@ describe("Abdallah ERP retired feature boundary", () => {
   ])("keeps essential or unrelated ERP endpoint %s available", (path) => {
     expect(isRetiredAbdallahErpRequest("GET", path)).toBe(false);
     expect(isRetiredAbdallahErpRequest("POST", path)).toBe(false);
+  });
+
+  it.each(RETIRED_ABDALLAH_MODE_API_PREFIXES)("refuses the retired mode API %s and its child URLs", (prefix) => {
+    expect(isRetiredAbdallahApiRequest("GET", prefix)).toBe(true);
+    expect(isRetiredAbdallahApiRequest("POST", prefix + "/123")).toBe(true);
+    expect(isRetiredAbdallahApiRequest("GET", prefix.toUpperCase() + "/")).toBe(true);
+  });
+
+  it("combines the retired mode and retired feature policies, without matching look-alike prefixes", () => {
+    expect(isRetiredAbdallahApiRequest("GET", "/api/sessions")).toBe(true);
+    expect(isRetiredAbdallahApiRequest("GET", "/api/spare-parts")).toBe(false);
+    expect(isRetiredAbdallahApiRequest("GET", "/api/factory-like")).toBe(false);
+    expect(isRetiredAbdallahApiRequest("GET", "/api/vouchers")).toBe(false);
   });
 });

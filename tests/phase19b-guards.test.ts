@@ -603,59 +603,6 @@ describe("PE7: fixed-asset delete", () => {
   });
 });
 
-describe("PE6: factory supplier permanent delete", () => {
-  const supplier = async (name: string) =>
-    (
-      await pool.query(
-        `INSERT INTO factory_suppliers (company_id, name, is_active) VALUES ($1, $2, true) RETURNING id`,
-        [ctx.companyId, `${PREFIX} ${name}`]
-      )
-    ).rows[0].id as number;
-
-  // Factory routes need a factory company: the seed company is one for this test.
-  beforeAll(async () => {
-    await pool.query(`UPDATE companies SET company_type = 'factory' WHERE id = $1`, [ctx.companyId]);
-  });
-  afterAll(async () => {
-    await pool.query(`UPDATE companies SET company_type = 'erp' WHERE id = $1`, [ctx.companyId]);
-  });
-
-  it("is Admin/Owner, refused with history (nothing removed), else one transaction with its audit", async () => {
-    const empty = await supplier("empty");
-    const withLines = await supplier("lines");
-    await withFixtureTransaction(async (client) => {
-      const id = (
-        await client.query(
-          `INSERT INTO vouchers (company_id, voucher_number, voucher_type, voucher_date, total_amount)
-           VALUES ($1, $2, 'Journal', $3, 9) RETURNING id`,
-          [ctx.companyId, nextNumber(), today]
-        )
-      ).rows[0].id as number;
-      await client.query(
-        `INSERT INTO voucher_entries (voucher_id, factory_supplier_id, debit_amount, credit_amount) VALUES ($1, $2, 9, 0)`,
-        [id, withLines]
-      );
-      await client.query(
-        `INSERT INTO voucher_entries (voucher_id, ledger_account_id, debit_amount, credit_amount) VALUES ($1, $2, 0, 9)`,
-        [id, ctx.cashAccountId]
-      );
-    });
-    await setRole("Manager");
-    expect((await agent.delete(`/api/factory/suppliers/${empty}/permanent`)).status).toBe(403);
-    await setRole("Owner");
-    const refused = await agent.delete(`/api/factory/suppliers/${withLines}/permanent`);
-    expect(refused.body).toMatchObject({ code: "FACTORY_SUPPLIER_HAS_HISTORY" });
-    expect(refused.status).toBe(409);
-    expect(refused.body).toMatchObject({ code: "FACTORY_SUPPLIER_HAS_HISTORY", history: { voucherLines: 1 } });
-    expect((await pool.query(`SELECT 1 FROM factory_suppliers WHERE id = $1`, [withLines])).rows).toHaveLength(1);
-    expect((await agent.delete(`/api/factory/suppliers/${empty}/permanent`)).status).toBe(200);
-    expect((await pool.query(`SELECT 1 FROM factory_suppliers WHERE id = $1`, [empty])).rows).toHaveLength(0);
-    const audit = await auditRows("factory_suppliers", empty);
-    expect(audit).toHaveLength(1);
-    expect(audit[0]).toMatchObject({ action: "delete", username: USERNAME });
-  });
-});
-
 describe("PE2: rental reads, roles, business date, actor and rate", () => {
   let contractId: number;
   let unitId: number;
@@ -687,17 +634,6 @@ describe("PE2: rental reads, roles, business date, actor and rate", () => {
     (await pool.query(`SELECT count(*)::int AS n FROM property_monthly_ledger WHERE contract_id = $1`, [contractId]))
       .rows[0].n as number;
 
-  it("GET detail and the statement export write no monthly row (missing months computed in memory)", async () => {
-    const detail = await agent.get(`/api/erp/rental/units/${unitId}/detail`);
-    expect(detail.status).toBe(200);
-    expect(detail.body.ledger.length).toBeGreaterThan(0);
-    expect(detail.body.ledger.every((row: { virtual?: boolean }) => row.virtual === true)).toBe(true);
-    expect(await monthlyRows()).toBe(0);
-    const exported = await agent.get(`/api/erp/rental/units/${unitId}/statement/export`);
-    expect(exported.status).toBe(200);
-    expect(await monthlyRows()).toBe(0);
-  });
-
   it("accrue, post-scheduled and run-monthly are Admin/Owner", async () => {
     await setRole("Manager");
     try {
@@ -708,93 +644,5 @@ describe("PE2: rental reads, roles, business date, actor and rate", () => {
       await setRole("Owner");
     }
     expect(await monthlyRows()).toBe(0);
-  });
-
-  it("accrue posts on the company's business date, audited with the signed-in user; a closed date is refused", async () => {
-    const accrued = await agent.post("/api/erp/rental/accrue").set("X-Client-Date", "2020-01-01");
-    expect(accrued.status).toBe(200);
-    expect(accrued.body.asOf).toBe(today);
-    expect(accrued.body.accrued).toBeGreaterThan(0);
-    const { rows: accruals } = await pool.query(
-      // Phase 22 (B): the accrual is numbered by the engine; found by its posting identity.
-      `SELECT v.id, v.voucher_date::text AS voucher_date FROM vouchers v
-         JOIN accounting_posting_requests apr ON apr.voucher_id = v.id
-        WHERE v.company_id = $1 AND apr.source_type = 'rental-accrual' AND v.deleted_at IS NULL`,
-      [ctx.companyId]
-    );
-    expect(accruals.length).toBeGreaterThan(0);
-    for (const voucher of accruals) expect(voucher.voucher_date).toBe(today);
-    const audit = await auditRows("vouchers", accruals[0].id);
-    expect(audit[0]).toMatchObject({ username: USERNAME });
-    expect(audit[0].changes.trigger.new).toBe("route");
-
-    const savedClosure = closureDate;
-    closureDate = today;
-    try {
-      await closeBooks();
-      const closed = await agent.post("/api/erp/rental/accrue");
-      expect(closed.status).toBe(409);
-      expect(closed.body.code).toBe("PERIOD_CLOSED");
-    } finally {
-      await reopenBooks();
-      closureDate = savedClosure;
-    }
-  });
-
-  it("posts a scheduled payment as of the business date with the real actor", async () => {
-    const [year, month] = today.split("-").map(Number);
-    await pool.query(
-      `INSERT INTO property_payments (company_id, module, contract_id, unit_id, amount, payment_date, for_year, for_month,
-         posting_status, payment_group_id, cash_account_id, currency, exchange_rate)
-       VALUES ($1, 'ERP', $2, $3, '300.00', $4, $5, $6, 'SCHEDULED', 'PG-P19B-1', $7, 'USD', '1')`,
-      [ctx.companyId, contractId, unitId, today, year, month, ctx.cashAccountId]
-    );
-    const res = await agent.post("/api/erp/rental/payments/post-scheduled").set("X-Client-Date", "2020-01-01");
-    expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ posted: 1, failed: 0, asOf: today });
-    const { rows } = await pool.query(
-      `SELECT username, changes FROM audit_log WHERE company_id = $1 AND record_identifier = 'rental-scheduled-payment:PG-P19B-1'`,
-      [ctx.companyId]
-    );
-    expect(rows).toHaveLength(1);
-    expect(rows[0].username).toBe(USERNAME);
-  });
-
-  it("a non-USD payment posts at the recorded dated rate, never the client's, and is refused without one", async () => {
-    const payment = (body: Record<string, unknown>) =>
-      agent.post("/api/erp/rental/payments").send({
-        contractId,
-        cashAccountId: ctx.cashAccountId,
-        amount: "6000",
-        paymentDate: today,
-        currency: "XOF",
-        ...body,
-      });
-    const refused = await payment({ exchangeRate: "1" });
-    expect(refused.status).toBe(409);
-    expect(refused.body).toMatchObject({ code: "RENTAL_RATE_REQUIRED", currency: "XOF", date: today });
-    expect(
-      (await pool.query(`SELECT 1 FROM property_payments WHERE contract_id = $1 AND currency = 'XOF'`, [contractId]))
-        .rows
-    ).toHaveLength(0);
-
-    await pool.query(
-      `INSERT INTO exchange_rates (company_id, from_currency, to_currency, rate, effective_date)
-       VALUES ($1, 'USD', 'XOF', 600, $2)`,
-      [ctx.companyId, addDays(today, -3)]
-    );
-    const posted = await payment({ exchangeRate: "1" });
-    expect(posted.status).toBe(200);
-    const { rows } = await pool.query(
-      `SELECT exchange_rate::text AS rate, voucher_id FROM property_payments WHERE contract_id = $1 AND currency = 'XOF'`,
-      [contractId]
-    );
-    expect(rows.length).toBeGreaterThan(0);
-    expect(Number(rows[0].rate)).toBe(600);
-    const lines = await pool.query(
-      `SELECT SUM(debit_amount)::numeric(20,2)::text AS base FROM voucher_entries WHERE voucher_id = $1`,
-      [rows[0].voucher_id]
-    );
-    expect(lines.rows[0].base).toBe("10.00");
   });
 });

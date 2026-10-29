@@ -26,14 +26,6 @@ let agent: request.SuperAgentTest;
 let employeeId: number;
 let runSeq = 0;
 
-async function employeeBalances() {
-  const result = await pool.query<{ current_balance: string; total_deposits: string; total_withdrawals: string }>(
-    `SELECT current_balance, total_deposits, total_withdrawals FROM employees WHERE id = $1`,
-    [employeeId]
-  );
-  return result.rows[0];
-}
-
 beforeAll(async () => {
   ctx = await seedTestData(TEST_PREFIX);
   await pool.query(`UPDATE companies SET company_type = 'factory' WHERE id = $1`, [ctx.companyId]);
@@ -67,35 +59,6 @@ afterAll(async () => {
   await cleanupTestData(TEST_PREFIX);
   closeTestServer();
 }, 60000);
-
-describe("daybook void of an engine-numbered employee cash voucher", () => {
-  it("moves the employee balance back when a deposit is voided", async () => {
-    const deposit = await agent
-      .post(`/api/factory/employees/${employeeId}/deposit`)
-      .send({ amount: "25.50", date: "2026-10-01", notes: `${TEST_PREFIX} deposit` });
-    expect(deposit.status).toBe(200);
-    const voucherId = Number(deposit.body.voucher.id);
-    expect(deposit.body.voucher.voucherNumber).not.toMatch(/^EMP-DEP-/);
-    expect(await employeeBalances()).toEqual({
-      current_balance: "35.50",
-      total_deposits: "35.50",
-      total_withdrawals: "0.00",
-    });
-
-    const voided = await agent.delete(`/api/factory/daybook/entry/-${voucherId}/void`);
-    expect(voided.status).toBe(200);
-
-    const voucher = await pool.query<{ deleted_at: string | null }>(`SELECT deleted_at FROM vouchers WHERE id = $1`, [
-      voucherId,
-    ]);
-    expect(voucher.rows[0]?.deleted_at).not.toBeNull();
-    expect(await employeeBalances()).toEqual({
-      current_balance: "10.00",
-      total_deposits: "10.00",
-      total_withdrawals: "0.00",
-    });
-  });
-});
 
 describe("ERP payroll run payment, undo and re-pay", () => {
   async function createDraftRun(): Promise<number> {

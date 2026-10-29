@@ -4,11 +4,11 @@ import path from "node:path";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { isRetiredAbdallahApiRequest } from "../server/middleware/abdallahErpRetiredFeatureBoundary";
 import { cleanupTestData, closeTestServer, seedTestData, type TestContext } from "./setup";
 import type { SerializedRouteManifest } from "./helpers/routeManifest";
 
 const ERP_PREFIX = "phase33imports";
-const FACTORY_PREFIX = "facimp";
 const MANIFEST_PATH = path.join(process.cwd(), "config/route-manifest.json");
 const MISSING_ID = 2_147_482_700;
 const REQUEST_TIMEOUT_MS = 12_000;
@@ -27,7 +27,6 @@ interface ImportRoute {
   method: ImportMethod;
   manifestPath: string;
   requestPath: string;
-  fixture: "erp" | "factory";
 }
 
 function loadManifest(): SerializedRouteManifest {
@@ -55,11 +54,7 @@ function materialize(routePath: string, ctx: TestContext): string {
   );
 }
 
-function selectImportRoutes(
-  manifest: SerializedRouteManifest,
-  erpCtx: TestContext,
-  factoryCtx: TestContext
-): ImportRoute[] {
+function selectImportRoutes(manifest: SerializedRouteManifest, ctx: TestContext): ImportRoute[] {
   const seen = new Set<string>();
   const routes: ImportRoute[] = [];
 
@@ -69,18 +64,16 @@ function selectImportRoutes(
     if (!(["POST", "PUT", "PATCH"] as string[]).includes(rawMethod)) continue;
     if (!IMPORT_PATTERN.test(routePath)) continue;
     if (EXCLUDED_PATTERNS.some((pattern) => pattern.test(routePath))) continue;
+    // ABDALLAH-SYSTEM refuses retired modes and features before any handler runs.
+    if (isRetiredAbdallahApiRequest(rawMethod, routePath)) continue;
 
     const key = `${rawMethod} ${routePath}`;
     if (seen.has(key)) continue;
     seen.add(key);
-
-    const fixture = routePath.startsWith("/api/factory/") ? "factory" : "erp";
-    const ctx = fixture === "factory" ? factoryCtx : erpCtx;
     routes.push({
       method: rawMethod as ImportMethod,
       manifestPath: routePath,
       requestPath: materialize(routePath, ctx),
-      fixture,
     });
   }
 
@@ -106,23 +99,18 @@ function issue(agent: request.SuperAgentTest, route: ImportRoute): request.Test 
 }
 
 describe("Phase 33 import/upload validation sweep", () => {
-  let erpCtx: TestContext;
-  let factoryCtx: TestContext;
-  let erpAgent: request.SuperAgentTest;
-  let factoryAgent: request.SuperAgentTest;
+  let ctx: TestContext;
+  let agent: request.SuperAgentTest;
   let routes: ImportRoute[] = [];
 
   beforeAll(async () => {
-    erpCtx = await seedTestData(ERP_PREFIX);
-    factoryCtx = await seedTestData(FACTORY_PREFIX);
-    erpAgent = await authenticatedAgent(erpCtx, ERP_PREFIX);
-    factoryAgent = await authenticatedAgent(factoryCtx, FACTORY_PREFIX);
-    routes = selectImportRoutes(loadManifest(), erpCtx, factoryCtx);
+    ctx = await seedTestData(ERP_PREFIX);
+    agent = await authenticatedAgent(ctx, ERP_PREFIX);
+    routes = selectImportRoutes(loadManifest(), ctx);
   }, 120_000);
 
   afterAll(async () => {
     await cleanupTestData(ERP_PREFIX);
-    await cleanupTestData(FACTORY_PREFIX);
     await closeTestServer();
   }, 120_000);
 
@@ -131,7 +119,6 @@ describe("Phase 33 import/upload validation sweep", () => {
     const failures: Array<{ route: string; variant: string; detail: string }> = [];
 
     for (const route of routes) {
-      const agent = route.fixture === "factory" ? factoryAgent : erpAgent;
       const variants: Array<{ name: string; run: () => request.Test }> = [
         {
           name: "empty-json",

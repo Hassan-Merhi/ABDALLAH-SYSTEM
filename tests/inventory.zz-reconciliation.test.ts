@@ -237,52 +237,6 @@ describe("POS Sale Edit Tests", () => {
   });
 });
 
-describe("Stock Transfer Edit Tests", () => {
-  beforeEach(async () => {
-    await resetInventory();
-  });
-
-  it("should update stock transfer item quantity via PATCH", async () => {
-    const transferRes = await agent.post("/api/stock-transfers").send({
-      sourceLocationId: ctx.locationId,
-      destinationLocationId: ctx.location2Id,
-      items: [
-        {
-          stockItemId: ctx.stockItemIds[0],
-          quantity: 10,
-          sourceLocationId: ctx.locationId,
-        },
-      ],
-      notes: "Transfer for edit test",
-      voucherDate: new Date().toISOString().split("T")[0],
-    });
-
-    expect(transferRes.status).toBeGreaterThanOrEqual(200);
-    expect(transferRes.status).toBeLessThan(300);
-
-    const srcAfterCreate = await getInventoryQty(ctx.locationId, ctx.stockItemIds[0]);
-    const dstAfterCreate = await getInventoryQty(ctx.location2Id, ctx.stockItemIds[0]);
-    expect(srcAfterCreate).toBe(90);
-    expect(dstAfterCreate).toBe(60);
-
-    const transferId = transferRes.body.transfer?.id || transferRes.body.transferId || transferRes.body.id;
-    expect(transferId).toBeDefined();
-
-    const transferItems = await db
-      .select()
-      .from(schema.stockTransferItems)
-      .where(eq(schema.stockTransferItems.transferId, transferId));
-
-    expect(transferItems.length).toBeGreaterThan(0);
-
-    const itemId = transferItems[0].id;
-
-    const patchRes = await agent.patch(`/api/stock-transfer-items/${itemId}`).send({ quantity: "15" });
-
-    expect(patchRes.status).toBeLessThan(500);
-  });
-});
-
 describe("Edit Transaction Endpoint Tests", () => {
   it("should validate numeric fields in stock transfer item patch", async () => {
     const res = await agent.patch("/api/stock-transfer-items/99999").send({ quantity: "abc" });
@@ -515,61 +469,4 @@ describe("Concurrency Tests", () => {
     const finalQty = await getInventoryQty(ctx.locationId, ctx.stockItemIds[0]);
     expect(finalQty).toBe(100 + NUM_CONCURRENT * QTY_PER_ADJUST);
   }, 30000);
-});
-
-describe("Stock Transfer Import Tests", () => {
-  beforeEach(async () => {
-    await resetInventory();
-  });
-
-  it("should handle multi-source transfer with different source locations", async () => {
-    const loc1Qty = await getInventoryQty(ctx.locationId, ctx.stockItemIds[0]);
-    const loc2Qty = await getInventoryQty(ctx.location2Id, ctx.stockItemIds[0]);
-    expect(loc1Qty).toBe(100);
-    expect(loc2Qty).toBe(50);
-
-    const res1 = await agent.post("/api/stock-transfers").send({
-      sourceLocationId: ctx.locationId,
-      destinationLocationId: ctx.location2Id,
-      items: [
-        {
-          stockItemId: ctx.stockItemIds[0],
-          quantity: 15,
-          sourceLocationId: ctx.locationId,
-        },
-      ],
-      notes: "Transfer from loc1 to loc2",
-      voucherDate: new Date().toISOString().split("T")[0],
-    });
-
-    expect(res1.status).toBeGreaterThanOrEqual(200);
-    expect(res1.status).toBeLessThan(300);
-
-    const afterLoc1 = await getInventoryQty(ctx.locationId, ctx.stockItemIds[0]);
-    const afterLoc2 = await getInventoryQty(ctx.location2Id, ctx.stockItemIds[0]);
-    expect(afterLoc1).toBe(85);
-    expect(afterLoc2).toBe(65);
-
-    const res2 = await agent.post("/api/stock-transfers").send({
-      sourceLocationId: ctx.location2Id,
-      destinationLocationId: ctx.locationId,
-      items: [
-        {
-          stockItemId: ctx.stockItemIds[0],
-          quantity: 10,
-          sourceLocationId: ctx.location2Id,
-        },
-      ],
-      notes: "Transfer from loc2 back to loc1",
-      voucherDate: new Date().toISOString().split("T")[0],
-    });
-
-    expect(res2.status).toBeGreaterThanOrEqual(200);
-    expect(res2.status).toBeLessThan(300);
-
-    const finalLoc1 = await getInventoryQty(ctx.locationId, ctx.stockItemIds[0]);
-    const finalLoc2 = await getInventoryQty(ctx.location2Id, ctx.stockItemIds[0]);
-    expect(finalLoc1).toBe(95);
-    expect(finalLoc2).toBe(55);
-  });
 });

@@ -64,22 +64,3 @@ describe("FX revaluation on a rate change", () => {
     expect(voucher.rowCount).toBe(0);
   });
 });
-
-describe("bulk worker advances", () => {
-  it("stores an advance of 1.005 as 1.01, not the float's 1.00", async () => {
-    const worker = await pool.query<{ id: number }>(
-      `INSERT INTO factory_workers (company_id, full_name) VALUES ($1, $2) RETURNING id`,
-      [ctx.companyId, `${TEST_PREFIX} Worker`]
-    );
-    const response = await agent
-      .post("/api/factory/advances/bulk")
-      .send({ advanceDate: "2026-10-01", items: [{ workerId: worker.rows[0].id, amount: "1.005" }] });
-    expect(response.status).toBe(200);
-
-    const advance = await pool.query<{ amount: string; remaining_balance: string }>(
-      `SELECT amount, remaining_balance FROM factory_worker_advances WHERE worker_id = $1`,
-      [worker.rows[0].id]
-    );
-    expect(advance.rows).toEqual([{ amount: "1.01", remaining_balance: "1.01" }]);
-  });
-});

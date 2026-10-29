@@ -5,7 +5,9 @@
  * the complementary blind spot: parameterized API routes are exercised through
  * the real auth, permission, tenant, path-parsing and handler stack with
  * guaranteed-missing resources. Missing-resource writes must also leave the
- * sensitive accounting/inventory state unchanged.
+ * sensitive accounting/inventory state unchanged. ABDALLAH-SYSTEM is ERP only,
+ * so routes owned by the retired Factory, Supplier Partner and Properties modes,
+ * and retired ERP features, are not exercised.
  */
 import fs from "node:fs";
 import http from "node:http";
@@ -15,9 +17,10 @@ import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { pool } from "../server/db";
+import { isRetiredAbdallahApiRequest } from "../server/middleware/abdallahErpRetiredFeatureBoundary";
 import { cleanupTestData, closeTestServer, seedTestData, type TestContext } from "./setup";
 
-type CompanyMode = "erp" | "factory" | "properties" | "supplier_partner";
+type CompanyMode = "erp";
 type HttpMethod = "DELETE" | "GET" | "PATCH" | "POST" | "PUT";
 type Manifest = { routes: string[] };
 type MatrixRoute = { method: HttpMethod; path: string };
@@ -58,10 +61,11 @@ let companies: Record<CompanyMode, number>;
 let routes: MatrixRoute[] = [];
 let beforeFingerprints: Record<CompanyMode, SensitiveFingerprint>;
 
-function modeForPath(routePath: string): CompanyMode {
-  if (routePath.startsWith("/api/sp/")) return "supplier_partner";
-  if (routePath.startsWith("/api/factory/")) return "factory";
-  if (routePath.startsWith("/api/properties/")) return "properties";
+/** Routes owned by a retired company mode have no ERP tenant to run in. */
+function modeForPath(routePath: string): CompanyMode | null {
+  if (routePath.startsWith("/api/sp/")) return null;
+  if (routePath.startsWith("/api/factory/")) return null;
+  if (routePath.startsWith("/api/properties/")) return null;
   return "erp";
 }
 
@@ -80,6 +84,7 @@ export function selectParameterizedApiRoutes(manifest: Manifest): MatrixRoute[] 
     if (!isHttpMethod(method) || !routePath?.startsWith("/api/")) continue;
     if (!routePath.includes(":") || routePath.includes("*")) continue;
     if (EXCLUDED_PATTERNS.some((pattern) => pattern.test(routePath))) continue;
+    if (!modeForPath(routePath) || isRetiredAbdallahApiRequest(method, routePath)) continue;
 
     const key = `${method} ${routePath}`;
     if (seen.has(key)) continue;
@@ -249,20 +254,10 @@ beforeAll(async () => {
      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`,
     [String(parentCompanyId)]
   );
-  companies = {
-    erp: ctx.companyId,
-    factory: await createCompany("factory", "factory"),
-    properties: await createCompany("properties", "properties"),
-    supplier_partner: await createCompany("supplier_partner", "supplier-partner"),
-  };
+  companies = { erp: ctx.companyId };
 
   routes = selectParameterizedApiRoutes(JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8")) as Manifest);
-  beforeFingerprints = {
-    erp: await sensitiveFingerprint(companies.erp),
-    factory: await sensitiveFingerprint(companies.factory),
-    properties: await sensitiveFingerprint(companies.properties),
-    supplier_partner: await sensitiveFingerprint(companies.supplier_partner),
-  };
+  beforeFingerprints = { erp: await sensitiveFingerprint(companies.erp) };
 }, 120000);
 
 afterAll(async () => {
@@ -279,7 +274,7 @@ describe("Phase 1 parameterized backend route matrix", () => {
     let activeMode: CompanyMode | null = null;
 
     for (const route of routes) {
-      const mode = modeForPath(route.path);
+      const mode: CompanyMode = "erp";
       if (activeMode !== mode) {
         await selectCompany(companies[mode]);
         activeMode = mode;

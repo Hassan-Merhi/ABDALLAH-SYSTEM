@@ -4,12 +4,11 @@ import path from "node:path";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { isRetiredAbdallahApiRequest } from "../server/middleware/abdallahErpRetiredFeatureBoundary";
 import { cleanupTestData, closeTestServer, seedTestData, type TestContext } from "./setup";
 import type { SerializedRouteManifest } from "./helpers/routeManifest";
 
 const ERP_PREFIX = "phase33read";
-// setup.ts intentionally maps this stable prefix to a factory-typed company.
-const FACTORY_PREFIX = "facimp";
 const MANIFEST_PATH = path.join(process.cwd(), "config/route-manifest.json");
 const REQUEST_TIMEOUT_MS = 15_000;
 
@@ -26,15 +25,10 @@ const EXCLUDED_PATTERNS: RegExp[] = [
 interface SweptRoute {
   manifestPath: string;
   requestPath: string;
-  fixture: "erp" | "factory";
 }
 
 function loadManifest(): SerializedRouteManifest {
   return JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8")) as SerializedRouteManifest;
-}
-
-function fixtureFor(routePath: string): "erp" | "factory" {
-  return routePath.startsWith("/api/factory/") ? "factory" : "erp";
 }
 
 function replacementFor(name: string, ctx: TestContext): string {
@@ -71,11 +65,7 @@ export function materializeParameterizedPath(routePath: string, ctx: TestContext
   );
 }
 
-export function selectParameterizedReadRoutes(
-  manifest: SerializedRouteManifest,
-  erpCtx: TestContext,
-  factoryCtx: TestContext
-): SweptRoute[] {
+export function selectParameterizedReadRoutes(manifest: SerializedRouteManifest, ctx: TestContext): SweptRoute[] {
   const seen = new Set<string>();
   const selected: SweptRoute[] = [];
 
@@ -86,17 +76,16 @@ export function selectParameterizedReadRoutes(
     if (!routePath.includes(":")) continue;
     if (routePath.includes("*")) continue;
     if (EXCLUDED_PATTERNS.some((pattern) => pattern.test(routePath))) continue;
+    // ABDALLAH-SYSTEM refuses retired modes and features before any handler runs.
+    if (isRetiredAbdallahApiRequest(method, routePath)) continue;
 
     const key = `${method} ${routePath}`;
     if (seen.has(key)) continue;
     seen.add(key);
 
-    const fixture = fixtureFor(routePath);
-    const ctx = fixture === "factory" ? factoryCtx : erpCtx;
     selected.push({
       manifestPath: routePath,
       requestPath: materializeParameterizedPath(routePath, ctx),
-      fixture,
     });
   }
 
@@ -117,23 +106,17 @@ async function authenticatedAgent(ctx: TestContext, prefix: string): Promise<req
 }
 
 describe("parameterized backend read-surface sweep", () => {
-  let erpCtx: TestContext;
-  let factoryCtx: TestContext;
-  let erpAgent: request.SuperAgentTest;
-  let factoryAgent: request.SuperAgentTest;
+  let agent: request.SuperAgentTest;
   let routes: SweptRoute[] = [];
 
   beforeAll(async () => {
-    erpCtx = await seedTestData(ERP_PREFIX);
-    factoryCtx = await seedTestData(FACTORY_PREFIX);
-    erpAgent = await authenticatedAgent(erpCtx, ERP_PREFIX);
-    factoryAgent = await authenticatedAgent(factoryCtx, FACTORY_PREFIX);
-    routes = selectParameterizedReadRoutes(loadManifest(), erpCtx, factoryCtx);
+    const ctx = await seedTestData(ERP_PREFIX);
+    agent = await authenticatedAgent(ctx, ERP_PREFIX);
+    routes = selectParameterizedReadRoutes(loadManifest(), ctx);
   }, 120_000);
 
   afterAll(async () => {
     await cleanupTestData(ERP_PREFIX);
-    await cleanupTestData(FACTORY_PREFIX);
     await closeTestServer();
   }, 120_000);
 
@@ -143,7 +126,6 @@ describe("parameterized backend read-surface sweep", () => {
     const failures: Array<{ route: string; requestPath: string; status: number; detail: string }> = [];
 
     for (const route of routes) {
-      const agent = route.fixture === "factory" ? factoryAgent : erpAgent;
       try {
         const response = await agent
           .get(route.requestPath)

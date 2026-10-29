@@ -17,12 +17,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
-import {
-  seedTestData,
-  cleanupTestData,
-  closeTestServer,
-  type TestContext,
-} from "./setup";
+import { seedTestData, cleanupTestData, closeTestServer, type TestContext } from "./setup";
 
 const TEST_PREFIX = "smktest";
 
@@ -102,7 +97,7 @@ describe("Smoke — Inventory", () => {
     const today = new Date().toISOString().split("T")[0];
     // stockItemId is required; startDate/endDate without values returns empty months (200)
     const res = await agent.get(
-      `/api/inventory/movement?stockItemId=${ctx.stockItemIds[0]}&locationId=${ctx.locationId}&startDate=2024-01-01&endDate=${today}`,
+      `/api/inventory/movement?stockItemId=${ctx.stockItemIds[0]}&locationId=${ctx.locationId}&startDate=2024-01-01&endDate=${today}`
     );
     expect(res.status).toBe(200);
   });
@@ -161,9 +156,7 @@ describe("Smoke — Reports", () => {
 
   it("GET /api/reports/profit-loss returns 200", async () => {
     const today = new Date().toISOString().split("T")[0];
-    const res = await agent.get(
-      `/api/reports/profit-loss?fromDate=2024-01-01&toDate=${today}`,
-    );
+    const res = await agent.get(`/api/reports/profit-loss?fromDate=2024-01-01&toDate=${today}`);
     expect(res.status).toBe(200);
   });
 
@@ -267,9 +260,10 @@ describe("Smoke — Decomposed route modules", () => {
     expect(res.status).toBe(200);
   });
 
-  it("userPresenceRoutes: GET /api/user-presence returns 200", async () => {
+  it("userPresenceRoutes: GET /api/user-presence is retired in ABDALLAH-SYSTEM (403)", async () => {
     const res = await agent.get("/api/user-presence");
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe("ERP_FEATURE_RETIRED");
   });
 
   it("accountTransactionRoutes: GET /api/accounts/supplier/:id/transactions is non-500", async () => {
@@ -315,15 +309,13 @@ describe("Smoke — Decomposed route modules", () => {
 
   it("stockSummaryLocationRoutes: GET /api/locations/:loc/stock-items/:id/monthly-summary returns 200", async () => {
     const res = await agent.get(
-      `/api/locations/${ctx.locationId}/stock-items/${ctx.stockItemIds[0]}/monthly-summary?year=2024&month=1`,
+      `/api/locations/${ctx.locationId}/stock-items/${ctx.stockItemIds[0]}/monthly-summary?year=2024&month=1`
     );
     expect(res.status).toBe(200);
   });
 
   it("stockSummaryLocationRoutes: GET /api/locations/:loc/stock-items/:id/transactions is non-500", async () => {
-    const res = await agent.get(
-      `/api/locations/${ctx.locationId}/stock-items/${ctx.stockItemIds[0]}/transactions`,
-    );
+    const res = await agent.get(`/api/locations/${ctx.locationId}/stock-items/${ctx.stockItemIds[0]}/transactions`);
     expect(res.status).toBeLessThan(500);
   });
 

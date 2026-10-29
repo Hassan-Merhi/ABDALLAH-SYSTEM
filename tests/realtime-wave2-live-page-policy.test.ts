@@ -50,16 +50,4 @@ describe("Wave 2 live-page policy", () => {
     expect(activeUsers).toContain("refetchInterval: visibleTabInterval(30_000)");
     expect(watchUser).toContain("refetchInterval: visibleTabInterval(30_000)");
   });
-
-  it("keeps scan fallbacks slow/visible instead of aggressive polling", () => {
-    const dailyScan = source("client/src/pages/factory/DailyScan.tsx");
-    const groundScan = source("client/src/pages/factory/GroundScan.tsx");
-
-    expect(dailyScan).toContain("visibleTabInterval(90_000)");
-    expect(dailyScan).toContain("refetchIntervalInBackground: false");
-    expect(groundScan).toContain("visibleTabInterval(30_000)");
-    expect(groundScan).toContain("refetchIntervalInBackground: false");
-    expect(dailyScan).not.toMatch(/visibleTabInterval\((?:1_?000|2_?000|3_?000|4_?000|5_?000)\)/);
-    expect(groundScan).not.toMatch(/visibleTabInterval\((?:1_?000|2_?000|3_?000|4_?000|5_?000)\)/);
-  });
 });

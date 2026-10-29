@@ -36,36 +36,6 @@ afterAll(async () => {
 }, 30000);
 
 describe("GET /api/admin/convergence-reconciliation", () => {
-  it("reports a clean reconciliation for a transfer that recorded its evidence", async () => {
-    const transfer = await agent.post("/api/stock-transfers").send({
-      sourceLocationId: ctx.locationId,
-      destinationLocationId: ctx.location2Id,
-      items: [
-        {
-          stockItemId: ctx.stockItemIds[0],
-          quantity: 2,
-          rate: "4.00",
-          sourceLocationId: ctx.locationId,
-        },
-      ],
-      notes: "reconciliation route transfer",
-      voucherDate: new Date().toISOString().split("T")[0],
-    });
-    expect(transfer.status).toBeGreaterThanOrEqual(200);
-    expect(transfer.status).toBeLessThan(300);
-
-    const res = await agent.get("/api/admin/convergence-reconciliation");
-
-    expect(res.status).toBe(200);
-    expect(res.body.companyId).toBe(ctx.companyId);
-    expect(res.body.stockSnapshots).toBeGreaterThan(0);
-    // The document and the journal agree, so there is nothing to report. A
-    // discrepancy here would mean the transfer applied stock without matching
-    // evidence, which is exactly what this endpoint exists to surface.
-    expect(res.body.discrepancies).toEqual([]);
-    expect(res.body.clean).toBe(true);
-  }, 30000);
-
   it("reconciles the company on the session rather than one named by the caller", async () => {
     // There is no companyId parameter to point this at another tenant; a
     // caller-supplied one is ignored, and the tenant boundary refuses a primary
@@ -121,8 +91,9 @@ describe("GET /api/admin/convergence-reconciliation", () => {
     expect(res.body.discrepancies).toEqual([]);
     expect(res.body.clean).toBe(true);
 
-    // Both stock domains now appear in one report rather than transfers alone.
-    expect(res.body.stockSnapshots).toBeGreaterThanOrEqual(2);
+    // Stock transfers are retired in ABDALLAH-SYSTEM, so the adjustment is the
+    // stock domain this report reconciles.
+    expect(res.body.stockSnapshots).toBeGreaterThan(0);
   }, 30000);
 
   it("does not report documents that predate the canonical journal", async () => {

@@ -12,14 +12,11 @@ const documentation = source("docs/archive/engineering/phase12-business-regressi
 
 const requiredSuites = [
   "tests/workflow.test.ts",
-  "tests/factory-container-lifecycle.test.ts",
   "tests/pos.test.ts",
   "tests/vouchers.test.ts",
   "tests/accounting.test.ts",
   "tests/reports.test.ts",
   "tests/company-context-enforcement.test.ts",
-  "tests/factory-mix-batch-stable-cost.test.ts",
-  "tests/factory-locked-rate-migration.test.ts",
 ];
 
 for (const suite of requiredSuites) {

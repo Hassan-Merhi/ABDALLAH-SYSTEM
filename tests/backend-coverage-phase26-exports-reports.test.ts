@@ -17,7 +17,6 @@ import { cleanupTestData, closeTestServer, seedTestData, type TestContext } from
 
 const PREFIX = `p26exp-${Date.now().toString(36)}`;
 const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-const LARGE_ROW_COUNT = 600;
 
 let ctx: TestContext;
 let agent: request.SuperAgentTest;
@@ -30,10 +29,6 @@ function binary(test: request.Test): request.Test {
     res.on("data", (chunk: Buffer) => chunks.push(chunk));
     res.on("end", () => callback(null, Buffer.concat(chunks)));
   });
-}
-
-function expectPdf(buffer: Buffer) {
-  expect(buffer.subarray(0, 4).toString("ascii")).toBe("%PDF");
 }
 
 function expectXlsx(buffer: Buffer) {
@@ -143,115 +138,4 @@ describe("Phase 26 exports and reports", () => {
     expect(invalidCompany.status).toBe(403);
     expect(invalidCompany.body.code).toBe("CROSS_COMPANY_ACCESS_DENIED");
   });
-
-  it("generates a valid Factory payroll PDF when there are no payroll rows", async () => {
-    await selectCompany(factoryCompanyId);
-    const response = await binary(
-      agent.post("/api/factory/payroll/export-pdf").send({
-        companyId: factoryCompanyId,
-        startDate: "2026-01-01",
-        endDate: "2026-01-31",
-      })
-    );
-
-    expect(response.status, response.text).toBe(200);
-    expect(response.headers["content-type"]).toContain("application/pdf");
-    expectPdf(response.body as Buffer);
-  }, 60_000);
-
-  it("generates and reopens a large Factory payroll XLSX without truncating workers", async () => {
-    await selectCompany(factoryCompanyId);
-
-    await pool.query(
-      `INSERT INTO factory_workers
-         (company_id, employee_code, full_name, salary_type, base_salary, active)
-       SELECT $1,
-              $2 || '-' || g::text,
-              'Phase 26 Worker ' || LPAD(g::text, 4, '0'),
-              'Monthly',
-              '1000.00',
-              true
-         FROM generate_series(1, $3::int) AS g`,
-      [factoryCompanyId, PREFIX, LARGE_ROW_COUNT]
-    );
-    await pool.query(
-      `INSERT INTO factory_payrolls
-         (company_id, worker_id, period_start, period_end, base_salary, net_salary, total_working_days, present_days, status)
-       SELECT $1, id, '2026-08-01', '2026-08-31', '1000.00', '1000.00', 26, '26.0', 'DRAFT'
-         FROM factory_workers
-        WHERE company_id = $1 AND employee_code LIKE $2`,
-      [factoryCompanyId, `${PREFIX}-%`]
-    );
-
-    const response = await binary(
-      agent.post("/api/factory/payroll/export-excel").send({
-        companyId: factoryCompanyId,
-        startDate: "2026-08-01",
-        endDate: "2026-08-31",
-      })
-    );
-
-    expect(response.status, response.text).toBe(200);
-    expect(response.headers["content-type"]).toContain(XLSX_MIME);
-    const body = response.body as Buffer;
-    expectXlsx(body);
-    expect(body.length).toBeGreaterThan(25_000);
-
-    const workbook = await loadWorkbook(body);
-    const summary = workbook.getWorksheet("Payroll Summary");
-    expect(summary).toBeTruthy();
-    expect(summary!.rowCount).toBeGreaterThan(LARGE_ROW_COUNT);
-
-    const workerNames: string[] = [];
-    summary!.eachRow({ includeEmpty: false }, (row) => {
-      const value = row.getCell(2).value;
-      if (typeof value === "string" && value.startsWith("Phase 26 Worker")) {
-        workerNames.push(value);
-      }
-    });
-    expect(workerNames).toHaveLength(LARGE_ROW_COUNT);
-  }, 120_000);
-
-  it("validates Factory export references instead of producing a broken download", async () => {
-    await selectCompany(factoryCompanyId);
-    const response = await agent.post("/api/factory/payroll/export-excel").send({
-      companyId: 0,
-      startDate: "2026-08-01",
-      endDate: "2026-08-31",
-    });
-    expect(response.status).toBe(400);
-  });
-
-  it("generates a valid empty Supplier Partner XLSX and rejects malformed location references", async () => {
-    await selectCompany(spCompanyId);
-
-    const response = await binary(
-      agent.get("/api/sp/sales-form/export-v2").query({ fromDate: "2026-01-01", toDate: "2026-01-02" })
-    );
-    expect(response.status, response.text).toBe(200);
-    expect(response.headers["content-type"]).toContain(XLSX_MIME);
-    const body = response.body as Buffer;
-    expectXlsx(body);
-    const workbook = await loadWorkbook(body);
-    expect(workbook.worksheets.length).toBeGreaterThan(0);
-
-    const invalidLocation = await agent.get("/api/sp/sales-form/export-v2").query({
-      fromDate: "2026-01-01",
-      toDate: "2026-01-02",
-      locationId: -1,
-    });
-    expect(invalidLocation.status).toBe(400);
-    expect(invalidLocation.body.message).toMatch(/locationId/i);
-  }, 120_000);
-
-  it("generates Supplier Partner reconciliation CSV safely with an empty operational register", async () => {
-    await selectCompany(spCompanyId);
-    const response = await agent.get("/api/sp/reconciliation/full/export.csv");
-
-    expect(response.status, response.text).toBe(200);
-    expect(response.headers["content-type"]).toContain("text/csv");
-    expect(response.headers["content-disposition"]).toContain(`sp-reconciliation-${spCompanyId}.csv`);
-    expect(response.text).toContain("surface,database_value,independent_value,status,evidence_status,basis,detail");
-    expect(response.text.split("\n").length).toBeGreaterThan(2);
-  }, 120_000);
 });

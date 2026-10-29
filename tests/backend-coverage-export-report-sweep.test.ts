@@ -4,8 +4,9 @@
  * The normal API smoke intentionally skips download/export surfaces. Those
  * handlers contain a large amount of workbook/PDF/report generation code and
  * represent one of the largest remaining backend coverage gaps. This suite
- * executes safe parameterless GET report/export endpoints in isolated tenants,
- * using the correct company mode, and proves the requests are read-only.
+ * executes safe parameterless GET report/export endpoints in an isolated ERP
+ * tenant and proves the requests are read-only. ABDALLAH-SYSTEM retires every
+ * non-ERP company mode, so those modes' routes are refused and not swept.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -14,9 +15,10 @@ import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { pool } from "../server/db";
+import { isRetiredAbdallahApiRequest } from "../server/middleware/abdallahErpRetiredFeatureBoundary";
 import { cleanupTestData, closeTestServer, seedTestData, type TestContext } from "./setup";
 
-type CompanyMode = "erp" | "factory" | "properties" | "supplier_partner";
+type CompanyMode = "erp";
 type Manifest = { routes: string[] };
 type SweptRoute = { mode: CompanyMode; path: string };
 type Fingerprint = {
@@ -44,23 +46,17 @@ let agent: request.SuperAgentTest;
 let companies: Record<CompanyMode, number>;
 let before: Record<CompanyMode, Fingerprint>;
 let routes: SweptRoute[] = [];
-let sequence = 0;
 
-function modeForPath(routePath: string): CompanyMode {
-  if (
+/** Routes owned by a retired company mode have no ERP tenant to run in. */
+function ownedByRetiredMode(routePath: string): boolean {
+  return (
     routePath.startsWith("/api/factory/") ||
     routePath.startsWith("/api/factory-") ||
-    routePath.startsWith("/api/factory-workers/")
-  ) {
-    return "factory";
-  }
-  if (routePath.startsWith("/api/sp/") || routePath.startsWith("/api/sp-migration/")) {
-    return "supplier_partner";
-  }
-  if (routePath.startsWith("/api/properties/") || routePath.startsWith("/api/rental/")) {
-    return "properties";
-  }
-  return "erp";
+    routePath.startsWith("/api/sp/") ||
+    routePath.startsWith("/api/sp-migration/") ||
+    routePath.startsWith("/api/properties/") ||
+    routePath.startsWith("/api/rental/")
+  );
 }
 
 export function selectExportReportRoutes(manifest: Manifest): SweptRoute[] {
@@ -73,8 +69,9 @@ export function selectExportReportRoutes(manifest: Manifest): SweptRoute[] {
     if (routePath.includes(":") || routePath.includes("*")) continue;
     if (!REPORT_PATTERN.test(routePath)) continue;
     if (UNSAFE_OR_EXTERNAL.some((pattern) => pattern.test(routePath))) continue;
+    if (ownedByRetiredMode(routePath) || isRetiredAbdallahApiRequest(method, routePath)) continue;
 
-    const mode = modeForPath(routePath);
+    const mode: CompanyMode = "erp";
     const key = `${mode} ${routePath}`;
     if (seen.has(key)) continue;
     seen.add(key);
@@ -82,34 +79,6 @@ export function selectExportReportRoutes(manifest: Manifest): SweptRoute[] {
   }
 
   return selected;
-}
-
-async function createCompany(mode: CompanyMode): Promise<number> {
-  sequence += 1;
-  if (mode === "erp") return ctx.companyId;
-
-  const result = await pool.query<{ id: number }>(
-    `INSERT INTO companies (code, name, company_type, parent_company_id, active, base_currency)
-     VALUES ($1, $2, $3, $4, true, 'USD') RETURNING id`,
-    [`${TEST_PREFIX}-${mode}-${sequence}`.slice(0, 50), `${TEST_PREFIX}_${mode}_${sequence}`, mode, ctx.companyId]
-  );
-  const companyId = result.rows[0].id;
-
-  await pool.query(
-    `INSERT INTO user_company_roles
-       (user_id, company_id, role, can_delete_records, can_sell_negative_stock)
-     VALUES ($1, $2, 'Developer', true, true)`,
-    [ctx.userId, companyId]
-  );
-  await pool.query(
-    `INSERT INTO user_security_permissions (user_id, company_id, permission, granted_by)
-     SELECT user_id, $2, permission, granted_by
-       FROM user_security_permissions
-      WHERE user_id = $1 AND company_id = $3
-     ON CONFLICT (user_id, company_id, permission) DO NOTHING`,
-    [ctx.userId, companyId, ctx.companyId]
-  );
-  return companyId;
 }
 
 async function fingerprint(companyId: number): Promise<Fingerprint> {
@@ -142,19 +111,9 @@ beforeAll(async () => {
   });
   if (login.status !== 200) throw new Error(`Login failed: ${login.status} ${login.text}`);
 
-  companies = {
-    erp: ctx.companyId,
-    factory: await createCompany("factory"),
-    properties: await createCompany("properties"),
-    supplier_partner: await createCompany("supplier_partner"),
-  };
+  companies = { erp: ctx.companyId };
   routes = selectExportReportRoutes(JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8")) as Manifest);
-  before = {
-    erp: await fingerprint(companies.erp),
-    factory: await fingerprint(companies.factory),
-    properties: await fingerprint(companies.properties),
-    supplier_partner: await fingerprint(companies.supplier_partner),
-  };
+  before = { erp: await fingerprint(companies.erp) };
 }, 120000);
 
 afterAll(async () => {

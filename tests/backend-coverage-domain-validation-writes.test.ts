@@ -1,5 +1,8 @@
 /**
- * Phase 1 backend coverage — ERP / Supplier Partner / Properties validation.
+ * Phase 1 backend coverage — ERP validation.
+ *
+ * ABDALLAH-SYSTEM retires the Supplier Partner and Properties modes, so only
+ * ERP write handlers are swept; retired APIs are refused before any handler.
  *
  * These are parameterless write handlers outside the dedicated sensitive-write
  * safety inventory. They run against isolated tenants with deliberately invalid
@@ -13,9 +16,10 @@ import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { pool } from "../server/db";
+import { isRetiredAbdallahApiRequest } from "../server/middleware/abdallahErpRetiredFeatureBoundary";
 import { cleanupTestData, closeTestServer, seedTestData, type TestContext } from "./setup";
 
-type CompanyMode = "erp" | "properties" | "supplier_partner";
+type CompanyMode = "erp";
 type HttpMethod = "DELETE" | "PATCH" | "POST" | "PUT";
 type Manifest = { routes: string[] };
 type Route = { method: HttpMethod; path: string; mode: CompanyMode };
@@ -67,8 +71,6 @@ function isWriteMethod(value: string): value is HttpMethod {
 }
 
 function modeForPath(routePath: string): CompanyMode | null {
-  if (routePath.startsWith("/api/sp/")) return "supplier_partner";
-  if (routePath.startsWith("/api/properties/")) return "properties";
   if (ERP_PREFIXES.some((prefix) => routePath.startsWith(prefix))) return "erp";
   return null;
 }
@@ -81,6 +83,7 @@ export function selectDomainValidationWrites(manifest: Manifest): Route[] {
     if (!isWriteMethod(method) || !routePath?.startsWith("/api/")) continue;
     if (routePath.startsWith("/api/factory/") || routePath.includes(":") || routePath.includes("*")) continue;
     if (EXCLUDED_PATTERNS.some((pattern) => pattern.test(routePath))) continue;
+    if (isRetiredAbdallahApiRequest(method, routePath)) continue;
     const mode = modeForPath(routePath);
     if (!mode) continue;
     const key = `${method} ${routePath}`;
@@ -190,17 +193,9 @@ beforeAll(async () => {
   });
   if (login.status !== 200) throw new Error(`Login failed: ${login.status} ${login.text}`);
 
-  companies = {
-    erp: await createCompany("erp"),
-    properties: await createCompany("properties"),
-    supplier_partner: await createCompany("supplier_partner"),
-  };
+  companies = { erp: await createCompany("erp") };
   routes = selectDomainValidationWrites(JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8")) as Manifest);
-  before = {
-    erp: await fingerprint(companies.erp),
-    properties: await fingerprint(companies.properties),
-    supplier_partner: await fingerprint(companies.supplier_partner),
-  };
+  before = { erp: await fingerprint(companies.erp) };
 }, 120000);
 
 afterAll(async () => {

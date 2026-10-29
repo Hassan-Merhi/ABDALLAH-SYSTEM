@@ -6,7 +6,6 @@ import process from "node:process";
 
 const smokeSuites = [
   "tests/workflow.test.ts",
-  "tests/factory-container-lifecycle.test.ts",
 ];
 
 const fullSuites = [
@@ -16,8 +15,6 @@ const fullSuites = [
   "tests/accounting.test.ts",
   "tests/reports.test.ts",
   "tests/company-context-enforcement.test.ts",
-  "tests/factory-mix-batch-stable-cost.test.ts",
-  "tests/factory-locked-rate-migration.test.ts",
 ];
 
 const mode = process.argv.includes("--smoke") ? "smoke" : "full";

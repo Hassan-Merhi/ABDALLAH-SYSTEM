@@ -1,4 +1,4 @@
-import type { RequestHandler } from "express";
+import type { Express, RequestHandler } from "express";
 
 /**
  * ABDALLAH-SYSTEM permanently retires these Settings, System Tools, and
@@ -81,3 +81,47 @@ export const enforceAbdallahErpRetiredFeatureBoundary: RequestHandler = (req, re
     message: "This feature is not available in ABDALLAH-SYSTEM",
   });
 };
+
+/**
+ * Whole non-ERP workspaces and retired ERP modules. Every request under these
+ * prefixes is refused, whatever the role or company, because ABDALLAH-SYSTEM
+ * deploys ERP mode only.
+ */
+export const RETIRED_ABDALLAH_MODE_API_PREFIXES = [
+  "/api/factory",
+  "/api/properties",
+  "/api/retail",
+  "/api/sp",
+  "/api/supplier-partner",
+  "/api/agent-accounts",
+  "/api/cost-centers",
+  "/api/supplier-profit-check",
+  "/api/supplier-profit-reconciliation",
+  "/api/offload-item-search",
+  "/api/intercompany-requests",
+  "/api/intercompany-links",
+  "/api/reports/item-market-analysis",
+  "/api/reports/stock-in-sales",
+  "/api/stock-transfer-order",
+  "/api/stock-transfer-import",
+  "/api/stock-transfers",
+  "/api/stock-transfer-revisions",
+  "/api/erp/rental",
+] as const;
+
+/** True for any request the deployment refuses: a retired mode or a retired ERP feature. */
+export function isRetiredAbdallahApiRequest(method: string, pathname: string, body?: unknown): boolean {
+  const path = pathname.toLowerCase().replace(/\/+$/, "") || "/";
+  return (
+    RETIRED_ABDALLAH_MODE_API_PREFIXES.some((prefix) => matchesPrefix(path, prefix)) ||
+    isRetiredAbdallahErpRequest(method, pathname, body)
+  );
+}
+
+/** Register before application routes so retired APIs never reach a handler. */
+export function registerAbdallahErpRetiredBoundaries(app: Express): void {
+  app.use([...RETIRED_ABDALLAH_MODE_API_PREFIXES], (_req, res) => {
+    res.status(403).json({ message: "Only ERP mode is available in ABDALLAH-SYSTEM" });
+  });
+  app.use(enforceAbdallahErpRetiredFeatureBoundary);
+}

@@ -91,43 +91,6 @@ describe("routes refuse another company's ledger account from the body", () => {
     ]);
   });
 
-  it("factory POS sale refuses a foreign cash account, expense account or location", async () => {
-    const before = await voucherCount();
-    const items = [{ productName: "Item", quantity: 1, unitPrice: "10" }];
-    const responses = [
-      await agent.post("/api/factory/pos/sale").send({ items, cashAccountId: foreignAccountId }),
-      await agent.post("/api/factory/pos/sale").send({
-        items,
-        cashAccountId: ctx.cashAccountId,
-        expenses: [{ accountId: foreignAccountId, description: "Fee", amount: "1" }],
-      }),
-    ];
-    expect(responses.map((response) => [response.status, response.body.message])).toEqual([
-      [400, "Account not found"],
-      [400, "Account not found"],
-    ]);
-    expect(await voucherCount()).toBe(before);
-  });
-
-  it("raw-stock offload refuses foreign freight, duty, commission and additional-charge accounts", async () => {
-    const responses = [
-      await agent.post("/api/factory/raw-stock/offload").send({ containerId: 1, freightAccountId: foreignAccountId }),
-      await agent.post("/api/factory/raw-stock/offload").send({ containerId: 1, dutyAccountId: foreignAccountId }),
-      await agent
-        .post("/api/factory/raw-stock/offload")
-        .send({ containerId: 1, commission: { ledgerAccountId: String(foreignAccountId) } }),
-      await agent
-        .post("/api/factory/raw-stock/offload")
-        .send({ containerId: 1, additionalCharges: [{ amount: "5", ledgerAccountId: String(foreignAccountId) }] }),
-    ];
-    expect(responses.map((response) => [response.status, response.body.message])).toEqual([
-      [400, "Account not found"],
-      [400, "Account not found"],
-      [400, "Account not found"],
-      [400, "Account not found"],
-    ]);
-  });
-
   it("still lets the company's own cash account past the account check", async () => {
     const response = await agent
       .post("/api/factory/raw-stock/offload")

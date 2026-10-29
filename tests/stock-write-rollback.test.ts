@@ -103,38 +103,6 @@ describe("stock writes roll back completely", () => {
     expect(await getInventoryQty(ctx.location2Id, stockItemId)).toBe(before.destinationQuantity);
   }, 60000);
 
-  it("lets the same request id succeed after the failed attempt rolled back", async () => {
-    const stockItemId = ctx.stockItemIds[0];
-    const clientRequestId = `roll-retry-${Date.now()}`;
-    const sourceBefore = await getInventoryQty(ctx.locationId, stockItemId);
-
-    const failed = await agent.post("/api/stock-transfers").send({
-      sourceLocationId: ctx.locationId,
-      destinationLocationId: ctx.location2Id,
-      items: [{ stockItemId: MISSING_STOCK_ITEM_ID, quantity: "1", sourceLocationId: ctx.locationId }],
-      notes: "rollback probe",
-      voucherDate: new Date().toISOString().split("T")[0],
-      clientRequestId,
-    });
-    expect(failed.status).toBeGreaterThanOrEqual(400);
-
-    const corrected = await agent.post("/api/stock-transfers").send({
-      sourceLocationId: ctx.locationId,
-      destinationLocationId: ctx.location2Id,
-      items: [{ stockItemId, quantity: "2", sourceLocationId: ctx.locationId }],
-      notes: "rollback probe",
-      voucherDate: new Date().toISOString().split("T")[0],
-      clientRequestId,
-    });
-
-    // The marker is written in the same transaction as the transfer, so a
-    // rolled-back attempt cannot claim the key and lock the user out of
-    // correcting and resubmitting.
-    expect(corrected.status).toBe(201);
-    expect(corrected.body.replayed).toBe(false);
-    expect(await getInventoryQty(ctx.locationId, stockItemId)).toBe(sourceBefore - 2);
-  }, 60000);
-
   it("removes the orphan voucher when an adjustment fails", async () => {
     const { rows } = await pool.query(
       `INSERT INTO vouchers (company_id, voucher_type, voucher_number, voucher_date, description, total_amount, optional)
