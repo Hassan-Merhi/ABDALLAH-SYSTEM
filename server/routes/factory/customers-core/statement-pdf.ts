@@ -178,7 +178,7 @@ export function registerFactoryCustomerStatementPdfRoutes(app: Express) {
       const custFontDir = pathModCust.join(process.cwd(), "server", "fonts");
       const custArabicFontPath = pathModCust.join(custFontDir, "Amiri-Regular.ttf");
       const custHasArabicFont = fs.existsSync(custArabicFontPath);
-      const custHmdLogoPath = path.join(process.cwd(), "server", "hmd-logo.png");
+      const custHmdLogoPath = path.join(process.cwd(), "server", "dakzo-logo.png");
 
       // ── Fetch company logo — prefer companySettings.logoUrl, fall back to disk ──
       let logoBuffer: Buffer | null = null;

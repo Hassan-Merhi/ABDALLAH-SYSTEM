@@ -183,7 +183,7 @@ export async function buildCanonicalInvoiceExcel(
   const logoRow = sheet.addRow([]);
   logoRow.height = 20;
 
-  const companyRow = sheet.addRow(["HMD INTERNATIONAL GROUP"]);
+  const companyRow = sheet.addRow(["DAKZO SYSTEMS"]);
   companyRow.height = 26;
   companyRow.getCell(1).font = { bold: true, size: 16, color: { argb: DARK_BLUE } };
   companyRow.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
@@ -469,7 +469,7 @@ export async function buildCanonicalInvoicePdf(
   const drawPageBranding = (firstPage: boolean) => {
     let y = 26;
     if (firstPage) {
-      const logo = path.join(process.cwd(), "server", "hmd-logo.png");
+      const logo = path.join(process.cwd(), "server", "dakzo-logo.png");
       if (fs.existsSync(logo)) {
         try {
           doc.image(logo, (doc.page.width - 150) / 2, 18, { width: 150 });

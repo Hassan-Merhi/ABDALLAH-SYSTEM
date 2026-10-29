@@ -103,7 +103,7 @@ export default function CustomerLogosSettings() {
         <PageHeader title="Customer Logos" />
       </div>
       <p className="text-sm text-muted-foreground">
-        Upload logos per customer. These replace the default HMD logo on bale labels when selected during stock entry.
+        Upload logos per customer. These replace the default Dakzo logo on bale labels when selected during stock entry.
         PNG, JPG or WEBP only — max 500 KB per file.
       </p>
 

@@ -71,7 +71,7 @@ export function registerInvoiceLoadingSessionReportRoutes(app: Express) {
 
         const ExcelJS = (await import("exceljs")).default;
         const wb = new ExcelJS.Workbook();
-        wb.creator = "HMD International Group";
+        wb.creator = "Dakzo Systems";
 
         // ── Sheet 1: Session ──
         const ws = wb.addWorksheet("Session");

@@ -47,7 +47,7 @@ export const openBrowserPrint = (
   prefetchBannersForPrint();
   const paperFormat = getPaperFormat();
   // All received bales need their full-size label, even when using the
-  // ordinary HMD banner rather than a custom design or customer logo.
+  // ordinary Dakzo banner rather than a custom design or customer logo.
   const labelsForA4 = labels;
 
   const preOpened = preOpenedWindowsRef.current;
@@ -171,7 +171,7 @@ export const printLabels = async (
       };
     });
 
-    // Color HMD lettering requires color printing; monochrome Zebra ZPL cannot reproduce it.
+    // Color Dakzo lettering requires color printing; monochrome Zebra ZPL cannot reproduce it.
     if (isZebraMode() && !labels.some((label) => label.priorityColor)) {
       try {
         await printRawZpl(buildZplBatch(labels, true));

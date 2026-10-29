@@ -97,7 +97,7 @@ export function registerPayrollPaymentSummaryPdfRoutes(app: Express) {
           .text(arabic ? shapeText(text) : text, x, y, { width, align: arabic ? "right" : align });
       };
 
-      const logoPath = path.join(process.cwd(), "server", "hmd-logo.png");
+      const logoPath = path.join(process.cwd(), "server", "dakzo-logo.png");
       if (fs.existsSync(logoPath)) {
         try {
           doc.image(logoPath, (doc.page.width - 220) / 2, doc.y, { width: 220 });

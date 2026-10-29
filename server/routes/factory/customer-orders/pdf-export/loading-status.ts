@@ -210,16 +210,16 @@ export function registerOrderLoadingStatusExportRoutes(app: Express) {
         const logoRow = sheet.addRow([]);
         logoRow.height = 110;
         try {
-          const lp = path.join(process.cwd(), "server", "hmd-logo.png");
+          const lp = path.join(process.cwd(), "server", "dakzo-logo.png");
           if (fs.existsSync(lp)) {
-            const lid = workbook.addImage({ buffer: toArrayBuffer(fs.readFileSync(lp)), extension: "jpeg" });
+            const lid = workbook.addImage({ buffer: toArrayBuffer(fs.readFileSync(lp)), extension: "png" });
             sheet.addImage(lid, { tl: { col: 0, row: 0 }, ext: { width: 180, height: 110 } });
           }
         } catch {
           // Failure here is non-fatal and the surrounding flow continues deliberately.
         }
 
-        const r1 = sheet.addRow(["HMD INTERNATIONAL GROUP"]);
+        const r1 = sheet.addRow(["DAKZO SYSTEMS"]);
         r1.height = 26;
         r1.getCell(1).font = { bold: true, size: 16, color: { argb: DARK_BLUE } };
         r1.getCell(1).alignment = { horizontal: "center", vertical: "middle" };

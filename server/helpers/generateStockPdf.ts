@@ -390,7 +390,7 @@ export async function generateStockPdf(
   // ── Footer on last page ───────────────────────────────────────────────────────
   const footerY = pageBottom() - 14;
   doc.font("Helvetica").fontSize(7).fillColor("#b0b8c4");
-  doc.text("HMD International Group · Confidential", X_LEFT, footerY, {
+  doc.text("Dakzo Systems · Confidential", X_LEFT, footerY, {
     width: CONTENT_W,
     align: "center",
     lineBreak: false,

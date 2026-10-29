@@ -496,9 +496,9 @@ export async function generateAccountStatementPdf(opts: StatementPdfOptions): Pr
       }
     }
   }
-  // Fallback: try hmd-logo.png
+  // Fallback: try dakzo-logo.png
   if (logoWidth === 0) {
-    const fallbackLogo = pathMod.join(process.cwd(), "server", "hmd-logo.png");
+    const fallbackLogo = pathMod.join(process.cwd(), "server", "dakzo-logo.png");
     if (fs.existsSync(fallbackLogo)) {
       try {
         doc.image(fallbackLogo, LM, headerY, { height: 44, fit: [70, 44] });

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Eye, EyeOff, BarChart3, ShoppingCart, Boxes, Factory, ScanFace, Fingerprint, KeyRound, X } from "lucide-react";
+import { Eye, EyeOff, BarChart3, ShoppingCart, Boxes, FileText, ScanFace, Fingerprint, KeyRound, X } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient, resetCsrfToken } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -37,8 +37,8 @@ const OPT_IN_KEY = "biometric_opted_in";
 
 const features = [
   { icon: Boxes, title: "Inventory Management", description: "Real-time stock tracking across all locations" },
-  { icon: ShoppingCart, title: "Point of Sale", description: "Fast, reliable checkout for every team" },
-  { icon: Factory, title: "Accounting", description: "Track balances, expenses, and transactions" },
+  { icon: ShoppingCart, title: "Purchasing & Sales", description: "Handle buying and sales orders" },
+  { icon: FileText, title: "Accounting", description: "Track balances, expenses, and transactions" },
   { icon: BarChart3, title: "Business Analytics", description: "Live reports to drive smarter decisions" },
 ];
 
@@ -547,7 +547,7 @@ export default function Login() {
             <img src="/dakzo-logo.svg" alt="Dakzo Systems" className="w-full h-full object-contain" />
           </div>
           <h1 className="text-base font-bold text-foreground tracking-tight">Dakzo Systems</h1>
-          <p className="text-[0.7rem] text-muted-foreground tracking-widest uppercase mt-0.5">ERP &amp; POS Platform</p>
+          <p className="text-[0.7rem] text-muted-foreground tracking-widest uppercase mt-0.5">ERP Platform</p>
         </div>
 
         {/* Theme toggle */}
@@ -725,7 +725,7 @@ export default function Login() {
               className="text-center text-[0.64rem] pt-1"
               style={{ color: isDark ? "rgba(24,143,255,0.30)" : "rgba(20,89,190,0.45)" }}
             >
-              Dakzo Systems &mdash; ERP &amp; POS Platform
+              Dakzo Systems &mdash; ERP Platform
             </p>
           </div>
         </div>

@@ -67,7 +67,7 @@ export function registerOrderPendingExportRoutes(app: Express) {
 
       // Logo header rows
       try {
-        const ldLogoPath = path.join(process.cwd(), "server", "hmd-logo.png");
+        const ldLogoPath = path.join(process.cwd(), "server", "dakzo-logo.png");
         if (fs.existsSync(ldLogoPath)) {
           const ldId = workbook.addImage({ buffer: toArrayBuffer(fs.readFileSync(ldLogoPath)), extension: "jpeg" });
           const ldRow = sheet.addRow([]);
