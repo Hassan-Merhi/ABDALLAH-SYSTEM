@@ -37,8 +37,8 @@ function rowToOption(r: LabelDesignColorRow): DesignColorOption {
   // Custom images use the original URL (stable ?t= timestamp → browser caches correctly).
   // Print always uses getDesignBannerUrl() from labelHtml.ts which uses the full-res original.
   const previewUrl = ts
-    ? `/labels/hmd-${r.slug}.jpg?t=${ts}` // custom image, stable cache key
-    : `/labels/previews/hmd-${r.slug}-preview.webp`; // default → small preview
+    ? `/labels/dakzo-${r.slug}.jpg?t=${ts}` // custom image, stable cache key
+    : `/labels/previews/hmd-${r.slug}-preview.svg`; // default → small preview
   return {
     id: r.id,
     slug: r.slug,

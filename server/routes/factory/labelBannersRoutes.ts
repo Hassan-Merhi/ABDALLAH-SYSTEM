@@ -6,9 +6,9 @@ import type { Express, Request, Response, RequestHandler } from "express";
  *
  * Strategy:
  *  - Color metadata AND custom images live in label_design_colors table.
- *  - Default images in client/public/labels/hmd-{slug}.jpg are served by
+ *  - Default images in client/public/labels/dakzo-{slug}.svg are served by
  *    Vite/static. Custom replacements are stored in the image_data column.
- *  - GET /labels/hmd-:slug.jpg queries the DB; if imageData is set it
+ *  - GET /labels/dakzo-:slug.jpg queries the DB; if imageData is set it
  *    decodes and streams the bytes; otherwise calls next() to fall through
  *    to Vite static serving.
  *  - labelHtml.ts never needs changing — it derives the URL from the slug.
@@ -58,7 +58,7 @@ function rowInfo(row: { imageData: string | null; imageUpdatedAt: Date | null })
 export function registerLabelBannersRoutes(app: Express, requireAuth: RequestHandler) {
   // ── Serve custom banner image from DB when present, else fall through ────────
   app.get(
-    "/labels/hmd-:slug.jpg",
+    "/labels/dakzo-:slug.jpg",
     async (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => {
       const { slug } = req.params;
       if (!/^[a-z0-9-]+$/.test(slug)) return next();

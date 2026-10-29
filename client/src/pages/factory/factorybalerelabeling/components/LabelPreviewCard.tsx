@@ -28,7 +28,7 @@ export function LabelPreviewCard({ item, designColor, printFormat }: LabelPrevie
         }}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
-          <div style={{ fontSize: "11pt", fontWeight: 900, letterSpacing: "1px" }}>HMD</div>
+          <div style={{ fontSize: "11pt", fontWeight: 900, letterSpacing: "1px" }}>DAKZO</div>
           <div style={{ textAlign: "right", fontSize: "7pt", lineHeight: 1.3 }}>
             <div>
               <strong>PIECES:</strong> 1
@@ -84,7 +84,7 @@ export function LabelPreviewCard({ item, designColor, printFormat }: LabelPrevie
           alignItems: "center",
         }}
       >
-        <span style={{ fontSize: "10pt", fontWeight: 900, letterSpacing: "1px" }}>HMD</span>
+        <span style={{ fontSize: "10pt", fontWeight: 900, letterSpacing: "1px" }}>DAKZO</span>
         <span style={{ fontSize: "7pt", fontWeight: 700, opacity: 0.9 }}>{printFormat}</span>
       </div>
       <div style={{ padding: "8px 10px", display: "flex", flexDirection: "column", gap: "4px" }}>

@@ -95,8 +95,8 @@ describe("A4 labels", () => {
 
     // Printing uses the full-resolution original, never the thumbnail the
     // picker shows on screen.
-    expect(html).toContain(`/labels/hmd-${second.value}.jpg`);
-    expect(html).not.toContain(`/labels/hmd-${first.value}.jpg`);
+    expect(html).toContain(`/labels/dakzo-${second.value}.svg`);
+    expect(html).not.toContain(`/labels/dakzo-${first.value}.svg`);
     expect(html).not.toContain("previews/");
   });
 
@@ -139,13 +139,13 @@ describe("Automatic Priority Printing labels", () => {
   function stripPriorityLogo(html: string): string {
     return html
       .replace(
-        /<div class="(?:logo-img|sticker-logo) priority-color-box"[^>]*><span class="priority-color-box-text">HMD<\/span><\/div>/g,
+        /<div class="(?:logo-img|sticker-logo) priority-color-box"[^>]*><span class="priority-color-box-text">DAKZO<\/span><\/div>/g,
         "<LOGO>"
       )
-      .replace(/<img class="(?:logo-img|sticker-logo)(?: hmd-default-logo)?"[^>]*\/>/g, "<LOGO>");
+      .replace(/<img class="(?:logo-img|sticker-logo)(?: dakzo-default-logo)?"[^>]*\/>/g, "<LOGO>");
   }
 
-  it("replaces the A4/A5 small logo with a saved priority color block marked HMD", () => {
+  it("replaces the A4/A5 small logo with a saved priority color block marked DAKZO", () => {
     const bale = label({ priorityColor: "#dc2626", priorityOrderId: 123, priorityNumber: 1 });
     for (const print of paperPrinters) {
       const html = print([bale]);
@@ -154,15 +154,15 @@ describe("Automatic Priority Printing labels", () => {
       expect(boxes).toHaveLength(1);
       const box = boxes[0] as HTMLElement;
       expect(box.tagName).toBe("DIV");
-      // Only the small black "HMD" mark sits inside the box (03cf7d27d).
+      // Only the small black "DAKZO" mark sits inside the box (03cf7d27d).
       expect(box.children).toHaveLength(1);
-      expect(box.querySelector(".priority-color-box-text")?.textContent).toBe("HMD");
+      expect(box.querySelector(".priority-color-box-text")?.textContent).toBe("DAKZO");
       expect(box.dataset.priorityColor).toBe("#dc2626");
       expect(box.style.backgroundColor).toBe("rgb(220, 38, 38)");
       expect(box.style.getPropertyPriority("background-color")).toBe("important");
       expect(box.style.getPropertyValue("print-color-adjust")).toBe("exact");
       expect(html).toContain("border-radius: 2mm");
-      expect(doc.querySelector(".priority-hmd-logo")).toBeNull();
+      expect(doc.querySelector(".priority-dakzo-logo")).toBeNull();
       expect(html).toContain("REF-001");
       expect(html).toContain("ART-100");
       expect(html).toContain("/api/barcode/REF-001");
@@ -183,7 +183,7 @@ describe("Automatic Priority Printing labels", () => {
     expect(printRule).not.toMatch(/width|height/);
   });
 
-  it("keeps the original HMD/customer logo for historical colors with no fixed letter", () => {
+  it("keeps the original Dakzo/customer logo for historical colors with no fixed letter", () => {
     for (const color of ["#dc2626", "Blue", "Navy"]) {
       for (const logoUrl of [undefined, "https://example.test/customer-logo.png"]) {
         const sticker = generateStickerLabelsHtml([
@@ -215,7 +215,7 @@ describe("Automatic Priority Printing labels", () => {
         const logo = top?.querySelector("img.sticker-logo");
         expect(logo?.getAttribute("alt")).toBe("Logo");
         if (logoUrl) expect(logo?.getAttribute("src")).toBe(logoUrl);
-        else expect(logo?.classList.contains("hmd-default-logo")).toBe(true);
+        else expect(logo?.classList.contains("dakzo-default-logo")).toBe(true);
         const letter = top?.querySelector(".sticker-priority-letter");
         expect(letter?.textContent).toBe(expectedLetter);
         expect(letter?.getAttribute("data-priority-letter")).toBe(expectedLetter);
@@ -265,7 +265,7 @@ describe("Automatic Priority Printing labels", () => {
     }
   );
 
-  it("keeps the exact ordinary A4/A5/sticker layout and large HMD banners for priority bales", () => {
+  it("keeps the exact ordinary A4/A5/sticker layout and large DAKZO banners for priority bales", () => {
     const [design] = A4_DESIGN_OPTIONS;
     const ordinary = label({ designColor: design.value });
     const priority = label({ designColor: design.value, priorityColor: "#2563eb" });
@@ -274,24 +274,24 @@ describe("Automatic Priority Printing labels", () => {
     }
     // The large banner artwork is still printed twice per A4 page.
     const a4 = generateCombinedLabelsHtml([priority]);
-    expect(a4.match(new RegExp(`/labels/hmd-${design.value}.jpg`, "g"))).toHaveLength(2);
+    expect(a4.match(new RegExp(`/labels/dakzo-${design.value}.svg`, "g"))).toHaveLength(2);
     expect(a4).not.toContain("priority-print-a4");
     expect(a4).not.toMatch(/stripe/i);
     expect(generateA5LabelsHtml([priority])).toContain("a5-page a5-page1");
   });
 
-  it("keeps the default HMD logo black on white in A4, A5 and sticker print", () => {
+  it("keeps the default DAKZO logo black on white in A4, A5 and sticker print", () => {
     for (const print of printers) {
       const html = print([label()]);
       const doc = new DOMParser().parseFromString(html, "text/html");
       const logo = doc.querySelector('img[alt="Logo"]');
-      expect(logo?.classList.contains("hmd-default-logo")).toBe(true);
+      expect(logo?.classList.contains("dakzo-default-logo")).toBe(true);
       // The global print brightness(0.9) used to turn white into #e6e6e6.
-      expect(html).toContain(".hmd-default-logo { background: #fff !important; filter: contrast(3) !important; }");
+      expect(html).toContain(".dakzo-default-logo { background: #fff !important; filter: contrast(3) !important; }");
       const custom = new DOMParser()
         .parseFromString(print([label({ customerLogoUrl: "https://example.test/customer.png" })]), "text/html")
         .querySelector('img[alt="Logo"]');
-      expect(custom?.classList.contains("hmd-default-logo")).toBe(false);
+      expect(custom?.classList.contains("dakzo-default-logo")).toBe(false);
     }
   });
 
@@ -327,7 +327,7 @@ describe("Automatic Priority Printing labels", () => {
     const html = generateStickerLabelsHtml([label({ priorityColor: "Blue", priorityNumber: 2 })]);
     expect(html).toContain("@page { size: 3in 1.97in");
     expect(html).not.toContain("data-priority-color");
-    expect(html).toContain('class="sticker-logo hmd-default-logo"');
+    expect(html).toContain('class="sticker-logo dakzo-default-logo"');
     expect(html).not.toContain('class="sticker-priority-letter"');
     expect(html).toContain('class="ref-barcode-img"');
     expect(html).toContain("REF-001");
@@ -374,20 +374,20 @@ describe("Automatic Priority Printing labels", () => {
 describe("Pressing/Production priority logo replacement", () => {
   const paperPrinters = [generateCombinedLabelsHtml, generateA5LabelsHtml];
 
-  it("retains ordinary HMD text and replaces priority text with the saved color box", () => {
+  it("retains ordinary DAKZO text and replaces priority text with the saved color box", () => {
     expect(renderLegacyPriorityLogo({ referenceNumber: "R1" })).toBe(
-      '<div class="logo-text">HMD</div><div class="logo-subtitle">INTERNATIONAL GROUP</div>'
+      '<div class="logo-text">DAKZO</div><div class="logo-subtitle">SYSTEMS</div>'
     );
     expect(renderPriorityColorBox({ referenceNumber: "R1" })).toBe("");
     const html = renderLegacyPriorityLogo({ referenceNumber: "R1", priorityColor: "Blue" });
     expect(html).toContain("background-color: #2563eb !important");
     expect(html).toContain('data-priority-color="#2563eb"');
-    // The ordinary logo text is replaced; the box shows only its small "HMD" mark.
+    // The ordinary logo text is replaced; the box shows only its small "DAKZO" mark.
     expect(html).not.toContain('class="logo-text"');
-    expect(html).not.toContain("INTERNATIONAL GROUP");
+    expect(html).not.toContain("SYSTEMS");
     const box = new DOMParser().parseFromString(html, "text/html").querySelector(".priority-color-box")!;
     expect(box.children).toHaveLength(1);
-    expect(box.textContent).toBe("HMD");
+    expect(box.textContent).toBe("DAKZO");
     expect(() => renderLegacyPriorityLogo({ referenceNumber: "R1", priorityColor: "url(x)" })).toThrow(
       /Unrecognized Priority Scan label color/
     );
