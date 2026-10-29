@@ -244,11 +244,42 @@ Do not treat the preflight's six-table check as full application readiness.
 
 ## 8. Backups and maintenance
 
-Schedule `pg_dump --format=custom` at least daily, preferably more often
-when financial data is changing. Encrypt and copy every backup to a different
-host or off-instance object store, with access independent of this VM. Test
-`pg_restore` into a scratch database regularly. Back up uploaded documents
-separately; a PostgreSQL dump **does not contain uploaded files**.
+This branch includes **disabled-by-default** daily backup templates:
+`deploy/oracle/backup-to-offsite.sh`, `abdallah-backup.service` and
+`abdallah-backup.timer`. Configure an independent offsite destination in
+`rclone` and an `age` public encryption recipient. Install dependencies:
+
+```bash
+sudo apt install -y age rclone
+rclone config
+```
+
+Add two variables to the private `/etc/abdallah-system/erp.env`:
+
+```dotenv
+BACKUP_AGE_RECIPIENT=age1YOUR_PUBLIC_AGE_RECIPIENT
+BACKUP_RCLONE_TARGET=remote:abdallah-erp-backups
+```
+
+**Keep the age private decryption key somewhere secure and OFF the VM.**
+Configure rclone for user `ubuntu` (the user running the timer); no rclone
+secrets belong in Git. Uploading outside the VM is required: a local backup
+does not survive instance loss. After a manual run and a verified restore
+**into a separate scratch PostgreSQL 18 database**, activate the timer:
+
+```bash
+sudo cp deploy/oracle/abdallah-backup.service deploy/oracle/abdallah-backup.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl start abdallah-backup.service
+sudo systemctl enable --now abdallah-backup.timer
+sudo systemctl list-timers abdallah-backup.timer
+```
+
+The script encrypts the `pg_dump --format=custom` stream before writing
+it to disk and uploads it via rclone; a failed upload causes a failed systemd
+service. It does not configure a backup destination or verify restores on its
+own. Back up uploaded documents separately — a PostgreSQL dump **does not
+contain uploaded files**. Monitor backup failures and retention limits.
 
 Monitor free disk, memory, PostgreSQL availability, application logs, HTTPS
 renewals and the OCI instance's status. Keep an emergency restore procedure
