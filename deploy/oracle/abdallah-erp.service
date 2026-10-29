@@ -1,0 +1,30 @@
+# Copy to /etc/systemd/system/abdallah-erp.service after reviewing paths.
+# Assumes Node.js 24.22.1 installed for the ubuntu user via nvm.
+[Unit]
+Description=ABDALLAH-SYSTEM ERP API and frontend
+After=network-online.target postgresql.service
+Wants=network-online.target
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/ABDALLAH-SYSTEM
+Environment=NODE_ENV=production
+Environment=PORT=5000
+Environment=PGSSLMODE=disable
+Environment=RUN_STARTUP_MIGRATIONS=true
+Environment=PATH=/home/ubuntu/.nvm/versions/node/v24.22.1/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/bin
+EnvironmentFile=/etc/abdallah-system/erp.env
+ExecStartPre=/usr/bin/env node scripts/oracle-db-preflight.mjs --ready
+ExecStart=/usr/bin/env node --expose-gc --import ./server/startupPreload.mjs --import ./server/runtimeMemoryGuard.mjs dist/index.js
+Restart=on-failure
+RestartSec=8
+LimitNOFILE=65535
+NoNewPrivileges=true
+PrivateTmp=true
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
