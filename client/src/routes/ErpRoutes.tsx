@@ -1,6 +1,7 @@
 import type { ComponentType } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Switch, Route, Redirect } from "wouter";
+import { Switch, Route, Redirect, useLocation } from "wouter";
+import { isBlockedAbdallahRoute } from "@/lib/abdallahErpOnly";
 import NotFound from "@/pages/not-found";
 import { canAccessAnyErpFeature, canAccessErpFeature, type ErpFeatureAccess } from "@/app/erpAccess";
 import type { FeatureKey } from "@shared/schema";
@@ -119,6 +120,7 @@ interface ErpRoutesProps {
 type RouteComponent = ComponentType;
 
 export function ErpRoutes({ user }: ErpRoutesProps) {
+  const [currentLocation] = useLocation();
   const { data: erpAccess } = useQuery<ErpFeatureAccess>({
     queryKey: ["/api/my-erp-pages"],
     enabled: !!user,
@@ -147,6 +149,8 @@ export function ErpRoutes({ user }: ErpRoutesProps) {
         <Redirect replace to="/tracking" />
       </Route>
     );
+
+  if (isBlockedAbdallahRoute(currentLocation)) return <Redirect replace to="/tracking" />;
 
   return (
     <Switch>
