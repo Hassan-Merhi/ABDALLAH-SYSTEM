@@ -34,6 +34,7 @@ import { DataToolsTab } from "./settings/DataToolsTab";
 import { PosSetupHub } from "./settings/PosSetupHub";
 import { ExportCenter } from "./settings/ExportCenter";
 import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
+import { ErpCompanyUsers } from "./settings/users/ErpCompanyUsers";
 import { AutomaticPriorityPrintingCard } from "./factory/factorysettings/AutomaticPriorityPrintingCard";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -218,7 +219,7 @@ export default function Settings() {
         <div className="flex-1 sm:overflow-y-auto py-3 sm:p-6">
           {activeSection === "companies" && <CompaniesTab />}
           {activeSection === "users-permissions" && (
-            <UsersPermissionsHub userRole={currentUser?.role} appMode={appMode} />
+            appMode === "erp" ? <ErpCompanyUsers /> : <UsersPermissionsHub userRole={currentUser?.role} appMode={appMode} />
           )}
           {activeSection === "edit-log" && <EditLogTab selectedCompany={selectedCompany} />}
           {activeSection === "data-tools" && currentUser?.role === "Developer" && <DataToolsTab />}

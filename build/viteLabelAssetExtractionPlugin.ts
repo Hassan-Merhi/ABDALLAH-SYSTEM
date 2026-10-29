@@ -4,10 +4,10 @@ import path from "node:path";
 import type { Plugin } from "vite";
 
 const LABEL_HTML_SUFFIX = "/client/src/lib/labelHtml.ts";
-const EMBEDDED_LABEL_LOGO_RE = /const HMD_LOGO_BASE64\s*=\s*"data:image\/png;base64,[^"]+";/s;
+const DAKZO_LABEL_LOGO_RE = /const DAKZO_LOGO_URL\s*=\s*"\/dakzo-icon\.svg";/;
 
 export function labelAssetExtractionPlugin(): Plugin {
-  const sourcePath = path.resolve(import.meta.dirname, "..", "server", "hmd-logo.png");
+  const sourcePath = path.resolve(import.meta.dirname, "..", "server", "dakzo-logo.png");
   let source: Buffer | null = null;
   let fileName = "";
   let publicUrl = "";
@@ -19,7 +19,7 @@ export function labelAssetExtractionPlugin(): Plugin {
     }
     source = fs.readFileSync(sourcePath);
     const hash = createHash("sha256").update(source).digest("hex").slice(0, 12);
-    fileName = `assets/hmd-label-logo-${hash}.jpg`;
+    fileName = `assets/dakzo-label-logo-${hash}.png`;
     publicUrl = `/${fileName}`;
     return source;
   };
@@ -43,7 +43,7 @@ export function labelAssetExtractionPlugin(): Plugin {
         const pathname = String(req.url || "").split("?", 1)[0];
         if (pathname !== publicUrl) return next();
         res.statusCode = 200;
-        res.setHeader("Content-Type", "image/jpeg");
+        res.setHeader("Content-Type", "image/png");
         res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
         res.end(source!);
       });
@@ -54,12 +54,12 @@ export function labelAssetExtractionPlugin(): Plugin {
       if (!normalizedId.endsWith(LABEL_HTML_SUFFIX)) return null;
 
       loadSource();
-      if (!EMBEDDED_LABEL_LOGO_RE.test(code)) {
-        this.error("Expected embedded HMD label logo was not found in labelHtml.ts");
+      if (!DAKZO_LABEL_LOGO_RE.test(code)) {
+        this.error("Expected Dakzo label logo URL was not found in labelHtml.ts");
       }
 
       return {
-        code: code.replace(EMBEDDED_LABEL_LOGO_RE, `const HMD_LOGO_BASE64 = "${publicUrl}";`),
+        code: code.replace(DAKZO_LABEL_LOGO_RE, `const DAKZO_LOGO_URL = "${publicUrl}";`),
         map: null,
       };
     },

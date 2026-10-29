@@ -345,7 +345,23 @@ export function registerCompanyAccessRoutes(app: Express) {
     try {
       const payload = await prepareCompanyPayload(req.body, undefined, true);
       if ((payload.companyType ?? "erp") !== "erp") return res.status(403).json({ message: "Only ERP companies can be created" });
-      res.status(201).json(await storage.createCompany(payload as Parameters<typeof storage.createCompany>[0]));
+      // The creating Admin must be able to switch into and administer the new company.
+      // Insert the company and its initial Admin membership atomically.
+      const created = await db.transaction(async (tx) => {
+        const [company] = await tx
+          .insert(companies)
+          .values(payload as Parameters<typeof storage.createCompany>[0])
+          .returning();
+        if (req.user!.role !== "Developer") {
+          await tx.insert(userCompanyRoles).values({
+            userId: req.user!.id,
+            companyId: company.id,
+            role: "Admin",
+          });
+        }
+        return company;
+      });
+      res.status(201).json(created);
     } catch (error: unknown) {
       res.status(400).json({ message: getErrorMessage(error) });
     }
