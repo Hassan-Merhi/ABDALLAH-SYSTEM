@@ -66,6 +66,21 @@ jobs:
         run: node scripts/oracle-bootstrap-empty-db.mjs
       - name: Verify core tables exist after disposable schema creation
         run: node scripts/oracle-db-preflight.mjs --ready
+      - name: Reject a second bootstrap on an already initialized database
+        env:
+          ORACLE_BOOTSTRAP_NEW_DATABASE: "YES"
+        run: |
+          if node scripts/oracle-bootstrap-empty-db.mjs; then
+            echo "Unsafe: bootstrap accepted a populated DB!"
+            exit 1
+          fi
+          if node scripts/oracle-db-preflight.mjs --empty; then
+            echo "Unsafe: empty preflight accepted a populated DB!"
+            exit 1
+          fi
+          echo "Expected: both write-protection checks rejected the populated DB."
+      - name: Validate deployment shell scripts
+        run: bash -n deploy/oracle/*.sh
       - name: Smoke-test first application boot on disposable PostgreSQL
         shell: bash
         run: |
