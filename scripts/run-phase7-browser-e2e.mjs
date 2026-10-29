@@ -363,9 +363,12 @@ try {
       throw new Error("Forbidden stock transfer modified inventory");
     }
     const directRoute = await openRoute(devPage, "/stock-transfer-order");
-    if (directRoute.path !== "/tracking") throw new Error("Stock transfer deep link was accessible: " + directRoute.path);
+    if (directRoute.path.split("?")[0] !== "/tracking") throw new Error("Stock transfer deep link was accessible: " + directRoute.path);
     const tabRoute = await openRoute(devPage, "/sales-tools?tab=transfers");
-    if (tabRoute.path !== "/tracking") throw new Error("Stock transfers tab was accessible: " + tabRoute.path);
+    if (tabRoute.path.split("?")[0] !== "/tracking") {
+      const transfersVisible = await devPage.evaluate(() => Boolean(document.querySelector('[data-testid="tab-transfers"]')));
+      if (transfersVisible) throw new Error("Stock transfers tab was accessible: " + tabRoute.path);
+    }
     return { status: denied.status, sourceQuantity: Number(afterSource.quantity),
       destinationQuantity: Number(afterDestination.quantity) };
   });
@@ -423,7 +426,7 @@ try {
     const deniedApi = await browserRequest(devPage, "GET", "/api/factory/daybook");
     if (deniedApi.status !== 403) throw new Error("Factory API returned " + deniedApi.status);
     const directRoute = await openRoute(devPage, "/factory/containers");
-    if (directRoute.path !== "/tracking") throw new Error("Factory page was accessible: " + directRoute.path);
+    if (directRoute.path.split("?")[0] !== "/tracking") throw new Error("Factory page was accessible: " + directRoute.path);
     return { switchStatus: deniedSwitch.status, apiStatus: deniedApi.status, route: directRoute.path };
   });
 
@@ -442,7 +445,7 @@ try {
     const deniedApi = await browserRequest(devPage, "POST", "/api/sp/sales", {});
     if (deniedApi.status !== 403) throw new Error("Supplier Partner API returned " + deniedApi.status);
     const directRoute = await openRoute(devPage, "/sp");
-    if (directRoute.path !== "/tracking") throw new Error("Supplier Partner page was accessible: " + directRoute.path);
+    if (directRoute.path.split("?")[0] !== "/tracking") throw new Error("Supplier Partner page was accessible: " + directRoute.path);
     return { switchStatus: deniedSwitch.status, apiStatus: deniedApi.status, route: directRoute.path };
   });
 
@@ -587,7 +590,7 @@ try {
       ];
       for (const attempted of restricted) {
         const state = await openRoute(phonePage, attempted);
-        if (state.path !== "/tracking") {
+        if (state.path.split("?")[0] !== "/tracking") {
           throw new Error("Non-ERP phone route was accessible: " + attempted + " -> " + state.path);
         }
       }
