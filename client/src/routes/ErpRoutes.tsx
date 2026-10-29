@@ -53,7 +53,6 @@ import {
   ErpRentalShops,
   ErpRentalWarehouses,
   GITMockup,
-  ImportCycleDiagnostics,
   ImportStockItems,
   ItemMarketAnalysis,
   IntercompanyLinks,
@@ -458,7 +457,7 @@ export function ErpRoutes({ user }: ErpRoutesProps) {
       {R("/chatbot-settings", isAdminOrDev, ChatbotSettings)}
       {R("/notification-settings", isAdminOrDev, NotificationSettings)}
       {R("/account-groups", isAdminOrDev, AccountGroups)}
-      {R("/import-cycle-diagnostics", isAdminOrDev, ImportCycleDiagnostics)}
+      <Route path="/import-cycle-diagnostics"><Redirect replace to="/settings" /></Route>
       {R("/inventory-repair", isAdminOrDev, InventoryRepair)}
       {R("/balance-repair", isAdminOrDev, BalanceRepair)}
       {R("/convergence-reconciliation", isAdminOwnerOrDev, ConvergenceReconciliation)}
