@@ -1,5 +1,18 @@
 # Fresh-Database Bootstrap — Known Gap & Fix Options
 
+> **Oracle ARM64 test update (2026-10-29):** A guarded, one-time bootstrap
+> has been added in `scripts/oracle-bootstrap-empty-db.mjs`. It refuses any
+> database with public relations, then creates foundational Drizzle tables
+> **only on a brand-new local PostgreSQL database**. The Oracle ARM64 GitHub
+> workflow passed a full first startup on PostgreSQL 18 with **0 reported
+> migration failures** and a healthy readiness endpoint. This does **not**
+> authorize `drizzle-kit push` on an existing database or replace production
+> data migration and restore tests. See [Oracle deployment](oracle-always-free.md).
+>
+> The historical gap described below remains relevant to **direct startup
+> without the one-time baseline**, which still cannot create those core tables.
+
+
 ## TL;DR
 
 - **Existing and production deployments are unaffected.** Their databases already
