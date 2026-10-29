@@ -16,7 +16,6 @@ import type {
   Account,
   DashboardCashAccount,
   FactoryDashboardKPIs,
-  ImportCycleBalanceData,
   PayableAccount,
   ProfitData,
 } from "./types";
@@ -58,7 +57,6 @@ export function useDashboard() {
   const [cashComboboxOpen, setCashComboboxOpen] = useState(false);
   const [balesExpanded, setBalesExpanded] = useState(false);
   const [categoriesExpanded, setCategoriesExpanded] = useState(false);
-  const [importCycleExpanded, setImportCycleExpanded] = useState(false);
 
   const {
     data: profitData,
@@ -73,21 +71,6 @@ export function useDashboard() {
       return await response.json();
     },
     enabled: !!selectedCompany,
-  });
-
-  const {
-    data: importCycleData,
-    isError: importCycleIsError,
-    isLoading: importCycleIsLoading,
-  } = useQuery<ImportCycleBalanceData>({
-    queryKey: ["/api/stats/import-cycle-balance", selectedCompany?.id, appMode],
-    queryFn: async () => {
-      const response = await modeApiRequest("GET", "/api/stats/import-cycle-balance");
-      if (!response.ok) throw new Error("Failed to fetch import cycle balance");
-      return await response.json();
-    },
-    enabled: !!selectedCompany,
-    retry: 1,
   });
 
   const { data: factoryKPIs } = useQuery<FactoryDashboardKPIs>({
@@ -344,9 +327,6 @@ export function useDashboard() {
   // isError from net-profit: show the rest of the dashboard with an inline warning
   // rather than a blank error screen.  Other queries are unaffected.
 
-  const importCycleBalance = importCycleData?.netImportCycleBalance ?? null;
-  const isImportCycleBalanced = importCycleBalance !== null && Math.abs(importCycleBalance) < 1;
-
   return {
     selectedCompany,
     formatAmount,
@@ -372,15 +352,10 @@ export function useDashboard() {
     setBalesExpanded,
     categoriesExpanded,
     setCategoriesExpanded,
-    importCycleExpanded,
-    setImportCycleExpanded,
     profitData,
     isLoading,
     isError,
     refetchProfit,
-    importCycleData,
-    importCycleIsError,
-    importCycleIsLoading,
     factoryKPIs,
     cashAccountsError,
     allAccounts,
@@ -400,7 +375,5 @@ export function useDashboard() {
     totalAvailable,
     totalPayable,
     netCashPosition,
-    importCycleBalance,
-    isImportCycleBalanced,
   };
 }
