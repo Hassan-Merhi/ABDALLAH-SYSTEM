@@ -163,7 +163,7 @@ export function ErpCompanyUsers() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/erp-company-users"] });
       setEditingId(null);
-      toast({ title: "Role updated", description: "The user's sessions were ended so the new permissions take effect." });
+      toast({ title: copy.changed, description: copy.changedInfo });
     },
     onError: (err: Error) => toast({ title: copy.changeFailed, description: err.message, variant: "destructive" }),
   });
