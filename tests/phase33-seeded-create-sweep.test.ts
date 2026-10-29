@@ -4,11 +4,11 @@ import path from "node:path";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { isRetiredAbdallahApiRequest } from "../server/middleware/abdallahErpRetiredFeatureBoundary";
 import { closeTestServer, seedTestData, type TestContext } from "./setup";
 import type { SerializedRouteManifest } from "./helpers/routeManifest";
 
 const ERP_PREFIX = "phase33create";
-const FACTORY_PREFIX = "facimp";
 const MANIFEST_PATH = path.join(process.cwd(), "config/route-manifest.json");
 const REQUEST_TIMEOUT_MS = 12_000;
 
@@ -24,7 +24,6 @@ const EXCLUDED_PATTERNS: RegExp[] = [
 
 interface CreateRoute {
   routePath: string;
-  fixture: "erp" | "factory";
 }
 
 function loadManifest(): SerializedRouteManifest {
@@ -41,11 +40,12 @@ function selectRoutes(manifest: SerializedRouteManifest): CreateRoute[] {
     if (!routePath?.startsWith("/api/")) continue;
     if (routePath.includes(":") || routePath.includes("*")) continue;
     if (EXCLUDED_PATTERNS.some((pattern) => pattern.test(routePath))) continue;
+    // ABDALLAH-SYSTEM refuses retired modes and features before any handler runs.
+    if (isRetiredAbdallahApiRequest(method, routePath)) continue;
     if (seen.has(routePath)) continue;
     seen.add(routePath);
     routes.push({
       routePath,
-      fixture: routePath.startsWith("/api/factory/") ? "factory" : "erp",
     });
   }
 
@@ -132,17 +132,13 @@ function seededPayload(ctx: TestContext, sequence: number): Record<string, unkno
 }
 
 describe("Phase 33 seeded safe-create sweep", () => {
-  let erpCtx: TestContext;
-  let factoryCtx: TestContext;
-  let erpAgent: request.SuperAgentTest;
-  let factoryAgent: request.SuperAgentTest;
+  let ctx: TestContext;
+  let agent: request.SuperAgentTest;
   let routes: CreateRoute[] = [];
 
   beforeAll(async () => {
-    erpCtx = await seedTestData(ERP_PREFIX);
-    factoryCtx = await seedTestData(FACTORY_PREFIX);
-    erpAgent = await authenticatedAgent(erpCtx, ERP_PREFIX);
-    factoryAgent = await authenticatedAgent(factoryCtx, FACTORY_PREFIX);
+    ctx = await seedTestData(ERP_PREFIX);
+    agent = await authenticatedAgent(ctx, ERP_PREFIX);
     routes = selectRoutes(loadManifest());
   }, 120_000);
 
@@ -161,8 +157,6 @@ describe("Phase 33 seeded safe-create sweep", () => {
     const failures: Array<{ route: string; detail: string }> = [];
 
     for (const [index, route] of routes.entries()) {
-      const ctx = route.fixture === "factory" ? factoryCtx : erpCtx;
-      const agent = route.fixture === "factory" ? factoryAgent : erpAgent;
       try {
         const response = await agent
           .post(route.routePath)

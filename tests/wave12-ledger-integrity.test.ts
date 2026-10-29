@@ -12,8 +12,8 @@
  *   - Fiscal close brings every P&L account to exactly zero, retained earnings
  *     move by exactly the net profit, activity is dated by effective date.
  *   - Opening balances are locked once a period is closed.
- *   - Company import refuses unbalanced posted vouchers, cannot mark history,
- *     and is audited.
+ *
+ * The Factory company-data import is retired with Factory Mode.
  */
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -43,7 +43,6 @@ import { cleanupTestData, closeTestServer, seedTestData, type TestContext } from
 const PREFIX = "wave12ledger";
 let ctx: TestContext;
 let agent: request.SuperAgentTest;
-let importCompanyId: number;
 let sequence = 0;
 const nextNumber = () => `${PREFIX}-${++sequence}`;
 
@@ -156,7 +155,7 @@ afterAll(async () => {
   for (const table of OPENING_BALANCE_LOCK_TABLES) {
     await pool.query(`DROP TRIGGER IF EXISTS ${openingBalanceLockTriggerName(table)} ON ${table}`);
   }
-  const companies = [ctx.companyId, importCompanyId].filter(Boolean);
+  const companies = [ctx.companyId];
   await withFixtureTransaction(async (client) => {
     await client.query(`SET LOCAL app.closed_period_override = 'on'`);
     await client.query(`SET LOCAL app.ledger_integrity_bypass = 'on'`);
@@ -164,25 +163,8 @@ afterAll(async () => {
     // Not removed by cleanupTestData.
     await client.query(`DELETE FROM bank_accounts WHERE company_id = $1`, [ctx.companyId]);
     await client.query(`DELETE FROM customers WHERE company_id = $1`, [ctx.companyId]);
-    if (importCompanyId) {
-      await client.query(
-        `DELETE FROM voucher_entries WHERE voucher_id IN (SELECT id FROM vouchers WHERE company_id = $1)`,
-        [importCompanyId]
-      );
-      await client.query(`DELETE FROM accounting_posting_requests WHERE company_id = $1`, [importCompanyId]);
-      await client.query(`DELETE FROM vouchers WHERE company_id = $1`, [importCompanyId]);
-      await client.query(`DELETE FROM ledger_accounts WHERE company_id = $1`, [importCompanyId]);
-      await client.query(`DELETE FROM user_company_roles WHERE company_id = $1`, [importCompanyId]);
-      await client.query(`DELETE FROM user_security_permissions WHERE company_id = $1`, [importCompanyId]);
-    }
   });
   await deleteAuditLogRowsForTests(pool, "company_id = ANY($1::int[])", [companies]);
-  if (importCompanyId) {
-    await withFixtureTransaction(async (client) => {
-      await client.query(`SET LOCAL session_replication_role = replica`);
-      await client.query(`DELETE FROM companies WHERE id = $1`, [importCompanyId]);
-    });
-  }
   await cleanupTestData(PREFIX);
   closeTestServer();
 }, 120000);
@@ -569,85 +551,6 @@ describe("fiscal close and the opening-balance lock", () => {
       (await pool.query(`SELECT opening_balance FROM ledger_accounts WHERE id = $1`, [incomeId])).rows[0]
         .opening_balance
     ).toBe("50.00");
-  });
-});
-
-describe("company import", () => {
-  const upload = (payload: unknown) =>
-    agent.post("/api/factory/import-company-data").attach("file", Buffer.from(JSON.stringify(payload)), {
-      filename: "export.json",
-      contentType: "application/json",
-    });
-
-  const file = (credit: string) => ({
-    sourceCompanyId: ctx.companyId,
-    tables: {
-      ledger_accounts: [
-        { id: 1, code: "IMP_CASH", name: "Imported Cash", accountType: "Asset", openingBalance: "0" },
-        { id: 2, code: "IMP_SALES", name: "Imported Sales", accountType: "Income", openingBalance: "0" },
-      ],
-      vouchers: [
-        {
-          id: 10,
-          voucherNumber: `${PREFIX}-IMPORTED`,
-          voucherType: "Journal",
-          voucherDate: "2026-03-01",
-          totalAmount: "5.00",
-          optional: false,
-          deletedAt: null,
-          createdAt: "2020-01-01T00:00:00.000Z",
-          balanceGuardExemptHistory: true,
-        },
-      ],
-      voucher_entries: [
-        { id: 100, voucherId: 10, ledgerAccountId: 1, debitAmount: "5.00", creditAmount: "0" },
-        { id: 101, voucherId: 10, ledgerAccountId: 2, debitAmount: "0", creditAmount: credit },
-      ],
-    },
-  });
-
-  beforeAll(async () => {
-    importCompanyId = // The company import is a factory route: it needs a factory company.
-      (
-        await pool.query(
-          `INSERT INTO companies (code, name, company_type) VALUES ($1::varchar, $1::text, 'factory') RETURNING id`,
-          [`${PREFIX.toUpperCase().slice(0, 6)}IMP`]
-        )
-      ).rows[0].id;
-    await pool.query(`INSERT INTO user_company_roles (user_id, company_id, role) VALUES ($1, $2, 'Admin')`, [
-      ctx.userId,
-      importCompanyId,
-    ]);
-    await pool.query(
-      `INSERT INTO user_security_permissions (user_id, company_id, permission, granted_by)
-       SELECT user_id, $2, permission, granted_by FROM user_security_permissions WHERE user_id = $1 AND company_id = $3`,
-      [ctx.userId, importCompanyId, ctx.companyId]
-    );
-    expect((await agent.post("/api/auth/set-company").send({ companyId: importCompanyId })).status).toBe(200);
-  });
-
-  it("refuses unbalanced posted vouchers, imports balanced ones as non-history, and audits", async () => {
-    const refused = await upload(file("4.00"));
-    expect(refused.status).toBe(400);
-    expect(refused.body.code).toBe("IMPORT_UNBALANCED_VOUCHERS");
-    expect(refused.body.vouchers).toEqual([
-      { voucherNumber: `${PREFIX}-IMPORTED`, voucherType: "Journal", debit: "5.00", credit: "4.00" },
-    ]);
-
-    const imported = await upload(file("5.00"));
-    expect(imported.status).toBe(200);
-    const [voucher] = (
-      await pool.query(`SELECT balance_guard_exempt_history FROM vouchers WHERE company_id = $1`, [importCompanyId])
-    ).rows;
-    expect(voucher.balance_guard_exempt_history).toBe(false);
-    const audit = (
-      await pool.query(`SELECT action, changes FROM audit_log WHERE company_id = $1 AND table_name = 'companies'`, [
-        importCompanyId,
-      ])
-    ).rows;
-    expect(audit).toHaveLength(1);
-    expect(audit[0].action).toBe("import");
-    expect(audit[0].changes.totalRecords.new).toBeGreaterThan(0);
   });
 });
 

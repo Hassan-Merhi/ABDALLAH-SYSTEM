@@ -197,15 +197,6 @@ async function resetLocation2Inventory() {
     .where(and(eq(schema.inventory.locationId, ctx.location2Id), eq(schema.inventory.companyId, ctx.companyId)));
 }
 
-function stockTransferBody(qty = 10) {
-  return {
-    sourceLocationId: ctx.locationId,
-    destinationLocationId: ctx.location2Id,
-    items: [{ stockItemId: ctx.stockItemIds[0], quantity: qty }],
-    voucherDate: TODAY,
-  };
-}
-
 // ── setup / teardown ──────────────────────────────────────────────────────────
 
 beforeAll(async () => {
@@ -544,106 +535,6 @@ describe("Workflow — Reports reflect seeded transactions", () => {
       expect(balRes.status).toBe(200);
       expect(parseFloat(balRes.body?.balance ?? "NaN")).toBeCloseTo(400, 1);
     }
-  });
-});
-
-// ═════════════════════════════════════════════════════════════════════════════
-// 5. STOCK TRANSFER WORKFLOW
-// ═════════════════════════════════════════════════════════════════════════════
-
-describe("Workflow — Stock transfer inventory movement", () => {
-  // Use the extended cleanup so FK constraints on stock_transfer_* tables are
-  // respected when vouchers are deleted.
-  beforeEach(async () => {
-    await resetInventory();
-    await resetLocation2Inventory();
-    await cleanupStockTransfersAndVouchers();
-  });
-
-  it("moves stock from source to destination and creates a Stock Transfer voucher", async () => {
-    const srcBefore = await getInventoryQty(ctx.locationId, ctx.stockItemIds[0]);
-    const dstBefore = await getInventoryQty(ctx.location2Id, ctx.stockItemIds[0]);
-
-    const res = await agent.post("/api/stock-transfers").send(stockTransferBody(15));
-    expect(res.status, `Stock transfer POST failed: ${JSON.stringify(res.body)}`).toBeGreaterThanOrEqual(200);
-    expect(res.status).toBeLessThan(300);
-
-    // Source inventory decreases
-    const srcAfter = await getInventoryQty(ctx.locationId, ctx.stockItemIds[0]);
-    expect(srcAfter).toBeCloseTo(srcBefore - 15, 1);
-
-    // Destination inventory increases
-    const dstAfter = await getInventoryQty(ctx.location2Id, ctx.stockItemIds[0]);
-    expect(dstAfter).toBeCloseTo(dstBefore + 15, 1);
-
-    // A voucher of type "Stock Transfer" was created
-    const voucherId = res.body?.voucher?.id ?? res.body?.transfer?.voucherId;
-    expect(voucherId, "Response must include a voucher ID").toBeDefined();
-    const [vRow] = await db
-      .select({ voucherType: schema.vouchers.voucherType })
-      .from(schema.vouchers)
-      .where(eq(schema.vouchers.id, voucherId));
-    expect(vRow?.voucherType).toBe("Stock Transfer");
-  });
-
-  it("stock transfer voucher entries are balanced and inventory is marked applied", async () => {
-    const res = await agent.post("/api/stock-transfers").send(stockTransferBody(5));
-    expect(res.status).toBeGreaterThanOrEqual(200);
-    const voucherId = res.body?.voucher?.id ?? res.body?.transfer?.voucherId;
-    expect(voucherId).toBeDefined();
-
-    // Entries, if present, must balance
-    const entries = await db.select().from(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, voucherId));
-    if (entries.length > 0) {
-      const dr = entries.reduce((s, e) => s + parseFloat(e.debitAmount ?? "0"), 0);
-      const cr = entries.reduce((s, e) => s + parseFloat(e.creditAmount ?? "0"), 0);
-      expect(Math.abs(dr - cr)).toBeLessThan(0.01);
-    }
-
-    // The stock_transfer_vouchers record must exist and have inventoryApplied = true
-    const [stv] = await db
-      .select({ inventoryApplied: schema.stockTransferVouchers.inventoryApplied })
-      .from(schema.stockTransferVouchers)
-      .where(eq(schema.stockTransferVouchers.voucherId, voucherId));
-    expect(stv).toBeDefined();
-    expect(stv.inventoryApplied).toBe(true);
-  });
-
-  it("source = destination is rejected with 400", async () => {
-    const res = await agent.post("/api/stock-transfers").send({
-      sourceLocationId: ctx.locationId,
-      destinationLocationId: ctx.locationId, // same as source
-      items: [{ stockItemId: ctx.stockItemIds[0], quantity: 5 }],
-    });
-    expect(res.status).toBe(400);
-    // Response body must mention the constraint
-    expect(JSON.stringify(res.body)).toMatch(/source.*destination|different/i);
-  });
-
-  it("invalid quantity (0) is rejected with 400; no partial voucher or inventory change", async () => {
-    const srcBefore = await getInventoryQty(ctx.locationId, ctx.stockItemIds[0]);
-    const stVouchersBefore = await db
-      .select({ id: schema.vouchers.id })
-      .from(schema.vouchers)
-      .where(and(eq(schema.vouchers.companyId, ctx.companyId), eq(schema.vouchers.voucherType, "Stock Transfer")));
-
-    const res = await agent.post("/api/stock-transfers").send({
-      sourceLocationId: ctx.locationId,
-      destinationLocationId: ctx.location2Id,
-      items: [{ stockItemId: ctx.stockItemIds[0], quantity: 0 }],
-    });
-    expect(res.status).toBe(400);
-
-    // Inventory must be unchanged
-    const srcAfter = await getInventoryQty(ctx.locationId, ctx.stockItemIds[0]);
-    expect(srcAfter).toBeCloseTo(srcBefore, 1);
-
-    // No new Stock Transfer voucher created
-    const stVouchersAfter = await db
-      .select({ id: schema.vouchers.id })
-      .from(schema.vouchers)
-      .where(and(eq(schema.vouchers.companyId, ctx.companyId), eq(schema.vouchers.voucherType, "Stock Transfer")));
-    expect(stVouchersAfter.length).toBe(stVouchersBefore.length);
   });
 });
 

@@ -96,8 +96,8 @@ const PAGES: PageCase[] = [
     landmark: "button-export-dropdown",
     sweep: true,
   },
-  { name: "SalesToolsHub", load: () => import("@/pages/SalesToolsHub"), landmark: "tab-transfers", sweep: true },
-  { name: "Settings", load: () => import("@/pages/Settings"), landmark: "text-users-title", sweep: true },
+  { name: "SalesToolsHub", load: () => import("@/pages/SalesToolsHub"), landmark: "tab-pricelist", sweep: true },
+  { name: "Settings", load: () => import("@/pages/Settings"), landmark: "button-add-company-user", sweep: true },
   {
     name: "SmartStockTransferOrderPage",
     load: () => import("@/pages/SmartStockTransferOrderPage"),
@@ -126,10 +126,11 @@ const PAGES: PageCase[] = [
     sweep: true,
   },
   {
+    // Tracking is now a single Containers OTW view with no tabs or buttons of
+    // its own, so there is nothing for the button sweep to press.
     name: "TrackingHub",
     load: () => import("@/pages/TrackingHub"),
-    landmark: "tab-tracking-containers-otw",
-    sweep: true,
+    landmark: "text-page-title",
   },
   {
     name: "FactoryAccounts",
@@ -291,7 +292,7 @@ const PAGES: PageCase[] = [
   {
     name: "PropertiesSettings",
     load: () => import("@/pages/properties/PropertiesSettings"),
-    landmark: "text-users-title",
+    landmark: "button-add-company-user",
     sweep: true,
   },
   {

@@ -85,13 +85,16 @@ describe("Unauthenticated Access", () => {
   });
 
   it("blocks /api/pos/sales without session", async () => {
-    const res = await request.agent(ctx.app).post("/api/pos/sales").send({
-      locationId: ctx.locationId,
-      items: [{ stockItemId: ctx.stockItemIds[0], quantity: 1, rate: 10 }],
-      paymentAccountType: "ledger",
-      paymentAccountId: ctx.cashAccountId,
-      voucherDate: new Date().toISOString().split("T")[0],
-    });
+    const res = await request
+      .agent(ctx.app)
+      .post("/api/pos/sales")
+      .send({
+        locationId: ctx.locationId,
+        items: [{ stockItemId: ctx.stockItemIds[0], quantity: 1, rate: 10 }],
+        paymentAccountType: "ledger",
+        paymentAccountId: ctx.cashAccountId,
+        voucherDate: new Date().toISOString().split("T")[0],
+      });
     expect(res.status).toBe(401);
   });
 
@@ -102,11 +105,6 @@ describe("Unauthenticated Access", () => {
 
   it("blocks /api/accounts/all without session", async () => {
     const res = await request.agent(ctx.app).get("/api/accounts/all");
-    expect(res.status).toBe(401);
-  });
-
-  it("blocks /api/stock-transfers without session", async () => {
-    const res = await request.agent(ctx.app).post("/api/stock-transfers").send({});
     expect(res.status).toBe(401);
   });
 

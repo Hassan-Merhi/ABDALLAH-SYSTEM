@@ -30,12 +30,8 @@ const ROUTE_GROUPS = [
   {
     workspace: "erp",
     companyCode: "PHASE9-ERP",
-    routes: ["/agents", "/account-groups", "/chat"],
-  },
-  {
-    workspace: "factory",
-    companyCode: "PHASE9-FACTORY",
-    routes: ["/factory/agents", "/factory/chat"],
+    // /agents and the Factory workspace are retired in ABDALLAH-SYSTEM.
+    routes: ["/account-groups", "/chat"],
   },
 ];
 

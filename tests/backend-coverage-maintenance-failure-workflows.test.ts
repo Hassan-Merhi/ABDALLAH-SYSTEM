@@ -5,6 +5,8 @@
  * cutover and backfill endpoints. Those handlers contain substantial validation
  * and safety logic, so this suite exercises them only inside disposable test
  * tenants with dry-run/invalid-confirmation input and guaranteed-missing ids.
+ * ABDALLAH-SYSTEM is ERP only: routes owned by the retired Factory, Supplier
+ * Partner and Properties modes, and retired ERP features, are not swept.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -13,9 +15,10 @@ import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { pool } from "../server/db";
+import { isRetiredAbdallahApiRequest } from "../server/middleware/abdallahErpRetiredFeatureBoundary";
 import { cleanupTestData, closeTestServer, seedTestData, type TestContext } from "./setup";
 
-type Mode = "erp" | "factory" | "properties" | "supplier_partner";
+type Mode = "erp";
 type Method = "DELETE" | "GET" | "PATCH" | "POST" | "PUT";
 type Manifest = { routes: string[] };
 type RouteCase = { mode: Mode; method: Method; template: string; concrete: string };
@@ -33,16 +36,16 @@ let agent: request.SuperAgentTest;
 let companies: Record<Mode, number>;
 let routes: RouteCase[] = [];
 let before: Record<Mode, Record<string, string>>;
-let sequence = 0;
 
 function isSupportedMethod(value: string): value is Method {
   return value === "DELETE" || value === "GET" || value === "PATCH" || value === "POST" || value === "PUT";
 }
 
-function modeForPath(routePath: string): Mode {
-  if (routePath.startsWith("/api/factory/") || routePath.startsWith("/api/factory-")) return "factory";
-  if (routePath.startsWith("/api/sp/") || routePath.startsWith("/api/sp-migration/")) return "supplier_partner";
-  if (routePath.startsWith("/api/properties/") || routePath.startsWith("/api/rental/")) return "properties";
+/** Routes owned by a retired company mode have no ERP tenant to run in. */
+function modeForPath(routePath: string): Mode | null {
+  if (routePath.startsWith("/api/factory/") || routePath.startsWith("/api/factory-")) return null;
+  if (routePath.startsWith("/api/sp/") || routePath.startsWith("/api/sp-migration/")) return null;
+  if (routePath.startsWith("/api/properties/") || routePath.startsWith("/api/rental/")) return null;
   return "erp";
 }
 
@@ -64,6 +67,7 @@ export function selectMaintenanceFailureWorkflows(manifest: Manifest): RouteCase
     if (!concrete) continue;
 
     const mode = modeForPath(routePath);
+    if (!mode || isRetiredAbdallahApiRequest(method, routePath)) continue;
     const key = `${mode} ${method} ${concrete}`;
     if (seen.has(key)) continue;
     seen.add(key);
@@ -71,29 +75,6 @@ export function selectMaintenanceFailureWorkflows(manifest: Manifest): RouteCase
   }
 
   return selected;
-}
-
-async function createCompany(mode: Exclude<Mode, "erp">): Promise<number> {
-  sequence += 1;
-  const { rows } = await pool.query<{ id: number }>(
-    `INSERT INTO companies (code, name, company_type, parent_company_id, active, base_currency)
-     VALUES ($1, $2, $3, $4, true, 'USD') RETURNING id`,
-    [`CMNT-${mode.slice(0, 3)}-${sequence}`, `${TEST_PREFIX}_${mode}_${sequence}`, mode, ctx.companyId]
-  );
-  const companyId = rows[0].id;
-  await pool.query(
-    `INSERT INTO user_company_roles (user_id, company_id, role, can_delete_records, can_sell_negative_stock)
-     VALUES ($1, $2, 'Developer', true, true)`,
-    [ctx.userId, companyId]
-  );
-  await pool.query(
-    `INSERT INTO user_security_permissions (user_id, company_id, permission, granted_by)
-     SELECT user_id, $2, permission, granted_by FROM user_security_permissions
-     WHERE user_id = $1 AND company_id = $3
-     ON CONFLICT (user_id, company_id, permission) DO NOTHING`,
-    [ctx.userId, companyId, ctx.companyId]
-  );
-  return companyId;
 }
 
 async function fingerprint(companyId: number): Promise<Record<string, string>> {
@@ -184,19 +165,9 @@ beforeAll(async () => {
   });
   if (login.status !== 200) throw new Error(`Login failed: ${login.status} ${login.text}`);
 
-  companies = {
-    erp: ctx.companyId,
-    factory: await createCompany("factory"),
-    properties: await createCompany("properties"),
-    supplier_partner: await createCompany("supplier_partner"),
-  };
+  companies = { erp: ctx.companyId };
   routes = selectMaintenanceFailureWorkflows(JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8")) as Manifest);
-  before = {
-    erp: await fingerprint(companies.erp),
-    factory: await fingerprint(companies.factory),
-    properties: await fingerprint(companies.properties),
-    supplier_partner: await fingerprint(companies.supplier_partner),
-  };
+  before = { erp: await fingerprint(companies.erp) };
 }, 120000);
 
 afterAll(async () => {
@@ -206,10 +177,12 @@ afterAll(async () => {
 
 describe("maintenance and reconciliation failure coverage", () => {
   it("executes guarded maintenance paths without unhandled errors", async () => {
-    expect(routes.length).toBeGreaterThan(20);
+    // Guards the selection from going vacuous. The ERP-only deployment keeps 12
+    // maintenance routes once the retired Factory, SP and Properties ones go.
+    expect(routes.length).toBeGreaterThan(10);
     const failures: Failure[] = [];
 
-    for (const mode of ["erp", "factory", "properties", "supplier_partner"] as Mode[]) {
+    for (const mode of ["erp"] as Mode[]) {
       const selected = await agent.post("/api/auth/set-company").send({ companyId: companies[mode] });
       expect(selected.status, `set-company ${mode}`).toBe(200);
       for (const route of routes.filter((candidate) => candidate.mode === mode)) {

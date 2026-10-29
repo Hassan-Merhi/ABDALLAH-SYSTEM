@@ -45,39 +45,6 @@ afterAll(async () => {
 }, 60000);
 
 describe("exact money in payroll and voucher writes", () => {
-  it("stores a deduction of 1.005 as 1.01, not the float's 1.00", async () => {
-    const response = await agent
-      .post(`/api/factory/workers/${workerId}/deductions`)
-      .send({ amount: "1.005", deductionDate: "2026-10-01" });
-    expect(response.status).toBe(200);
-    expect(response.body.amount).toBe("1.01");
-  });
-
-  it("splits an advance into a repayment and a remaining balance that add back up", async () => {
-    const advance = await pool.query<{ id: number }>(
-      `INSERT INTO factory_worker_advances
-         (company_id, worker_id, advance_date, amount, remaining_balance, repayment_type)
-       VALUES ($1, $2, '2026-10-01', '2.00', '2.00', 'manual_repayment') RETURNING id`,
-      [ctx.companyId, workerId]
-    );
-    const advanceId = advance.rows[0].id;
-
-    const response = await agent
-      .post(`/api/factory/advances/${advanceId}/repayments`)
-      .send({ amount: "1.005", repaymentDate: "2026-10-02" });
-    expect(response.status).toBe(200);
-
-    const repayment = await pool.query<{ amount: string }>(
-      `SELECT amount FROM factory_advance_repayments WHERE advance_id = $1`,
-      [advanceId]
-    );
-    const balance = await pool.query<{ remaining_balance: string }>(
-      `SELECT remaining_balance FROM factory_worker_advances WHERE id = $1`,
-      [advanceId]
-    );
-    expect([repayment.rows[0].amount, balance.rows[0].remaining_balance]).toEqual(["1.01", "0.99"]);
-  });
-
   it("refuses a payment voucher whose entry amount is not a number", async () => {
     const response = await agent.post("/api/vouchers/payment-receipt").send({
       voucherType: "Payment",

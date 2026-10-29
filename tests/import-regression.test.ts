@@ -13,12 +13,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
-import {
-  seedTestData,
-  cleanupTestData,
-  closeTestServer,
-  type TestContext,
-} from "./setup";
+import { seedTestData, cleanupTestData, closeTestServer, type TestContext } from "./setup";
 import { db } from "../server/db";
 import { eq } from "drizzle-orm";
 import * as schema from "../shared/schema";
@@ -59,12 +54,6 @@ describe("Import — Template downloads", () => {
 
   it("GET /api/pos-import/template returns 200 with Excel content-type", async () => {
     const res = await request(ctx.app).get("/api/pos-import/template");
-    expect(res.status).toBe(200);
-    expect(res.headers["content-type"] ?? "").toMatch(/spreadsheet|excel|octet-stream/i);
-  });
-
-  it("GET /api/stock-transfer-import/template returns 200 with Excel content-type", async () => {
-    const res = await request(ctx.app).get("/api/stock-transfer-import/template");
     expect(res.status).toBe(200);
     expect(res.headers["content-type"] ?? "").toMatch(/spreadsheet|excel|octet-stream/i);
   });
@@ -175,9 +164,7 @@ describe("Import — Company isolation", () => {
   it("GET /api/locations returns only this company's locations", async () => {
     const res = await agent.get("/api/locations");
     expect(res.status).toBe(200);
-    const companyIds = (res.body as any[])
-      .filter((l) => l.companyId !== undefined)
-      .map((l) => l.companyId);
+    const companyIds = (res.body as any[]).filter((l) => l.companyId !== undefined).map((l) => l.companyId);
     // If companyId is exposed, all must match; if not exposed, just verify 200
     const allMatch = companyIds.every((id) => id === ctx.companyId);
     expect(allMatch).toBe(true);
@@ -213,9 +200,7 @@ describe("Import — Stock item naming and search data", () => {
     const res = await agent.get("/api/stock-items");
     expect(res.status).toBe(200);
     // The seeded items are named "Test Item 1", "Test Item 2", "Test Item 3"
-    const testItems = (res.body as any[]).filter((i) =>
-      i.name?.startsWith("Test Item"),
-    );
+    const testItems = (res.body as any[]).filter((i) => i.name?.startsWith("Test Item"));
     expect(testItems.length).toBeGreaterThanOrEqual(3);
   });
 });
@@ -235,12 +220,14 @@ describe("Import — POS import item validation logic", () => {
 
     const res = await agent.post("/api/pos-import/validate").send({
       locationId: ctx.locationId,
-      items: [{
-        barcode: seededItem.code,
-        quantity: 1,
-        sellingPrice: 10,
-        rowNum: 1,
-      }],
+      items: [
+        {
+          barcode: seededItem.code,
+          quantity: 1,
+          sellingPrice: 10,
+          rowNum: 1,
+        },
+      ],
     });
     expect(res.status).toBe(200);
     const validatedItem = res.body?.validatedItems?.[0];
@@ -252,12 +239,14 @@ describe("Import — POS import item validation logic", () => {
   it("nonexistent barcode returns error row in validatedItems (not 500)", async () => {
     const res = await agent.post("/api/pos-import/validate").send({
       locationId: ctx.locationId,
-      items: [{
-        barcode: "NONEXISTENT-BARCODE-XYZ-999",
-        quantity: 1,
-        sellingPrice: 10,
-        rowNum: 1,
-      }],
+      items: [
+        {
+          barcode: "NONEXISTENT-BARCODE-XYZ-999",
+          quantity: 1,
+          sellingPrice: 10,
+          rowNum: 1,
+        },
+      ],
     });
     expect(res.status).toBe(200); // validate always returns 200; errors are in the body
     const validatedItem = res.body?.validatedItems?.[0];
@@ -332,11 +321,13 @@ describe("Import — PO import validate logic", () => {
     const res = await agent.post("/api/po-import/validate").send({
       containerNumber: "TEST-CONT-KNOWN",
       supplierId: 999999, // supplier error expected, but item should resolve
-      preview: [{
-        containerNumber: "TEST-CONT-KNOWN",
-        items: [{ barcode: seededItem.code, itemName: seededItem.name, qty: 1, rate: 10, rowNum: 1 }],
-        charges: {},
-      }],
+      preview: [
+        {
+          containerNumber: "TEST-CONT-KNOWN",
+          items: [{ barcode: seededItem.code, itemName: seededItem.name, qty: 1, rate: 10, rowNum: 1 }],
+          charges: {},
+        },
+      ],
     });
     expect(res.status).toBeLessThan(500);
     if (res.status === 200) {
@@ -396,24 +387,6 @@ describe("Import — XLSX fixture: in-memory creation with ExcelJS", () => {
     await wb2.xlsx.load(buffer as Buffer);
     const ws2 = wb2.worksheets[0];
     expect(ws2.rowCount).toBe(3); // 1 header + 2 data rows
-  });
-
-  it("downloaded stock-transfer template returns 200 with Excel content-type (binary, not JSON)", async () => {
-    // Use supertest buffer mode to get raw bytes
-    const templateRes = await request(ctx.app)
-      .get("/api/stock-transfer-import/template")
-      .buffer(true)
-      .parse((_res, fn) => {
-        const chunks: Buffer[] = [];
-        (_res as any).on("data", (c: Buffer) => chunks.push(c));
-        (_res as any).on("end", () => fn(null, Buffer.concat(chunks)));
-      });
-    expect(templateRes.status).toBe(200);
-    expect(templateRes.headers["content-type"] ?? "").toMatch(/spreadsheet|excel|octet-stream/i);
-    // First 4 bytes of a valid XLSX (zip file) are PK\x03\x04
-    const body = templateRes.body as Buffer;
-    expect(body[0]).toBe(0x50); // 'P'
-    expect(body[1]).toBe(0x4b); // 'K'
   });
 });
 

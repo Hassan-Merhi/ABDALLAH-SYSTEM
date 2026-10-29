@@ -365,8 +365,9 @@ export default function AccountMigration() {
     staleTime: 0,
   });
 
+  // Only well-formed migrations can be listed or undone; both read `accounts`.
   const pendingMigrations: PendingMigration[] = Array.isArray(pendingMigrationsResponse)
-    ? pendingMigrationsResponse
+    ? pendingMigrationsResponse.filter((migration) => Array.isArray(migration?.accounts))
     : [];
 
   const previewMutation = useMutation({

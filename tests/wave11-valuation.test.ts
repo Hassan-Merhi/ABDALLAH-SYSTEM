@@ -43,16 +43,6 @@ let ctx: TestContext;
 let agent: request.SuperAgentTest;
 let inactiveLocationId: number;
 
-function findKey(value: unknown, key: string): unknown {
-  if (!value || typeof value !== "object") return undefined;
-  if (key in (value as Record<string, unknown>)) return (value as Record<string, unknown>)[key];
-  for (const child of Object.values(value as Record<string, unknown>)) {
-    const found = findKey(child, key);
-    if (found !== undefined) return found;
-  }
-  return undefined;
-}
-
 beforeAll(async () => {
   ctx = await seedTestData(TEST_PREFIX);
   agent = request.agent(ctx.app);
@@ -116,10 +106,8 @@ describe("stock value readers", () => {
     expect(Number(((await computeRawBalance(ctx.companyId)) - rawBefore).toFixed(2))).toBe(1);
     expect(await companyStockValue(db, ctx.companyId)).toBe("23.51");
 
-    const importCycle = await agent.get("/api/stats/import-cycle-balance");
-    expect(importCycle.status, JSON.stringify(importCycle.body).slice(0, 300)).toBe(200);
-    expect(findKey(importCycle.body, "stockOnFloorValue")).toBe(23.51);
-
+    // The import-cycle dashboard stat is retired in ABDALLAH-SYSTEM; the
+    // reports below carry the same stock value.
     const movement = await agent.get("/api/reports/stock-movement");
     expect(movement.status).toBe(200);
     expect(movement.body.summary.grandTotalValue).toBe(23.51);

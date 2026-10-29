@@ -170,85 +170,6 @@ describe("POS Sale Inventory Tests", () => {
   });
 });
 
-describe("Stock Transfer Tests", () => {
-  beforeEach(async () => {
-    await resetInventory();
-  });
-
-  it("should decrease source and increase destination inventory", async () => {
-    const res = await agent.post("/api/stock-transfers").send({
-      sourceLocationId: ctx.locationId,
-      destinationLocationId: ctx.location2Id,
-      items: [
-        {
-          stockItemId: ctx.stockItemIds[0],
-          quantity: 10,
-          sourceLocationId: ctx.locationId,
-        },
-      ],
-      notes: "Test transfer",
-      voucherDate: new Date().toISOString().split("T")[0],
-    });
-
-    expect(res.status).toBeGreaterThanOrEqual(200);
-    expect(res.status).toBeLessThan(300);
-
-    const srcQty = await getInventoryQty(ctx.locationId, ctx.stockItemIds[0]);
-    const dstQty = await getInventoryQty(ctx.location2Id, ctx.stockItemIds[0]);
-    expect(srcQty).toBe(90);
-    expect(dstQty).toBe(60);
-  });
-
-  it("should handle multi-item transfers atomically", async () => {
-    const res = await agent.post("/api/stock-transfers").send({
-      sourceLocationId: ctx.locationId,
-      destinationLocationId: ctx.location2Id,
-      items: [
-        {
-          stockItemId: ctx.stockItemIds[0],
-          quantity: 5,
-          sourceLocationId: ctx.locationId,
-        },
-        {
-          stockItemId: ctx.stockItemIds[1],
-          quantity: 8,
-          sourceLocationId: ctx.locationId,
-        },
-      ],
-      notes: "Multi-item test transfer",
-      voucherDate: new Date().toISOString().split("T")[0],
-    });
-
-    expect(res.status).toBeGreaterThanOrEqual(200);
-    expect(res.status).toBeLessThan(300);
-
-    const srcQty0 = await getInventoryQty(ctx.locationId, ctx.stockItemIds[0]);
-    const srcQty1 = await getInventoryQty(ctx.locationId, ctx.stockItemIds[1]);
-    const dstQty0 = await getInventoryQty(ctx.location2Id, ctx.stockItemIds[0]);
-    const dstQty1 = await getInventoryQty(ctx.location2Id, ctx.stockItemIds[1]);
-    expect(srcQty0).toBe(95);
-    expect(srcQty1).toBe(92);
-    expect(dstQty0).toBe(55);
-    expect(dstQty1).toBe(58);
-  });
-
-  it("should reject transfer with same source and destination", async () => {
-    const res = await agent.post("/api/stock-transfers").send({
-      sourceLocationId: ctx.locationId,
-      destinationLocationId: ctx.locationId,
-      items: [
-        {
-          stockItemId: ctx.stockItemIds[0],
-          quantity: 5,
-          sourceLocationId: ctx.locationId,
-        },
-      ],
-    });
-
-    expect(res.status).toBe(400);
-  });
-});
-
 describe("Quick Adjust Tests", () => {
   beforeEach(async () => {
     await resetInventory();
@@ -366,22 +287,6 @@ describe("Input Validation Tests", () => {
       items: [{ stockItemId: ctx.stockItemIds[0], quantity: 5, sellingPrice: 15 }],
       paymentAccountType: "ledger",
       paymentAccountId: ctx.cashAccountId,
-    });
-
-    expect(res.status).toBe(400);
-  });
-
-  it("should reject stock transfer with invalid item quantity", async () => {
-    const res = await agent.post("/api/stock-transfers").send({
-      sourceLocationId: ctx.locationId,
-      destinationLocationId: ctx.location2Id,
-      items: [
-        {
-          stockItemId: ctx.stockItemIds[0],
-          quantity: "not_a_number",
-          sourceLocationId: ctx.locationId,
-        },
-      ],
     });
 
     expect(res.status).toBe(400);

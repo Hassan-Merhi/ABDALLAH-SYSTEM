@@ -7,6 +7,7 @@
  * builders execute their normal paths.
  */
 import fs from "node:fs";
+import http from "node:http";
 import path from "node:path";
 
 import request from "supertest";
@@ -58,6 +59,7 @@ const EXCLUDED: RegExp[] = [
 
 let ctx: TestContext;
 let agent: request.SuperAgentTest;
+let sweepServer: http.Server;
 let ids: ResourceIds;
 let routes: RouteCase[] = [];
 let before: Fingerprint;
@@ -166,7 +168,13 @@ async function executeBatch(batch: RouteCase[]): Promise<Array<{ route: string; 
 
 beforeAll(async () => {
   ctx = await seedTestData(TEST_PREFIX);
-  agent = request.agent(ctx.app);
+  // Listen once, up front. Supertest closes a server it started itself as soon
+  // as its last pending request settles, so concurrent batches raced that close
+  // and saw ECONNRESET. A server that is already listening is the caller's, so
+  // Supertest leaves it open for the whole sweep.
+  sweepServer = http.createServer(ctx.app);
+  await new Promise<void>((resolve) => sweepServer.listen(0, "127.0.0.1", resolve));
+  agent = request.agent(sweepServer);
 
   await pool.query(
     `UPDATE user_company_roles
@@ -246,6 +254,8 @@ beforeAll(async () => {
 }, 120000);
 
 afterAll(async () => {
+  sweepServer?.closeAllConnections();
+  await new Promise<void>((resolve) => (sweepServer ? sweepServer.close(() => resolve()) : resolve()));
   await cleanupTestData(TEST_PREFIX);
   closeTestServer();
 }, 120000);

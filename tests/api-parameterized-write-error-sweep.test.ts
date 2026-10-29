@@ -4,11 +4,11 @@ import path from "node:path";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { isRetiredAbdallahApiRequest } from "../server/middleware/abdallahErpRetiredFeatureBoundary";
 import { cleanupTestData, closeTestServer, seedTestData, type TestContext } from "./setup";
 import type { SerializedRouteManifest } from "./helpers/routeManifest";
 
 const ERP_PREFIX = "phase33write";
-const FACTORY_PREFIX = "facimp";
 const MANIFEST_PATH = path.join(process.cwd(), "config/route-manifest.json");
 const MISSING_ID = 2_147_483_000;
 const REQUEST_TIMEOUT_MS = 10_000;
@@ -26,15 +26,10 @@ interface SweptWriteRoute {
   method: "POST" | "PUT" | "PATCH" | "DELETE";
   manifestPath: string;
   requestPath: string;
-  fixture: "erp" | "factory";
 }
 
 function loadManifest(): SerializedRouteManifest {
   return JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8")) as SerializedRouteManifest;
-}
-
-function fixtureFor(routePath: string): "erp" | "factory" {
-  return routePath.startsWith("/api/factory/") ? "factory" : "erp";
 }
 
 function missingValueFor(name: string): string {
@@ -67,6 +62,8 @@ export function selectParameterizedWriteRoutes(manifest: SerializedRouteManifest
       continue;
     }
     if (EXCLUDED_PATTERNS.some((pattern) => pattern.test(routePath))) continue;
+    // ABDALLAH-SYSTEM refuses retired modes and features before any handler runs.
+    if (isRetiredAbdallahApiRequest(rawMethod, routePath)) continue;
 
     const method = rawMethod as SweptWriteRoute["method"];
     const key = `${method} ${routePath}`;
@@ -77,7 +74,6 @@ export function selectParameterizedWriteRoutes(manifest: SerializedRouteManifest
       method,
       manifestPath: routePath,
       requestPath: materializeMissingWritePath(routePath),
-      fixture: fixtureFor(routePath),
     });
   }
 
@@ -125,23 +121,18 @@ function issueWrite(agent: request.SuperAgentTest, route: SweptWriteRoute, ctx: 
 }
 
 describe("parameterized backend write/error-path sweep", () => {
-  let erpCtx: TestContext;
-  let factoryCtx: TestContext;
-  let erpAgent: request.SuperAgentTest;
-  let factoryAgent: request.SuperAgentTest;
+  let ctx: TestContext;
+  let agent: request.SuperAgentTest;
   let routes: SweptWriteRoute[] = [];
 
   beforeAll(async () => {
-    erpCtx = await seedTestData(ERP_PREFIX);
-    factoryCtx = await seedTestData(FACTORY_PREFIX);
-    erpAgent = await authenticatedAgent(erpCtx, ERP_PREFIX);
-    factoryAgent = await authenticatedAgent(factoryCtx, FACTORY_PREFIX);
+    ctx = await seedTestData(ERP_PREFIX);
+    agent = await authenticatedAgent(ctx, ERP_PREFIX);
     routes = selectParameterizedWriteRoutes(loadManifest());
   }, 120_000);
 
   afterAll(async () => {
     await cleanupTestData(ERP_PREFIX);
-    await cleanupTestData(FACTORY_PREFIX);
     await closeTestServer();
   }, 120_000);
 
@@ -151,9 +142,6 @@ describe("parameterized backend write/error-path sweep", () => {
     const timeouts: Array<{ method: string; route: string; detail: string }> = [];
 
     for (const route of routes) {
-      const ctx = route.fixture === "factory" ? factoryCtx : erpCtx;
-      const agent = route.fixture === "factory" ? factoryAgent : erpAgent;
-
       try {
         const response = await issueWrite(agent, route, ctx).timeout({
           response: REQUEST_TIMEOUT_MS,

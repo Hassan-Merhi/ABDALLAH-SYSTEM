@@ -65,6 +65,7 @@ failure, so a correct document cannot quietly become undiscoverable.
 | [pressing-machine-tracking-phase6.md](pressing-machine-tracking-phase6.md) | Pressing Machines Phase 6: permanent history, filters, saved views, Excel export limits |
 | [pressing-machine-tracking-phase7.md](pressing-machine-tracking-phase7.md) | Pressing Machines Phase 7: configured shifts, overnight rollover, recorded downtime, observed analytics |
 | [pressing-machine-tracking-phase8.md](pressing-machine-tracking-phase8.md) | Pressing Machines Phase 8: supervisor voids, append-only corrections, audited rescans and the executed verification record |
+| [pressing-scan-simple-mode.md](pressing-scan-simple-mode.md) | Pressing Scan simplified ground mode: role-specific layout, daily per-worker totals and hourly KG targets; supersedes the Phase 2 and Phase 7 UI |
 | [erp-test-company.md](erp-test-company.md) | Provisioning an isolated ERP test company and its limited tester account |
 | [automatic-priority-print-loading.md](automatic-priority-print-loading.md) | Automatic Priority Printing & Loading: company switch, automatic loading allocation, priority-colored labels, physical bale deletion and Priority #1 recovery |
 | [priority-scan-fixed-palette-color-block.md](priority-scan-fixed-palette-color-block.md) | Priority Scan fixed 11-color palette, solid color-box priority labels, legacy-color moves and saved-color print/reprint checks |
@@ -93,6 +94,7 @@ failure, so a correct document cannot quietly become undiscoverable.
 | [program-1-incident-response-runbook.md](program-1-incident-response-runbook.md) | Incident response |
 | [troubleshooting.md](troubleshooting.md) | Common failures and fixes |
 | [fresh-db-bootstrap.md](fresh-db-bootstrap.md) | Known gap bootstrapping an empty database |
+| [global-force-refresh-all-users-2026-10-28.md](global-force-refresh-all-users-2026-10-28.md) | Role-scoped force refresh: regular-user and Admin/Owner/Developer reload controls, endpoints and cooldowns |
 
 ## Building and testing
 

@@ -11,8 +11,8 @@
  *  - the ERP root is the containers board for Admin/Developer only
  *  - FactoryRoutes mounts the page for its path and follows its legacy redirects
  *  - Admin-only factory routes stay closed to other roles
- *  - the authenticated shell shows a loading state (not a page) while factory
- *    access is pending, and a recovery state when it failed to load
+ *  - the authenticated shell is ERP only: a non-ERP company sees a notice,
+ *    never the Factory loading, recovery or shell states
  */
 import React, { Suspense } from "react";
 import { act, render, screen } from "@testing-library/react";
@@ -278,21 +278,24 @@ describe("AuthenticatedApp route gate", () => {
     };
   });
 
-  it("shows the loading UI, not a shell, while factory access is pending", async () => {
+  // ABDALLAH-SYSTEM is ERP only: a non-ERP company never reaches the Factory
+  // bootstrap gate or shell, whatever state its Factory access is in.
+  it("stops a Factory company at the ERP-only notice while factory access is pending", async () => {
     const { AuthenticatedApp } = await import("@/app/AuthenticatedApp");
     mountAt("/factory/daybook", <AuthenticatedApp user={user} handleLogout={vi.fn()} />);
 
-    expect(screen.getByText("Loading Factory access")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("ABDALLAH-SYSTEM supports ERP workspaces only.");
+    expect(screen.queryByText("Loading Factory access")).not.toBeInTheDocument();
     expect(screen.queryByTestId("shell-factory")).not.toBeInTheDocument();
   });
 
-  it("offers recovery when factory access failed to load", async () => {
+  it("stops a Factory company at the ERP-only notice when factory access failed to load", async () => {
     appData.current = { ...appData.current, myAccessLoading: false, myAccessError: true };
     const { AuthenticatedApp } = await import("@/app/AuthenticatedApp");
     mountAt("/factory/daybook", <AuthenticatedApp user={user} handleLogout={vi.fn()} />);
 
-    expect(screen.getByText("Application data could not be loaded")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Reload application" })).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("ABDALLAH-SYSTEM supports ERP workspaces only.");
+    expect(screen.queryByRole("button", { name: "Reload application" })).not.toBeInTheDocument();
   });
 
   it("shows the loading UI while the company itself is loading", async () => {
@@ -303,17 +306,17 @@ describe("AuthenticatedApp route gate", () => {
     expect(screen.getByText("Loading application")).toBeInTheDocument();
   });
 
-  it("redirects an ERP company away from a /factory route", async () => {
+  it("redirects an ERP company away from a retired /factory route", async () => {
     companyState.current = { selectedCompany: { id: 3, name: "ERP Co", companyType: "erp" }, isLoading: false };
     appData.current = { ...appData.current, myAccessLoading: false };
     const { AuthenticatedApp } = await import("@/app/AuthenticatedApp");
     const { memory } = mountAt("/factory/daybook", <AuthenticatedApp user={user} handleLogout={vi.fn()} />);
 
     expect(await screen.findByTestId("shell-erp")).toBeInTheDocument();
-    expect(memory.history.at(-1)).toBe("/");
+    expect(memory.history.at(-1)).toBe("/tracking");
   });
 
-  it("mounts the factory shell once access has resolved", async () => {
+  it("never mounts the factory shell, even once access has resolved", async () => {
     appData.current = {
       ...appData.current,
       myAccessLoading: false,
@@ -322,7 +325,8 @@ describe("AuthenticatedApp route gate", () => {
     const { AuthenticatedApp } = await import("@/app/AuthenticatedApp");
     mountAt("/factory/daybook", <AuthenticatedApp user={user} handleLogout={vi.fn()} />);
 
-    expect(await screen.findByTestId("shell-factory")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("ABDALLAH-SYSTEM supports ERP workspaces only.");
+    expect(screen.queryByTestId("shell-factory")).not.toBeInTheDocument();
   });
 
   it("mounts the POS shell for a POS user", async () => {

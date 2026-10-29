@@ -60,10 +60,10 @@ describe("Phase 23 — aggregate concurrency guards", () => {
   it("rejects a purchase-order edit while the same container lifecycle lock is held", async () => {
     const lockClient = await pool.connect();
     try {
-      const locked = await lockClient.query<{ locked: boolean }>(
-        "SELECT pg_try_advisory_lock($1, $2) AS locked",
-        [ctx.companyId, containerId]
-      );
+      const locked = await lockClient.query<{ locked: boolean }>("SELECT pg_try_advisory_lock($1, $2) AS locked", [
+        ctx.companyId,
+        containerId,
+      ]);
       expect(locked.rows[0]?.locked).toBe(true);
 
       const response = await agent.patch(`/api/purchase-orders/${poId}`).send({
@@ -86,41 +86,14 @@ describe("Phase 23 — aggregate concurrency guards", () => {
 
     const probe = await pool.connect();
     try {
-      const locked = await probe.query<{ locked: boolean }>(
-        "SELECT pg_try_advisory_lock($1, $2) AS locked",
-        [ctx.companyId, containerId]
-      );
+      const locked = await probe.query<{ locked: boolean }>("SELECT pg_try_advisory_lock($1, $2) AS locked", [
+        ctx.companyId,
+        containerId,
+      ]);
       expect(locked.rows[0]?.locked).toBe(true);
       await probe.query("SELECT pg_advisory_unlock($1, $2)", [ctx.companyId, containerId]);
     } finally {
       probe.release();
-    }
-  });
-
-  it("rejects a simultaneous Supplier Partner offload on the same company/container key", async () => {
-    await pool.query("UPDATE companies SET company_type = 'supplier_partner' WHERE id = $1", [ctx.companyId]);
-    const spContainerId = containerId + 1_000_000;
-
-    const lockClient = await pool.connect();
-    try {
-      const locked = await lockClient.query<{ locked: boolean }>(
-        "SELECT pg_try_advisory_lock($1, $2) AS locked",
-        [ctx.companyId, spContainerId]
-      );
-      expect(locked.rows[0]?.locked).toBe(true);
-
-      const response = await agent.post("/api/sp/offload").send({
-        containerId: spContainerId,
-        locationId: ctx.locationId,
-        offloadDate: "2026-09-15",
-        chargeLines: [],
-      });
-
-      expect(response.status).toBe(409);
-      expect(response.body).toMatchObject({ code: "SP_OFFLOAD_IN_PROGRESS" });
-    } finally {
-      await lockClient.query("SELECT pg_advisory_unlock($1, $2)", [ctx.companyId, spContainerId]);
-      lockClient.release();
     }
   });
 });

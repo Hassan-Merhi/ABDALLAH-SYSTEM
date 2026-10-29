@@ -40,7 +40,6 @@ import {
   stockItemHistorySqlText,
 } from "../server/services/inventory/stockItemHistory";
 import { STOCK_DOCUMENT_NOT_RESTORABLE } from "../server/services/inventory/voucherStockReversal";
-import { STOCK_TRANSFER_IMPORT_SOURCE_MISSING } from "../server/routes/stockTransferImportPosting";
 import { createStockTransfer } from "../server/storage/stock-ops/transfers-create";
 import { cleanupTestData, closeTestServer, seedTestData, type TestContext } from "./setup";
 
@@ -279,46 +278,6 @@ describe("H1: transfer revision approvals conserve value", () => {
 });
 
 describe("H2/H3: stock transfer imports and missing sources", () => {
-  it("the single-source import moves the exact relieved value and records value_moved", async () => {
-    const item = await newItem();
-    await setStock(ctx.locationId, item.id, "3", "3.3333333", "10.00");
-    const response = await agent.post("/api/stock-transfer-import/import").send({
-      sourceLocationId: ctx.locationId,
-      destinationLocationId: ctx.location2Id,
-      transferDate: today,
-      items: [{ barcode: item.code, quantity: 3 }],
-    });
-    expect(response.status, JSON.stringify(response.body)).toBe(200);
-    // 3 × the 2dp rate (3.33) would have received 9.99 for the 10.00 relieved.
-    expect(await stockRow(ctx.location2Id, item.id)).toEqual({ q: "3.000", v: "10.00" });
-    expect(await stockRow(ctx.locationId, item.id)).toEqual({ q: "0.000", v: "0.00" });
-    const { rows } = await pool.query(
-      `SELECT sti.value_moved::text AS v, stv.inventory_applied AS applied
-         FROM stock_transfer_items sti JOIN stock_transfer_vouchers stv ON stv.id = sti.transfer_id
-        WHERE sti.stock_item_id = $1`,
-      [item.id]
-    );
-    expect(rows).toEqual([{ v: "10.00", applied: true }]);
-  }, 60_000);
-
-  it("after the cut-over the multi-source import refuses a source with no stock row", async () => {
-    const item = await newItem();
-    await setCutover("2026-01-01");
-    try {
-      const response = await agent.post("/api/stock-transfer-import/import-multi-source").send({
-        destinationLocationId: ctx.location2Id,
-        transferDate: today,
-        items: [{ stockItemId: item.id, sourceLocationId: ctx.locationId, quantity: 2 }],
-      });
-      expect(response.status, JSON.stringify(response.body)).toBe(409);
-      expect(response.body.code).toBe(STOCK_TRANSFER_IMPORT_SOURCE_MISSING);
-      expect(await stockRow(ctx.locationId, item.id)).toBeNull();
-      expect(await stockRow(ctx.location2Id, item.id)).toBeNull();
-    } finally {
-      await setCutover(null);
-    }
-  }, 60_000);
-
   it("a transfer from a location with no row keeps the shortage's value: nothing is created", async () => {
     const item = await newItem();
     const [voucher] = await db

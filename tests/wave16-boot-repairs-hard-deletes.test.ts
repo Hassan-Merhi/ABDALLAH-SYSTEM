@@ -21,7 +21,6 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { db, pool } from "../server/db";
 import { MoneyDecimal } from "../server/lib/money";
-import { runAccountingIntegrityDiagnostic } from "../server/services/accounting/integrity/accountingIntegrityDiagnostic";
 import {
   infrastructurePostingIdentity,
   insertInfrastructureVoucherTx,
@@ -31,7 +30,6 @@ import {
   removeLinkedJournalTx,
 } from "../server/services/accounting/perpetualInventory/linkedJournal";
 import { isRetiredVoucherNumber, retiredVoucherNumber } from "../server/services/accounting/voucherRetirement";
-import { ensureSpSupplierVoucherSyncTrigger } from "../server/routes/sp/spSupplierVoucherSync";
 import { deleteAuditLogRowsForTests } from "./helpers/auditLogCleanup";
 import { withFixtureTransaction } from "./helpers/voucherFixtureTransaction";
 import { cleanupTestData, closeTestServer, seedTestData, type TestContext } from "./setup";
@@ -309,95 +307,6 @@ describe("insurance direction repair as a reviewed tool (decision 1)", () => {
     // The closed-period voucher is untouched.
     expect(byVoucher(closed, expense)).toMatchObject({ d: "40.00", c: "0.00" });
     expect(await auditRows("record_identifier = 'insurance-journal-direction-repair'", [])).toHaveLength(1);
-  });
-});
-
-describe("SP supplier links: no rewrite of posted lines, listed, reviewed apply (decision 1)", () => {
-  it("leaves a posted voucher's supplier when the container's changes, lists it and repairs it audited", async () => {
-    await ensureSpSupplierVoucherSyncTrigger();
-    const supplier = async (name: string) =>
-      (
-        await pool.query<{ id: number }>(
-          `INSERT INTO suppliers (company_id, code, legal_name, email, active) VALUES ($1, $2, $3, $4, true) RETURNING id`,
-          [ctx.companyId, `${TEST_PREFIX}-S${next()}`, name, `${TEST_PREFIX}${sequence}@example.test`]
-        )
-      ).rows[0].id;
-    const supplierA = await supplier("w16 A");
-    const supplierB = await supplier("w16 B");
-    const otw = await ledgerAccount(`${TEST_PREFIX} Goods OTW`, "Asset", "sp_otw");
-    const clearing = await ledgerAccount(`${TEST_PREFIX} OTW clearing`, "Liability", "sp_otw_clearing");
-    const voucherId = await voucher(
-      `SP-OTW-${TEST_PREFIX}-${next()}`,
-      "2026-09-06",
-      [
-        { account: otw, debit: "70.00", credit: "0" },
-        { account: clearing, debit: "0", credit: "70.00", supplierId: supplierA },
-      ],
-      // A legacy OTW line names its clearing account and its supplier (the
-      // line-target guard of wave 16 B refuses that shape for new lines).
-      { sourceModule: "SP", supplierId: supplierA, legacy: true }
-    );
-    const container = await pool.query<{ id: number }>(
-      `INSERT INTO sp_containers (company_id, supplier_id, supplier_name, invoice_number, invoice_date, goods_otw_voucher_id)
-       VALUES ($1, $2, 'w16 A', $3, '2026-09-06', $4) RETURNING id`,
-      [ctx.companyId, supplierA, `${TEST_PREFIX}-INV`, voucherId]
-    );
-    await pool.query(`UPDATE sp_containers SET supplier_id = $2 WHERE id = $1`, [container.rows[0].id, supplierB]);
-
-    const read = async () =>
-      (
-        await pool.query(
-          `SELECT v.supplier_id AS header, ve.supplier_id AS line
-             FROM vouchers v JOIN voucher_entries ve ON ve.voucher_id = v.id AND ve.ledger_account_id = $2
-            WHERE v.id = $1`,
-          [voucherId, clearing]
-        )
-      ).rows[0];
-    expect(await read()).toEqual({ header: supplierA, line: supplierA });
-
-    const report = await runAccountingIntegrityDiagnostic(ctx.companyId);
-    const listed = report.checks.find((c) => c.key === "sp_supplier_voucher_link_mismatch");
-    expect(listed?.status).toBe("warn");
-    expect(listed?.samples).toContainEqual(expect.objectContaining({ voucher_id: voucherId }));
-
-    // The line-target guard (wave 16 B) refuses any write to a line naming
-    // both its clearing account and a supplier, so the apply is shown on the
-    // header: the legacy line is moved to the new supplier here, as legacy.
-    await withFixtureTransaction(
-      (client) =>
-        client.query(`UPDATE voucher_entries SET supplier_id = $2 WHERE voucher_id = $1 AND ledger_account_id = $3`, [
-          voucherId,
-          supplierB,
-          clearing,
-        ]),
-      { legacyUnbalanced: true }
-    );
-
-    // The SP routes answer for a supplier-partner company only.
-    const { rows: typeRows } = await pool.query(`SELECT company_type FROM companies WHERE id = $1`, [ctx.companyId]);
-    await pool.query(`UPDATE companies SET company_type = 'supplier_partner' WHERE id = $1`, [ctx.companyId]);
-    try {
-      const preview = await agent.get("/api/sp/admin/supplier-voucher-links/plan");
-      expect(preview.status).toBe(200);
-      const planned = preview.body.vouchers.find((v: { voucherId: number }) => v.voucherId === voucherId);
-      expect(planned.header).toEqual({ from: supplierA, to: supplierB });
-      expect(planned.lines).toEqual([]);
-      const stale = await agent
-        .post("/api/sp/admin/supplier-voucher-links/apply")
-        .send({ confirm: true, planHash: "0".repeat(64) });
-      expect(stale.status).toBe(409);
-      const applied = await agent
-        .post("/api/sp/admin/supplier-voucher-links/apply")
-        .send({ confirm: true, planHash: preview.body.planHash });
-      expect(applied.status).toBe(200);
-      expect(await read()).toEqual({ header: supplierB, line: supplierB });
-      expect(await auditRows("record_identifier = 'sp-supplier-voucher-link-repair'", [])).toHaveLength(1);
-    } finally {
-      await pool.query(`UPDATE companies SET company_type = $2 WHERE id = $1`, [
-        ctx.companyId,
-        typeRows[0].company_type,
-      ]);
-    }
   });
 });
 

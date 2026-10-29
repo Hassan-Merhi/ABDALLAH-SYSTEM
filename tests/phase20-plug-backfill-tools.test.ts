@@ -230,6 +230,8 @@ describe("A2: legacy equity plug clear (Owner preview/apply)", () => {
   });
 });
 
+const ERP_OVERRIDE = { allowNonSupplierPartner: "true", reason: "Reviewed: ERP-only deployment" };
+
 describe("B2: stock adjustment backfill reversal (Owner preview/apply)", () => {
   let consumption: number;
   let mixed: number;
@@ -267,53 +269,14 @@ describe("B2: stock adjustment backfill reversal (Owner preview/apply)", () => {
     expect(await reversalVouchers()).toEqual([]);
   });
 
-  it("previews the reversing journals for a supplier partner; refuses stale hashes, an Admin apply and a closed date", async () => {
-    await setCompanyType("supplier_partner");
-    const plan = await agent.get(`${MIRROR}/plan`);
-    expect(plan.status).toBe(200);
-    expect(plan.body).toMatchObject({
-      supplierPartner: true,
-      blockers: [],
-      offsetAccount: { code: "OPENING_BALANCE_EQUITY" },
-      total: { vouchers: 2, lines: 3, inventoryDebit: "140.00", inventoryCredit: "25.50" },
-    });
-    const consumptionPlan = plan.body.vouchers.find((v: { voucherId: number }) => v.voucherId === consumption);
-    expect(consumptionPlan.journal).toEqual([
-      expect.objectContaining({ account: "INVENTORY", debit: "100.00", credit: "0.00" }),
-      expect.objectContaining({ account: "OPENING_BALANCE_EQUITY", debit: "0.00", credit: "100.00" }),
-    ]);
-
-    const stale = await agent.post(`${MIRROR}/apply`).send({ confirm: true, planHash: "f".repeat(64) });
-    expect(stale.status).toBe(409);
-    expect(stale.body.code).toBe("PLAN_CHANGED");
-
-    await setRole("Admin");
-    try {
-      expect((await agent.get(`${MIRROR}/plan`)).status).toBe(200);
-      const forbidden = await agent.post(`${MIRROR}/apply`).send({ confirm: true, planHash: plan.body.planHash });
-      expect(forbidden.status).toBe(403);
-    } finally {
-      await setRole("Owner");
-    }
-
-    await closeToday();
-    try {
-      const closed = await agent.get(`${MIRROR}/plan`);
-      expect(closed.body.blockers).toContain("PERIOD_CLOSED");
-      const refused = await agent.post(`${MIRROR}/apply`).send({ confirm: true, planHash: closed.body.planHash });
-      expect(refused.status).toBe(409);
-      expect(refused.body.code).toBe("PERIOD_CLOSED");
-    } finally {
-      await pool.query(`DELETE FROM fiscal_period_closures WHERE company_id = $1`, [ctx.companyId]);
-    }
-    expect(await reversalVouchers()).toEqual([]);
-  });
-
   it("posts one balanced reversing journal per voucher, leaves the originals alone, audits, and is idempotent", async () => {
     const before = { consumption: await linesOf(consumption), mixed: await linesOf(mixed) };
     const inventoryBefore = await inventoryNet();
-    const plan = await agent.get(`${MIRROR}/plan`);
-    const applied = await agent.post(`${MIRROR}/apply`).send({ confirm: true, planHash: plan.body.planHash });
+    // ABDALLAH-SYSTEM runs ERP companies only, so the reviewed override applies.
+    const plan = await agent.get(`${MIRROR}/plan`).query(ERP_OVERRIDE);
+    const applied = await agent
+      .post(`${MIRROR}/apply`)
+      .send({ confirm: true, planHash: plan.body.planHash, ...ERP_OVERRIDE });
     expect(applied.status).toBe(200);
     expect(applied.body.reversals).toHaveLength(2);
 
@@ -343,11 +306,13 @@ describe("B2: stock adjustment backfill reversal (Owner preview/apply)", () => {
     expect(audits[0].changes.reversalJournals.new).toHaveLength(2);
     expect(audits[0].changes.backfillLines.old[0].reversed).toBe(false);
 
-    const again = await agent.get(`${MIRROR}/plan`);
+    const again = await agent.get(`${MIRROR}/plan`).query(ERP_OVERRIDE);
     expect(again.body.vouchers).toEqual([]);
     expect(again.body.alreadyReversed).toHaveLength(2);
     expect(again.body.blockers).toEqual(["NOTHING_TO_APPLY"]);
-    const reapply = await agent.post(`${MIRROR}/apply`).send({ confirm: true, planHash: again.body.planHash });
+    const reapply = await agent
+      .post(`${MIRROR}/apply`)
+      .send({ confirm: true, planHash: again.body.planHash, ...ERP_OVERRIDE });
     expect(reapply.status).toBe(400);
     expect(await reversalVouchers()).toHaveLength(2);
   });

@@ -4,11 +4,11 @@ import path from "node:path";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { isRetiredAbdallahApiRequest } from "../server/middleware/abdallahErpRetiredFeatureBoundary";
 import { cleanupTestData, closeTestServer, seedTestData, type TestContext } from "./setup";
 import type { SerializedRouteManifest } from "./helpers/routeManifest";
 
 const ERP_PREFIX = "phase33npwrite";
-const FACTORY_PREFIX = "facimp";
 const MANIFEST_PATH = path.join(process.cwd(), "config/route-manifest.json");
 const MISSING_ID = 2_147_482_900;
 const REQUEST_TIMEOUT_MS = 8_000;
@@ -26,7 +26,6 @@ type WriteMethod = "POST" | "PUT" | "PATCH" | "DELETE";
 interface SweptWriteRoute {
   method: WriteMethod;
   routePath: string;
-  fixture: "erp" | "factory";
 }
 
 function loadManifest(): SerializedRouteManifest {
@@ -43,6 +42,8 @@ function selectRoutes(manifest: SerializedRouteManifest): SweptWriteRoute[] {
     if (!(["POST", "PUT", "PATCH", "DELETE"] as string[]).includes(rawMethod)) continue;
     if (routePath.includes(":") || routePath.includes("*")) continue;
     if (EXCLUDED_PATTERNS.some((pattern) => pattern.test(routePath))) continue;
+    // ABDALLAH-SYSTEM refuses retired modes and features before any handler runs.
+    if (isRetiredAbdallahApiRequest(rawMethod, routePath)) continue;
 
     const key = `${rawMethod} ${routePath}`;
     if (seen.has(key)) continue;
@@ -50,7 +51,6 @@ function selectRoutes(manifest: SerializedRouteManifest): SweptWriteRoute[] {
     selected.push({
       method: rawMethod as WriteMethod,
       routePath,
-      fixture: routePath.startsWith("/api/factory/") ? "factory" : "erp",
     });
   }
 
@@ -139,23 +139,18 @@ function malformedProbe(ctx: TestContext) {
 }
 
 describe("Phase 33 safe non-parameterized write-surface sweep", () => {
-  let erpCtx: TestContext;
-  let factoryCtx: TestContext;
-  let erpAgent: request.SuperAgentTest;
-  let factoryAgent: request.SuperAgentTest;
+  let ctx: TestContext;
+  let agent: request.SuperAgentTest;
   let routes: SweptWriteRoute[] = [];
 
   beforeAll(async () => {
-    erpCtx = await seedTestData(ERP_PREFIX);
-    factoryCtx = await seedTestData(FACTORY_PREFIX);
-    erpAgent = await authenticatedAgent(erpCtx, ERP_PREFIX);
-    factoryAgent = await authenticatedAgent(factoryCtx, FACTORY_PREFIX);
+    ctx = await seedTestData(ERP_PREFIX);
+    agent = await authenticatedAgent(ctx, ERP_PREFIX);
     routes = selectRoutes(loadManifest());
   }, 120_000);
 
   afterAll(async () => {
     await cleanupTestData(ERP_PREFIX);
-    await cleanupTestData(FACTORY_PREFIX);
     await closeTestServer();
   }, 120_000);
 
@@ -165,9 +160,6 @@ describe("Phase 33 safe non-parameterized write-surface sweep", () => {
     const failures: Array<{ method: string; route: string; variant: string; detail: string }> = [];
 
     for (const route of routes) {
-      const ctx = route.fixture === "factory" ? factoryCtx : erpCtx;
-      const agent = route.fixture === "factory" ? factoryAgent : erpAgent;
-
       try {
         const unauthenticated = await unauthenticatedRequestFor(ctx, route)
           .send({})

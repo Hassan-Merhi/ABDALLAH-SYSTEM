@@ -9,8 +9,10 @@ import {
   reserveFinancialOperationTx,
   withDurableFinancialOperation,
 } from "../server/services/accounting/durableFinancialOperation";
+import { cleanupTestData, closeTestServer, seedTestData } from "./setup";
 
 const describePostgres = process.env.DATABASE_URL ? describe : describe.skip;
+const TEST_PREFIX = "durablefinop";
 
 let companyId: number;
 const keys: string[] = [];
@@ -26,24 +28,27 @@ async function cleanup(): Promise<void> {
   await db.execute(sql`
     DELETE FROM financial_operation_requests
     WHERE company_id = ${companyId}
-      AND idempotency_key IN (${sql.join(keys.map((key) => sql`${key}`), sql`, `)})
+      AND idempotency_key IN (${sql.join(
+        keys.map((key) => sql`${key}`),
+        sql`, `
+      )})
   `);
 }
 
 describePostgres("durable financial operation PostgreSQL boundary", () => {
   beforeAll(async () => {
     await ensureFinancialOperationRequests(pool);
-    const result = await db.execute(sql`SELECT id FROM companies ORDER BY id LIMIT 1`);
-    companyId = Number((result.rows[0] as { id?: number } | undefined)?.id);
-    if (!Number.isInteger(companyId) || companyId <= 0) {
-      throw new Error("The PostgreSQL test database needs at least one company");
-    }
+    // Seed an own company rather than borrowing whichever one an earlier test
+    // in the shard happened to leave behind.
+    companyId = (await seedTestData(TEST_PREFIX)).companyId;
     await cleanup();
-  });
+  }, 120_000);
 
   afterAll(async () => {
     await cleanup();
-  });
+    await cleanupTestData(TEST_PREFIX);
+    closeTestServer();
+  }, 120_000);
 
   it("serializes concurrent identical transactions and commits one result", async () => {
     const key = testKey("concurrent");
@@ -132,8 +137,8 @@ describePostgres("durable financial operation PostgreSQL boundary", () => {
         (${companyId}, ${input.operationName}, ${key}, ${input.requestFingerprint}, 'processing')
     `);
 
-    await expect(
-      db.transaction(async (tx) => reserveFinancialOperationTx(tx, input))
-    ).resolves.toMatchObject({ kind: "uncertain" });
+    await expect(db.transaction(async (tx) => reserveFinancialOperationTx(tx, input))).resolves.toMatchObject({
+      kind: "uncertain",
+    });
   });
 });

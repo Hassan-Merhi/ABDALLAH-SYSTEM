@@ -78,7 +78,7 @@ describe("ERP test company access policy", () => {
     expect([...FEATURE_KEYS].filter((key) => key !== "settings")).toEqual(ERP_TESTER_PAGE_KEYS);
   });
 
-  it("hides All Daybook for ERP Tester without blocking ordinary Daybook", () => {
+  it("retires All Daybook for every role without blocking ordinary Daybook", () => {
     const decide = (currentLocation: string, userRole = ERP_TESTER_ROLE) =>
       resolveAuthenticatedAppRoute({
         currentLocation,
@@ -89,10 +89,12 @@ describe("ERP test company access policy", () => {
         myAccessError: false,
       }).decision;
 
-    expect(decide("/transaction-journal")).toEqual({ kind: "redirect", to: "/daybook" });
-    expect(decide("/transaction-journal/")).toEqual({ kind: "redirect", to: "/daybook" });
+    // ABDALLAH-SYSTEM retires /transaction-journal for everyone, ahead of the
+    // ERP Tester redirect to Daybook.
+    expect(decide("/transaction-journal")).toEqual({ kind: "redirect", to: "/tracking" });
+    expect(decide("/transaction-journal/")).toEqual({ kind: "redirect", to: "/tracking" });
     expect(decide("/daybook")).toEqual({ kind: "continue" });
-    expect(decide("/transaction-journal", "Manager")).toEqual({ kind: "continue" });
+    expect(decide("/transaction-journal", "Manager")).toEqual({ kind: "redirect", to: "/tracking" });
   });
 
   it("retains the extra restrictions of the optional standalone test-company creator", () => {

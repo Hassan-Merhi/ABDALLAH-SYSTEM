@@ -37,23 +37,6 @@ describe("retail company type", () => {
     expect(companyTypeSchema.parse("retail")).toBe("retail");
   });
 
-  it("keeps retail companies inside the normal ERP workspace", () => {
-    expect(route("/")).toEqual({ kind: "redirect", to: "/financial-overview" });
-    expect(route("/retail/dashboard")).toEqual({ kind: "redirect", to: "/financial-overview" });
-
-    for (const normalErpPage of ["/financial-overview", "/accounts", "/vouchers", "/daybook", "/parties", "/create"])
-      expect(route(normalErpPage)).toEqual({ kind: "continue" });
-  });
-
-  it("specializes only retail inventory and POS routes", () => {
-    expect(route("/inventory")).toEqual({ kind: "redirect", to: "/retail/inventory" });
-    expect(route("/stock")).toEqual({ kind: "redirect", to: "/retail/inventory" });
-    expect(route("/location-inventory")).toEqual({ kind: "redirect", to: "/retail/inventory" });
-    expect(route("/pos")).toEqual({ kind: "redirect", to: "/retail/pos" });
-    expect(route("/retail/inventory")).toEqual({ kind: "continue" });
-    expect(route("/retail/pos")).toEqual({ kind: "continue" });
-  });
-
   it("rejects the retail workspace for non-retail companies", () => {
     expect(route("/retail/inventory", "normal")).toEqual({ kind: "redirect", to: "/tracking" });
   });

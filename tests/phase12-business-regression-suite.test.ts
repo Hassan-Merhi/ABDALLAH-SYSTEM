@@ -5,10 +5,9 @@ function source(path: string): string {
 }
 
 describe("Phase 12 business regression suite contracts", () => {
-  it("keeps a deterministic smoke boundary for the two cross-module workflows", () => {
+  it("keeps a deterministic smoke boundary for the cross-module ERP workflow", () => {
     const runner = source("scripts/run-phase12-business-regression.mjs");
     expect(runner).toContain('"tests/workflow.test.ts"');
-    expect(runner).toContain('"tests/factory-container-lifecycle.test.ts"');
     expect(runner).toContain('process.argv.includes("--smoke")');
   });
 
@@ -20,8 +19,6 @@ describe("Phase 12 business regression suite contracts", () => {
       "tests/accounting.test.ts",
       "tests/reports.test.ts",
       "tests/company-context-enforcement.test.ts",
-      "tests/factory-mix-batch-stable-cost.test.ts",
-      "tests/factory-locked-rate-migration.test.ts",
     ]) {
       expect(runner).toContain(suite);
     }

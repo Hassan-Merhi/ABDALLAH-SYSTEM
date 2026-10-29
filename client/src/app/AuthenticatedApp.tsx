@@ -10,6 +10,7 @@ import { useAuthenticatedAppData } from "./useAuthenticatedAppData";
 import { resolveAuthenticatedAppRoute } from "./authenticatedAppRouteGuard";
 import { AppLeaveConfirmDialog } from "./AppLeaveConfirmDialog";
 import { AppLoadingState } from "./AppLoadingState";
+import { ErpOnlyNotice } from "./ErpOnlyNotice";
 import { AuthenticatedAppOverlays } from "./AuthenticatedAppOverlays";
 import { useErpScrollRestoration } from "./useErpScrollRestoration";
 
@@ -42,14 +43,8 @@ export function AuthenticatedApp({ user, handleLogout }: AuthenticatedAppProps) 
       userRole: user.role ?? undefined,
     });
 
-  if (companyLoading) return <AppLoadingState />;
-  if (!selectedCompany || selectedCompany.companyType !== "erp") {
-    return (
-      <div role="alert" className="flex min-h-screen items-center justify-center p-6 text-center">
-        ABDALLAH-SYSTEM supports ERP workspaces only. Ask your administrator to assign an ERP company.
-      </div>
-    );
-  }
+  if (companyLoading || !selectedCompany) return <AppLoadingState />;
+  if (selectedCompany.companyType !== "erp") return <ErpOnlyNotice />;
 
   const isAdminOwner = user.role === "Admin" || user.role === "Owner" || user.role === "Developer";
   const routeState = resolveAuthenticatedAppRoute({

@@ -86,8 +86,8 @@ describe("company parent relationship", () => {
   it("accepts an active parent when creating and preserves it on update", async () => {
     const created = await agent.post("/api/companies").send({
       code: "CPARENT03",
-      name: `${TEST_PREFIX}_SupplierPartner`,
-      companyType: "supplier_partner",
+      name: `${TEST_PREFIX}_ErpChild`,
+      companyType: "erp",
       active: true,
       baseCurrency: "USD",
       parentCompanyId: activeParentId,
@@ -95,7 +95,7 @@ describe("company parent relationship", () => {
 
     expect(created.status).toBe(201);
     expect(created.body).toMatchObject({
-      companyType: "supplier_partner",
+      companyType: "erp",
       parentCompanyId: activeParentId,
     });
     childCompanyId = created.body.id;
@@ -106,7 +106,7 @@ describe("company parent relationship", () => {
     });
 
     const unchanged = await agent.patch(`/api/companies/${childCompanyId}`).send({
-      name: `${TEST_PREFIX}_SupplierPartnerUpdated`,
+      name: `${TEST_PREFIX}_ErpChildUpdated`,
       parentCompanyId: activeParentId,
     });
 

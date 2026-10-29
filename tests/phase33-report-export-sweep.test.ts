@@ -4,11 +4,11 @@ import path from "node:path";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { isRetiredAbdallahApiRequest } from "../server/middleware/abdallahErpRetiredFeatureBoundary";
 import { cleanupTestData, closeTestServer, seedTestData, type TestContext } from "./setup";
 import type { SerializedRouteManifest } from "./helpers/routeManifest";
 
 const ERP_PREFIX = "phase33reports";
-const FACTORY_PREFIX = "facimp";
 const MANIFEST_PATH = path.join(process.cwd(), "config/route-manifest.json");
 const MISSING_ID = 2_147_482_800;
 const REQUEST_TIMEOUT_MS = 15_000;
@@ -25,7 +25,6 @@ const EXCLUDED_PATTERNS: RegExp[] = [
 interface SweptReadRoute {
   manifestPath: string;
   requestPath: string;
-  fixture: "erp" | "factory";
 }
 
 function loadManifest(): SerializedRouteManifest {
@@ -59,7 +58,7 @@ function materialize(routePath: string, ctx: TestContext): string {
   );
 }
 
-function selectRoutes(manifest: SerializedRouteManifest, erpCtx: TestContext, factoryCtx: TestContext): SweptReadRoute[] {
+function selectRoutes(manifest: SerializedRouteManifest, ctx: TestContext): SweptReadRoute[] {
   const selected: SweptReadRoute[] = [];
   const seen = new Set<string>();
 
@@ -69,12 +68,11 @@ function selectRoutes(manifest: SerializedRouteManifest, erpCtx: TestContext, fa
     if (!routePath?.startsWith("/api/") || routePath.includes("*")) continue;
     if (!REPORT_PATTERN.test(routePath)) continue;
     if (EXCLUDED_PATTERNS.some((pattern) => pattern.test(routePath))) continue;
+    // ABDALLAH-SYSTEM refuses retired modes and features before any handler runs.
+    if (isRetiredAbdallahApiRequest(method, routePath)) continue;
     if (seen.has(routePath)) continue;
     seen.add(routePath);
-
-    const fixture = routePath.startsWith("/api/factory/") ? "factory" : "erp";
-    const ctx = fixture === "factory" ? factoryCtx : erpCtx;
-    selected.push({ manifestPath: routePath, requestPath: materialize(routePath, ctx), fixture });
+    selected.push({ manifestPath: routePath, requestPath: materialize(routePath, ctx) });
   }
 
   return selected;
@@ -94,23 +92,18 @@ async function authenticatedAgent(ctx: TestContext, prefix: string): Promise<req
 }
 
 describe("Phase 33 report/export/statement read-surface sweep", () => {
-  let erpCtx: TestContext;
-  let factoryCtx: TestContext;
-  let erpAgent: request.SuperAgentTest;
-  let factoryAgent: request.SuperAgentTest;
+  let ctx: TestContext;
+  let agent: request.SuperAgentTest;
   let routes: SweptReadRoute[] = [];
 
   beforeAll(async () => {
-    erpCtx = await seedTestData(ERP_PREFIX);
-    factoryCtx = await seedTestData(FACTORY_PREFIX);
-    erpAgent = await authenticatedAgent(erpCtx, ERP_PREFIX);
-    factoryAgent = await authenticatedAgent(factoryCtx, FACTORY_PREFIX);
-    routes = selectRoutes(loadManifest(), erpCtx, factoryCtx);
+    ctx = await seedTestData(ERP_PREFIX);
+    agent = await authenticatedAgent(ctx, ERP_PREFIX);
+    routes = selectRoutes(loadManifest(), ctx);
   }, 120_000);
 
   afterAll(async () => {
     await cleanupTestData(ERP_PREFIX);
-    await cleanupTestData(FACTORY_PREFIX);
     await closeTestServer();
   }, 120_000);
 
@@ -120,7 +113,6 @@ describe("Phase 33 report/export/statement read-surface sweep", () => {
     const failures: Array<{ route: string; requestPath: string; detail: string }> = [];
 
     for (const route of routes) {
-      const agent = route.fixture === "factory" ? factoryAgent : erpAgent;
       try {
         const response = await agent
           .get(route.requestPath)

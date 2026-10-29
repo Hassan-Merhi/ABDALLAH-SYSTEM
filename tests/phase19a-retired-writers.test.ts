@@ -299,39 +299,6 @@ describe("EMP-* account migration (G2)", () => {
   });
 });
 
-describe("factory daybook void (G3)", () => {
-  it("retires the voucher with its lines kept and audited", async () => {
-    const voucherId = await voucher(
-      factory.companyId,
-      "2026-05-01",
-      [
-        { ledger: factory.cashAccountId, debit: "100.00", credit: "0" },
-        { ledger: factory.salesAccountId, debit: "0", credit: "100.00" },
-      ],
-      { voucherType: "Payment", description: "p19a void" }
-    );
-    const entry = await pool.query<{ id: number }>(
-      `INSERT INTO factory_daybook_entries
-         (company_id, tx_date, tx_type, reference_id, reference_table, description,
-          currency_code, amount_currency, fx_rate_to_usd, amount_usd)
-       VALUES ($1, '2026-05-01', 'PAYMENT', $2, 'vouchers', 'p19a void', 'USD', '100.00', '1', '100.00') RETURNING id`,
-      [factory.companyId, voucherId]
-    );
-
-    const response = await factoryAgent.delete(`/api/factory/daybook/entry/${entry.rows[0].id}/void`);
-    expect(response.status, JSON.stringify(response.body)).toBe(200);
-
-    const lines = await pool.query(`SELECT count(*)::int AS n FROM voucher_entries WHERE voucher_id = $1`, [voucherId]);
-    expect(lines.rows[0].n).toBe(2);
-    const row = await pool.query(`SELECT deleted_at, voucher_number FROM vouchers WHERE id = $1`, [voucherId]);
-    expect(row.rows[0].deleted_at).not.toBeNull();
-    expect(String(row.rows[0].voucher_number).endsWith(`~DEL${voucherId}`)).toBe(true);
-    const rows = await audits(factory.companyId, "vouchers", voucherId);
-    expect(rows.map((r) => r.action)).toEqual(["delete"]);
-    expect(rows[0].changes.entries.old).toHaveLength(2);
-  });
-});
-
 describe("narration and location rewrites (G19, DI9)", () => {
   async function container(number: string): Promise<number> {
     const supplier = await pool.query<{ id: number }>(

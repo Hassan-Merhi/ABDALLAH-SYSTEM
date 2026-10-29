@@ -12,25 +12,10 @@
       "shape": "workbook:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       "hash": "cd5324ab11354eaaf9e4794d8d245ff5a798527e0421f3a8b4f062cce9ace413"
     },
-    "GET /api/factory/net-position": {
-      "status": 200,
-      "shape": "{asOf,balanceOnTableValue,businessToday,companyId,currencyRevaluation,forUs,forUsTotal,fxAgentWalletWarnings,fxAgentWallets,historyBasis,historyCompleteness,historyCoverage,historyWarnings,inventoryValue,ledgerAssets,ledgerLiabilities,loadingOrders,loadingTotal,netPosition,netPositionLabel,onUs,onUsTotal,payrollPayable,pendingOrders,pendingTotal,rawMaterialValue,stockOtwValue,supplierLiabilities,supplierOverpayments,timeZone,valuationMode,verifiedOrders,verifiedTotal}",
-      "hash": "106c37491bd8d7e28206a4a005a652e6a68961a7697362f0cd0d0966872d047a"
-    },
-    "GET /api/factory/suppliers/:supplierId/statement": {
-      "status": 200,
-      "shape": "{balanceBasis,brokerContainers,currencyGroups,fxTransfers,ledger,ledgerView,linkedSupplierGroups,obCommissions,offloadCharges,operationalMemoLabel,payments,statement,summary,supplier,voucherPayments}",
-      "hash": "9d1f53b585be70655b670f0cb7026995c1e25e952937900833a9a345e8e39b28"
-    },
     "PATCH /api/purchase-orders/:poId": {
       "status": 200,
       "shape": "{chargesEdited,companyId,containerId,createdAt,currency,discount,documentCharges,freight,freightOwnAccountId,freightPaidBy,freightParentAccountId,fumigation,historicalExchangeRate,historicalRateDate,id,itemsTotal,nativeDiscount,nativeDocumentCharges,nativeFreight,nativeFumigation,nativeItemsTotal,nativeLineCount,nativeOtherCharges,nativeSurcharge,otherCharges,poNumber,status,supplierId,surcharge,voucherId}",
       "hash": "bd2b56f3d18c1481f6a919e20c43755d849dc6d8f4124f273176ffa5d0cfac9d"
-    },
-    "POST /api/factory/raw-stock/offload": {
-      "status": 200,
-      "shape": "{commission,rawStock}",
-      "hash": "3d7f5a53fb683c9754a103dc5aa9dc501de5c381de4b162c4230bb15f1ed550b"
     }
   }
 }

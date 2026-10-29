@@ -5,11 +5,11 @@ import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { pool } from "../server/db";
+import { isRetiredAbdallahApiRequest } from "../server/middleware/abdallahErpRetiredFeatureBoundary";
 import { closeTestServer, seedTestData, type TestContext } from "./setup";
 import type { SerializedRouteManifest } from "./helpers/routeManifest";
 
 const ERP_PREFIX = "phase33pwrite";
-const FACTORY_PREFIX = "phase33pfactory";
 const MANIFEST_PATH = path.join(process.cwd(), "config/route-manifest.json");
 const MISSING_ID = 2_147_482_500;
 const REQUEST_TIMEOUT_MS = 12_000;
@@ -20,7 +20,6 @@ interface SweptWriteRoute {
   method: WriteMethod;
   manifestPath: string;
   requestPath: string;
-  fixture: "erp" | "factory";
 }
 
 const EXCLUDED_PATTERNS: RegExp[] = [
@@ -35,10 +34,6 @@ const EXCLUDED_PATTERNS: RegExp[] = [
 
 function loadManifest(): SerializedRouteManifest {
   return JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8")) as SerializedRouteManifest;
-}
-
-function fixtureFor(routePath: string): "erp" | "factory" {
-  return routePath.startsWith("/api/factory/") ? "factory" : "erp";
 }
 
 function parameterValue(routePath: string, name: string, ctx: TestContext): string {
@@ -80,11 +75,7 @@ function materialize(routePath: string, ctx: TestContext): string {
   );
 }
 
-function selectRoutes(
-  manifest: SerializedRouteManifest,
-  erpCtx: TestContext,
-  factoryCtx: TestContext
-): SweptWriteRoute[] {
+function selectRoutes(manifest: SerializedRouteManifest, ctx: TestContext): SweptWriteRoute[] {
   const routes: SweptWriteRoute[] = [];
   const seen = new Set<string>();
 
@@ -94,18 +85,16 @@ function selectRoutes(
     if (!routePath.includes(":")) continue;
     if (!(["POST", "PUT", "PATCH"] as string[]).includes(rawMethod)) continue;
     if (EXCLUDED_PATTERNS.some((pattern) => pattern.test(routePath))) continue;
+    // ABDALLAH-SYSTEM refuses retired modes and features before any handler runs.
+    if (isRetiredAbdallahApiRequest(rawMethod, routePath)) continue;
 
     const key = `${rawMethod} ${routePath}`;
     if (seen.has(key)) continue;
     seen.add(key);
-
-    const fixture = fixtureFor(routePath);
-    const ctx = fixture === "factory" ? factoryCtx : erpCtx;
     routes.push({
       method: rawMethod as WriteMethod,
       manifestPath: routePath,
       requestPath: materialize(routePath, ctx),
-      fixture,
     });
   }
 
@@ -205,28 +194,20 @@ function seededPayload(ctx: TestContext, sequence: number, alternate: boolean): 
 }
 
 describe("Phase 33 seeded parameterized write sweep", () => {
-  let erpCtx: TestContext;
-  let factoryCtx: TestContext;
-  let erpAgent: request.SuperAgentTest;
-  let factoryAgent: request.SuperAgentTest;
+  let ctx: TestContext;
+  let agent: request.SuperAgentTest;
   let routes: SweptWriteRoute[] = [];
 
   beforeAll(async () => {
-    erpCtx = await seedTestData(ERP_PREFIX);
-    factoryCtx = await seedTestData(FACTORY_PREFIX);
+    ctx = await seedTestData(ERP_PREFIX);
 
-    // seedTestData intentionally defaults unknown prefixes to ERP. Turn this
-    // dedicated disposable tenant into a factory tenant without broadening the
-    // shared fixture prefix registry, then restore the ERP parent-company pin.
-    await pool.query("UPDATE companies SET company_type = 'factory' WHERE id = $1", [factoryCtx.companyId]);
-    await pool.query(
-      "UPDATE system_settings SET value = $1, updated_at = now() WHERE key = 'parentCompanyId'",
-      [String(erpCtx.companyId)]
-    );
+    // Pin this ERP tenant as the parent company the writes resolve against.
+    await pool.query("UPDATE system_settings SET value = $1, updated_at = now() WHERE key = 'parentCompanyId'", [
+      String(ctx.companyId),
+    ]);
 
-    erpAgent = await authenticatedAgent(erpCtx, ERP_PREFIX);
-    factoryAgent = await authenticatedAgent(factoryCtx, FACTORY_PREFIX);
-    routes = selectRoutes(loadManifest(), erpCtx, factoryCtx);
+    agent = await authenticatedAgent(ctx, ERP_PREFIX);
+    routes = selectRoutes(loadManifest(), ctx);
   }, 120_000);
 
   afterAll(async () => {
@@ -242,9 +223,6 @@ describe("Phase 33 seeded parameterized write sweep", () => {
     const failures: Array<{ method: string; route: string; variant: string; detail: string }> = [];
 
     for (const [index, route] of routes.entries()) {
-      const ctx = route.fixture === "factory" ? factoryCtx : erpCtx;
-      const agent = route.fixture === "factory" ? factoryAgent : erpAgent;
-
       for (const alternate of [false, true]) {
         try {
           const response = await issue(agent, route)

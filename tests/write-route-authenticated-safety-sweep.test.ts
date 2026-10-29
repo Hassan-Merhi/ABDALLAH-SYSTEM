@@ -16,6 +16,8 @@
  * - sentinel vouchers in untouched ERP, Factory, Properties and Supplier
  *   Partner companies must survive the entire sweep unchanged, catching
  *   cross-company leakage.
+ * - ABDALLAH-SYSTEM is ERP only: routes owned by the retired company modes, and
+ *   retired ERP features, are refused before any handler and are not invoked.
  *
  * Deep positive-path tests remain the source of truth for exact journal legs,
  * quantities and lifecycle transitions. This file closes the broad gap that
@@ -26,6 +28,7 @@ import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { pool } from "../server/db";
+import { isRetiredAbdallahApiRequest } from "../server/middleware/abdallahErpRetiredFeatureBoundary";
 import { auditWriteRouteCoverage } from "../scripts/audit-write-route-coverage.mjs";
 import { cleanupTestData, closeTestServer, seedTestData, type TestContext } from "./setup";
 
@@ -34,6 +37,7 @@ const MISSING_ID = "2147483646";
 const MISSING_REFERENCE = `${TEST_PREFIX}-missing-reference`;
 
 type CompanyMode = "erp" | "factory" | "properties" | "supplier_partner";
+type SweptMode = Extract<CompanyMode, "erp">;
 type WriteMethod = "DELETE" | "PATCH" | "POST" | "PUT";
 
 type RouteUnderTest = {
@@ -61,8 +65,8 @@ type Fingerprint = {
 let ctx: TestContext;
 let agent: request.SuperAgentTest;
 let parentCompanyId: number;
-let stableCompanies: Record<CompanyMode, number>;
-let parameterlessCompanies: Record<CompanyMode, number>;
+let stableCompanies: Record<SweptMode, number>;
+let parameterlessCompanies: Record<SweptMode, number>;
 let controlCompanies: Record<CompanyMode, number>;
 let controlBefore: Record<CompanyMode, Fingerprint>;
 let companySequence = 0;
@@ -252,22 +256,12 @@ beforeAll(async () => {
     [String(parentCompanyId)]
   );
 
-  stableCompanies = {
-    erp: ctx.companyId,
-    factory: await createCompany("factory", "stable-factory"),
-    properties: await createCompany("properties", "stable-properties"),
-    supplier_partner: await createCompany("supplier_partner", "stable-sp"),
-  };
+  stableCompanies = { erp: ctx.companyId };
   // Parameterless writes get their own isolated empty company so they cannot
-  // contaminate the stable missing-resource fixtures. Reuse one per mode: the
-  // sweep requires every call to leave the sensitive fingerprint unchanged, so
+  // contaminate the stable missing-resource fixtures. One is enough: the sweep
+  // requires every call to leave the sensitive fingerprint unchanged, so
   // creating one company per route would add teardown cost without extra safety.
-  parameterlessCompanies = {
-    erp: await createCompany("erp", "parameterless-erp"),
-    factory: await createCompany("factory", "parameterless-factory"),
-    properties: await createCompany("properties", "parameterless-properties"),
-    supplier_partner: await createCompany("supplier_partner", "parameterless-sp"),
-  };
+  parameterlessCompanies = { erp: await createCompany("erp", "parameterless-erp") };
   controlCompanies = {
     erp: await createCompany("erp", "control-erp"),
     factory: await createCompany("factory", "control-factory"),
@@ -302,6 +296,7 @@ describe("authenticated sensitive write safety sweep", () => {
 
     for (const route of routes) {
       const mode = modeForPath(route.path);
+      if (mode !== "erp" || isRetiredAbdallahApiRequest(route.method, route.path)) continue;
       const parameterised = hasPathParams(route.path);
       const companyId = parameterised ? stableCompanies[mode] : parameterlessCompanies[mode];
       await selectCompany(companyId);

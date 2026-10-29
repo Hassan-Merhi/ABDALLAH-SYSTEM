@@ -62,7 +62,7 @@ describe("net profit purchase-accounts drill-down", () => {
 });
 
 describe("Analytics expense period filters", () => {
-  it("uses only the selected period's indirect expenses, including the factory endpoint", async () => {
+  it("uses only the selected period's indirect expenses", async () => {
     const account = await pool.query<{ id: number }>(
       `INSERT INTO ledger_accounts (company_id, code, name, account_type, sub_type, opening_balance, opening_balance_side)
        VALUES ($1, 'INDIRECT-NPSDRILL', 'Period expense test', 'Expense', 'Indirect Expense', '0', 'Dr') RETURNING id`,
@@ -86,14 +86,8 @@ describe("Analytics expense period filters", () => {
       );
     }
 
-    // The factory endpoint is pinned to a Factory company (tenantIsolationBoundary),
-    // so the seeded company must be one for both endpoints to read it.
-    await pool.query("UPDATE companies SET company_type = 'factory' WHERE id = $1", [ctx.companyId]);
-
-    for (const path of [
-      "/api/reports/net-profit-statement/indirect-expenses",
-      "/api/factory/analytics/indirect-expenses",
-    ]) {
+    // The Factory analytics twin of this endpoint is retired with Factory Mode.
+    for (const path of ["/api/reports/net-profit-statement/indirect-expenses"]) {
       const october = await agent.get(path).query({ startDate: "2026-10-01", endDate: "2026-10-15" });
       expect(october.status).toBe(200);
       expect(october.body.accounts.find((a: { id: number }) => a.id === expenseAccountId)).toMatchObject({

@@ -88,9 +88,7 @@ afterAll(async () => {
 
 describe("Phase 3 ERP read success paths", () => {
   it("reads a seeded ledger pre-period balance from the account statement route", async () => {
-    const response = await agent.get(
-      `/api/accounts/ledger/${ctx.cashAccountId}/pre-period-balance?endDate=2026-09-14`
-    );
+    const response = await agent.get(`/api/accounts/ledger/${ctx.cashAccountId}/pre-period-balance?endDate=2026-09-14`);
 
     expect(response.status).toBe(200);
     expect(response.body).toHaveProperty("balance");
@@ -139,25 +137,6 @@ describe("Phase 3 ERP read success paths", () => {
 
     expect(response.status).toBe(200);
     expect(Array.isArray(response.body)).toBe(true);
-  });
-
-  it("discovers a seeded active transporter through the ranked transporter-statement read route", async () => {
-    const response = await agent.get("/api/transporter-statement/transporters");
-
-    expect(response.status).toBe(200);
-    expect(Array.isArray(response.body)).toBe(true);
-    expect(
-      response.body.some(
-        (row: { id?: number; name?: string }) => row.id === ctx.cashAccountId && row.name === TRANSPORTER_NAME
-      )
-    ).toBe(true);
-  });
-
-  it("reads seeded transporter payment terms", async () => {
-    const response = await agent.get(`/api/transporter-statement/${ctx.cashAccountId}/settings`);
-
-    expect(response.status).toBe(200);
-    expect(response.body).toEqual({ paymentTermsDays: 21 });
   });
 
   it("keeps the transporter discovery fixture tied to this company", async () => {

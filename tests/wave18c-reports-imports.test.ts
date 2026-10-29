@@ -8,23 +8,17 @@
  *   2. the statement Excel opens bank and employee at the engine's period
  *      opening (it opened them at zero) and lists only the lines the engine
  *      counts; the PDF refuses another company's account (404);
- *   3. bale and raw-stock imports: Admin/Owner only, audited in their
- *      transaction, listed by the readiness report at spreadsheet cost, and
- *      refused once the perpetual cut-over is applied; a back-dated stock
- *      entry is refused once the cut-over applies on the business date;
+ *   3. (retired) the Factory bale and raw-stock spreadsheet imports are
+ *      retired with Factory Mode in ABDALLAH-SYSTEM;
  *   4. aging includes factory suppliers, ages USD base amounts and counts days
  *      from the company's business date.
  */
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { db, pool } from "../server/db";
+import { pool } from "../server/db";
 import { getCompanyBusinessDate } from "../server/lib/dateUtils";
-import { perpetualReadinessReport } from "../server/services/accounting/perpetualInventory/readiness";
-import { noMixCataloguePricedBales } from "../server/services/accounting/perpetualInventory/factoryCutoverBlockers";
-import { stockEntryCutoverTx } from "../server/services/factory/stockImportPolicy";
 import { ensureFactoryCostBasisSchema } from "../server/services/factory/factoryCostBasisSchema";
-import { runWithDatabaseMaintenanceScope } from "../server/services/security/databaseScopeRuntimeContext";
 import { serveAccountListForCompany } from "../server/routes/accounts/all";
 import { deleteAuditLogRowsForTests } from "./helpers/auditLogCleanup";
 import { normalizedLineFields } from "./helpers/normalizedVoucherLine";
@@ -46,8 +40,6 @@ let agent: request.SuperAgentTest;
 let companyB: number;
 const ids: Record<string, number> = {};
 let sequence = 0;
-
-const asMaintenance = <T>(work: () => Promise<T>) => runWithDatabaseMaintenanceScope("wave18c-test", work);
 
 async function insertId(text: string, params: unknown[]): Promise<number> {
   const { rows } = await pool.query<{ id: number }>(text, params);
@@ -115,17 +107,6 @@ async function voucher(date: string, lines: Line[], opts: { legacy?: boolean; co
   );
 }
 
-async function setCutover(effectiveFrom: string | null) {
-  await pool.query(`DELETE FROM gl_inventory_cutovers WHERE company_id = $1`, [ctx.companyId]);
-  if (effectiveFrom) {
-    await pool.query(
-      `INSERT INTO gl_inventory_cutovers (company_id, effective_from, opening_plan, applied_by)
-       VALUES ($1, $2, '{}'::jsonb, 'test')`,
-      [ctx.companyId, effectiveFrom]
-    );
-  }
-}
-
 async function accountList(query: Record<string, string> = {}) {
   let body: { accounts: Array<Record<string, unknown>> } = { accounts: [] };
   const res = {
@@ -179,8 +160,6 @@ async function excelRows(query: string) {
 beforeAll(async () => {
   ctx = await seedTestData(PREFIX);
   await ensureFactoryCostBasisSchema(pool);
-  // The factory import routes need a factory company.
-  await pool.query(`UPDATE companies SET company_type = 'factory' WHERE id = $1`, [ctx.companyId]);
   agent = request.agent(ctx.app);
   expect(
     (await agent.post("/api/auth/login").send({ username: `${PREFIX}_testuser`, password: "testpassword123" })).status
@@ -376,128 +355,6 @@ describe("2: statement exports open at the engine's period opening", () => {
       .parse(binaryParser as never);
     expect(own.status).toBe(200);
   }, 30_000);
-});
-
-describe("3: spreadsheet stock imports and the cut-over", () => {
-  it("is Admin/Owner only", async () => {
-    const manager = request.agent(ctx.app);
-    await manager.post("/api/auth/login").send({ username: `${PREFIX}_testuser`, password: "testpassword123" });
-    await pool.query(`UPDATE user_company_roles SET role = 'Manager' WHERE user_id = $1 AND company_id = $2`, [
-      ctx.userId,
-      ctx.companyId,
-    ]);
-    try {
-      await manager.post("/api/auth/set-company").send({ companyId: ctx.companyId });
-      const refused = await manager.post("/api/factory/import/bales").send({ bales: [{ baleCode: "X", weightKg: 1 }] });
-      expect(refused.status).toBe(403);
-      expect(refused.body.message).toBe("Forbidden");
-      expect((await manager.post("/api/factory/import/raw-stock").send({ items: [{}] })).status).toBe(403);
-    } finally {
-      await pool.query(`UPDATE user_company_roles SET role = 'Admin' WHERE user_id = $1 AND company_id = $2`, [
-        ctx.userId,
-        ctx.companyId,
-      ]);
-    }
-  });
-
-  it("before the cut-over: imports, audits and lists them at spreadsheet cost", async () => {
-    await setCutover(null);
-    const bales = await agent.post("/api/factory/import/bales").send({
-      fileName: "w18c.xlsx",
-      bales: [{ baleCode: "W18C-B", articleCode: "W18C-ART", weightKg: "50", costPerKg: "2", status: "IN_STOCK" }],
-    });
-    expect(bales.status).toBe(200);
-    expect(bales.body).toMatchObject({ imported: 1, errors: [] });
-    const batchAudit = await pool.query(
-      `SELECT 1 FROM audit_log WHERE company_id = $1 AND table_name = 'factory_bale_import_batches'
-          AND action = 'import' AND record_id = $2`,
-      [ctx.companyId, bales.body.batchId]
-    );
-    expect(batchAudit.rows).toHaveLength(1);
-
-    const raw = await agent.post("/api/factory/import/raw-stock").send({
-      items: [{ containerNumber: "W18C-CONT", receivedKg: "100", usedKg: "40", costPerKg: "1.5" }],
-    });
-    expect(raw.status).toBe(200);
-    expect(raw.body).toMatchObject({ imported: 1, errors: [] });
-
-    const report = await asMaintenance(() => perpetualReadinessReport(ctx.companyId));
-    expect(report.importedAtSpreadsheetCost).toMatchObject({ bales: 1, rawStock: 1, value: "190.00" });
-    expect(report.importedAtSpreadsheetCost.rows.map((row) => [row.source, row.value])).toEqual([
-      ["factory_bales", "100.00"],
-      ["factory_raw_stock", "90.00"],
-    ]);
-    // Owner decision (wave 18): an imported bale has no mix, so it still blocks
-    // the cut-over like any no-mix bale until it is sold, written off or
-    // re-entered from a costed mix; readiness also lists it at spreadsheet cost.
-    expect((await asMaintenance(() => noMixCataloguePricedBales(db, ctx.companyId))).count).toBe(1);
-  }, 60_000);
-
-  it("after the cut-over: refuses every import and writes nothing", async () => {
-    await setCutover("2026-01-01");
-    const before = await pool.query(`SELECT COUNT(*)::int AS n FROM factory_bales WHERE company_id = $1`, [
-      ctx.companyId,
-    ]);
-    const bales = await agent
-      .post("/api/factory/import/bales")
-      .send({ bales: [{ baleCode: "W18C-C", weightKg: "10", costPerKg: "1" }] });
-    expect(bales.status).toBe(409);
-    expect(bales.body).toMatchObject({ code: "FACTORY_STOCK_IMPORT_AFTER_CUTOVER", effectiveFrom: "2026-01-01" });
-    expect(bales.body.message).toBe(
-      "Perpetual inventory applies from 2026-01-01: stock cannot be imported from a spreadsheet. Enter it through costed receipts and mixes."
-    );
-    const raw = await agent
-      .post("/api/factory/import/raw-stock")
-      .send({ items: [{ containerNumber: "W18C-CONT2", receivedKg: "1", costPerKg: "1" }] });
-    expect(raw.status).toBe(409);
-
-    const ExcelJS = (await import("exceljs")).default;
-    const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet("Bales");
-    sheet.addRow(["Reference Number", "Product Name", "Weight (kg)", "Cost per kg"]);
-    sheet.addRow(["W18C-REF-1", "W18C product", 20, 1]);
-    const file = Buffer.from(await workbook.xlsx.writeBuffer());
-    const reimport = await agent.post("/api/factory/bales/reimport").attach("file", file, "w18c.xlsx");
-    expect(reimport.status).toBe(409);
-    expect(reimport.body.code).toBe("FACTORY_STOCK_IMPORT_AFTER_CUTOVER");
-
-    const after = await pool.query(`SELECT COUNT(*)::int AS n FROM factory_bales WHERE company_id = $1`, [
-      ctx.companyId,
-    ]);
-    expect(after.rows[0].n).toBe(before.rows[0].n);
-    const containers = await pool.query(
-      `SELECT 1 FROM factory_containers WHERE company_id = $1 AND container_number = 'W18C-CONT2'`,
-      [ctx.companyId]
-    );
-    expect(containers.rows).toEqual([]);
-
-    // Before the cut-over the reimport is accepted, batched and audited.
-    await setCutover(null);
-    const accepted = await agent.post("/api/factory/bales/reimport").attach("file", file, "w18c.xlsx");
-    expect(accepted.status).toBe(200);
-    expect(accepted.body.imported).toBe(1);
-    const reimported = await pool.query(
-      `SELECT import_batch_id FROM factory_bales WHERE company_id = $1 AND reference_number = 'W18C-REF-1'`,
-      [ctx.companyId]
-    );
-    expect(reimported.rows[0].import_batch_id).toBe(accepted.body.batchId);
-  }, 60_000);
-
-  it("refuses a back-dated stock entry once the cut-over applies on the business date", async () => {
-    await setCutover("2026-01-01");
-    await expect(
-      asMaintenance(() => db.transaction((tx) => stockEntryCutoverTx(tx, ctx.companyId, "2025-12-31")))
-    ).rejects.toMatchObject({ statusCode: 409, code: "FACTORY_STOCK_ENTRY_BEFORE_CUTOVER" });
-    const today = getCompanyBusinessDate(TIMEZONE);
-    const state = await asMaintenance(() => db.transaction((tx) => stockEntryCutoverTx(tx, ctx.companyId, today)));
-    expect(state).toEqual({ perpetual: true, businessDate: today });
-    // A cut-over still ahead: an earlier entry is not perpetual and not refused.
-    await setCutover("2099-01-01");
-    expect(
-      await asMaintenance(() => db.transaction((tx) => stockEntryCutoverTx(tx, ctx.companyId, "2025-12-31")))
-    ).toMatchObject({ perpetual: false });
-    await setCutover(null);
-  });
 });
 
 describe("4: aging", () => {

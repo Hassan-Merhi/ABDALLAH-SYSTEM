@@ -1,5 +1,5 @@
 /**
- * Response pins for the six route files whose bulk is a single handler.
+ * Response pins for the ERP route files whose bulk is a single handler.
  *
  * These are the last of the Phase 3 monoliths, and the route manifest cannot
  * carry them: it proves a route is still *registered* after a change, not that
@@ -28,12 +28,11 @@ import { pool } from "../server/db";
 import { seedTestData, cleanupTestData, closeTestServer, type TestContext } from "./setup";
 
 /**
- * Two fixtures: the factory endpoints resolve a factory-type company and answer
- * 403 against an ERP one, so pinning them from a single seed would pin the
- * guard rather than the handler.
+ * One ERP fixture. ABDALLAH-SYSTEM retires Factory Mode and refuses every
+ * /api/factory request, so the Factory net-position, supplier-statement and
+ * raw-stock offload handlers are no longer pinned here.
  */
 const ERP_PREFIX = "chartest";
-const FACTORY_PREFIX = "charfact";
 const PIN_PATH = path.join(process.cwd(), "config/report-characterization.json");
 const shouldUpdate = process.env.UPDATE_REPORT_CHARACTERIZATION === "1";
 const REQUEST_TIMEOUT_MS = 30000;
@@ -50,8 +49,6 @@ const FIXED_CLIENT_DATE = "2030-12-31";
 interface PinnedEndpoint {
   /** Route file this endpoint is the whole of, for traceability. */
   sourceModule: string;
-  /** Which seeded company this endpoint needs to reach its handler. */
-  fixture: "erp" | "factory";
   method: "GET" | "POST" | "PATCH";
   path: string;
   /** Query string appended verbatim; keeps the request deterministic. */
@@ -97,39 +94,23 @@ async function clearPurchaseOrderFixture(prefix: string): Promise<void> {
 const ENDPOINTS: PinnedEndpoint[] = [
   {
     sourceModule: "server/routes/stats/statsNetProfitRoutes.ts",
-    fixture: "erp",
     method: "GET",
     path: "/api/stats/net-profit",
     query: "startDate=2020-01-01&endDate=2030-12-31",
   },
   {
     sourceModule: "server/routes/netProfitExcelRoute.ts",
-    fixture: "erp",
     method: "GET",
     path: "/api/reports/net-profit-excel",
     query: "startDate=2020-01-01&endDate=2030-12-31",
     binary: true,
   },
-  {
-    sourceModule: "server/routes/factory/employee-pos/employeeNetPositionRoutes.ts",
-    fixture: "factory",
-    method: "GET",
-    path: "/api/factory/net-position",
-    // Today's report. A future asOf is now refused (400), and a past one is a
-    // known-at-cutoff snapshot; the fixture's rows are all dated by today.
-  },
-  {
-    sourceModule: "server/routes/factory/suppliers/supplierStatementRoutes.ts",
-    fixture: "factory",
-    method: "GET",
-    path: "/api/factory/suppliers/:supplierId/statement",
-  },
+
   {
     // The 1,156-line handler in this file, and the one the god-file program
     // named as having no test referencing it at all. It recomputes a purchase
     // order's charge totals, so the figures are the whole point.
     sourceModule: "server/routes/containers/containerFreightWriteRoutes.ts",
-    fixture: "erp",
     method: "PATCH",
     path: "/api/purchase-orders/:poId",
     isolate: true,
@@ -169,47 +150,17 @@ const ENDPOINTS: PinnedEndpoint[] = [
     },
     teardown: async (_ctx, prefix) => clearPurchaseOrderFixture(prefix),
   },
-  {
-    // The 972-line handler: landed-cost calculation for a container receipt.
-    // It writes raw stock and posts journals, which is why it is isolated.
-    sourceModule: "server/routes/factory/raw-stock/rawStockOffloadRoutes.ts",
-    fixture: "factory",
-    method: "POST",
-    path: "/api/factory/raw-stock/offload",
-    isolate: true,
-    body: {
-      receivedKg: "1000",
-      costPerKg: "2.5",
-      currencyCode: "USD",
-      fxRateToUsd: "1",
-      offloadDate: "2030-12-31",
-    },
-    setup: async (ctx, prefix) => {
-      // factory_containers *is* company-scoped in cleanupTestData, so this
-      // needs no teardown of its own.
-      const container = await pool.query(
-        `INSERT INTO factory_containers
-           (company_id, container_number, declared_kg, rate_per_kg, currency_code, fx_rate_to_usd, status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-        [ctx.companyId, `${prefix}-FC-1`, "1000.000", "2.500000", "USD", "1", "PENDING"]
-      );
-      return { ":containerId": String(container.rows[0].id) };
-    },
-  },
 ];
 
 /**
  * The route files this suite exists to protect. Asserted against the pins, so
- * that "the six single-handler files are pinned" is a checked claim rather than
- * a sentence in a comment — it read "six" while covering four.
+ * that "the single-handler files are pinned" is a checked claim rather than a
+ * sentence in a comment — it once read "six" while covering four.
  */
 const PHASE_3_MODULES = [
   "server/routes/stats/statsNetProfitRoutes.ts",
   "server/routes/netProfitExcelRoute.ts",
-  "server/routes/factory/employee-pos/employeeNetPositionRoutes.ts",
-  "server/routes/factory/suppliers/supplierStatementRoutes.ts",
   "server/routes/containers/containerFreightWriteRoutes.ts",
-  "server/routes/factory/raw-stock/rawStockOffloadRoutes.ts",
 ];
 
 interface PinFile {
@@ -329,7 +280,7 @@ function loadPins(): PinFile {
 const observed: PinFile["pins"] = {};
 
 /** Seed one fixture, walk the endpoints that need it, then release it. */
-async function captureWith(prefix: string, fixture: "erp" | "factory"): Promise<void> {
+async function captureWith(prefix: string): Promise<void> {
   const ctx: TestContext = await seedTestData(prefix);
   try {
     const agent = request.agent(ctx.app);
@@ -340,21 +291,8 @@ async function captureWith(prefix: string, fixture: "erp" | "factory"): Promise<
     if (login.status !== 200) throw new Error(`Login failed for ${prefix}: ${login.status}`);
     await agent.post("/api/auth/set-company").send({ companyId: ctx.companyId });
 
-    // The shared fixture seeds no factory supplier, so the statement endpoint
-    // would 404 for any id and the pin would capture the miss rather than the
-    // report. Create one and pin the statement it actually produces.
-    let supplierId = 0;
-    if (fixture === "factory") {
-      const created = await agent
-        .post("/api/factory/suppliers")
-        .send({ name: `${prefix} supplier`, currencyCode: "USD" });
-      supplierId = (created.body as { id?: number })?.id ?? 0;
-      if (!supplierId) throw new Error(`Could not seed a factory supplier: ${created.status}`);
-    }
-
-    for (const endpoint of ENDPOINTS.filter((e) => e.fixture === fixture && !e.isolate)) {
-      const resolved = endpoint.path.replace(":supplierId", String(supplierId));
-      const url = endpoint.query ? `${resolved}?${endpoint.query}` : resolved;
+    for (const endpoint of ENDPOINTS.filter((e) => !e.isolate)) {
+      const url = endpoint.query ? `${endpoint.path}?${endpoint.query}` : endpoint.path;
 
       let call = agent[endpoint.method === "GET" ? "get" : "post"](url).set("x-client-date", FIXED_CLIENT_DATE);
       if (endpoint.binary)
@@ -437,11 +375,10 @@ async function captureIsolated(endpoint: PinnedEndpoint, prefix: string): Promis
 }
 
 beforeAll(async () => {
-  await captureWith(ERP_PREFIX, "erp");
-  await captureWith(FACTORY_PREFIX, "factory");
+  await captureWith(ERP_PREFIX);
 
   for (const endpoint of ENDPOINTS.filter((e) => e.isolate)) {
-    await captureIsolated(endpoint, endpoint.fixture === "factory" ? FACTORY_PREFIX : ERP_PREFIX);
+    await captureIsolated(endpoint, ERP_PREFIX);
   }
 
   if (shouldUpdate) {

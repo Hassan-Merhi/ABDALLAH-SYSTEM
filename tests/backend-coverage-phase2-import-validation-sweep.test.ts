@@ -14,9 +14,10 @@ import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { pool } from "../server/db";
+import { isRetiredAbdallahApiRequest } from "../server/middleware/abdallahErpRetiredFeatureBoundary";
 import { cleanupTestData, closeTestServer, seedTestData, type TestContext } from "./setup";
 
-type CompanyMode = "erp" | "factory" | "properties" | "supplier_partner";
+type CompanyMode = "erp";
 type Manifest = { routes: string[] };
 type RouteCase = { mode: CompanyMode; path: string; multipart: boolean };
 type Fingerprint = {
@@ -51,21 +52,21 @@ let agent: request.SuperAgentTest;
 let companies: Record<CompanyMode, number>;
 let routes: RouteCase[] = [];
 let before: Record<CompanyMode, Fingerprint>;
-let sequence = 0;
 
-function modeForPath(routePath: string): CompanyMode {
+/**
+ * ABDALLAH-SYSTEM is ERP only: routes owned by the retired Factory, Supplier
+ * Partner and Properties modes have no ERP tenant to run in.
+ */
+function modeForPath(routePath: string): CompanyMode | null {
   if (
     routePath.startsWith("/api/factory/") ||
     routePath.startsWith("/api/factory-") ||
-    routePath.startsWith("/api/factory-workers/")
+    routePath.startsWith("/api/sp/") ||
+    routePath.startsWith("/api/sp-migration/") ||
+    routePath.startsWith("/api/properties/") ||
+    routePath.startsWith("/api/rental/")
   ) {
-    return "factory";
-  }
-  if (routePath.startsWith("/api/sp/") || routePath.startsWith("/api/sp-migration/")) {
-    return "supplier_partner";
-  }
-  if (routePath.startsWith("/api/properties/") || routePath.startsWith("/api/rental/")) {
-    return "properties";
+    return null;
   }
   return "erp";
 }
@@ -81,6 +82,7 @@ export function selectPhase2ImportValidationRoutes(manifest: Manifest): RouteCas
     if (!IMPORT_PATTERN.test(routePath) || EXCLUDED.some((pattern) => pattern.test(routePath))) continue;
 
     const mode = modeForPath(routePath);
+    if (!mode || isRetiredAbdallahApiRequest(method, routePath)) continue;
     const key = `${mode} ${routePath}`;
     if (seen.has(key)) continue;
     seen.add(key);
@@ -88,32 +90,6 @@ export function selectPhase2ImportValidationRoutes(manifest: Manifest): RouteCas
   }
 
   return selected;
-}
-
-async function createCompany(mode: Exclude<CompanyMode, "erp">): Promise<number> {
-  sequence += 1;
-  const result = await pool.query<{ id: number }>(
-    `INSERT INTO companies (code, name, company_type, parent_company_id, active, base_currency)
-     VALUES ($1, $2, $3, $4, true, 'USD') RETURNING id`,
-    [`P2I${sequence}${mode.slice(0, 2)}`.slice(0, 50), `${TEST_PREFIX}_${mode}_${sequence}`, mode, ctx.companyId]
-  );
-  const companyId = result.rows[0].id;
-
-  await pool.query(
-    `INSERT INTO user_company_roles
-       (user_id, company_id, role, can_delete_records, can_sell_negative_stock)
-     VALUES ($1, $2, 'Developer', true, true)`,
-    [ctx.userId, companyId]
-  );
-  await pool.query(
-    `INSERT INTO user_security_permissions (user_id, company_id, permission, granted_by)
-     SELECT user_id, $2, permission, granted_by
-       FROM user_security_permissions
-      WHERE user_id = $1 AND company_id = $3
-     ON CONFLICT (user_id, company_id, permission) DO NOTHING`,
-    [ctx.userId, companyId, ctx.companyId]
-  );
-  return companyId;
 }
 
 async function fingerprint(companyId: number): Promise<Fingerprint> {
@@ -183,19 +159,9 @@ beforeAll(async () => {
   });
   if (login.status !== 200) throw new Error(`Login failed: ${login.status} ${login.text}`);
 
-  companies = {
-    erp: ctx.companyId,
-    factory: await createCompany("factory"),
-    properties: await createCompany("properties"),
-    supplier_partner: await createCompany("supplier_partner"),
-  };
+  companies = { erp: ctx.companyId };
   routes = selectPhase2ImportValidationRoutes(JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8")) as Manifest);
-  before = {
-    erp: await fingerprint(companies.erp),
-    factory: await fingerprint(companies.factory),
-    properties: await fingerprint(companies.properties),
-    supplier_partner: await fingerprint(companies.supplier_partner),
-  };
+  before = { erp: await fingerprint(companies.erp) };
 }, 120000);
 
 afterAll(async () => {
@@ -204,11 +170,11 @@ afterAll(async () => {
 }, 120000);
 
 describe("Phase 2 import/upload validation sweep", () => {
-  it("rejects empty imports cleanly across every company mode", async () => {
+  it("rejects empty imports cleanly in the ERP company", async () => {
     expect(routes.length).toBeGreaterThan(15);
     const failures: Array<{ route: string; status: number; detail: string }> = [];
 
-    for (const mode of ["erp", "factory", "properties", "supplier_partner"] as CompanyMode[]) {
+    for (const mode of ["erp"] as CompanyMode[]) {
       const switched = await agent.post("/api/auth/set-company").send({ companyId: companies[mode] });
       expect(switched.status, `set-company ${mode}`).toBe(200);
 

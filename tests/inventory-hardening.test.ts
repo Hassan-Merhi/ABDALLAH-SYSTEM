@@ -105,35 +105,6 @@ describe("Inventory API hardening", () => {
     expect(await getInventoryQty(ctx.locationId, ctx.stockItemIds[0])).toBe(110);
   });
 
-  it("conserves total quantity when a transfer intentionally creates negative source stock", async () => {
-    const initialTotal =
-      (await getInventoryQty(ctx.locationId, ctx.stockItemIds[0])) +
-      (await getInventoryQty(ctx.location2Id, ctx.stockItemIds[0]));
-
-    const res = await agent.post("/api/stock-transfers").send({
-      sourceLocationId: ctx.locationId,
-      destinationLocationId: ctx.location2Id,
-      items: [
-        {
-          stockItemId: ctx.stockItemIds[0],
-          quantity: 150,
-          sourceLocationId: ctx.locationId,
-        },
-      ],
-      notes: "Negative-source transfer invariant test",
-      voucherDate: new Date().toISOString().split("T")[0],
-    });
-
-    expect(res.status).toBeGreaterThanOrEqual(200);
-    expect(res.status).toBeLessThan(300);
-
-    const sourceQty = await getInventoryQty(ctx.locationId, ctx.stockItemIds[0]);
-    const destinationQty = await getInventoryQty(ctx.location2Id, ctx.stockItemIds[0]);
-    expect(sourceQty).toBe(-50);
-    expect(destinationQty).toBe(200);
-    expect(sourceQty + destinationQty).toBe(initialTotal);
-  });
-
   it("keeps inventory unchanged after a rejected excessive quick subtraction", async () => {
     const res = await agent.post("/api/inventory/quick-adjust").send({
       stockItemId: ctx.stockItemIds[0],

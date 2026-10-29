@@ -4,7 +4,7 @@
  *
  *   - Account rules: an account with posted lines changes its opening only by
  *     an Admin or Owner (audited in the transaction), permits category edits
- *     by privileged roles, never moves company (ledger accounts, banks, factory suppliers).
+ *     by privileged roles, never moves company (ledger accounts, banks).
  *   - Factory suppliers and fixed assets are under the opening-balance lock.
  *   - transfer-account is Admin/Owner, one transaction, audited in it.
  *   - Central voucher handlers write their audit in the posting transaction:
@@ -127,8 +127,6 @@ async function auditRows(tableName: string, recordId: number) {
 
 beforeAll(async () => {
   ctx = await seedTestData(PREFIX);
-  // Factory supplier routes need a factory company.
-  await pool.query(`UPDATE companies SET company_type = 'factory' WHERE id = $1`, [ctx.companyId]);
   expect(await ensureLedgerIntegrityGuard(pool)).toBe(true);
   await ensureClosedPeriodGuard(pool);
   expect(await ensureOpeningBalanceLock(pool)).toBe(true);
@@ -349,54 +347,6 @@ describe("bank account edits", () => {
   });
 });
 
-describe("factory suppliers", () => {
-  let supplierId: number;
-
-  beforeAll(async () => {
-    const created = await agent
-      .post("/api/factory/suppliers")
-      .send({ name: `${PREFIX} Supplier`, openingBalance: "25" });
-    expect(created.status).toBe(200);
-    supplierId = created.body.id;
-    expect((await auditRows("factory_suppliers", supplierId)).map((row) => row.action)).toEqual(["create"]);
-    await postAgainst({ factory_supplier_id: supplierId });
-  });
-
-  it("writes only the supplier's editable fields, under the history rules, audited", async () => {
-    // A column outside the edit schema is not written (the raw body used to be).
-    const edit = await agent
-      .patch(`/api/factory/suppliers/${supplierId}`)
-      .send({ phone: "123", currentRawMaterialCostPerKgUsd: "9.99" });
-    expect(edit.status).toBe(200);
-    const row = (
-      await pool.query(`SELECT phone, current_raw_material_cost_per_kg_usd FROM factory_suppliers WHERE id = $1`, [
-        supplierId,
-      ])
-    ).rows[0];
-    expect(row).toEqual({ phone: "123", current_raw_material_cost_per_kg_usd: null });
-
-    await setRole("Manager");
-    const refused = await agent
-      .patch(`/api/factory/suppliers/${supplierId}/opening-balance`)
-      .send({ openingBalance: "30" });
-    expect(refused.status).toBe(403);
-    await setRole("Admin");
-    const accepted = await agent.patch(`/api/factory/suppliers/${supplierId}/opening-balance`).send({
-      openingBalance: "30.10",
-    });
-    expect(accepted.status).toBe(200);
-    expect(accepted.body.openingBalance).toBe("30.1000");
-    const audit = (await auditRows("factory_suppliers", supplierId)).at(-1);
-    expect(audit?.changes.openingBalance).toEqual({ old: "25.0000", new: "30.1000" });
-
-    const moved = await agent.patch(`/api/factory/suppliers/${supplierId}`).send({ companyId: otherCompanyId });
-    expect([403, 409]).toContain(moved.status);
-    expect(
-      (await pool.query(`SELECT company_id FROM factory_suppliers WHERE id = $1`, [supplierId])).rows[0].company_id
-    ).toBe(ctx.companyId);
-  });
-});
-
 describe("opening-balance lock v2", () => {
   it("installs on factory suppliers and fixed assets and refuses their opening changes after a close", async () => {
     expect(await installedOpeningBalanceLockVersion(pool)).toBe(OPENING_BALANCE_LOCK_VERSION);
@@ -431,10 +381,6 @@ describe("opening-balance lock v2", () => {
         // Other fields stay editable.
         await pool.query(`UPDATE ${table} SET name = name || ' (renamed)' WHERE id = $1`, [id]);
       }
-      const routeRefusal = await agent.patch(`/api/factory/suppliers/${supplier}/opening-balance`).send({
-        openingBalance: "6",
-      });
-      expect(routeRefusal.status).toBe(409);
     } finally {
       await withFixtureTransaction(async (client) => {
         await client.query(`SET LOCAL app.closed_period_override = 'on'`);

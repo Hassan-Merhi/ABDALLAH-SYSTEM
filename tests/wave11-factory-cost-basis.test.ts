@@ -631,7 +631,7 @@ describe("the reviewed bale re-cost", () => {
         `INSERT INTO customer_orders
           (company_id, customer_id, order_date, status, invoice_number, finalized_at)
          VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
-        [companyId, customerId, today, status, invoiced ? `INV-${baleId}` : null, invoiced ? new Date() : null]
+        [companyId, customerId, today, status, invoiced ? `INV-BALE-${baleId}` : null, invoiced ? new Date() : null]
       );
       await pool.query(
         `INSERT INTO customer_order_bales
@@ -698,7 +698,7 @@ describe("the reviewed bale re-cost", () => {
     // Even without changing the stored SOLD status, an invoice issued between
     // preview and apply must invalidate the previously reviewed plan hash.
     await pool.query("UPDATE customer_orders SET invoice_number=$1, finalized_at=NOW() WHERE id=$2", [
-      `INV-${unbilledOrder}`,
+      `INV-ORDER-${unbilledOrder}`,
       unbilledOrder,
     ]);
     const refused = await call("POST /api/factory/bale-cost/recost-apply", {
