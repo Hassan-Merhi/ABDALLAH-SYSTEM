@@ -61,6 +61,32 @@ jobs:
       - name: Verify PostgreSQL scratch database starts empty
         run: node scripts/oracle-db-preflight.mjs --empty
       - name: Provision declared schema in a DISPOSABLE CI database only
+        env:
+          ORACLE_BOOTSTRAP_NEW_DATABASE: "YES"
         run: node scripts/oracle-bootstrap-empty-db.mjs
       - name: Verify core tables exist after disposable schema creation
         run: node scripts/oracle-db-preflight.mjs --ready
+      - name: Smoke-test first application boot on disposable PostgreSQL
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm start > "$RUNNER_TEMP/oracle-first-boot.log" 2>&1 &
+          app_pid=$!
+          trap 'kill "$app_pid" 2>/dev/null || true; tail -n 80 "$RUNNER_TEMP/oracle-first-boot.log"' EXIT
+          ready=0
+          for attempt in $(seq 1 120); do
+            if curl --fail --silent http://127.0.0.1:5000/api/health/db > "$RUNNER_TEMP/oracle-health.json"; then
+              if node -e "const fs=require('fs'); const j=JSON.parse(fs.readFileSync(process.argv[1],'utf8')); process.exit(j.migrations?.completed ? 0 : 1)" "$RUNNER_TEMP/oracle-health.json"; then
+                ready=1
+                break
+              fi
+            fi
+            if ! kill -0 "$app_pid" 2>/dev/null; then
+              echo "ERP exited during first boot"
+              exit 1
+            fi
+            sleep 3
+          done
+          test "$ready" -eq 1 || { echo "ERP did not finish first-boot migrations"; exit 1; }
+          node scripts/verify-startup-migrations.mjs --report "$RUNNER_TEMP/oracle-health.json" --label "Oracle ARM64 first boot"
+          curl --fail --silent --show-error http://127.0.0.1:5000/api/health/ready > /dev/null
