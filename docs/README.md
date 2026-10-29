@@ -20,6 +20,7 @@ failure, so a correct document cannot quietly become undiscoverable.
 |---|---|
 | [what-is-this.md](what-is-this.md) | What the system is, in one page |
 | [onboarding.md](onboarding.md) | First login through first transaction |
+| [render-aiven-free.md](render-aiven-free.md) | Render Free + Aiven Free test deployment and safety checks |
 | [architecture.md](architecture.md) | How the codebase fits together |
 | [core-concepts.md](core-concepts.md) | Companies, modes, tenancy, the vocabulary |
 | [contributing.md](contributing.md) | Project layout and how to work in it |
