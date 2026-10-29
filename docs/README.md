@@ -20,6 +20,7 @@ failure, so a correct document cannot quietly become undiscoverable.
 |---|---|
 | [what-is-this.md](what-is-this.md) | What the system is, in one page |
 | [onboarding.md](onboarding.md) | First login through first transaction |
+| [oracle-always-free.md](oracle-always-free.md) | Deploy the dedicated ERP on Oracle ARM64 with PostgreSQL 18 and guarded bootstrap |
 | [architecture.md](architecture.md) | How the codebase fits together |
 | [core-concepts.md](core-concepts.md) | Companies, modes, tenancy, the vocabulary |
 | [contributing.md](contributing.md) | Project layout and how to work in it |
