@@ -134,7 +134,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   const companies: Company[] = userCompanyAssignments
     .map(mapCompanyAssignment)
     .filter(
-      (company, index, allCompanies) => index === allCompanies.findIndex((candidate) => candidate.id === company.id)
+      (company, index, allCompanies) => company.companyType === "erp" && index === allCompanies.findIndex((candidate) => candidate.id === company.id)
     );
   const companiesRef = useRef(companies);
   companiesRef.current = companies;
@@ -168,6 +168,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
 
   const performCompanySelection = useCallback(
     async (company: Company, options: CompanySelectionOptions = {}): Promise<boolean> => {
+      if (company.companyType !== "erp") return false;
       if (selectedCompanyRef.current?.id === company.id) {
         if (options.offline || lastSyncedCompanyId.current === company.id) return true;
       }
