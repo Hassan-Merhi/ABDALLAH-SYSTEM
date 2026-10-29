@@ -39,9 +39,9 @@ describe("command palette hub tabs for retail companies", () => {
     companyState.companyType = "erp";
   });
 
-  it("offers the Sales Tools tabs to non-retail companies", () => {
+  it("offers the Sales Tools tabs to non-retail companies, except the retired Stock Transfers", () => {
     renderPalette();
-    expect(screen.getByText("Stock Transfers")).toBeInTheDocument();
+    expect(screen.queryByText("Stock Transfers")).toBeNull();
     expect(screen.getByText("Price List")).toBeInTheDocument();
   });
 

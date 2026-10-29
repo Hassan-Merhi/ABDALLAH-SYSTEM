@@ -20,16 +20,18 @@ describe("Retail navigation", () => {
     expect(RETAIL_NAV_LINKS.map((link) => link.href)).toEqual(["/retail/inventory"]);
   });
 
-  it("redirects old Selling settings bookmarks to Retail Inventory", () => {
-    expect(route("/retail/selling", "retail")).toEqual({ kind: "redirect", to: "/retail/inventory" });
+  it("sends old Selling settings bookmarks to Tracking now that /retail is retired", () => {
+    expect(route("/retail/selling", "retail")).toEqual({ kind: "redirect", to: "/tracking" });
   });
 
   it("redirects retired retail quick-add, stock operations and optional vouchers", () => {
     for (const path of ["/retail/quick-add", "/retail/stock", "/optional-vouchers"]) {
-      expect(route(path, "retail")).toEqual({ kind: "redirect", to: "/retail/inventory" });
-      expect(route(path, "erp")).toEqual(
-        path.startsWith("/retail/") ? { kind: "redirect", to: "/tracking" } : { kind: "continue" }
+      // ABDALLAH blocks every /retail page for all companies before Retail routing runs.
+      const isRetailPage = path.startsWith("/retail/");
+      expect(route(path, "retail")).toEqual(
+        isRetailPage ? { kind: "redirect", to: "/tracking" } : { kind: "redirect", to: "/retail/inventory" }
       );
+      expect(route(path, "erp")).toEqual(isRetailPage ? { kind: "redirect", to: "/tracking" } : { kind: "continue" });
     }
   });
 
@@ -37,9 +39,9 @@ describe("Retail navigation", () => {
     expect(route("/pos", "retail")).toEqual({ kind: "redirect", to: "/retail/pos" });
   });
 
-  it("redirects legacy Transfer Order links to Retail Vouchers, for Retail only", () => {
-    expect(route("/stock-transfer-order", "retail")).toEqual({ kind: "redirect", to: "/vouchers?tab=transfer" });
-    expect(route("/stock-transfer-order/12", "retail")).toEqual({ kind: "redirect", to: "/vouchers?tab=transfer" });
-    expect(route("/stock-transfer-order", "erp")).toEqual({ kind: "continue" });
+  it("blocks retired Transfer Order links for every company type", () => {
+    expect(route("/stock-transfer-order", "retail")).toEqual({ kind: "redirect", to: "/tracking" });
+    expect(route("/stock-transfer-order/12", "retail")).toEqual({ kind: "redirect", to: "/tracking" });
+    expect(route("/stock-transfer-order", "erp")).toEqual({ kind: "redirect", to: "/tracking" });
   });
 });

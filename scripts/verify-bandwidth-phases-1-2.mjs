@@ -299,7 +299,7 @@ if (fs.existsSync(distAssets)) {
   const assetFiles = fs.readdirSync(distAssets);
   const jsFiles = assetFiles.filter((name) => name.endsWith(".js"));
   const labelChunks = jsFiles.filter((name) => /^label-printing-[A-Za-z0-9_-]+\.js$/.test(name));
-  const labelLogos = assetFiles.filter((name) => /^hmd-label-logo-[a-f0-9]{12}\.jpg$/.test(name));
+  const labelLogos = assetFiles.filter((name) => /^dakzo-label-logo-[a-f0-9]{12}\.png$/.test(name));
 
   if (labelChunks.length !== 1) {
     failures.push(`Expected exactly one label-printing chunk, found ${labelChunks.length}.`);

@@ -31,10 +31,10 @@ describe("hub tab navigation", () => {
   });
 
   it("renders the StockHub tab selected by a valid direct URL", () => {
-    window.history.replaceState({}, "", "/stock?tab=offload");
+    window.history.replaceState({}, "", "/stock?tab=query");
     render(<StockHub />);
 
-    expect(screen.getByText("Offload content")).toBeInTheDocument();
+    expect(screen.getByText("Stock query content")).toBeInTheDocument();
     expect(screen.queryByText("Stock items content")).not.toBeInTheDocument();
   });
 

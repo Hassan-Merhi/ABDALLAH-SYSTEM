@@ -1,19 +1,13 @@
 import { describe, expect, it } from "vitest";
-import {
-  RETIRED_ABDALLAH_ERP_API_PREFIXES,
-  isRetiredAbdallahErpRequest,
-} from "./abdallahErpRetiredFeatureBoundary";
+import { RETIRED_ABDALLAH_ERP_API_PREFIXES, isRetiredAbdallahErpRequest } from "./abdallahErpRetiredFeatureBoundary";
 
 describe("Abdallah ERP retired feature boundary", () => {
-  it.each(RETIRED_ABDALLAH_ERP_API_PREFIXES)(
-    "blocks direct API access to %s (including child URLs)",
-    (prefix) => {
-      expect(isRetiredAbdallahErpRequest("GET", prefix)).toBe(true);
-      expect(isRetiredAbdallahErpRequest("POST", prefix + "/123")).toBe(true);
-      expect(isRetiredAbdallahErpRequest("DELETE", prefix + "/123")).toBe(true);
-      expect(isRetiredAbdallahErpRequest("HEAD", prefix.toUpperCase() + "/")).toBe(true);
-    },
-  );
+  it.each(RETIRED_ABDALLAH_ERP_API_PREFIXES)("blocks direct API access to %s (including child URLs)", (prefix) => {
+    expect(isRetiredAbdallahErpRequest("GET", prefix)).toBe(true);
+    expect(isRetiredAbdallahErpRequest("POST", prefix + "/123")).toBe(true);
+    expect(isRetiredAbdallahErpRequest("DELETE", prefix + "/123")).toBe(true);
+    expect(isRetiredAbdallahErpRequest("HEAD", prefix.toUpperCase() + "/")).toBe(true);
+  });
 
   it("blocks watching active users without breaking presence heartbeat or sign-out", () => {
     expect(isRetiredAbdallahErpRequest("GET", "/api/user-presence")).toBe(true);
@@ -26,7 +20,9 @@ describe("Abdallah ERP retired feature boundary", () => {
   it("blocks Floating Widgets preference changes but preserves other preferences", () => {
     expect(isRetiredAbdallahErpRequest("PUT", "/api/user-preferences", { showChatWidget: false })).toBe(true);
     expect(isRetiredAbdallahErpRequest("PUT", "/api/user-preferences", { showNotesPanel: true })).toBe(true);
-    expect(isRetiredAbdallahErpRequest("PUT", "/api/user-preferences", { showChatWidget: null, dateFormat: "DD/MM/YYYY" })).toBe(true);
+    expect(
+      isRetiredAbdallahErpRequest("PUT", "/api/user-preferences", { showChatWidget: null, dateFormat: "DD/MM/YYYY" })
+    ).toBe(true);
     expect(isRetiredAbdallahErpRequest("PUT", "/api/user-preferences", { dateFormat: "DD/MM/YYYY" })).toBe(false);
     expect(isRetiredAbdallahErpRequest("GET", "/api/user-preferences")).toBe(false);
   });

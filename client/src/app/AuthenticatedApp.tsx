@@ -42,8 +42,8 @@ export function AuthenticatedApp({ user, handleLogout }: AuthenticatedAppProps) 
       userRole: user.role ?? undefined,
     });
 
-  if (companyLoading) return <AppLoadingState />;
-  if (!selectedCompany || selectedCompany.companyType !== "erp") {
+  if (companyLoading || !selectedCompany) return <AppLoadingState />;
+  if (selectedCompany.companyType !== "erp") {
     return (
       <div role="alert" className="flex min-h-screen items-center justify-center p-6 text-center">
         ABDALLAH-SYSTEM supports ERP workspaces only. Ask your administrator to assign an ERP company.

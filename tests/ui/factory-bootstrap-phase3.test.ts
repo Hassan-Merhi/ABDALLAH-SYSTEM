@@ -19,20 +19,7 @@ describe("Phase 3 factory bootstrap isolation", () => {
   it("blocks Settings for ERP Tester across all company types without blocking regular operations", () => {
     const cases = [
       { companyType: "erp", settings: "/settings", normal: "/tracking", fallback: "/tracking" },
-      { companyType: "retail", settings: "/my-settings", normal: "/retail/pos", fallback: "/tracking" },
-      {
-        companyType: "factory",
-        settings: "/factory/intelligence/settings",
-        normal: "/factory/production-report",
-        fallback: "/factory/production-report",
-      },
-      {
-        companyType: "properties",
-        settings: "/properties/my-settings",
-        normal: "/properties/daybook",
-        fallback: "/properties/daybook",
-      },
-      { companyType: "supplier_partner", settings: "/sp/setup", normal: "/sp", fallback: "/sp" },
+      { companyType: "retail", settings: "/my-settings", normal: "/vouchers", fallback: "/tracking" },
     ] as const;
 
     for (const item of cases) {
@@ -53,6 +40,24 @@ describe("Phase 3 factory bootstrap isolation", () => {
         myAccess: fullFactoryAccess,
       });
       expect(allowed.decision).toEqual({ kind: "continue" });
+    }
+
+    // ABDALLAH retires the Factory, Properties and Supplier Partner workspaces,
+    // so their settings pages are blocked before any role-specific fallback.
+    const retired = [
+      { companyType: "factory", settings: "/factory/intelligence/settings" },
+      { companyType: "properties", settings: "/properties/my-settings" },
+      { companyType: "supplier_partner", settings: "/sp/setup" },
+    ] as const;
+    for (const item of retired) {
+      const blocked = resolveAuthenticatedAppRoute({
+        ...baseGuardInput,
+        currentLocation: item.settings,
+        companyType: item.companyType,
+        userRole: "ERP Tester",
+        myAccess: fullFactoryAccess,
+      });
+      expect(blocked.decision).toEqual({ kind: "redirect", to: "/tracking" });
     }
   });
 
@@ -96,16 +101,16 @@ describe("Phase 3 factory bootstrap isolation", () => {
     expect(result.hasErpAccess).toBe(true);
   });
 
-  it("keeps a Factory route loading while access is still being resolved", () => {
+  it("keeps a Factory company loading while access is still being resolved", () => {
     const loading = resolveAuthenticatedAppRoute({
       ...baseGuardInput,
-      currentLocation: "/factory/production-report",
+      currentLocation: "/tracking",
       companyType: "factory",
       myAccessLoading: true,
     });
     const noDataYet = resolveAuthenticatedAppRoute({
       ...baseGuardInput,
-      currentLocation: "/factory/production-report",
+      currentLocation: "/tracking",
       companyType: "factory",
     });
 
@@ -116,7 +121,7 @@ describe("Phase 3 factory bootstrap isolation", () => {
   it("surfaces recovery only after Factory access retries have ended in error", () => {
     const result = resolveAuthenticatedAppRoute({
       ...baseGuardInput,
-      currentLocation: "/factory/production-report",
+      currentLocation: "/tracking",
       companyType: "factory",
       myAccessError: true,
     });
@@ -127,16 +132,18 @@ describe("Phase 3 factory bootstrap isolation", () => {
   it("keeps cached Factory access usable when a background refetch fails", () => {
     const result = resolveAuthenticatedAppRoute({
       ...baseGuardInput,
-      currentLocation: "/factory/production-report",
+      currentLocation: "/tracking",
       companyType: "factory",
       myAccess: fullFactoryAccess,
       myAccessError: true,
     });
 
-    expect(result.decision).toEqual({ kind: "continue" });
+    // Cached access moves past the bootstrap gate to the Factory landing page
+    // instead of surfacing the recovery screen.
+    expect(result.decision).toEqual({ kind: "redirect", to: result.factoryDefaultPage });
   });
 
-  it("continues into Factory after valid access is loaded", () => {
+  it("blocks Factory routes even after valid Factory access is loaded", () => {
     const result = resolveAuthenticatedAppRoute({
       ...baseGuardInput,
       currentLocation: "/factory/production-report",
@@ -144,7 +151,7 @@ describe("Phase 3 factory bootstrap isolation", () => {
       myAccess: fullFactoryAccess,
     });
 
-    expect(result.decision).toEqual({ kind: "continue" });
+    expect(result.decision).toEqual({ kind: "redirect", to: "/tracking" });
   });
 
   it("rejects a stale Factory URL for a non-Factory company without waiting for Factory data", () => {
@@ -155,7 +162,7 @@ describe("Phase 3 factory bootstrap isolation", () => {
       myAccessLoading: true,
     });
 
-    expect(result.decision).toEqual({ kind: "redirect", to: "/" });
+    expect(result.decision).toEqual({ kind: "redirect", to: "/tracking" });
   });
 
   it("only enables Factory bootstrap queries for Factory companies", () => {

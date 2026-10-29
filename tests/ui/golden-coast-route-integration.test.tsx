@@ -25,14 +25,14 @@ const guardInput = {
 };
 
 describe("Golden Coast route and navigation wiring", () => {
-  it("admits /sp/golden-coast for a Supplier Partner company", () => {
+  it("blocks /sp/golden-coast even for a Supplier Partner company now that /sp is retired", () => {
     const { decision } = resolveAuthenticatedAppRoute({
       ...guardInput,
       currentLocation: "/sp/golden-coast",
       companyType: "supplier_partner",
     });
 
-    expect(decision).toEqual({ kind: "continue" });
+    expect(decision).toEqual({ kind: "redirect", to: "/tracking" });
   });
 
   it("keeps the route closed to companies that are not Supplier Partners", () => {
@@ -45,14 +45,14 @@ describe("Golden Coast route and navigation wiring", () => {
     expect(decision).toEqual({ kind: "redirect", to: "/tracking" });
   });
 
-  it("leaves unknown Supplier Partner routes redirecting to the overview", () => {
+  it("sends unknown Supplier Partner routes to Tracking as well", () => {
     const { decision } = resolveAuthenticatedAppRoute({
       ...guardInput,
       currentLocation: "/sp/golden-coast-typo",
       companyType: "supplier_partner",
     });
 
-    expect(decision).toEqual({ kind: "redirect", to: "/sp" });
+    expect(decision).toEqual({ kind: "redirect", to: "/tracking" });
   });
 
   it("offers Golden Coast and Setup in the Supplier Partner navigation", () => {

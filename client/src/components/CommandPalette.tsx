@@ -451,7 +451,7 @@ export function CommandPalette({
   isPOS = false,
   hasErpAccess = true,
   hasFactoryAccess = false,
-  hasPropertiesAccess = false,
+  hasPropertiesAccess: _hasPropertiesAccess = false,
   isAdminOwner = false,
   user,
 }: CommandPaletteProps) {
@@ -594,7 +594,6 @@ export function CommandPalette({
             ))}
           </CommandGroup>
         )}
-
 
         <CommandSeparator />
         <CommandGroup heading="AI Assistant">

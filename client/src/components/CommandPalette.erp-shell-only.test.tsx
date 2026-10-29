@@ -60,12 +60,15 @@ describe("command palette admin entries by shell", () => {
     expect(screen.queryByText(CONVERGENCE)).toBeNull();
   });
 
-  it("still shows the rest of the admin group in the factory shell", () => {
-    renderPalette("factory");
-
-    // The filter has to remove one entry, not the group: dropping the whole
-    // Admin & Settings heading from the factory palette would be a much larger
-    // behaviour change than the defect it is fixing.
+  it("shows the rest of the admin group in the ERP shell", () => {
+    renderPalette("erp");
     expect(screen.getByText("Deleted Items")).toBeInTheDocument();
+  });
+
+  it("drops the whole admin group from the retired factory shell", () => {
+    // ABDALLAH-SYSTEM is ERP only, so the factory palette no longer offers
+    // any Admin & Settings commands.
+    renderPalette("factory");
+    expect(screen.queryByText("Deleted Items")).toBeNull();
   });
 });
