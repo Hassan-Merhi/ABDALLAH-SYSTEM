@@ -1,7 +1,5 @@
-import { CountryActivityKPI } from "@/components/CountryActivityKPI";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,15 +14,12 @@ import {
   BarChart2,
   BookOpen,
   Boxes,
-  CheckCircle2,
   ChevronDown,
   DollarSign,
   Factory,
   ReceiptText,
   Scale,
   TrendingUp,
-  Truck,
-  X,
   Zap,
 } from "lucide-react";
 
@@ -44,15 +39,10 @@ export default function Dashboard() {
     setLocation,
     isFactoryMode,
     isViewer,
-    importCycleExpanded,
-    setImportCycleExpanded,
     profitData,
     isLoading,
     isError,
     refetchProfit,
-    importCycleData,
-    importCycleIsError,
-    importCycleIsLoading,
   } = dashboard;
 
   return (
@@ -171,7 +161,7 @@ export default function Dashboard() {
       <div
         className={cn(
           "grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4",
-          !isFactoryMode ? "lg:grid-cols-3" : "lg:grid-cols-2"
+          !isFactoryMode ? "lg:grid-cols-2" : "lg:grid-cols-2"
         )}
       >
         {!isFactoryMode && (
@@ -212,116 +202,7 @@ export default function Dashboard() {
           }
           testId="kpi-net-position"
         />
-        <DashboardKPICard
-          title="Import Cycle Balance"
-          value={importCycleIsError ? "Unavailable" : importCycleIsLoading ? "Loading..." : formatAmount(0)}
-          change={
-            importCycleIsError
-              ? "Could not load cycle data"
-              : importCycleIsLoading
-                ? ""
-                : "Balanced (temporary display — click to see actual balance)"
-          }
-          changeType={importCycleIsError ? "neutral" : "positive"}
-          icon={importCycleIsError ? Truck : CheckCircle2}
-          stripeClass="bg-linear-to-r from-chart-2 via-chart-2/60 to-chart-2/20"
-          iconBgClass="bg-chart-2/15"
-          iconFgClass="text-chart-2"
-          onClick={!importCycleIsError && !importCycleIsLoading ? () => setImportCycleExpanded((v) => !v) : undefined}
-          testId="kpi-import-cycle-balance"
-        />
       </div>
-
-      {/* ── Import Cycle Breakdown (expandable, only when imbalanced) ── */}
-      {importCycleData && importCycleExpanded && (
-        <Card className="p-4 sm:p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-base font-semibold">Import Cycle Breakdown</h3>
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={() => setImportCycleExpanded(false)}
-              data-testid="button-close-cycle-breakdown"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2 text-sm">
-            {[
-              {
-                label: "Supplier Balance",
-                value: importCycleData.components.supplierBalance,
-              },
-              {
-                label: "Stock on the Way",
-                value: importCycleData.components.stockOtwValue,
-              },
-              {
-                label: "Duty Agent",
-                value: importCycleData.components.dutyAgentBalance,
-              },
-              {
-                label: "Transporter Agent",
-                value: importCycleData.components.transporterAgentBalance,
-              },
-              {
-                label: "Loans",
-                value: importCycleData.components.loansBalance,
-              },
-              { label: "Cash", value: importCycleData.components.cashBalance },
-              { label: "Bank", value: importCycleData.components.bankBalance },
-              {
-                label: "Direct Expenses",
-                value: importCycleData.components.directExpenseBalance,
-              },
-              {
-                label: "Indirect Expenses",
-                value: importCycleData.components.indirectExpenseBalance,
-              },
-              {
-                label: "Income",
-                value: importCycleData.components.incomeBalance,
-              },
-              {
-                label: "Stock on Floor",
-                value: importCycleData.components.stockOnFloorValue,
-              },
-              { label: "COGS", value: importCycleData.components.cogsBalance },
-              {
-                label: "Payroll Expense",
-                value: importCycleData.components.payrollExpenseBalance,
-              },
-              {
-                label: "Salary Advances",
-                value: importCycleData.components.salaryAdvancesBalance,
-              },
-              {
-                label: "Payroll Liabilities",
-                value: importCycleData.components.payrollLiabilitiesBalance,
-              },
-            ].map(({ label, value }) => (
-              <div key={label} className="flex justify-between py-1 border-b last:border-0">
-                <span className="text-muted-foreground">{label}</span>
-                <span
-                  className={cn(
-                    "font-mono font-medium",
-                    value === 0 ? "text-muted-foreground" : value > 0 ? "text-chart-2" : "text-destructive"
-                  )}
-                >
-                  {formatAmount(value)}
-                </span>
-              </div>
-            ))}
-          </div>
-          <div className="mt-4 pt-3 border-t flex justify-between font-semibold">
-            <span>Net Imbalance</span>
-            <span className="font-mono text-destructive">{formatAmount(importCycleData.netImportCycleBalance)}</span>
-          </div>
-        </Card>
-      )}
-
-      {/* ── Country Activity KPI (expandable) ── */}
-      {!isFactoryMode && <CountryActivityKPI />}
 
       {/* ── Main content area: 2-col on XL ── */}
       <DashboardFinancePanel dashboard={dashboard} />
