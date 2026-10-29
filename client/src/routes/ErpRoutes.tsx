@@ -52,7 +52,6 @@ import {
   ErpRentalPayments,
   ErpRentalShops,
   ErpRentalWarehouses,
-  GITMockup,
   ImportStockItems,
   ItemMarketAnalysis,
   IntercompanyLinks,
@@ -223,8 +222,6 @@ export function ErpRoutes({ user }: ErpRoutesProps) {
 
       {R("/mock-containers-otw", isAdminOrDev, ContainersOTW as RouteComponent)}
       {R("/containers-otw", isAdminOrDev, ContainersOTW as RouteComponent)}
-      {R("/mock-git", isAdminOrDev, GITMockup as RouteComponent)}
-      {R("/git", isAdminOrDev, GITMockup as RouteComponent)}
 
       {G("/containers/:containerId/verification", "containers", ContainerVerification)}
       {G("/containers/:id", "containers", ContainerDetailPage)}

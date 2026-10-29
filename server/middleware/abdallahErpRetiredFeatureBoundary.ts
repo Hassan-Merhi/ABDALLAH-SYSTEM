@@ -18,6 +18,16 @@ export const RETIRED_ABDALLAH_ERP_API_PREFIXES = [
   // Settings: Supplier Defaults, Scheduled Messages, Recurring Journals
   "/api/tracking-defaults/suppliers",
   "/api/tracking-defaults/backfill",
+  // Tracking: retire GIT workbook-only tools and transporter statements.
+  // Do not block /api/git/containers: Containers OTW still depends on it.
+  "/api/git/agent-duty-summary",
+  "/api/git/agent-duty-wa-settings",
+  "/api/git/agent-notes-bulk",
+  "/api/git/agent-note",
+  "/api/git/agent-adjustments-bulk",
+  "/api/git/agent-adjustments",
+  "/api/transporter-statement",
+  "/api/transporter-entry-due-dates",
   "/api/whatsapp/message-schedules",
   "/api/recurring-journals",
   // Settings: Files & Export: only private file storage, NOT Export Center

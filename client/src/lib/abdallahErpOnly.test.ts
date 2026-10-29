@@ -16,11 +16,17 @@ describe("ABDALLAH ERP-only policy", () => {
       "/stock-transfers", "/offload-item-search", "/factory/dashboard", "/properties/daybook",
       "/retail/inventory", "/sp/reports", "/erp/rental/shops", "/agents/23",
       "/stock?tab=offload", "/sales-tools?tab=transfers",
+      "/git", "/git/legacy", "/mock-git", "/git-tracking",
+      "/transporter-statement", "/transporter-statement/123",
+      "/tracking/git-tracking", "/tracking/transporter-statement",
+      "/tracking?tab=git-tracking", "/tracking?tab=transporter-statement",
+      "/tracking?tab=git-tracking#tab",
     ]) expect(isBlockedAbdallahRoute(url)).toBe(true);
   });
   it("keeps Daybook and normal ERP pages available", () => {
     for (const url of [
       "/", "/tracking", "/daybook", "/vouchers", "/inventory",
+      "/tracking?tab=containers-otw",
       "/stock?tab=query", "/sales-tools?tab=pricelist", "/accounts", "/settings",
     ]) expect(isBlockedAbdallahRoute(url)).toBe(false);
   });

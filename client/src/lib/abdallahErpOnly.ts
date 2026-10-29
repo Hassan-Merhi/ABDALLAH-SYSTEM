@@ -8,6 +8,9 @@ const HIDDEN_PATHS = [
   "/supplier-profit-reconciliation", "/stock-in-sales-report", "/item-market-analysis",
   "/intercompany-requests", "/intercompany-links", "/stock-transfer-order",
   "/stock-transfers", "/offload-item-search",
+  // Retired Tracking sections and their legacy direct routes.
+  "/git", "/mock-git", "/git-tracking", "/transporter-statement",
+  "/tracking/git-tracking", "/tracking/transporter-statement",
   "/factory", "/factory-production", "/bales", "/bale-products", "/production-bales",
   "/properties", "/retail", "/sp", "/erp/rental",
   "/accounting/factory-production", "/accounting/rentals",
@@ -21,5 +24,6 @@ export function isBlockedAbdallahRoute(url: string): boolean {
   if (HIDDEN_PATHS.some((root) => path === root || path.startsWith(root + "/"))) return true;
   const tab = new URLSearchParams(search ?? "").get("tab");
   return (path === "/stock" && tab === "offload") ||
-    (path === "/sales-tools" && tab === "transfers");
+    (path === "/sales-tools" && tab === "transfers") ||
+    (path === "/tracking" && (tab === "git-tracking" || tab === "transporter-statement"));
 }
