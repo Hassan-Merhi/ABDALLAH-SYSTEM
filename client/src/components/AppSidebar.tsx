@@ -44,6 +44,7 @@ import { companyQueryKey } from "@/lib/companyQueryScope";
 import { accessQueryPolicy, liveCountQueryPolicy, stableSettingsQueryPolicy } from "@/lib/queryPolicies";
 import { SUPPLIER_PARTNER_RECENT_ITEMS, SUPPLIER_PARTNER_SECTIONS } from "@/lib/supplier-partner-navigation";
 import { getErpRouteFeatureKeys } from "@/app/erpAccess";
+import { isBlockedAbdallahRoute } from "@/lib/abdallahErpOnly";
 import {
   ModuleHeader,
   ModuleFooter,
@@ -213,6 +214,7 @@ export function useErpVisibleSections(user?: SidebarUser): {
     const isAdmin = effectiveRole === "Admin" || effectiveRole === "Developer";
     const isDeveloper = effectiveRole === "Developer";
     const isOwner = effectiveRole === "Owner";
+    if (isBlockedAbdallahRoute(item.url)) return false;
     const featureKeys = getErpRouteFeatureKeys(item.url);
 
     // Never show Dashboard to ERP View Only, including pinned and recently visited links.
@@ -437,12 +439,6 @@ export function AppSidebar({ user, onLogout }: { user?: SidebarUser; onLogout: (
           {!SETTINGS_HIDDEN_ROLES.has(currentRole) && (
             <SidebarFlatLink href="/my-settings" icon={KeyRound} label="My Settings" testId="link-my-settings" />
           )}
-          <SidebarFlatLink
-            href="/intercompany-requests"
-            icon={ArrowRight}
-            label="IC Requests"
-            testId="link-ic-requests"
-          />
           {isItemVisible({ title: "Settings", url: "/settings", icon: Settings }) && (
             <SidebarFlatLink href="/settings" icon={Settings} label="Settings" testId="link-settings" />
           )}
