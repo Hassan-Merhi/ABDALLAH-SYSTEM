@@ -72,7 +72,6 @@ import { runApprovedMali53DestinationNormalization } from "./startup/runApproved
 import { ensureFactorySheetsSacksSchema } from "./startup/factorySheetsSacksSchema";
 import { ensureSpGitTracking } from "./lib/spGitTracking";
 import { ensureRecurringJournalSchema } from "./services/accounting/ensureRecurringJournalSchema";
-import { bootstrapRecurringJournalFromEnvironment } from "./services/accounting/recurringJournalBootstrap";
 import { ensureFactoryInvoiceDocumentSnapshotStore } from "./services/factoryInvoiceDocumentService";
 import {
   startupMigrations,
@@ -337,7 +336,6 @@ let migrationsDone = false;
       } catch (err: unknown) {
         logger.error("[startup] Sheets & Sacks schema ensure failed", { error: String(err) });
       }
-      await bootstrapRecurringJournalFromEnvironment();
       try {
         // Factory Production Targets and Attendance Register must be available
         // even when production skips the bulk startup migration pass.
