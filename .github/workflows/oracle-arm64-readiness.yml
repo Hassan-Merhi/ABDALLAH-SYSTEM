@@ -34,7 +34,7 @@ jobs:
       NODE_OPTIONS: --max-old-space-size=4096
     services:
       postgres:
-        image: postgres:16
+        image: postgres:18
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -47,10 +47,10 @@ jobs:
           --health-timeout 5s
           --health-retries 12
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
-          node-version-file: .node-version
+          node-version: "24.22.1"
           cache: npm
       - name: Install architecture-specific optional dependencies
         run: npm ci --include=optional --no-audit
@@ -61,6 +61,6 @@ jobs:
       - name: Verify PostgreSQL scratch database starts empty
         run: node scripts/oracle-db-preflight.mjs --empty
       - name: Provision declared schema in a DISPOSABLE CI database only
-        run: npx drizzle-kit push --force
+        run: node scripts/oracle-bootstrap-empty-db.mjs
       - name: Verify core tables exist after disposable schema creation
         run: node scripts/oracle-db-preflight.mjs --ready
