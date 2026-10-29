@@ -382,15 +382,6 @@ const adminPages: PageEntry[] = [
   },
 ];
 
-const intercompanyPages: PageEntry[] = [
-  {
-    label: "Intercompany Requests",
-    description: "Review and approve intercompany payment notifications",
-    path: "/intercompany-requests",
-    icon: ArrowRight,
-  },
-];
-
 const posPages: PageEntry[] = [
   { label: "Point of Sale", description: "POS interface", path: "/", icon: ShoppingCart },
   { label: "POS Daybook", description: "Daily POS log", path: "/pos-daybook", icon: Calendar },
