@@ -1,0 +1,12 @@
+# Not enabled by default: configure offsite, encryption and restore first.
+[Unit]
+Description=Daily ABDALLAH-SYSTEM PostgreSQL encrypted backup
+
+[Timer]
+OnCalendar=*-*-* 04:15:00 UTC
+Persistent=true
+RandomizedDelaySec=30m
+Unit=abdallah-backup.service
+
+[Install]
+WantedBy=timers.target
