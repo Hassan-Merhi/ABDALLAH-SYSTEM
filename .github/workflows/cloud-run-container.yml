@@ -1,0 +1,43 @@
+name: Cloud Run container readiness
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - .github/workflows/cloud-run-container.yml
+      - server/**
+      - scripts/**
+      - package.json
+      - package-lock.json
+      - .node-version
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  docker-build:
+    name: Cloud Run image build and runtime smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build production Docker image
+        run: docker build --pull -t abdallah-cloud-run:test .
+      - name: Test bundled server and native canvas inside container
+        run: |
+          docker run --rm --entrypoint node abdallah-cloud-run:test --input-type=module -e '
+            import fs from "node:fs";
+            import { createCanvas } from "@napi-rs/canvas";
+            if (!fs.existsSync("dist/index.js") || !fs.existsSync("dist/public/index.html")) {
+              throw new Error("Production bundle missing");
+            }
+            const output = createCanvas(2, 2).toBuffer("image/png");
+            if (output.length < 10) throw new Error("Native canvas PNG failed");
+            console.log("Cloud Run production bundle and native canvas verified.");
+          '
