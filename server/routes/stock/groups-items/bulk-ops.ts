@@ -149,19 +149,22 @@ export function registerStockItemBulkRoutes(app: Express) {
       const requestedLocationIds = new Set<number>();
       for (const entry of prices) {
         if (!entry || typeof entry !== "object") {
-          return res.status(400).json({ message: "Invalid price entry" });
+          const errorText = "Invalid price entry";
+          return res.status(400).json({ message: errorText });
         }
         if (entry.locationId === undefined || entry.locationId === null || entry.locationId === "") continue;
         const id = Number(entry.locationId);
         if (!Number.isSafeInteger(id) || id <= 0 || String(id) !== String(entry.locationId)) {
-          return res.status(400).json({ message: "Invalid location ID in price upload" });
+          const errorText = "Invalid location ID in price upload";
+          return res.status(400).json({ message: errorText });
         }
         requestedLocationIds.add(id);
       }
       const requestedIds = [...requestedLocationIds];
       const ownedLocations = await ownLocationIds(companyId, requestedIds);
       if (requestedIds.some((id) => !ownedLocations.has(id))) {
-        return res.status(403).json({ message: "Price upload includes a location outside this company" });
+        const errorText = "Price upload includes a location outside this company";
+        return res.status(403).json({ message: errorText });
       }
 
       // Followers inherit prices from their master location, so upload to the
@@ -181,6 +184,12 @@ export function registerStockItemBulkRoutes(app: Express) {
             )
         : [];
       const effectiveLocationIds = new Map(followers.map((row) => [row.followerLocationId, row.masterLocationId]));
+      const masterIds = [...new Set(followers.map((row) => row.masterLocationId))];
+      const ownedMasters = await ownLocationIds(companyId, masterIds);
+      if (masterIds.some((id) => !ownedMasters.has(id))) {
+        const errorText = "A price group contains a master location outside this company";
+        return res.status(403).json({ message: errorText });
+      }
 
       // Pre-fetch all items + aliases once to avoid N+1
       const allItems = await storage.getAllStockItems(companyId);

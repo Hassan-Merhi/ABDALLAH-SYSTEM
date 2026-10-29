@@ -501,10 +501,8 @@ export function usePosPriceListModel({ posUser }: POSPriceListProps) {
       const locationCols = Object.keys(rawRows[0]).filter((col) => nameToId.has(col.toLowerCase().trim()));
       if (locationCols.length === 0) {
         toast({
-          title: "Price column not found",
-          description: isAllMode
-            ? "Make sure you're uploading the All Locations template downloaded from this page."
-            : 'Use the template for this location and fill in its "Selling Price" column.',
+          title: "No location columns found",
+          description: "Make sure you're uploading the template downloaded from this page.",
           variant: "destructive",
         });
         return;
