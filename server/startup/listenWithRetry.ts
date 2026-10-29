@@ -16,7 +16,7 @@ import { log } from "../vite";
 export function listenWithRetry(server: Server, port: number, onListening: () => void): void {
   // Called only after migrations have completed (see startServer below).
   const doListen = () => {
-    server.listen({ port, host: "0.0.0.0", reusePort: true }, () => {
+    server.listen({ port, host: process.env.ERP_BIND_HOST || "0.0.0.0", reusePort: true }, () => {
       log(`serving on port ${port}`);
       onListening();
     });
