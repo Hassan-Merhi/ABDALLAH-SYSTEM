@@ -9,7 +9,16 @@ import { registerVoucherPathPhase5to6Boundary } from "./services/accounting/vouc
 
 export function registerRoutes(app: Express): Promise<Server> {
   // Retired mode APIs are not exposed by the ABDALLAH ERP deployment.
-  app.use(["/api/factory", "/api/properties", "/api/retail", "/api/sp", "/api/supplier-partner"], (_req, res) => {
+  app.use([
+    "/api/factory", "/api/properties", "/api/retail", "/api/sp", "/api/supplier-partner",
+    "/api/agent-accounts", "/api/cost-centers", "/api/supplier-profit-check",
+    "/api/supplier-profit-reconciliation", "/api/offload-item-search",
+    "/api/intercompany-requests", "/api/intercompany-links",
+    "/api/reports/item-market-analysis", "/api/reports/stock-in-sales",
+    "/api/stock-transfer-order", "/api/stock-transfer-import",
+    "/api/stock-transfers", "/api/stock-transfer-revisions",
+    "/api/erp/rental",
+  ], (_req, res) => {
     res.status(403).json({ message: "Only ERP mode is available in ABDALLAH-SYSTEM" });
   });
   registerTenantIsolationBoundary(app);
