@@ -8,6 +8,7 @@ import { registerLanguagePreferenceRoutes } from "./auth/languagePreferenceRoute
 import { registerSessionRoutes } from "./auth/sessionRoutes";
 import { registerUserAccessRoutes } from "./auth/userAccessRoutes";
 import { registerUserAdministrationRoutes } from "./auth/userAdministrationRoutes";
+import { registerErpCompanyUsersRoutes } from "./auth/erpCompanyUsersRoutes";
 import { registerExchangeRateRoutes } from "./exchangeRateRoutes";
 import { registerUserPresenceRoutes } from "./userPresenceRoutes";
 
@@ -17,6 +18,7 @@ export function registerAuthRoutes(app: Express) {
   registerAuthAuditLogRoutes(app);
   registerActivityOverviewRoutes(app);
   registerUserAdministrationRoutes(app);
+  registerErpCompanyUsersRoutes(app);
   registerUserAccessRoutes(app);
   registerLanguagePreferenceRoutes(app);
   registerCompanyAccessRoutes(app);
