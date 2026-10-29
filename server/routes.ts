@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import type { Server } from "http";
 
+import { enforceAbdallahErpRetiredFeatureBoundary } from "./middleware/abdallahErpRetiredFeatureBoundary";
 import { registerApplicationRoutes } from "./routes/applicationRoutes";
 import { registerOperationalMonitoringRoutes } from "./routes/admin/operationalMonitoringRoutes";
 import { registerTenantIsolationBoundary } from "./routes/tenantBoundaryRegistrar";
@@ -21,6 +22,8 @@ export function registerRoutes(app: Express): Promise<Server> {
   ], (_req, res) => {
     res.status(403).json({ message: "Only ERP mode is available in ABDALLAH-SYSTEM" });
   });
+  // Central deny policy: protects retired UI modules from direct HTTP access.
+  app.use(enforceAbdallahErpRetiredFeatureBoundary);
   registerTenantIsolationBoundary(app);
   registerOperationalVoucherRequestBoundary(app);
   registerVoucherPathPhase5to6Boundary(app);
