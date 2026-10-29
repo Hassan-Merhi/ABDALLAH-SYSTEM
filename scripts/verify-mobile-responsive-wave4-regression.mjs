@@ -58,8 +58,12 @@ for (const route of criticalErpRoutes) {
   requireText(browser, `path: "${route}"`, "Wave 4 ERP rendered route set");
   requireText(erpRoutes, route.split("?")[0], "Live ERP route table");
 }
+// ABDALLAH-SYSTEM retires Factory Mode: its routes stay in the route table but
+// are blocked for every role, so the rendered smoke must not visit them.
+const abdallahErpOnly = read("client/src/lib/abdallahErpOnly.ts");
+requireText(abdallahErpOnly, '"/factory",', "ABDALLAH retired route list");
 for (const route of criticalFactoryRoutes) {
-  requireText(browser, `path: "${route}"`, "Wave 4 Factory rendered route set");
+  forbidText(browser, `path: "${route}"`, "Wave 4 rendered route set (retired Factory route)");
   requireText(factoryRoutes, route.split("?")[0], "Live Factory route table");
 }
 

@@ -43,36 +43,12 @@ const ROUTE_GROUPS = [
       { path: "/pos" },
     ],
   },
-  {
-    workspace: "factory",
-    companyCode: "PHASE9-FACTORY",
-    routes: [
-      { path: "/factory/raw-stock" },
-      { path: "/factory/location-inventory" },
-      { path: "/factory/containers-hub" },
-      { path: "/factory/accounts" },
-      { path: "/factory/parties" },
-      { path: "/factory/vouchers" },
-      { path: "/factory/payroll-hub" },
-      { path: "/factory/sales/loading/new" },
-      { path: "/factory/stock-allocation-v5" },
-      { path: "/factory/bale-tracking" },
-      { path: "/factory/import" },
-      { path: "/factory/bale-relabeling" },
-      { path: "/factory/bale-product-images" },
-    ],
-  },
+  // The Factory workspace is retired in ABDALLAH-SYSTEM and no longer renders.
 ];
 
-const HOVER_CRITICAL_ROUTES = new Set([
-  "/factory/raw-stock",
-  "/factory/sales/loading/new",
-  "/factory/stock-allocation-v5",
-  "/factory/bale-tracking",
-  "/factory/import",
-  "/factory/bale-relabeling",
-  "/factory/bale-product-images",
-]);
+// Every hover-critical route was a Factory floor screen; none remain in the
+// ERP-only workspace, so no route currently needs the hover-only check.
+const HOVER_CRITICAL_ROUTES = new Set([]);
 
 const report = {
   startedAt: new Date().toISOString(),

@@ -316,13 +316,10 @@ jobs:
 
           run_smoke scripts/run-phase9-language-browser-smoke.mjs
           run_smoke scripts/verify-mobile-responsive-phase1-browser.mjs
-          run_smoke scripts/verify-mobile-responsive-wave2-browser.mjs
           run_smoke scripts/verify-mobile-responsive-wave3-browser.mjs
           run_smoke scripts/verify-mobile-responsive-wave4-browser.mjs
-          # Factory Mode beyond the floor screens: canonical destinations plus seeded detail and
-          # workflow routes (the disposable fixture gets one record of each kind).
-          export ERP_FACTORY_MOBILE_CREATE_SEEDS=1 ERP_FACTORY_MOBILE_REQUIRE_SEEDS=1 ERP_FACTORY_MOBILE_STRICT_TABLES=1
-          run_smoke scripts/verify-factory-mobile-browser.mjs
+          # The Wave 2 and Factory mobile suites drive only Factory Mode, which
+          # ABDALLAH-SYSTEM retires; they stay available as manual scripts.
 
       - name: Full responsive contract matrix
         run: node scripts/verify-mobile-responsive-phase11-regression.mjs

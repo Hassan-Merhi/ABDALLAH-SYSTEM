@@ -36,35 +36,16 @@ const DEFAULT_WORKSPACE_ROUTE_GROUPS = [
     routes: [
       "/tracking",
       "/daybook",
-      "/transaction-journal",
       "/accounts",
       "/inventory?tab=by-location",
       "/stock?tab=items",
       "/vouchers",
-      "/sales-tools?tab=transfers",
+      "/sales-tools?tab=pricelist",
       "/pos",
     ],
   },
-  {
-    workspace: "factory",
-    companyCode: "PHASE9-FACTORY",
-    routes: [
-      "/factory/production-report",
-      "/factory/daybook",
-      "/factory/containers",
-      "/factory/location-inventory",
-    ],
-  },
-  {
-    workspace: "properties",
-    companyCode: "PHASE9-PROPERTIES",
-    routes: ["/properties/dashboard", "/properties/daybook", "/properties/accounts", "/properties/vouchers"],
-  },
-  {
-    workspace: "supplier-partner",
-    companyCode: "PHASE9-SP",
-    routes: ["/sp", "/sp/reports", "/sp/opening-stock"],
-  },
+  // ABDALLAH-SYSTEM is ERP only: the Factory, Properties and Supplier
+  // Partner workspaces are retired and no longer render.
 ];
 
 const requestedRoutes = (process.env.ERP_SMOKE_ROUTES || "")
