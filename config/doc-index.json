@@ -349,6 +349,7 @@
     "docs/bandwidth-cache-hardening.md": "reference",
     "docs/ci/branch-protection.md": "reference",
     "docs/compatibility.md": "reference",
+    "docs/cloud-run-free-tier.md": "reference",
     "docs/containers-flow.md": "reference",
     "docs/contributing.md": "reference",
     "docs/core-concepts.md": "reference",
