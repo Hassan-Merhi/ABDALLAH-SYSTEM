@@ -38,7 +38,7 @@ function rowToOption(r: LabelDesignColorRow): DesignColorOption {
   // Print always uses getDesignBannerUrl() from labelHtml.ts which uses the full-res original.
   const previewUrl = ts
     ? `/labels/dakzo-${r.slug}.jpg?t=${ts}` // custom image, stable cache key
-    : `/labels/previews/hmd-${r.slug}-preview.svg`; // default → small preview
+    : `/labels/previews/dakzo-${r.slug}-preview.svg`; // default → small preview
   return {
     id: r.id,
     slug: r.slug,

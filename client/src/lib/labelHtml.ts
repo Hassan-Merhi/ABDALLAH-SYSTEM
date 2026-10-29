@@ -225,13 +225,13 @@ export type A4DesignColor = string;
 
 // Static fallback used when the API hasn't loaded yet and as seed data.
 // previewUrl → small WebP thumbnail used for UI/screen display only.
-// Print paths always use the full-res /labels/dakzo-*.jpg originals (via getDesignBannerUrl).
+// Print paths use Dakzo SVG defaults or the uploaded full-resolution banner.
 export const A4_DESIGN_OPTIONS: { value: string; label: string; color: string; previewUrl: string }[] = [
-  { value: "purple", label: "Purple (#1)", color: "#5B21B6", previewUrl: "/labels/previews/hmd-purple-preview.svg" },
-  { value: "green", label: "Green (#2)", color: "#047857", previewUrl: "/labels/previews/hmd-green-preview.svg" },
-  { value: "gold", label: "Gold (#3)", color: "#B8860B", previewUrl: "/labels/previews/hmd-gold-preview.svg" },
-  { value: "white", label: "White (#4)", color: "#F5F5F5", previewUrl: "/labels/previews/hmd-white-preview.svg" },
-  { value: "red", label: "Dakzo Red (#5)", color: "#B91C1C", previewUrl: "/labels/previews/hmd-red-preview.svg" },
+  { value: "purple", label: "Purple (#1)", color: "#5B21B6", previewUrl: "/labels/previews/dakzo-purple-preview.svg" },
+  { value: "green", label: "Green (#2)", color: "#047857", previewUrl: "/labels/previews/dakzo-green-preview.svg" },
+  { value: "gold", label: "Gold (#3)", color: "#B8860B", previewUrl: "/labels/previews/dakzo-gold-preview.svg" },
+  { value: "white", label: "White (#4)", color: "#F5F5F5", previewUrl: "/labels/previews/dakzo-white-preview.svg" },
+  { value: "red", label: "Dakzo Red (#5)", color: "#B91C1C", previewUrl: "/labels/previews/dakzo-red-preview.svg" },
 ];
 
 // Cache-busting timestamps for custom banner images.
