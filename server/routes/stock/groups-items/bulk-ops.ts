@@ -10,7 +10,8 @@ import { db } from "../../../db";
 import { storage } from "../../../storage";
 import { requireAuth, requireNonPOS } from "../../../auth";
 import { logAudit } from "../../_helpers";
-import { inventory, stockItems, stockItemLocationPrices } from "@shared/schema";
+import { inventory, stockItems, stockItemLocationPrices, locationPriceGroups } from "@shared/schema";
+import { ownLocationIds } from "../../helpers/companyOwnership";
 import { eq, and, or, inArray } from "drizzle-orm";
 import { toMoney } from "../../../lib/money";
 
@@ -143,6 +144,53 @@ export function registerStockItemBulkRoutes(app: Express) {
 
       const companyId = req.session.currentCompanyId;
 
+      // Only accept location prices belonging to this company. Global price
+      // imports (which omit locationId) remain supported by this endpoint.
+      const requestedLocationIds = new Set<number>();
+      for (const entry of prices) {
+        if (!entry || typeof entry !== "object") {
+          const errorText = "Invalid price entry";
+          return res.status(400).json({ message: errorText });
+        }
+        if (entry.locationId === undefined || entry.locationId === null || entry.locationId === "") continue;
+        const id = Number(entry.locationId);
+        if (!Number.isSafeInteger(id) || id <= 0 || String(id) !== String(entry.locationId)) {
+          const errorText = "Invalid location ID in price upload";
+          return res.status(400).json({ message: errorText });
+        }
+        requestedLocationIds.add(id);
+      }
+      const requestedIds = [...requestedLocationIds];
+      const ownedLocations = await ownLocationIds(companyId, requestedIds);
+      if (requestedIds.some((id) => !ownedLocations.has(id))) {
+        const errorText = "Price upload includes a location outside this company";
+        return res.status(403).json({ message: errorText });
+      }
+
+      // Followers inherit prices from their master location, so upload to the
+      // effective master to make the updated price visible on follower lists.
+      const followers = requestedIds.length
+        ? await db
+            .select({
+              followerLocationId: locationPriceGroups.followerLocationId,
+              masterLocationId: locationPriceGroups.masterLocationId,
+            })
+            .from(locationPriceGroups)
+            .where(
+              and(
+                eq(locationPriceGroups.companyId, companyId),
+                inArray(locationPriceGroups.followerLocationId, requestedIds)
+              )
+            )
+        : [];
+      const effectiveLocationIds = new Map(followers.map((row) => [row.followerLocationId, row.masterLocationId]));
+      const masterIds = [...new Set(followers.map((row) => row.masterLocationId))];
+      const ownedMasters = await ownLocationIds(companyId, masterIds);
+      if (masterIds.some((id) => !ownedMasters.has(id))) {
+        const errorText = "A price group contains a master location outside this company";
+        return res.status(403).json({ message: errorText });
+      }
+
       // Pre-fetch all items + aliases once to avoid N+1
       const allItems = await storage.getAllStockItems(companyId);
       const allAliases = await storage.getAllCompanyCodeAliases(companyId);
@@ -170,8 +218,13 @@ export function registerStockItemBulkRoutes(app: Express) {
         if (!barcode || !sellingPrice) continue;
         const item = itemsByCode.get((barcode as string).toLowerCase());
         if (item) {
-          if (locationId) {
-            locationUpdates.push({ stockItemId: item.id, locationId, sellingPrice });
+          if (locationId !== undefined && locationId !== null && locationId !== "") {
+            const requestedId = Number(locationId);
+            locationUpdates.push({
+              stockItemId: item.id,
+              locationId: effectiveLocationIds.get(requestedId) ?? requestedId,
+              sellingPrice,
+            });
           } else {
             globalUpdates.push({ id: item.id, sellingPrice });
           }

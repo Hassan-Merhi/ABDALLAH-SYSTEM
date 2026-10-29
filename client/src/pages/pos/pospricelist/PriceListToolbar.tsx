@@ -37,20 +37,20 @@ export function PriceListTitleBar({ model }: { model: PosPriceListModel }) {
           ) : null
         }
       >
-        {selectedLocationId && isAllMode && canEdit && (
+        {selectedLocationId && canEdit && (
           <Button
             variant="outline"
             size="sm"
             data-testid="button-download-price-template"
             onClick={model.downloadTemplate}
-            disabled={masters.length === 0}
+            disabled={isAllMode ? masters.length === 0 : model.locationPricedList.length === 0}
             className="gap-1.5"
           >
             <FileSpreadsheet className="w-3.5 h-3.5" />
             Template
           </Button>
         )}
-        {selectedLocationId && isAllMode && canEdit && (
+        {selectedLocationId && canEdit && (
           <Button
             variant="outline"
             size="sm"
@@ -76,7 +76,7 @@ export function PriceListTitleBar({ model }: { model: PosPriceListModel }) {
           </Button>
         )}
       </PageHeader>
-      {isAllMode && canEdit && (
+      {selectedLocationId && canEdit && (
         <input
           ref={model.importFileRef}
           type="file"

@@ -22,7 +22,6 @@ import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useToast } from "@/hooks/use-toast";
 import type {
   Location,
-  MasterItem,
   MasterPriceListResponse,
   POSPriceListProps,
   PriceListItem,
@@ -446,17 +445,24 @@ export function usePosPriceListModel({ posUser }: POSPriceListProps) {
   const importFileRef = useRef<HTMLInputElement>(null);
 
   const downloadTemplate = async () => {
-    if (!isAllMode || masters.length === 0) return;
+    if (!selectedLocationId || (isAllMode ? masters.length === 0 : !selectedLocation)) return;
     const XLSX = await import("@/lib/excelHelper");
-    const rows = masterItems.map((item: MasterItem) => {
+    const items = isAllMode ? masterItems : priceList;
+    const rows = items.map((item: PriceListRow) => {
       const row: Record<string, unknown> = {
         Code: item.code || "",
         "Item Name": item.name,
         Group: item.stockGroupName || "",
       };
-      for (const m of masters) {
-        const price = masterPriceFor(item, m.id);
-        row[m.name] = price && parseFloat(price) > 0 ? parseFloat(price) : "";
+      if (isAllMode) {
+        for (const m of masters) {
+          const price = masterPriceFor(item, m.id);
+          row[m.name] = price && parseFloat(price) > 0 ? parseFloat(price) : "";
+        }
+      } else {
+        // Single-location templates also accept exports from this location.
+        const price = item.sellingPrice ?? item.baseSellingPrice;
+        row["Selling Price"] = price && parseFloat(price) > 0 ? parseFloat(price) : "";
       }
       return row;
     });
@@ -464,7 +470,8 @@ export function usePosPriceListModel({ posUser }: POSPriceListProps) {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Price List");
     const dateStr = new Date().toLocaleDateString("en-CA");
-    await XLSX.writeFile(wb, `price_list_template_${dateStr}.xlsx`);
+    const scope = isAllMode ? "all_locations" : selectedLocation!.name.replace(/[^a-z0-9_-]+/gi, "_");
+    await XLSX.writeFile(wb, `price_list_template_${scope}_${dateStr}.xlsx`);
   };
 
   const handleImportFile = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -482,9 +489,15 @@ export function usePosPriceListModel({ posUser }: POSPriceListProps) {
         return;
       }
 
-      // Build locationName → locationId map from current masters
+      // In a single location, accept "Selling Price" from its template/export,
+      // or a column named after that location. Never import columns for other locations.
       const nameToId = new Map<string, number>();
-      for (const m of masters) nameToId.set(m.name.toLowerCase().trim(), m.id);
+      if (isAllMode) {
+        for (const m of masters) nameToId.set(m.name.toLowerCase().trim(), m.id);
+      } else if (selectedLocationId && selectedLocation) {
+        nameToId.set("selling price", selectedLocationId);
+        nameToId.set(selectedLocation.name.toLowerCase().trim(), selectedLocationId);
+      }
       const locationCols = Object.keys(rawRows[0]).filter((col) => nameToId.has(col.toLowerCase().trim()));
       if (locationCols.length === 0) {
         toast({
@@ -503,8 +516,8 @@ export function usePosPriceListModel({ posUser }: POSPriceListProps) {
         const changes: { locationId: number; locationName: string; price: string }[] = [];
         for (const col of locationCols) {
           const raw = row[col];
-          const parsed = parseFloat(String(raw));
-          if (!isNaN(parsed) && parsed > 0) {
+          const parsed = Number(String(raw).trim());
+          if (String(raw).trim() !== "" && Number.isFinite(parsed) && parsed > 0) {
             changes.push({
               locationId: nameToId.get(col.toLowerCase().trim())!,
               locationName: col,
@@ -534,7 +547,11 @@ export function usePosPriceListModel({ posUser }: POSPriceListProps) {
   };
 
   const handleImportSubmit = async () => {
-    if (importPreview.length === 0) return;
+    if (importPreview.length === 0 || !selectedLocationId) return;
+    if (!isAllMode && importPreview.some((row) => row.changes.some((change) => change.locationId !== selectedLocationId))) {
+      setImportError("The selected location changed. Reopen the upload for this location.");
+      return;
+    }
     setImporting(true);
     try {
       const prices: { barcode: string; sellingPrice: string; locationId: number }[] = [];
@@ -629,6 +646,10 @@ export function usePosPriceListModel({ posUser }: POSPriceListProps) {
   };
 
   const selectLocation = (id: number) => {
+    // Never carry a pending import from one location into another.
+    setImportDialogOpen(false);
+    setImportPreview([]);
+    setImportError(null);
     setSelectedLocationId(id);
     setSearch("");
     setGroupFilter("all");

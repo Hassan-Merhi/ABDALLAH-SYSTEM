@@ -283,7 +283,7 @@ rejectText(
 requireText(viteConfig, "labelAssetExtractionPlugin()", "The label asset extraction plugin must remain enabled.");
 requireText(viteConfig, "cssColorMixPlugin()", "CSS color-mix() must be resolved at build time so capture can skip the style walk.");
 requireText(viteConfig, 'return "label-printing";', "Label printing code must remain isolated from core bundles.");
-requireText(labelAssetPlugin, "EMBEDDED_LABEL_LOGO_RE", "The embedded label logo must be replaced during builds.");
+requireText(labelAssetPlugin, "DAKZO_LABEL_LOGO_RE", "The Dakzo label logo URL must be replaced during builds.");
 requireText(labelAssetPlugin, "createHash", "The extracted label logo must use a content-derived filename.");
 requireText(labelAssetPlugin, "this.emitFile", "The extracted label logo must be emitted as a build asset.");
 requireText(labelAssetPlugin, 'Cache-Control", "public, max-age=31536000, immutable"', "The dev label asset must mirror immutable production caching.");
@@ -305,7 +305,7 @@ if (fs.existsSync(distAssets)) {
     failures.push(`Expected exactly one label-printing chunk, found ${labelChunks.length}.`);
   }
   if (labelLogos.length !== 1) {
-    failures.push(`Expected exactly one hashed HMD label logo, found ${labelLogos.length}.`);
+    failures.push(`Expected exactly one hashed Dakzo label logo, found ${labelLogos.length}.`);
   }
 
   const embeddedLogoSignature = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABQAAAANV";
@@ -314,7 +314,7 @@ if (fs.existsSync(distAssets)) {
     const size = fs.statSync(filePath).size;
     const source = fs.readFileSync(filePath, "utf8");
     if (source.includes(embeddedLogoSignature)) {
-      failures.push(`${name} still contains the full embedded HMD label PNG.`);
+      failures.push(`${name} still contains the full embedded legacy label PNG.`);
     }
     if (/^index-[A-Za-z0-9_-]+\.js$/.test(name) && size > 1_500_000) {
       failures.push(`${name} exceeds the 1.5 MB core entry budget (${size} bytes).`);

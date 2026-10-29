@@ -7,6 +7,10 @@ const harness = vi.hoisted(() => ({
   apiRequest: vi.fn(),
   invalidateQueries: vi.fn(),
   navigate: vi.fn(),
+  readSpreadsheet: vi.fn(),
+  sheetRows: vi.fn(),
+  createSheet: vi.fn((_rows: any[]) => ({})),
+  writeSpreadsheet: vi.fn((_workbook: unknown, _filename: string) => Promise.resolve()),
 }));
 
 const priceItems = [
@@ -128,6 +132,16 @@ vi.mock("@tanstack/react-query", () => ({
     }),
   }),
 }));
+vi.mock("@/lib/excelHelper", () => ({
+  read: harness.readSpreadsheet,
+  writeFile: harness.writeSpreadsheet,
+  utils: {
+    sheet_to_json: harness.sheetRows,
+    json_to_sheet: harness.createSheet,
+    book_new: () => ({ sheets: [] }),
+    book_append_sheet: vi.fn(),
+  },
+}));
 vi.mock("@/lib/queryClient", () => ({
   queryClient: { invalidateQueries: harness.invalidateQueries },
   apiRequest: harness.apiRequest,
@@ -201,6 +215,9 @@ describe("POS price list page behavior", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     harness.apiRequest.mockResolvedValue({ ok: true, json: async () => ({ success: true }) });
+    harness.readSpreadsheet.mockResolvedValue({ SheetNames: ["Price List"], Sheets: { "Price List": {} } });
+    harness.sheetRows.mockReturnValue([]);
+    harness.createSheet.mockReturnValue({});
   });
 
   it("selects a location, filters items, surfaces unpriced stock, and updates a location price", async () => {
@@ -316,4 +333,47 @@ describe("POS price list page behavior", () => {
     expect(screen.queryByTestId("input-price-101")).not.toBeInTheDocument();
     expect(harness.apiRequest).not.toHaveBeenCalled();
   });
+  it("offers a location-specific template and uploads prices only to the selected location", async () => {
+    harness.sheetRows.mockReturnValue([
+      { Code: "A101", "Item Name": "Blue Shirt", "Selling Price": 47 },
+      { Code: "A102", "Item Name": "Red Shirt", "Selling Price": "" },
+    ]);
+
+    render(<POSPriceList />);
+    expect(screen.queryByTestId("button-download-price-template")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("button-location-11"));
+    const template = screen.getByTestId("button-download-price-template");
+    expect(template).toBeEnabled();
+    expect(screen.getByTestId("button-upload-price-list")).toBeEnabled();
+    expect(screen.getByTestId("input-import-price-file")).toBeInTheDocument();
+
+    fireEvent.click(template);
+    await waitFor(() => expect(harness.writeSpreadsheet).toHaveBeenCalledTimes(1));
+    const exportedRows = harness.createSheet.mock.calls[0][0];
+    expect(exportedRows[0]).toMatchObject({
+      Code: "A101",
+      "Item Name": "Blue Shirt",
+      "Selling Price": 20,
+    });
+    expect(harness.writeSpreadsheet.mock.calls[0][1]).toMatch(/^price_list_template_Main_/);
+
+    fireEvent.change(screen.getByTestId("input-import-price-file"), {
+      target: { files: [new File(["sample"], "prices.xlsx")] },
+    });
+    await waitFor(() => expect(screen.getByTestId("button-import-confirm")).toHaveTextContent("1 items"));
+    fireEvent.click(screen.getByTestId("button-import-confirm"));
+    await waitFor(() =>
+      expect(harness.apiRequest).toHaveBeenCalledWith("POST", "/api/stock-items/bulk-update-prices", {
+        prices: [{ barcode: "A101", sellingPrice: "47.00", locationId: 11 }],
+      })
+    );
+  });
+
+  it("does not offer pricing uploads to POS-only users", () => {
+    render(<POSPriceList posUser />);
+    expect(screen.queryByTestId("button-download-price-template")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("button-upload-price-list")).not.toBeInTheDocument();
+  });
+
 });
