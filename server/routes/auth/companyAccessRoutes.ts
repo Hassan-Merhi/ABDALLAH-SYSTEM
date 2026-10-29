@@ -166,7 +166,7 @@ export function registerCompanyAccessRoutes(app: Express) {
       if (!req.user) return res.status(401).json({ message: "Unauthorized" });
       const accessible = await getAccessibleCompanyIds(req.user.id);
       const allCompanies = await storage.getAllCompanies();
-      res.json(allCompanies.filter((company) => accessible.has(Number(company.id))));
+      res.json(allCompanies.filter((company) => accessible.has(Number(company.id)) && (company.companyType ?? "erp") === "erp"));
     } catch (error: unknown) {
       if (error instanceof CompanyAccessError) return sendCompanyAccessError(res, error);
       res.status(500).json({ message: getErrorMessage(error) });
@@ -180,7 +180,7 @@ export function registerCompanyAccessRoutes(app: Express) {
       if (req.user.role === "Developer") {
         const allCompanies = await storage.getAllCompanies();
         return res.json(
-          allCompanies.map((company) => ({
+          allCompanies.filter((company) => (company.companyType ?? "erp") === "erp").map((company) => ({
             id: -1,
             userId: req.user!.id,
             companyId: company.id,
@@ -225,7 +225,7 @@ export function registerCompanyAccessRoutes(app: Express) {
          ORDER BY c.name`,
         [req.user.id]
       );
-      res.json(rows);
+      res.json(rows.filter((company: { companyType: string }) => company.companyType === "erp"));
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
     }
@@ -344,6 +344,7 @@ export function registerCompanyAccessRoutes(app: Express) {
   app.post("/api/companies", requireAuth, requireRole("Admin"), async (req, res) => {
     try {
       const payload = await prepareCompanyPayload(req.body, undefined, true);
+      if ((payload.companyType ?? "erp") !== "erp") return res.status(403).json({ message: "Only ERP companies can be created" });
       res.status(201).json(await storage.createCompany(payload as Parameters<typeof storage.createCompany>[0]));
     } catch (error: unknown) {
       res.status(400).json({ message: getErrorMessage(error) });
@@ -355,6 +356,7 @@ export function registerCompanyAccessRoutes(app: Express) {
       const companyId = await resolveAuthorizedCompanyId(req, req.params.id);
       const company = await storage.getCompanyById(companyId);
       if (!company) return res.status(404).json({ message: "Company not found" });
+      if ((company.companyType ?? "erp") !== "erp") return res.status(403).json({ message: "Only ERP companies are available" });
       res.json(company);
     } catch (error: unknown) {
       if (error instanceof CompanyAccessError) return sendCompanyAccessError(res, error);
@@ -366,6 +368,7 @@ export function registerCompanyAccessRoutes(app: Express) {
     try {
       const companyId = await resolveAuthorizedCompanyId(req, req.params.id);
       const payload = await prepareCompanyPayload(req.body, companyId);
+      if (payload.companyType !== undefined && payload.companyType !== "erp") return res.status(403).json({ message: "Only ERP mode is allowed" });
       res.json(await storage.updateCompany(companyId, payload as Parameters<typeof storage.updateCompany>[1]));
     } catch (error: unknown) {
       if (error instanceof CompanyAccessError) return sendCompanyAccessError(res, error);
@@ -448,10 +451,12 @@ export function registerCompanyAccessRoutes(app: Express) {
       }
 
       const [companyRow] = await db
-        .select({ name: companies.name })
+        .select({ name: companies.name, companyType: companies.companyType })
         .from(companies)
         .where(eq(companies.id, companyId))
         .limit(1);
+      if (!companyRow) return res.status(404).json({ message: "Company not found" });
+      if ((companyRow.companyType ?? "erp") !== "erp") return res.status(403).json({ message: "Only ERP mode is available" });
 
       req.session.currentCompanyId = companyId;
       delete req.session.factoryCompanyId;
