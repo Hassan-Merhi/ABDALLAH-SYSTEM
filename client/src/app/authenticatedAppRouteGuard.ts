@@ -1,5 +1,6 @@
 import { computeFactoryDefaultPage, computeFactoryGuardRedirect } from "./factoryAccessGuard";
 import type { FactoryAccess } from "./useAuthenticatedAppData";
+import { isBlockedAbdallahRoute } from "@/lib/abdallahErpOnly";
 
 const SUPPLIER_PARTNER_PATHS = new Set([
   "/sp",
@@ -55,8 +56,10 @@ export function resolveAuthenticatedAppRoute({
 
   let decision: AuthenticatedAppRouteDecision = { kind: "continue" };
 
-  // All Daybook is intentionally unavailable to ERP Tester, including direct links.
-  if (
+  // ABDALLAH restrictions apply to every role and direct URL.
+  if (isBlockedAbdallahRoute(currentLocation)) {
+    decision = { kind: "redirect", to: "/tracking" };
+  } else if (
     userRole === "ERP Tester" &&
     (currentLocation === "/transaction-journal" || currentLocation.startsWith("/transaction-journal/"))
   ) {
