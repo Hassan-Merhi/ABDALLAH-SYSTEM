@@ -40,6 +40,7 @@ import {
 import { useAppMode } from "@/contexts/AppModeContext";
 import { isRetailHiddenErpPath, useErpVisibleSections } from "@/components/AppSidebar";
 import { useCompany } from "@/contexts/CompanyContext";
+import { isBlockedAbdallahRoute } from "@/lib/abdallahErpOnly";
 import { useFactoryVisibleSections } from "@/components/FactorySidebar";
 import { PROPERTIES_NAV_SECTIONS } from "@/components/PropertiesSidebar";
 import type { NavItem, NavSection } from "@/components/sidebar/sidebarPrimitives";
@@ -410,12 +411,14 @@ function buildEntries(sections: NavSection[], extras: PageEntry[] = [], extraNav
   const seen = new Set<string>();
   const out: PageEntry[] = [];
   for (const e of extras) {
+    if (isBlockedAbdallahRoute(e.path)) continue;
     if (!seen.has(e.path)) {
       seen.add(e.path);
       out.push(e);
     }
   }
   for (const item of extraNavItems) {
+    if (isBlockedAbdallahRoute(item.url)) continue;
     if (!seen.has(item.url)) {
       seen.add(item.url);
       out.push(navItemToEntry(item));
@@ -423,6 +426,7 @@ function buildEntries(sections: NavSection[], extras: PageEntry[] = [], extraNav
   }
   for (const section of sections) {
     for (const item of section.items) {
+      if (isBlockedAbdallahRoute(item.url)) continue;
       if (!seen.has(item.url)) {
         seen.add(item.url);
         out.push(navItemToEntry(item));
@@ -535,8 +539,8 @@ export function CommandPalette({
   );
 
   const showErp = !isPOS && hasErpAccess;
-  const showFactory = !isPOS && hasFactoryAccess;
-  const showProperties = !isPOS && hasPropertiesAccess;
+  const showFactory = false;
+  const showProperties = false;
   // Global admin routes (e.g. /settings, /deleted-items) only work in ERP/Factory shells.
   // In properties-only mode, suppress them since the properties shell redirects away.
   const showAdmin = !isPOS && canSeeAdminCommands && (showErp || showFactory);
@@ -600,12 +604,6 @@ export function CommandPalette({
           </CommandGroup>
         )}
 
-        <CommandSeparator />
-        <CommandGroup heading="Intercompany">
-          {intercompanyPages.map((p) => (
-            <PaletteItem key={p.path} page={p} onSelect={navigate} />
-          ))}
-        </CommandGroup>
 
         <CommandSeparator />
         <CommandGroup heading="AI Assistant">
