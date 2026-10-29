@@ -6,8 +6,6 @@ import {
   Loader2,
   Trash2,
   PieChart,
-  Layers3,
-  ScanSearch,
   Info,
   ShieldCheck,
   Sparkles,
@@ -24,7 +22,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CleanEmptyAccountsDialog } from "./CleanEmptyAccountsDialog";
 import { ResetCompanyDataDialog } from "./SystemMaintenanceDialogs";
-import { GroupNetPositionPage } from "./GroupNetPositionPage";
 import { useLocation } from "wouter";
 import type { Company } from "@shared/schema";
 
@@ -113,7 +110,6 @@ export function SystemToolsTab({ appMode, currentUser, selectedCompany, companie
 
   const [isResetDataDialogOpen, setIsResetDataDialogOpen] = useState(false);
   const [emptyAccountsOpen, setEmptyAccountsOpen] = useState(false);
-  const [groupNetPositionOpen, setGroupNetPositionOpen] = useState(false);
 
   const { data: parentCompanyData } = useQuery<{ parentCompanyId: number | null }>({
     queryKey: ["/api/system/parent-company"],
@@ -137,10 +133,6 @@ export function SystemToolsTab({ appMode, currentUser, selectedCompany, companie
       ? "/properties/net-position-details"
       : "/net-position-details";
 
-  if (groupNetPositionOpen && !isFactory && !isProperties) {
-    return <GroupNetPositionPage onBack={() => setGroupNetPositionOpen(false)} />;
-  }
-
   const cards: ToolCard[] = [
     {
       category: "Recovery",
@@ -155,17 +147,6 @@ export function SystemToolsTab({ appMode, currentUser, selectedCompany, companie
       testId: "card-deleted-items",
     },
     {
-      category: "Diagnostics",
-      categoryColor: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
-      icon: <ScanSearch className="h-6 w-6 text-amber-500" />,
-      iconBg: "bg-amber-500/10",
-      title: "Import Cycle Diagnostics",
-      description: "Detect imbalance issues and troubleshoot import cycle problems.",
-      actionLabel: "Run Check",
-      onAction: () => navigate("/import-cycle-diagnostics"),
-      testId: "card-import-cycle",
-    },
-    {
       category: "Financials",
       categoryColor: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300",
       icon: <PieChart className="h-6 w-6 text-violet-500" />,
@@ -176,22 +157,6 @@ export function SystemToolsTab({ appMode, currentUser, selectedCompany, companie
       onAction: () => navigate(netPositionPath),
       testId: "card-net-position",
     },
-    ...(!isFactory && !isProperties
-      ? [
-          {
-            category: "Financials",
-            categoryColor: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
-            icon: <Layers3 className="h-6 w-6 text-blue-500" />,
-            iconBg: "bg-blue-500/10",
-            title: "Group Net Position",
-            description:
-              "Combine What We Have, What We Owe, and Net Position across active ERP and Properties companies. Factory and Supplier Partner companies are excluded.",
-            actionLabel: "View Group",
-            onAction: () => setGroupNetPositionOpen(true),
-            testId: "card-group-net-position",
-          } satisfies ToolCard,
-        ]
-      : []),
   ];
   const visibleCards = cards.filter((card) => isDev || !card.devOnly);
 
@@ -212,7 +177,7 @@ export function SystemToolsTab({ appMode, currentUser, selectedCompany, companie
             <div>
               <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">System Tools</h2>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-                Recovery, diagnostics, and financial insights for{" "}
+                Recovery and financial insights for{" "}
                 <span className="font-medium text-foreground">{selectedCompany?.name || "the current company"}</span>.
               </p>
             </div>
@@ -250,7 +215,7 @@ export function SystemToolsTab({ appMode, currentUser, selectedCompany, companie
         <SectionHeading
           icon={Sparkles}
           eyebrow="Workspace tools"
-          title="Recovery, diagnostics & insights"
+          title="Recovery & financial insights"
           description="Open a focused tool only when you need to inspect or change system data."
         />
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-4">
