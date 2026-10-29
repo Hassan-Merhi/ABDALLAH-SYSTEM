@@ -1,6 +1,6 @@
-# ERP / POS System
+# Dakzo Systems
 
-A comprehensive, multi-company **ERP and POS platform** for warehouse
+Dakzo Systems is a multi-company **ERP platform** for warehouse
 management, inventory, and financials — with container tracking, factory
 production, property rentals, offline-capable point of sale, and an AI
 chatbot for querying ERP data.

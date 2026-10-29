@@ -389,7 +389,11 @@ export function ModuleHeader({ icon: Icon, label, tagline, accent }: ModuleHeade
             boxShadow: `0 3px 16px ${accent}66, inset 0 1px 0 rgba(255,255,255,0.22), inset 0 -1px 0 rgba(0,0,0,0.15)`,
           }}
         >
-          <Icon className="h-5 w-5 drop-shadow-xs" />
+          {label === "Dakzo Systems" ? (
+            <img src="/dakzo-icon.svg" alt="" className="h-8 w-8 object-contain" />
+          ) : (
+            <Icon className="h-5 w-5 drop-shadow-xs" />
+          )}
         </div>
         <div className="flex flex-col min-w-0 gap-0.5">
           <span className="text-sm font-bold leading-tight">{label}</span>

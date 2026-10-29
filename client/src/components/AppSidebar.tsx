@@ -343,7 +343,7 @@ export function AppSidebar({ user, onLogout }: { user?: SidebarUser; onLogout: (
 
   return (
     <Sidebar className="flex!">
-      <ModuleHeader icon={Package} label="Business OS" tagline="ERP / Warehouse" accent={MODULE_ACCENT.erp} />
+      <ModuleHeader icon={Package} label="Dakzo Systems" tagline="ERP / Warehouse" accent={MODULE_ACCENT.erp} />
 
       <SidebarContent className="px-3 py-2 overflow-y-auto">
         <PinnedNavList

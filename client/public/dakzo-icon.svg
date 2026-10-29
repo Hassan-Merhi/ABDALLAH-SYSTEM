@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-label="Dakzo Systems icon"><rect width="160" height="160" rx="35" fill="#06152D"/><g transform="translate(9 0) scale(1.08)"><defs><linearGradient id="blue" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2298FF"/><stop offset="1" stop-color="#0062EF"/></linearGradient><linearGradient id="deep" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#103A98"/><stop offset="1" stop-color="#0264DA"/></linearGradient></defs>
+<path d="M18 24h53c27 0 47 20 47 48s-20 48-48 48H51L70 94h1c13 0 22-9 22-22s-9-22-22-22H38z" fill="url(#blue)"/>
+<path d="M49 59h32L37 120H9z" fill="url(#deep)"/>
+<path d="M31 24h44l19 26H50z" fill="#248EFF" opacity=".90"/></g></svg>

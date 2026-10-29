@@ -2,7 +2,7 @@ const { app, BrowserWindow, Menu, shell, dialog, nativeTheme } = require('electr
 const path = require('path');
 
 const APP_URL = 'https://www.hmdinternationalgroup.com';
-const APP_NAME = 'ERP Warehouse';
+const APP_NAME = 'Dakzo Systems';
 const ICON_PATH = path.join(__dirname, 'icons', 'icon.ico');
 
 let mainWindow = null;
@@ -138,13 +138,13 @@ function buildMenu() {
       label: 'Help',
       submenu: [
         {
-          label: 'About ERP Warehouse',
+          label: 'About Dakzo Systems',
           click: () => {
             dialog.showMessageBox(mainWindow, {
               type: 'info',
-              title: 'About ERP Warehouse',
-              message: 'ERP Warehouse',
-              detail: `Version: ${app.getVersion()}\nHMD International Group\nhttps://www.hmdinternationalgroup.com`,
+              title: 'About Dakzo Systems',
+              message: 'Dakzo Systems',
+              detail: `Version: ${app.getVersion()}\nDakzo Systems\n${APP_URL}`,
               icon: ICON_PATH,
             });
           },

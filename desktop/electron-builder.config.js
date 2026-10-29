@@ -1,12 +1,12 @@
 /**
- * electron-builder configuration for HMD ERP + FACTORY SYSTEM
+ * electron-builder configuration for Dakzo Systems
  * Microsoft Store MSIX / APPX package
  */
 
 module.exports = {
   appId: "com.hmdinternationalgroup.hmderpfactorysystem",
-  productName: "HMD ERP + FACTORY SYSTEM",
-  copyright: "Copyright © 2026 HMD International Group",
+  productName: "Dakzo Systems",
+  copyright: "Copyright © 2026 Dakzo Systems",
 
   directories: {
     output: "dist",
@@ -47,7 +47,7 @@ module.exports = {
     publisherDisplayName: "Hassan Dakik",
 
     applicationId: "HMDERPFactorySystem",
-    displayName: "HMD ERP + FACTORY SYSTEM",
+    displayName: "Dakzo Systems",
     backgroundColor: "#0f172a",
     showNameOnTiles: true,
     languages: ["en-US"],
@@ -62,6 +62,6 @@ module.exports = {
     installerHeaderIcon: "icons/icon.ico",
     createDesktopShortcut: true,
     createStartMenuShortcut: true,
-    shortcutName: "HMD ERP + FACTORY SYSTEM",
+    shortcutName: "Dakzo Systems",
   },
 };

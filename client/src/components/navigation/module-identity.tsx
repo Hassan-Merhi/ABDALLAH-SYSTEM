@@ -25,7 +25,7 @@ const toneClasses: Record<ModuleIdentityTone, string> = {
 };
 
 export function ModuleIdentity({
-  productName = "Business OS",
+  productName = "Dakzo Systems",
   moduleName,
   description,
   companyName,

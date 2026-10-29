@@ -1,11 +1,10 @@
 {
-  "name": "erp-warehouse",
+  "name": "dakzo-systems",
   "version": "1.0.0",
-  "description": "ERP, POS, factory, warehouse, and inventory management system by HMD International Group.",
+  "description": "Dakzo Systems ERP desktop client",
   "main": "main.js",
   "author": {
-    "name": "HMD International Group",
-    "email": "admin@hmdinternationalgroup.com"
+    "name": "Dakzo Systems"
   },
   "license": "UNLICENSED",
   "private": true,

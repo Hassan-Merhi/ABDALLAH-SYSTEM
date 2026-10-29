@@ -17,7 +17,7 @@ import type { CapacitorConfig } from "@capacitor/cli";
  */
 const config: CapacitorConfig = {
   appId: "com.erp.warehouse",
-  appName: "ERP Warehouse",
+  appName: "Dakzo Systems",
   webDir: "dist/public",
   server: {
     androidScheme: "https",
