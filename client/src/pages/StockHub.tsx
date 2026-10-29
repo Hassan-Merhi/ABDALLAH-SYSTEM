@@ -1,16 +1,14 @@
-import { Package, Search, Truck } from "lucide-react";
+import { Package, Search } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useHubQueryState } from "@/hooks/use-hub-query-state";
 import StockItems from "@/pages/StockItems";
 import StockQuery from "@/pages/StockQuery";
-import OffloadItemSearch from "@/pages/OffloadItemSearch";
 import { canAccessErpFeature, type ErpFeatureAccess } from "@/app/erpAccess";
 import { RestrictedTabsState } from "@/components/RestrictedTabsState";
 
 const TABS = [
   { value: "items", label: "Items", icon: Package, featureKey: "stock_items" as const },
   { value: "query", label: "Query", icon: Search, featureKey: "stock_query" as const },
-  { value: "offload", label: "Offload Search", icon: Truck, featureKey: "stock_items" as const },
 ] as const;
 
 const TAB_VALUES = TABS.map((tab) => tab.value);
@@ -47,9 +45,6 @@ export default function StockHub({ access }: { access?: ErpFeatureAccess }) {
       </TabsContent>
       <TabsContent value="query" className="m-0">
         {visibleValues.includes("query") && <StockQuery />}
-      </TabsContent>
-      <TabsContent value="offload" className="m-0">
-        {visibleValues.includes("offload") && <OffloadItemSearch />}
       </TabsContent>
     </Tabs>
   );
