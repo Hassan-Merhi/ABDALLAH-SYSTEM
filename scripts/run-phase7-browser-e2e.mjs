@@ -340,49 +340,34 @@ try {
     return { before: Number(before.quantity), after: Number(after.quantity) };
   });
 
-  await runCase("ERP stock transfer updates both locations", devPage, async () => {
+  await runCase("ERP-only rejects transfers without moving inventory", devPage, async () => {
     await selectCompany(devPage, "PHASE7-ERP");
-    const beforeSource = await queryOne(
-      `SELECT quantity FROM inventory WHERE company_id = $1 AND location_id = $2 AND stock_item_id = $3`,
-      [fixture.companies.erp, fixture.erp.locationId, fixture.erp.stockItemId],
-    );
-    const beforeDestination = await queryOne(
-      `SELECT quantity FROM inventory WHERE company_id = $1 AND location_id = $2 AND stock_item_id = $3`,
-      [fixture.companies.erp, fixture.erp.location2Id, fixture.erp.stockItemId],
-    );
-    const transfer = await browserRequest(devPage, "POST", "/api/stock-transfers", {
+    const inventorySql = "SELECT quantity FROM inventory WHERE company_id = $1 AND location_id = $2 AND stock_item_id = $3";
+    const sourceArgs = [fixture.companies.erp, fixture.erp.locationId, fixture.erp.stockItemId];
+    const destinationArgs = [fixture.companies.erp, fixture.erp.location2Id, fixture.erp.stockItemId];
+    const beforeSource = await queryOne(inventorySql, sourceArgs);
+    const beforeDestination = await queryOne(inventorySql, destinationArgs);
+
+    const denied = await browserRequest(devPage, "POST", "/api/stock-transfers", {
       sourceLocationId: fixture.erp.locationId,
       destinationLocationId: fixture.erp.location2Id,
-      items: [
-        {
-          stockItemId: fixture.erp.stockItemId,
-          quantity: 7,
-          sourceLocationId: fixture.erp.locationId,
-        },
-      ],
-      notes: "Phase 7 browser E2E stock transfer",
+      items: [{ stockItemId: fixture.erp.stockItemId, quantity: 7, sourceLocationId: fixture.erp.locationId }],
+      notes: "ERP-only forbidden stock transfer",
       voucherDate: new Date().toISOString().slice(0, 10),
     });
-    expectStatus(transfer, "Stock transfer");
-    const afterSource = await queryOne(
-      `SELECT quantity FROM inventory WHERE company_id = $1 AND location_id = $2 AND stock_item_id = $3`,
-      [fixture.companies.erp, fixture.erp.locationId, fixture.erp.stockItemId],
-    );
-    const afterDestination = await queryOne(
-      `SELECT quantity FROM inventory WHERE company_id = $1 AND location_id = $2 AND stock_item_id = $3`,
-      [fixture.companies.erp, fixture.erp.location2Id, fixture.erp.stockItemId],
-    );
-    if (Number(afterSource.quantity) !== Number(beforeSource.quantity) - 7) {
-      throw new Error(`Source transfer delta mismatch: ${beforeSource.quantity} -> ${afterSource.quantity}`);
+    if (denied.status !== 403) throw new Error("Stock transfers must be denied with 403; received " + denied.status);
+    const afterSource = await queryOne(inventorySql, sourceArgs);
+    const afterDestination = await queryOne(inventorySql, destinationArgs);
+    if (Number(afterSource.quantity) !== Number(beforeSource.quantity) ||
+        Number(afterDestination.quantity) !== Number(beforeDestination.quantity)) {
+      throw new Error("Forbidden stock transfer modified inventory");
     }
-    if (Number(afterDestination.quantity) !== Number(beforeDestination.quantity) + 7) {
-      throw new Error(`Destination transfer delta mismatch: ${beforeDestination.quantity} -> ${afterDestination.quantity}`);
-    }
-    await openRoute(devPage, "/sales-tools?tab=transfers");
-    return {
-      source: [Number(beforeSource.quantity), Number(afterSource.quantity)],
-      destination: [Number(beforeDestination.quantity), Number(afterDestination.quantity)],
-    };
+    const directRoute = await openRoute(devPage, "/stock-transfer-order");
+    if (directRoute.path !== "/tracking") throw new Error("Stock transfer deep link was accessible: " + directRoute.path);
+    const tabRoute = await openRoute(devPage, "/sales-tools?tab=transfers");
+    if (tabRoute.path !== "/tracking") throw new Error("Stock transfers tab was accessible: " + tabRoute.path);
+    return { status: denied.status, sourceQuantity: Number(afterSource.quantity),
+      destinationQuantity: Number(afterDestination.quantity) };
   });
 
   await runCase("ERP journal voucher stays balanced", devPage, async () => {
@@ -423,96 +408,42 @@ try {
     return { voucherId, debit: Number(totals.debit), credit: Number(totals.credit) };
   });
 
-  await runCase("Factory offload and reverse round trip", devPage, async () => {
-    await selectCompany(devPage, "PHASE7-FACTORY");
-    const offload = await browserRequest(devPage, "POST", "/api/factory/raw-stock/offload", {
-      containerId: fixture.factory.containerId,
-      receivedKg: "100",
-      costPerKg: "2",
-      currencyCode: "USD",
-      fxRateToUsd: "1",
-      freight: "0",
-      otherCharges: "0",
-      dutyStatus: "NONE",
-      offloadDate: new Date().toISOString().slice(0, 10),
-      idempotencyKey: `phase7-browser-offload-${fixture.factory.containerId}`,
+  await runCase("ERP-only rejects Factory company and API access", devPage, async () => {
+    await selectCompany(devPage, "PHASE7-ERP");
+    const available = await browserRequest(devPage, "GET", "/api/user/companies");
+    expectStatus(available, "ERP-only company list");
+    if (!Array.isArray(available.body) ||
+        available.body.some((company) => company.companyCode === "PHASE7-FACTORY")) {
+      throw new Error("Factory company must not appear in ERP-only company list");
+    }
+    const deniedSwitch = await browserRequest(devPage, "POST", "/api/auth/set-company", {
+      companyId: fixture.companies.factory,
     });
-    expectStatus(offload, "Factory offload");
-    const afterOffload = await queryOne(
-      `SELECT c.status, c.actual_received_kg,
-              COALESCE(rs.received_kg::numeric, 0) AS raw_received_kg
-       FROM factory_containers c
-       LEFT JOIN factory_raw_stock rs ON rs.container_id = c.id
-       WHERE c.id = $1`,
-      [fixture.factory.containerId],
-    );
-    if (afterOffload.status !== "OFFLOADED" || Number(afterOffload.raw_received_kg) !== 100) {
-      throw new Error(`Factory offload state mismatch: ${JSON.stringify(afterOffload)}`);
-    }
-    await openRoute(devPage, "/factory/containers");
-
-    const reverse = await browserRequest(
-      devPage,
-      "POST",
-      `/api/factory/containers/${fixture.factory.containerId}/reverse-offload`,
-      {},
-    );
-    expectStatus(reverse, "Factory reverse offload");
-    const afterReverse = await queryOne(
-      `SELECT c.status, c.actual_received_kg,
-              (SELECT COUNT(*)::int FROM factory_raw_stock rs WHERE rs.container_id = c.id) AS raw_rows
-       FROM factory_containers c WHERE c.id = $1`,
-      [fixture.factory.containerId],
-    );
-    if (afterReverse.status !== "ARRIVED" || afterReverse.actual_received_kg !== null || Number(afterReverse.raw_rows) !== 0) {
-      throw new Error(`Factory reverse state mismatch: ${JSON.stringify(afterReverse)}`);
-    }
-    await openRoute(devPage, "/factory/containers");
-    return { afterOffload, afterReverse };
+    if (deniedSwitch.status !== 403) throw new Error("Factory company switch returned " + deniedSwitch.status);
+    const deniedApi = await browserRequest(devPage, "GET", "/api/factory/daybook");
+    if (deniedApi.status !== 403) throw new Error("Factory API returned " + deniedApi.status);
+    const directRoute = await openRoute(devPage, "/factory/containers");
+    if (directRoute.path !== "/tracking") throw new Error("Factory page was accessible: " + directRoute.path);
+    return { switchStatus: deniedSwitch.status, apiStatus: deniedApi.status, route: directRoute.path };
   });
 
-  await runCase("Supplier Partner sale preserves stock and accounting invariants", devPage, async () => {
-    await selectCompany(devPage, "PHASE7-SP");
-    const before = await queryOne(
-      `SELECT COALESCE(SUM(qty_remaining::numeric), 0) AS quantity
-       FROM sp_stock_movements WHERE company_id = $1 AND stock_item_id = $2`,
-      [fixture.companies.supplierPartner, fixture.supplierPartner.stockItemId],
-    );
-    const sale = await browserRequest(devPage, "POST", "/api/sp/sales", {
-      saleDate: new Date().toISOString().slice(0, 10),
-      customerName: "Phase 7 Browser Customer",
-      paymentAccountType: "cash",
-      paymentAccountId: fixture.supplierPartner.cashAccountId,
-      saleLines: [{ stockItemId: fixture.supplierPartner.stockItemId, qtySold: 1, salePricePerUnit: 30 }],
+  await runCase("ERP-only rejects Supplier Partner company and API access", devPage, async () => {
+    await selectCompany(devPage, "PHASE7-ERP");
+    const available = await browserRequest(devPage, "GET", "/api/user/companies");
+    expectStatus(available, "ERP-only company list");
+    if (!Array.isArray(available.body) ||
+        available.body.some((company) => company.companyCode === "PHASE7-SP")) {
+      throw new Error("Supplier Partner company must not appear in ERP-only company list");
+    }
+    const deniedSwitch = await browserRequest(devPage, "POST", "/api/auth/set-company", {
+      companyId: fixture.companies.supplierPartner,
     });
-    expectStatus(sale, "Supplier Partner sale");
-    const after = await queryOne(
-      `SELECT COALESCE(SUM(qty_remaining::numeric), 0) AS quantity
-       FROM sp_stock_movements WHERE company_id = $1 AND stock_item_id = $2`,
-      [fixture.companies.supplierPartner, fixture.supplierPartner.stockItemId],
-    );
-    if (Number(after.quantity) !== Number(before.quantity) - 1) {
-      throw new Error(`SP stock delta mismatch: ${before.quantity} -> ${after.quantity}`);
-    }
-    const voucherId = Number(sale.body?.voucherId);
-    const totals = await queryOne(
-      `SELECT COUNT(*)::int AS entries,
-              COALESCE(SUM(debit_amount::numeric), 0) AS debit,
-              COALESCE(SUM(credit_amount::numeric), 0) AS credit
-       FROM voucher_entries WHERE voucher_id = $1`,
-      [voucherId],
-    );
-    if (Number(totals.entries) !== 2 || Number(totals.debit) !== 30 || Number(totals.credit) !== 30) {
-      throw new Error(`SP accounting mismatch: ${JSON.stringify(totals)}`);
-    }
-    await openRoute(devPage, "/sp");
-    return {
-      saleId: sale.body?.id,
-      voucherId,
-      stock: [Number(before.quantity), Number(after.quantity)],
-      debit: Number(totals.debit),
-      credit: Number(totals.credit),
-    };
+    if (deniedSwitch.status !== 403) throw new Error("Supplier Partner switch returned " + deniedSwitch.status);
+    const deniedApi = await browserRequest(devPage, "POST", "/api/sp/sales", {});
+    if (deniedApi.status !== 403) throw new Error("Supplier Partner API returned " + deniedApi.status);
+    const directRoute = await openRoute(devPage, "/sp");
+    if (directRoute.path !== "/tracking") throw new Error("Supplier Partner page was accessible: " + directRoute.path);
+    return { switchStatus: deniedSwitch.status, apiStatus: deniedApi.status, route: directRoute.path };
   });
 
   await runCase("Phone POS checkout through the mobile sale UI", devPage, async () => {
@@ -643,23 +574,26 @@ try {
     }
   });
 
-  await runCase("Phone factory containers list shows the arrived container", devPage, async () => {
-    await selectCompany(devPage, "PHASE7-FACTORY");
+  await runCase("Phone ERP-only navigation blocks non-ERP modes", devPage, async () => {
+    await selectCompany(devPage, "PHASE7-ERP");
     const phonePage = await browser.newPage();
     await phonePage.setViewport(PHONE_VIEWPORT);
     try {
-      const container = await queryOne(
-        `SELECT c.status, s.name AS supplier FROM factory_containers c
-         JOIN factory_suppliers s ON s.id = c.supplier_id WHERE c.id = $1`,
-        [fixture.factory.containerId],
-      );
-      await openRoute(phonePage, "/factory/containers-hub?section=containers");
-      await waitForText(phonePage, "#main-content", container.supplier);
-      await tapTestId(phonePage, "button-view-list");
-      await waitForText(phonePage, "#main-content", "Containers (1)");
-      await assertNoHorizontalOverflow(phonePage, "Factory containers");
-      await capture(phonePage, "phone factory containers");
-      return container;
+      const restricted = [
+        "/factory/containers-hub?section=containers",
+        "/properties/daybook",
+        "/retail/inventory",
+        "/sp/reports",
+      ];
+      for (const attempted of restricted) {
+        const state = await openRoute(phonePage, attempted);
+        if (state.path !== "/tracking") {
+          throw new Error("Non-ERP phone route was accessible: " + attempted + " -> " + state.path);
+        }
+      }
+      await assertNoHorizontalOverflow(phonePage, "ERP-only phone tracking");
+      await capture(phonePage, "phone ERP-only route restrictions");
+      return { blockedRoutes: restricted.length, landingPage: "/tracking" };
     } finally {
       await phonePage.close().catch(() => undefined);
     }
