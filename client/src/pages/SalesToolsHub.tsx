@@ -20,8 +20,8 @@ const ERP_TABS = [
   { key: "pricelist", label: "Price List", icon: Tag },
 ] as const;
 
-const POS_TAB_KEYS = POS_TABS.map((t) => t.key) as unknown as readonly ("daybook" | "transfers")[];
-const ERP_TAB_KEYS = ERP_TABS.map((t) => t.key) as unknown as readonly ("transfers" | "pricelist")[];
+const POS_TAB_KEYS = POS_TABS.map((t) => t.key) as unknown as readonly "daybook"[];
+const ERP_TAB_KEYS = ERP_TABS.map((t) => t.key) as unknown as readonly "pricelist"[];
 
 export default function SalesToolsHub({ access }: { access?: ErpFeatureAccess }) {
   const { data: user } = useQuery<AuthMe>({ queryKey: ["/api/auth/me"] });
@@ -44,7 +44,7 @@ export default function SalesToolsHub({ access }: { access?: ErpFeatureAccess })
   return (
     <Tabs
       value={activeTab}
-      onValueChange={(value) => setTab(value as "daybook" | "transfers" | "pricelist")}
+      onValueChange={(value) => setTab(value as "daybook" | "pricelist")}
       className="flex min-w-0 flex-col h-full"
     >
       <div className="border-b bg-background px-3 sm:px-4 py-2.5 shrink-0">
