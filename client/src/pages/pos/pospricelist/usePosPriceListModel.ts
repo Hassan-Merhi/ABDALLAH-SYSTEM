@@ -22,7 +22,6 @@ import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useToast } from "@/hooks/use-toast";
 import type {
   Location,
-  MasterItem,
   MasterPriceListResponse,
   POSPriceListProps,
   PriceListItem,

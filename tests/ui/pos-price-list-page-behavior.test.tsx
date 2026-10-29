@@ -9,8 +9,8 @@ const harness = vi.hoisted(() => ({
   navigate: vi.fn(),
   readSpreadsheet: vi.fn(),
   sheetRows: vi.fn(),
-  createSheet: vi.fn(),
-  writeSpreadsheet: vi.fn(),
+  createSheet: vi.fn((_rows: any[]) => ({})),
+  writeSpreadsheet: vi.fn((_workbook: unknown, _filename: string) => Promise.resolve()),
 }));
 
 const priceItems = [
