@@ -1,25 +1,22 @@
 import { Suspense } from "react";
 import { lazyRetry as lazy } from "@/lib/lazyRetry";
 import { useQuery } from "@tanstack/react-query";
-import { Book, ArrowLeftRight, Tag } from "lucide-react";
+import { Book, Tag } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useHubQueryState } from "@/hooks/use-hub-query-state";
 import type { AuthMe } from "@shared/apiTypes";
 import { canAccessErpFeature, type ErpFeatureAccess } from "@/app/erpAccess";
 
 const POSDaybook = lazy(() => import("@/pages/pos/POSDaybook"));
-const StockTransfers = lazy(() => import("@/pages/StockTransfers"));
 const POSPriceList = lazy(() => import("@/pages/pos/POSPriceList"));
 
 // These arrays are module-level constants so their references are stable across
 // renders — safe to pass as allowedValues to useHubQueryState without memoising.
 const POS_TABS = [
   { key: "daybook", label: "POS Daybook", icon: Book },
-  { key: "transfers", label: "Stock Transfers", icon: ArrowLeftRight },
 ] as const;
 
 const ERP_TABS = [
-  { key: "transfers", label: "Stock Transfers", icon: ArrowLeftRight },
   { key: "pricelist", label: "Price List", icon: Tag },
 ] as const;
 
@@ -35,7 +32,7 @@ export default function SalesToolsHub({ access }: { access?: ErpFeatureAccess })
     : [...ERP_TABS];
   const knownTabKeys = isPOS ? POS_TAB_KEYS : ERP_TAB_KEYS;
   const tabKeys = tabs.map((tab) => tab.key);
-  const defaultTab = tabKeys[0] ?? "transfers";
+  const defaultTab = tabKeys[0] ?? "pricelist";
 
   const [activeTab, setTab] = useHubQueryState({
     key: "tab",
@@ -67,9 +64,6 @@ export default function SalesToolsHub({ access }: { access?: ErpFeatureAccess })
         <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading…</div>}>
           <TabsContent value="daybook" className="m-0">
             <POSDaybook />
-          </TabsContent>
-          <TabsContent value="transfers" className="m-0">
-            <StockTransfers hideVoucherNotes />
           </TabsContent>
           <TabsContent value="pricelist" className="m-0">
             <POSPriceList />
