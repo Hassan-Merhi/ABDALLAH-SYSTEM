@@ -137,7 +137,6 @@ export function ErpMobileNavSheet({ user, open, onOpenChange }: ErpMobileNavShee
     if (!SETTINGS_HIDDEN_ROLES.has(currentRole)) {
       account.push({ title: "My Settings", url: "/my-settings", icon: KeyRound });
     }
-    account.push({ title: "IC Requests", url: "/intercompany-requests", icon: ArrowRight });
     if (isItemVisible({ title: "Settings", url: "/settings", icon: Settings })) {
       account.push({ title: "Settings", url: "/settings", icon: Settings });
     }
