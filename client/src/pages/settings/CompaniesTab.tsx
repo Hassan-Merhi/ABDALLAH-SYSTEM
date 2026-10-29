@@ -241,7 +241,7 @@ export function CompaniesTab() {
                 <FormField
                   control={companyForm.control}
                   name="companyType"
-                  render={({ field }) => (
+                  render={() => (
                     <FormItem>
                       <FormLabel>Company Type</FormLabel>
                       <Select disabled value="erp">
