@@ -13,6 +13,7 @@ Group=ubuntu
 WorkingDirectory=/home/ubuntu/ABDALLAH-SYSTEM
 Environment=NODE_ENV=production
 Environment=PORT=5000
+Environment=ERP_BIND_HOST=127.0.0.1
 Environment=PGSSLMODE=disable
 Environment=RUN_STARTUP_MIGRATIONS=true
 Environment=PATH=/home/ubuntu/.nvm/versions/node/v24.22.1/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/bin
