@@ -4,7 +4,7 @@ import path from "node:path";
 import type { Plugin } from "vite";
 
 const LABEL_HTML_SUFFIX = "/client/src/lib/labelHtml.ts";
-const EMBEDDED_LABEL_LOGO_RE = /const HMD_LOGO_BASE64\s*=\s*"data:image\/png;base64,[^"]+";/s;
+const DAKZO_LABEL_LOGO_RE = /const DAKZO_LOGO_URL\s*=\s*"\/dakzo-icon\.svg";/;
 
 export function labelAssetExtractionPlugin(): Plugin {
   const sourcePath = path.resolve(import.meta.dirname, "..", "server", "dakzo-logo.png");
