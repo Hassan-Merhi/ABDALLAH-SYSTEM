@@ -244,13 +244,7 @@ export function CompaniesTab() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Company Type</FormLabel>
-                      <Select
-                        onValueChange={(value) => {
-                          field.onChange(value);
-                          if (value === "properties") companyForm.setValue("parentCompanyId", undefined);
-                        }}
-                        value={field.value || "erp"}
-                      >
+                      <Select disabled value="erp">
                         <FormControl>
                           <SelectTrigger data-testid="select-company-type">
                             <SelectValue placeholder="Select type" />
@@ -258,10 +252,6 @@ export function CompaniesTab() {
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="erp">Normal ERP</SelectItem>
-                          <SelectItem value="retail">Retail / Variant Inventory</SelectItem>
-                          <SelectItem value="factory">Factory Production</SelectItem>
-                          <SelectItem value="properties">Properties</SelectItem>
-                          <SelectItem value="supplier_partner">Supplier Partner</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
