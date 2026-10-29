@@ -42,7 +42,14 @@ export function AuthenticatedApp({ user, handleLogout }: AuthenticatedAppProps) 
       userRole: user.role ?? undefined,
     });
 
-  if (companyLoading || !selectedCompany) return <AppLoadingState />;
+  if (companyLoading) return <AppLoadingState />;
+  if (!selectedCompany || selectedCompany.companyType !== "erp") {
+    return (
+      <div role="alert" className="flex min-h-screen items-center justify-center p-6 text-center">
+        ABDALLAH-SYSTEM supports ERP workspaces only. Ask your administrator to assign an ERP company.
+      </div>
+    );
+  }
 
   const isAdminOwner = user.role === "Admin" || user.role === "Owner" || user.role === "Developer";
   const routeState = resolveAuthenticatedAppRoute({
