@@ -1,0 +1,6 @@
+# Replace erp.example.com with your real DNS hostname (A record -> OCI VM public IP).
+# Caddy obtains and renews HTTPS certificates. Only 80/443 need public access.
+erp.example.com {
+  encode zstd gzip
+  reverse_proxy 127.0.0.1:5000
+}
