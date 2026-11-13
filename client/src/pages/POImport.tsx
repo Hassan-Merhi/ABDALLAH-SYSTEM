@@ -1,3 +1,5 @@
+import { compareItemNamesAZ } from "@/lib/itemNameSort";
+import { compareContainerNumbersAZ } from "@shared/containerNumberSort";
 import type { ClientErrorLike } from "@/lib/clientError";
 import SpPOImport from "./SpPOImport";
 import { useCallback, useEffect, useState } from "react";
@@ -666,7 +668,7 @@ function ErpPOImport() {
               </div>
             )}
 
-            {preview.preview.map((container: POImportContainer, idx: number) => (
+            {[...preview.preview].sort((a, b) => compareContainerNumbersAZ(a.containerNumber, b.containerNumber)).map((container: POImportContainer, idx: number) => (
               <div key={idx} className="space-y-4 mb-6">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold">Container: {container.containerNumber}</h3>
@@ -687,7 +689,7 @@ function ErpPOImport() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {container.items.map((item: POImportItem, itemIdx: number) => (
+                      {[...container.items].sort((a, b) => compareItemNamesAZ(a.itemName || a.barcode, b.itemName || b.barcode)).map((item: POImportItem, itemIdx: number) => (
                         <TableRow key={itemIdx}>
                           <TableCell>{item.poNumber}</TableCell>
                           <TableCell>{item.itemName}</TableCell>
