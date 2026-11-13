@@ -171,11 +171,13 @@ export function PosMobileLayout({
               onChange={(event) => setSearchTerm(event.target.value)}
               data-testid="input-mobile-product-search"
             />
-            <MobileBarcodeScanner onScan={(code) => {
-              const match = inventory.find((item) => item.code?.trim().toUpperCase() === code.trim().toUpperCase());
-              if (match) openItemSheet(match);
-              else setSearchTerm(code);
-            }} />
+            <MobileBarcodeScanner
+              onScan={(code) => {
+                const match = inventory.find((item) => item.code?.trim().toUpperCase() === code.trim().toUpperCase());
+                if (match) openItemSheet(match);
+                else setSearchTerm(code);
+              }}
+            />
             {searchTerm && (
               <button
                 type="button"
@@ -519,9 +521,26 @@ export function PosMobileLayout({
                   </div>
                 </div>
                 {showAdminReferencePrices && row.stockItemId && (
-                  <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-muted-foreground" data-testid={`pos-mobile-admin-prices-${actualIndex}`}>
-                    <div>{referenceLabels.baleCost}: <span className="font-mono">{row.costPrice != null && Number.isFinite(row.costPrice) ? (formatReferenceAmount?.(row.costPrice) ?? formatDisplayAmount(row.costPrice)) : "—"}</span></div>
-                    <div>{referenceLabels.configPrice}: <span className="font-mono">{row.configuredPrice != null && Number.isFinite(row.configuredPrice) ? (formatReferenceAmount?.(row.configuredPrice) ?? formatDisplayAmount(row.configuredPrice)) : "—"}</span></div>
+                  <div
+                    className="mt-2 grid grid-cols-2 gap-2 text-xs text-muted-foreground"
+                    data-testid={`pos-mobile-admin-prices-${actualIndex}`}
+                  >
+                    <div>
+                      {referenceLabels.baleCost}:{" "}
+                      <span className="font-mono">
+                        {row.costPrice != null && Number.isFinite(row.costPrice)
+                          ? (formatReferenceAmount?.(row.costPrice) ?? formatDisplayAmount(row.costPrice))
+                          : "—"}
+                      </span>
+                    </div>
+                    <div>
+                      {referenceLabels.configPrice}:{" "}
+                      <span className="font-mono">
+                        {row.configuredPrice != null && Number.isFinite(row.configuredPrice)
+                          ? (formatReferenceAmount?.(row.configuredPrice) ?? formatDisplayAmount(row.configuredPrice))
+                          : "—"}
+                      </span>
+                    </div>
                   </div>
                 )}
               </Card>

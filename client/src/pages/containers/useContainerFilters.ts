@@ -30,7 +30,9 @@ export function useContainerFilters(allContainers: Container[], soldContainers: 
     setSearchTerm("");
   };
 
-  const otwContainers = allContainers.filter((c) => c.status === "OTW").sort((a, b) => compareContainerNumbersAZ(a.containerNumber, b.containerNumber));
+  const otwContainers = allContainers
+    .filter((c) => c.status === "OTW")
+    .sort((a, b) => compareContainerNumbersAZ(a.containerNumber, b.containerNumber));
 
   // Extract unique values for OTW filters
   const uniqueOtwLocations = Array.from(
@@ -97,18 +99,20 @@ export function useContainerFilters(allContainers: Container[], soldContainers: 
     .filter((sale) => !debouncedSoldSearch || searchAny(debouncedSoldSearch, sale.containerNumber, sale.customerName))
     .sort((a, b) => compareContainerNumbersAZ(a.containerNumber, b.containerNumber));
 
-  const containers = allContainers.filter((c) => {
-    if (debouncedSearch && !searchAny(debouncedSearch, c.containerNumber)) {
-      return false;
-    }
-    if (statusFilter !== "ALL" && c.status !== statusFilter) {
-      return false;
-    }
-    if (supplierFilter.length > 0 && !supplierFilter.includes(c.supplierId.toString())) {
-      return false;
-    }
-    return true;
-  }).sort((a, b) => compareContainerNumbersAZ(a.containerNumber, b.containerNumber));
+  const containers = allContainers
+    .filter((c) => {
+      if (debouncedSearch && !searchAny(debouncedSearch, c.containerNumber)) {
+        return false;
+      }
+      if (statusFilter !== "ALL" && c.status !== statusFilter) {
+        return false;
+      }
+      if (supplierFilter.length > 0 && !supplierFilter.includes(c.supplierId.toString())) {
+        return false;
+      }
+      return true;
+    })
+    .sort((a, b) => compareContainerNumbersAZ(a.containerNumber, b.containerNumber));
 
   return {
     // Search terms

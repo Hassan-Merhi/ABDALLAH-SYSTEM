@@ -77,7 +77,12 @@ export function buildPosInventory(
     stock: parseFloat(item.quantity) || 0,
     price: parseFloat(item.lastSellingPrice || item.averageRate || "0") || 0,
     configuredPrice: parseFloat(item.lastSellingPrice || "0") || 0,
-    costPrice: item.averageRate == null ? undefined : (Number.isFinite(Number(item.averageRate)) ? Number(item.averageRate) : undefined),
+    costPrice:
+      item.averageRate == null
+        ? undefined
+        : Number.isFinite(Number(item.averageRate))
+          ? Number(item.averageRate)
+          : undefined,
     stockItemId: item.stockItemId,
   }));
 

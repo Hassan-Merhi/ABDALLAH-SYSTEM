@@ -50,10 +50,12 @@ export function ContainerDetailErpView({ model }: { model: Model }) {
 
   const { container, pos, charges } = containerData;
   // Sort display copies only. Preserve PO/line IDs and accounting insertion order.
-  const alphabetizedPos = [...pos].sort((a, b) => a.poNumber.localeCompare(b.poNumber, undefined, { numeric: true, sensitivity: "base" })).map((po) => ({
-    ...po,
-    items: [...po.items].sort((a, b) => compareItemNamesAZ(a.itemName, b.itemName)),
-  }));
+  const alphabetizedPos = [...pos]
+    .sort((a, b) => a.poNumber.localeCompare(b.poNumber, undefined, { numeric: true, sensitivity: "base" }))
+    .map((po) => ({
+      ...po,
+      items: [...po.items].sort((a, b) => compareItemNamesAZ(a.itemName, b.itemName)),
+    }));
   const supplier = suppliers.find((s) => s.id === container.supplierId);
 
   // Compute totals live from the actual PO and charges data so they are

@@ -4,7 +4,15 @@ import { ADMIN_POS_COLUMNS, POS_COLUMNS, canSeePosReferencePrices } from "./posC
 describe("POS reference columns", () => {
   it("puts Bale Cost and Config Price immediately before P/L", () => {
     expect(ADMIN_POS_COLUMNS.map((column) => column.key)).toEqual([
-      "itemName", "quantity", "rate", "amount", "baleCost", "configPrice", "plBale", "totalPL", "delete",
+      "itemName",
+      "quantity",
+      "rate",
+      "amount",
+      "baleCost",
+      "configPrice",
+      "plBale",
+      "totalPL",
+      "delete",
     ]);
     expect(POS_COLUMNS.map((column) => column.key)).not.toContain("baleCost");
     expect(POS_COLUMNS.map((column) => column.key)).not.toContain("configPrice");

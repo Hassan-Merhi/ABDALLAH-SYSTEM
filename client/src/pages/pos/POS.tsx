@@ -30,7 +30,12 @@ import { usePosMutations } from "./hooks/usePosMutations";
 import { usePosAutosave } from "./hooks/usePosAutosave";
 import { usePosHandlers } from "./hooks/usePosHandlers";
 
-import { POS_COLUMNS, adminPosColumnsForLanguage, canSeePosReferencePrices, formatDisplayAmount } from "./utils/posCalculations";
+import {
+  POS_COLUMNS,
+  adminPosColumnsForLanguage,
+  canSeePosReferencePrices,
+  formatDisplayAmount,
+} from "./utils/posCalculations";
 import { ErrorState } from "@/components/ui/page-state";
 import { GoldenCoastPosReadinessAlert } from "./pos-components/GoldenCoastPosReadinessAlert";
 
@@ -551,9 +556,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: AuthMe; edit
     if (!showAdminReferencePrices) return rows;
     const costByItem = new Map(inventory.map((item) => [item.stockItemId, item.costPrice]));
     return rows.map((row) =>
-      row.stockItemId && row.costPrice == null
-        ? { ...row, costPrice: costByItem.get(row.stockItemId) }
-        : row
+      row.stockItemId && row.costPrice == null ? { ...row, costPrice: costByItem.get(row.stockItemId) } : row
     );
   }, [rows, inventory, showAdminReferencePrices]);
   const goldenCoastPosBlocked = isSpCompany && goldenCoastPhase6 && goldenCoastReadiness?.canPost === false;

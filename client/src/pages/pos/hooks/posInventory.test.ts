@@ -29,10 +29,31 @@ describe("POS admin reference prices", () => {
     expect(item.costPrice).toBeUndefined();
   });
   it("uses the final SP bale cost when there are movements", () => {
-    const [item] = buildPosInventory([inventory], [
-      { id: 1, articleCode: "AA-7", description: "Bale", stockItemId: 7, locationId: 1, qtyRemaining: "2", finalUnitCostUsd: "4.00" },
-      { id: 2, articleCode: "AA-7", description: "Bale", stockItemId: 7, locationId: 1, qtyRemaining: "3", finalUnitCostUsd: "6.00" },
-    ], true, 1);
+    const [item] = buildPosInventory(
+      [inventory],
+      [
+        {
+          id: 1,
+          articleCode: "AA-7",
+          description: "Bale",
+          stockItemId: 7,
+          locationId: 1,
+          qtyRemaining: "2",
+          finalUnitCostUsd: "4.00",
+        },
+        {
+          id: 2,
+          articleCode: "AA-7",
+          description: "Bale",
+          stockItemId: 7,
+          locationId: 1,
+          qtyRemaining: "3",
+          finalUnitCostUsd: "6.00",
+        },
+      ],
+      true,
+      1
+    );
     expect(item.costPrice).toBeCloseTo(5.2);
     expect(item.configuredPrice).toBeCloseTo(5.2);
   });

@@ -38,8 +38,10 @@ export const ADMIN_POS_COLUMNS: POSColumn[] = [
 export function adminPosColumnsForLanguage(language: ApplicationLanguage): POSColumn[] {
   const labels = POS_REFERENCE_PRICE_LABELS[language];
   return ADMIN_POS_COLUMNS.map((column) =>
-    column.key === "baleCost" ? { ...column, label: labels.baleCost }
-      : column.key === "configPrice" ? { ...column, label: labels.configPrice }
+    column.key === "baleCost"
+      ? { ...column, label: labels.baleCost }
+      : column.key === "configPrice"
+        ? { ...column, label: labels.configPrice }
         : column
   );
 }

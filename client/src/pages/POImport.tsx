@@ -668,109 +668,113 @@ function ErpPOImport() {
               </div>
             )}
 
-            {[...preview.preview].sort((a, b) => compareContainerNumbersAZ(a.containerNumber, b.containerNumber)).map((container: POImportContainer, idx: number) => (
-              <div key={idx} className="space-y-4 mb-6">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">Container: {container.containerNumber}</h3>
-                  <div className="flex gap-4 text-sm">
-                    <span className="text-muted-foreground">{container.itemsCount} items</span>
-                    <span className="text-muted-foreground">{container.posCount} PO(s)</span>
+            {[...preview.preview]
+              .sort((a, b) => compareContainerNumbersAZ(a.containerNumber, b.containerNumber))
+              .map((container: POImportContainer, idx: number) => (
+                <div key={idx} className="space-y-4 mb-6">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold">Container: {container.containerNumber}</h3>
+                    <div className="flex gap-4 text-sm">
+                      <span className="text-muted-foreground">{container.itemsCount} items</span>
+                      <span className="text-muted-foreground">{container.posCount} PO(s)</span>
+                    </div>
                   </div>
-                </div>
-                <div className="rounded-md border">
-                  <Table>
-                    <TableHeader className="sticky top-0 z-30 bg-background">
-                      <TableRow>
-                        <TableHead>PO Number</TableHead>
-                        <TableHead>Item Name</TableHead>
-                        <TableHead className="text-right">Quantity</TableHead>
-                        <TableHead className="text-right">Rate</TableHead>
-                        <TableHead className="text-right">Line Total</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {[...container.items].sort((a, b) => compareItemNamesAZ(a.itemName, b.itemName)).map((item: POImportItem, itemIdx: number) => (
-                        <TableRow key={itemIdx}>
-                          <TableCell>{item.poNumber}</TableCell>
-                          <TableCell>{item.itemName}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(Number(item.quantity))}</TableCell>
-                          <TableCell className="text-right">
-                            {priceSymbol}
-                            {formatCurrency(Number(item.rate))}
-                          </TableCell>
-                          <TableCell className="text-right font-medium">
-                            {priceSymbol}
-                            {formatCurrency(Number(item.lineTotal))}
-                          </TableCell>
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader className="sticky top-0 z-30 bg-background">
+                        <TableRow>
+                          <TableHead>PO Number</TableHead>
+                          <TableHead>Item Name</TableHead>
+                          <TableHead className="text-right">Quantity</TableHead>
+                          <TableHead className="text-right">Rate</TableHead>
+                          <TableHead className="text-right">Line Total</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                      </TableHeader>
+                      <TableBody>
+                        {[...container.items]
+                          .sort((a, b) => compareItemNamesAZ(a.itemName, b.itemName))
+                          .map((item: POImportItem, itemIdx: number) => (
+                            <TableRow key={itemIdx}>
+                              <TableCell>{item.poNumber}</TableCell>
+                              <TableCell>{item.itemName}</TableCell>
+                              <TableCell className="text-right">{formatCurrency(Number(item.quantity))}</TableCell>
+                              <TableCell className="text-right">
+                                {priceSymbol}
+                                {formatCurrency(Number(item.rate))}
+                              </TableCell>
+                              <TableCell className="text-right font-medium">
+                                {priceSymbol}
+                                {formatCurrency(Number(item.lineTotal))}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                      </TableBody>
+                    </Table>
+                  </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4 bg-muted rounded-md">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Items Total</p>
-                    <p className="text-lg font-semibold">
-                      {priceSymbol}
-                      {formatCurrency(Number(container.itemsTotal))}
-                    </p>
-                  </div>
-                  {Number(container.charges.freight) > 0 && (
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4 bg-muted rounded-md">
                     <div>
-                      <p className="text-sm text-muted-foreground">Freight</p>
+                      <p className="text-sm text-muted-foreground">Items Total</p>
                       <p className="text-lg font-semibold">
                         {priceSymbol}
-                        {formatCurrency(Number(container.charges.freight))}
+                        {formatCurrency(Number(container.itemsTotal))}
                       </p>
                     </div>
-                  )}
-                  {Number(container.charges.surcharge) > 0 && (
-                    <div>
-                      <p className="text-sm text-muted-foreground">Surcharge</p>
-                      <p className="text-lg font-semibold">
+                    {Number(container.charges.freight) > 0 && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Freight</p>
+                        <p className="text-lg font-semibold">
+                          {priceSymbol}
+                          {formatCurrency(Number(container.charges.freight))}
+                        </p>
+                      </div>
+                    )}
+                    {Number(container.charges.surcharge) > 0 && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Surcharge</p>
+                        <p className="text-lg font-semibold">
+                          {priceSymbol}
+                          {formatCurrency(Number(container.charges.surcharge))}
+                        </p>
+                      </div>
+                    )}
+                    {Number(container.charges.fumigation) > 0 && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Fumigation</p>
+                        <p className="text-lg font-semibold">
+                          {priceSymbol}
+                          {formatCurrency(Number(container.charges.fumigation))}
+                        </p>
+                      </div>
+                    )}
+                    {Number(container.charges.discount) > 0 && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Discount</p>
+                        <p className="text-lg font-semibold text-red-500">
+                          -{priceSymbol}
+                          {formatCurrency(Number(container.charges.discount))}
+                        </p>
+                      </div>
+                    )}
+                    {Number(container.charges.documentCharges) > 0 && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Document Charges</p>
+                        <p className="text-lg font-semibold">
+                          {priceSymbol}
+                          {formatCurrency(Number(container.charges.documentCharges))}
+                        </p>
+                      </div>
+                    )}
+                    <div className="col-span-full border-t pt-2">
+                      <p className="text-sm text-muted-foreground">Grand Total</p>
+                      <p className="text-xl font-bold">
                         {priceSymbol}
-                        {formatCurrency(Number(container.charges.surcharge))}
+                        {formatCurrency(Number(container.grandTotal))}
                       </p>
                     </div>
-                  )}
-                  {Number(container.charges.fumigation) > 0 && (
-                    <div>
-                      <p className="text-sm text-muted-foreground">Fumigation</p>
-                      <p className="text-lg font-semibold">
-                        {priceSymbol}
-                        {formatCurrency(Number(container.charges.fumigation))}
-                      </p>
-                    </div>
-                  )}
-                  {Number(container.charges.discount) > 0 && (
-                    <div>
-                      <p className="text-sm text-muted-foreground">Discount</p>
-                      <p className="text-lg font-semibold text-red-500">
-                        -{priceSymbol}
-                        {formatCurrency(Number(container.charges.discount))}
-                      </p>
-                    </div>
-                  )}
-                  {Number(container.charges.documentCharges) > 0 && (
-                    <div>
-                      <p className="text-sm text-muted-foreground">Document Charges</p>
-                      <p className="text-lg font-semibold">
-                        {priceSymbol}
-                        {formatCurrency(Number(container.charges.documentCharges))}
-                      </p>
-                    </div>
-                  )}
-                  <div className="col-span-full border-t pt-2">
-                    <p className="text-sm text-muted-foreground">Grand Total</p>
-                    <p className="text-xl font-bold">
-                      {priceSymbol}
-                      {formatCurrency(Number(container.grandTotal))}
-                    </p>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
 
             <div className="flex flex-wrap gap-2 justify-end mt-4">
               <Button variant="outline" onClick={handleCancel} data-testid="button-cancel">
