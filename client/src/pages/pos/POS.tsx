@@ -863,6 +863,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: AuthMe; edit
         handleSaveSale={handleSaveSale}
         formatDisplayAmount={fmtAmount}
         isSpCompany={isSpCompany}
+        language={language}
         showAdminReferencePrices={showAdminReferencePrices}
         formatReferenceAmount={fmtReferenceAmount}
       />
