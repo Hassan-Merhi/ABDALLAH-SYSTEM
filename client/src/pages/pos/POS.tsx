@@ -29,7 +29,7 @@ import { usePosMutations } from "./hooks/usePosMutations";
 import { usePosAutosave } from "./hooks/usePosAutosave";
 import { usePosHandlers } from "./hooks/usePosHandlers";
 
-import { POS_COLUMNS, formatDisplayAmount } from "./utils/posCalculations";
+import { POS_COLUMNS, ADMIN_POS_COLUMNS, formatDisplayAmount } from "./utils/posCalculations";
 import { ErrorState } from "@/components/ui/page-state";
 import { GoldenCoastPosReadinessAlert } from "./pos-components/GoldenCoastPosReadinessAlert";
 
@@ -331,6 +331,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: AuthMe; edit
       rateUSD: parseFloat(String(item.sellingPrice)),
       amount: parseFloat(String(item.totalSales)),
       configuredPrice: parseFloat(String(item.configuredPrice || "0")) || undefined,
+      costPrice: item.costPrice == null ? undefined : Number(item.costPrice),
     }));
     newRows.push({
       id: String(newRows.length + 1),
@@ -535,6 +536,13 @@ export default function POS({ posUser, editVoucherId }: { posUser?: AuthMe; edit
 
   const handleKeyDown = makeHandleKeyDown(searchTerm);
   const fmtAmount = (v: number) => formatDisplayAmount(activeCurrency, v);
+  // Evaluate the effective role in this company: costs are hidden for all
+  // non-admin/Developer roles, including POS users.
+  const showAdminReferencePrices = ["Admin", "Developer"].includes(
+    authUser?.currentRole ?? authUser?.role ?? ""
+  );
+  const fmtReferenceAmount = (usd: number) =>
+    fmtAmount(activeCurrency !== "USD" && exchangeRate ? usd * exchangeRate : usd);
   const goldenCoastPosBlocked = isSpCompany && goldenCoastPhase6 && goldenCoastReadiness?.canPost === false;
   const goldenCoastPosSaveDisabled = isSpCompany && (goldenCoastReadinessLoading || goldenCoastPosBlocked);
 
@@ -754,7 +762,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: AuthMe; edit
             ) : (
               <SaleGrid
                 rows={rows}
-                columns={POS_COLUMNS}
+                columns={showAdminReferencePrices ? ADMIN_POS_COLUMNS : POS_COLUMNS}
                 selectedCell={selectedCell}
                 setSelectedCell={setSelectedCell}
                 updateRow={updateRow}
@@ -839,6 +847,8 @@ export default function POS({ posUser, editVoucherId }: { posUser?: AuthMe; edit
         handleSaveSale={handleSaveSale}
         formatDisplayAmount={fmtAmount}
         isSpCompany={isSpCompany}
+        showAdminReferencePrices={showAdminReferencePrices}
+        formatReferenceAmount={fmtReferenceAmount}
       />
 
       <POSDialogs
