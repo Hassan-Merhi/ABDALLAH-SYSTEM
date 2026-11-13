@@ -139,6 +139,7 @@ export function usePosRowCalculations({
       quantity,
       amount: quantity * displayRate,
       configuredPrice: item.configuredPrice,
+      costPrice: item.costPrice,
     };
 
     if (targetRow === rows.length - 1) {
