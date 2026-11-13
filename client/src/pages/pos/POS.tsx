@@ -29,7 +29,7 @@ import { usePosMutations } from "./hooks/usePosMutations";
 import { usePosAutosave } from "./hooks/usePosAutosave";
 import { usePosHandlers } from "./hooks/usePosHandlers";
 
-import { POS_COLUMNS, ADMIN_POS_COLUMNS, formatDisplayAmount } from "./utils/posCalculations";
+import { POS_COLUMNS, ADMIN_POS_COLUMNS, canSeePosReferencePrices, formatDisplayAmount } from "./utils/posCalculations";
 import { ErrorState } from "@/components/ui/page-state";
 import { GoldenCoastPosReadinessAlert } from "./pos-components/GoldenCoastPosReadinessAlert";
 
@@ -538,9 +538,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: AuthMe; edit
   const fmtAmount = (v: number) => formatDisplayAmount(activeCurrency, v);
   // Evaluate the effective role in this company: costs are hidden for all
   // non-admin/Developer roles, including POS users.
-  const showAdminReferencePrices = ["Admin", "Developer"].includes(
-    authUser?.currentRole ?? authUser?.role ?? ""
-  );
+  const showAdminReferencePrices = canSeePosReferencePrices(authUser?.currentRole ?? authUser?.role);
   const fmtReferenceAmount = (usd: number) =>
     fmtAmount(activeCurrency !== "USD" && exchangeRate ? usd * exchangeRate : usd);
   const goldenCoastPosBlocked = isSpCompany && goldenCoastPhase6 && goldenCoastReadiness?.canPost === false;
