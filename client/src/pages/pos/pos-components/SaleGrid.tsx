@@ -111,6 +111,26 @@ export function SaleGrid({
                             </Button>
                           )}
                         </div>
+                      ) : col.key === "baleCost" || col.key === "configPrice" ? (
+                        (() => {
+                          // Admin-only read-only reference columns, from the actual
+                          // inventory cost and the configured P/L reference price.
+                          const valueUSD = col.key === "baleCost" ? row.costPrice : row.configuredPrice;
+                          const value =
+                            valueUSD == null || !Number.isFinite(valueUSD)
+                              ? null
+                              : activeCurrency !== "USD" && exchangeRate
+                                ? valueUSD * exchangeRate
+                                : valueUSD;
+                          return (
+                            <div
+                              data-testid={`pos-${col.key}-${rowIndex}`}
+                              className="flex items-center justify-end h-full px-1.5 sm:px-2 font-mono text-xs sm:text-sm text-muted-foreground"
+                            >
+                              {row.stockItemId && value != null ? formatDisplayAmount(value) : "—"}
+                            </div>
+                          );
+                        })()
                       ) : col.key === "plBale" || col.key === "totalPL" ? (
                         (() => {
                           const cfgUSD = row.configuredPrice ?? 0;
