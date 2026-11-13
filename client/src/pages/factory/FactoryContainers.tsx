@@ -1,4 +1,5 @@
 import { searchAny } from "@shared/searchNormalization";
+import { compareContainerNumbersAZ } from "@shared/containerNumberSort";
 import { useState, useRef, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Plus, Download, FileSpreadsheet, AlertCircle, CheckCircle2, Trash2, ArrowLeft } from "lucide-react";
@@ -227,15 +228,8 @@ export default function FactoryContainers() {
     return true;
   });
 
-  // Keep supplier grouping, but list each supplier's offloaded containers by number.
-  if (statusFilter === "OFFLOADED") {
-    filteredContainers?.sort((a, b) =>
-      (a.containerNumber ?? "").localeCompare(b.containerNumber ?? "", undefined, {
-        numeric: true,
-        sensitivity: "base",
-      })
-    );
-  }
+  // A–Z display ordering applies to OTW, offloaded and all container views.
+  filteredContainers?.sort((a, b) => compareContainerNumbersAZ(a.containerNumber, b.containerNumber));
 
   const openEdit = (c: ContainerWithSupplier) => {
     setEditingContainer(c);
