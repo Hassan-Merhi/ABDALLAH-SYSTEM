@@ -17,7 +17,8 @@ import type {
   PosMutationPending,
   SaleRow,
 } from "./posTypes";
-import { getFilteredInventory } from "../utils/posCalculations";
+import { getFilteredInventory, POS_REFERENCE_PRICE_LABELS } from "../utils/posCalculations";
+import { useApplicationLanguage } from "@/contexts/ApplicationLanguageContext";
 import type { PosItemSelectionOverrides } from "../hooks/usePosRowCalculations";
 import { PosMobileItemSheet, type PosItemRateInfo } from "./PosMobileItemSheet";
 import { useState } from "react";
@@ -113,6 +114,8 @@ export function PosMobileLayout({
   showAdminReferencePrices = false,
   formatReferenceAmount,
 }: PosMobileLayoutProps) {
+  const { language } = useApplicationLanguage();
+  const referenceLabels = POS_REFERENCE_PRICE_LABELS[language];
   const filteredInventory = getFilteredInventory(inventory, searchTerm).slice(0, 60);
   const validRows = rows.filter((row) => row.stockItemId && row.quantity > 0);
   // A line stays on screen while its quantity is being retyped. Filtering the
@@ -517,8 +520,8 @@ export function PosMobileLayout({
                 </div>
                 {showAdminReferencePrices && row.stockItemId && (
                   <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-muted-foreground" data-testid={`pos-mobile-admin-prices-${actualIndex}`}>
-                    <div>Bale Cost: <span className="font-mono">{row.costPrice != null && Number.isFinite(row.costPrice) ? (formatReferenceAmount?.(row.costPrice) ?? formatDisplayAmount(row.costPrice)) : "—"}</span></div>
-                    <div>Config Price: <span className="font-mono">{row.configuredPrice != null && Number.isFinite(row.configuredPrice) ? (formatReferenceAmount?.(row.configuredPrice) ?? formatDisplayAmount(row.configuredPrice)) : "—"}</span></div>
+                    <div>{referenceLabels.baleCost}: <span className="font-mono">{row.costPrice != null && Number.isFinite(row.costPrice) ? (formatReferenceAmount?.(row.costPrice) ?? formatDisplayAmount(row.costPrice)) : "—"}</span></div>
+                    <div>{referenceLabels.configPrice}: <span className="font-mono">{row.configuredPrice != null && Number.isFinite(row.configuredPrice) ? (formatReferenceAmount?.(row.configuredPrice) ?? formatDisplayAmount(row.configuredPrice)) : "—"}</span></div>
                   </div>
                 )}
               </Card>
