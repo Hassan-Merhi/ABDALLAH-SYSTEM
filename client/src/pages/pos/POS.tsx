@@ -1,4 +1,5 @@
 import { getErrorDetails } from "@shared/errorUtils";
+import { populatePosTransactionHeader } from "./utils/posTransactionHeader";
 import { useEffect, useMemo, useRef } from "react";
 import { useLocation as useLocationContext } from "@/contexts/LocationContext";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -544,14 +545,9 @@ export default function POS({ posUser, editVoucherId }: { posUser?: AuthMe; edit
 
   const handleKeyDown = makeHandleKeyDown(searchTerm);
   const fmtAmount = (v: number) => formatDisplayAmount(activeCurrency, v);
-  // Evaluate the effective role in this company: costs are hidden for all
-  // non-admin/Developer roles, including POS users.
   const showAdminReferencePrices = canSeePosReferencePrices(authUser?.currentRole ?? authUser?.role);
   const fmtReferenceAmount = (usd: number) =>
     fmtAmount(activeCurrency !== "USD" && exchangeRate ? usd * exchangeRate : usd);
-  // Restored drafts and old vouchers might not contain a cached cost. Use the
-  // current location's authorized inventory cost for display only, leaving the
-  // actual sale rows and historical P/L reference unchanged.
   const posDisplayRows = useMemo(() => {
     if (!showAdminReferencePrices) return rows;
     const costByItem = new Map(inventory.map((item) => [item.stockItemId, item.costPrice]));
@@ -574,26 +570,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: AuthMe; edit
       const wb = new ExcelJS.Workbook();
       const ws = wb.addWorksheet("Transaction");
 
-      // ── Header row ──────────────────────────────────────────────────────────
-      const headerRow = ws.addRow(["#", "Item", "Code", "Qty", "Rate", "Amt", "P/L", "T.P/L"]);
-      headerRow.font = { bold: true };
-      headerRow.eachCell((cell) => {
-        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE2E8F0" } };
-        cell.border = {
-          bottom: { style: "thin", color: { argb: "FF94A3B8" } },
-        };
-        cell.alignment = { horizontal: "center" };
-      });
-
-      // ── Column widths ────────────────────────────────────────────────────────
-      ws.getColumn(1).width = 5; // #
-      ws.getColumn(2).width = 30; // Item
-      ws.getColumn(3).width = 14; // Code
-      ws.getColumn(4).width = 8; // Qty
-      ws.getColumn(5).width = 10; // Rate
-      ws.getColumn(6).width = 12; // Amt
-      ws.getColumn(7).width = 10; // P/L
-      ws.getColumn(8).width = 12; // T.P/L
+      populatePosTransactionHeader(ws);
 
       // ── Data rows ────────────────────────────────────────────────────────────
       validRows.forEach((row, i) => {
