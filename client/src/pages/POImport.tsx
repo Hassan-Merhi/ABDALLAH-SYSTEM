@@ -689,7 +689,7 @@ function ErpPOImport() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {[...container.items].sort((a, b) => compareItemNamesAZ(a.itemName || a.barcode, b.itemName || b.barcode)).map((item: POImportItem, itemIdx: number) => (
+                      {[...container.items].sort((a, b) => compareItemNamesAZ(a.itemName, b.itemName)).map((item: POImportItem, itemIdx: number) => (
                         <TableRow key={itemIdx}>
                           <TableCell>{item.poNumber}</TableCell>
                           <TableCell>{item.itemName}</TableCell>
