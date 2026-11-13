@@ -346,6 +346,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: AuthMe; edit
       rateUSD: 0,
       amount: 0,
       configuredPrice: undefined,
+      costPrice: undefined,
     });
     setRows(newRows);
     editRowsInitRef.current = true;
