@@ -18,7 +18,7 @@ import type {
   SaleRow,
 } from "./posTypes";
 import { getFilteredInventory, POS_REFERENCE_PRICE_LABELS } from "../utils/posCalculations";
-import { useApplicationLanguage } from "@/contexts/ApplicationLanguageContext";
+import type { ApplicationLanguage } from "@shared/applicationLanguageContract";
 import type { PosItemSelectionOverrides } from "../hooks/usePosRowCalculations";
 import { PosMobileItemSheet, type PosItemRateInfo } from "./PosMobileItemSheet";
 import { useState } from "react";
@@ -66,6 +66,7 @@ interface PosMobileLayoutProps {
   handleSaveSale: () => void;
   formatDisplayAmount: (v: number) => string;
   isSpCompany?: boolean;
+  language?: ApplicationLanguage;
   showAdminReferencePrices?: boolean;
   formatReferenceAmount?: (valueUSD: number) => string;
 }
@@ -111,10 +112,10 @@ export function PosMobileLayout({
   handleSaveSale,
   formatDisplayAmount,
   isSpCompany,
+  language = "en",
   showAdminReferencePrices = false,
   formatReferenceAmount,
 }: PosMobileLayoutProps) {
-  const { language } = useApplicationLanguage();
   const referenceLabels = POS_REFERENCE_PRICE_LABELS[language];
   const filteredInventory = getFilteredInventory(inventory, searchTerm).slice(0, 60);
   const validRows = rows.filter((row) => row.stockItemId && row.quantity > 0);
