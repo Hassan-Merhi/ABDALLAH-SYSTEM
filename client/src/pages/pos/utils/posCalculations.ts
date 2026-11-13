@@ -3,7 +3,7 @@ import { formatMoneyDisplay } from "@/lib/moneyDisplay";
 import { normalizeSearchText } from "@shared/searchNormalization";
 
 export interface POSColumn {
-  key: "itemName" | "quantity" | "rate" | "amount" | "plBale" | "totalPL" | "delete";
+  key: "itemName" | "quantity" | "rate" | "amount" | "baleCost" | "configPrice" | "plBale" | "totalPL" | "delete";
   label: string;
   width: string;
 }
@@ -16,6 +16,14 @@ export const POS_COLUMNS: POSColumn[] = [
   { key: "plBale", label: "P/L", width: "w-20" },
   { key: "totalPL", label: "T.P/L", width: "w-20" },
   { key: "delete", label: "", width: "w-12" },
+];
+
+/** Read-only Admin/Developer reference columns; editable column indices stay unchanged. */
+export const ADMIN_POS_COLUMNS: POSColumn[] = [
+  ...POS_COLUMNS.slice(0, 4),
+  { key: "baleCost", label: "Bale Cost", width: "w-24" },
+  { key: "configPrice", label: "Config Price", width: "w-24" },
+  ...POS_COLUMNS.slice(4),
 ];
 
 export function formatDisplayAmount(activeCurrency: string, v: number): string {
