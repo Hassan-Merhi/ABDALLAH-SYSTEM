@@ -2,6 +2,7 @@ import { getErrorDetails } from "@shared/errorUtils";
 import { useEffect, useMemo, useRef } from "react";
 import { useLocation as useLocationContext } from "@/contexts/LocationContext";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useApplicationLanguage } from "@/contexts/ApplicationLanguageContext";
 import { useLocation } from "wouter";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/PageHeader";
@@ -29,13 +30,14 @@ import { usePosMutations } from "./hooks/usePosMutations";
 import { usePosAutosave } from "./hooks/usePosAutosave";
 import { usePosHandlers } from "./hooks/usePosHandlers";
 
-import { POS_COLUMNS, ADMIN_POS_COLUMNS, canSeePosReferencePrices, formatDisplayAmount } from "./utils/posCalculations";
+import { POS_COLUMNS, adminPosColumnsForLanguage, canSeePosReferencePrices, formatDisplayAmount } from "./utils/posCalculations";
 import { ErrorState } from "@/components/ui/page-state";
 import { GoldenCoastPosReadinessAlert } from "./pos-components/GoldenCoastPosReadinessAlert";
 
 export default function POS({ posUser, editVoucherId }: { posUser?: AuthMe; editVoucherId?: string } = {}) {
   const { selectedLocation, setSelectedLocation } = useLocationContext();
   const { selectedCompany } = useCompany();
+  const { language } = useApplicationLanguage();
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { selectedCurrency, exchangeRate: dailyExchangeRate, displayCurrency } = useCurrencyContext();
@@ -760,7 +762,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: AuthMe; edit
             ) : (
               <SaleGrid
                 rows={rows}
-                columns={showAdminReferencePrices ? ADMIN_POS_COLUMNS : POS_COLUMNS}
+                columns={showAdminReferencePrices ? adminPosColumnsForLanguage(language) : POS_COLUMNS}
                 selectedCell={selectedCell}
                 setSelectedCell={setSelectedCell}
                 updateRow={updateRow}
