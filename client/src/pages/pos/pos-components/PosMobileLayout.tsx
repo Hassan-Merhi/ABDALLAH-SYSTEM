@@ -65,6 +65,8 @@ interface PosMobileLayoutProps {
   handleSaveSale: () => void;
   formatDisplayAmount: (v: number) => string;
   isSpCompany?: boolean;
+  showAdminReferencePrices?: boolean;
+  formatReferenceAmount?: (valueUSD: number) => string;
 }
 
 export function PosMobileLayout({
@@ -108,6 +110,8 @@ export function PosMobileLayout({
   handleSaveSale,
   formatDisplayAmount,
   isSpCompany,
+  showAdminReferencePrices = false,
+  formatReferenceAmount,
 }: PosMobileLayoutProps) {
   const filteredInventory = getFilteredInventory(inventory, searchTerm).slice(0, 60);
   const validRows = rows.filter((row) => row.stockItemId && row.quantity > 0);
@@ -511,6 +515,12 @@ export function PosMobileLayout({
                     </div>
                   </div>
                 </div>
+                {showAdminReferencePrices && row.stockItemId && (
+                  <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-muted-foreground" data-testid={`pos-mobile-admin-prices-${actualIndex}`}>
+                    <div>Bale Cost: <span className="font-mono">{row.costPrice != null && Number.isFinite(row.costPrice) ? (formatReferenceAmount?.(row.costPrice) ?? formatDisplayAmount(row.costPrice)) : "—"}</span></div>
+                    <div>Config Price: <span className="font-mono">{row.configuredPrice != null && Number.isFinite(row.configuredPrice) ? (formatReferenceAmount?.(row.configuredPrice) ?? formatDisplayAmount(row.configuredPrice)) : "—"}</span></div>
+                  </div>
+                )}
               </Card>
             );
           })
