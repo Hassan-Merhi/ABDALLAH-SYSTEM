@@ -59,7 +59,7 @@ export function usePosInvoiceActions({
       "Item Name": item.stockItemName || "",
       UOM: item.stockItemUom || "",
       "Stock Qty": parseFloat(item.quantity),
-      "Avg Rate (USD)": parseFloat(item.averageRate),
+      "Avg Rate (USD)": item.averageRate == null ? "" : parseFloat(item.averageRate),
       "Total Value (USD)": parseFloat(item.totalValue),
       Group: item.stockGroupName || "",
     }));
