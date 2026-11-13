@@ -144,6 +144,7 @@ export type PosEditSalesItem = {
   quantity?: string | number;
   sellingPrice?: string | number;
   totalSales?: string | number;
+  costPrice?: string | number | null;
   configuredPrice?: string | number | null;
 };
 
