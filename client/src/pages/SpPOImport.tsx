@@ -1,3 +1,4 @@
+import { compareItemNamesAZ } from "@/lib/itemNameSort";
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -525,7 +526,7 @@ export default function SpPOImport() {
                   <TableHead className="text-right">{copy.rate}</TableHead>
                   <TableHead className="text-right">{copy.lineTotal}</TableHead>
                 </TableRow></TableHeader>
-                <TableBody>{selected.lines.map((line, index) => (
+                <TableBody>{[...selected.lines].sort((a, b) => compareItemNamesAZ(a.description, b.description)).map((line, index) => (
                   <TableRow key={index} className={isDiscountOrNegativeLine(line) ? "text-red-500" : undefined}>
                     <TableCell>{line.poNumber}</TableCell>
                     <TableCell>{line.description}</TableCell>
