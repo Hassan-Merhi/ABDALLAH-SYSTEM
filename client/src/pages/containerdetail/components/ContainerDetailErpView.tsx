@@ -1,3 +1,4 @@
+import { compareItemNamesAZ } from "@/lib/itemNameSort";
 import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -48,6 +49,11 @@ export function ContainerDetailErpView({ model }: { model: Model }) {
   if (!containerData) return null;
 
   const { container, pos, charges } = containerData;
+  // Sort display copies only. Preserve PO/line IDs and accounting insertion order.
+  const alphabetizedPos = [...pos].sort((a, b) => a.poNumber.localeCompare(b.poNumber, undefined, { numeric: true, sensitivity: "base" })).map((po) => ({
+    ...po,
+    items: [...po.items].sort((a, b) => compareItemNamesAZ(a.itemName, b.itemName)),
+  }));
   const supplier = suppliers.find((s) => s.id === container.supplierId);
 
   // Compute totals live from the actual PO and charges data so they are
@@ -310,7 +316,7 @@ export function ContainerDetailErpView({ model }: { model: Model }) {
         </div>
       ) : (
         <div className="space-y-4">
-          {pos.map((po) => (
+          {alphabetizedPos.map((po) => (
             <div key={po.id} className="rounded-lg border bg-card overflow-hidden">
               {/* PO header bar */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-4 py-3 bg-muted/40 border-b">
