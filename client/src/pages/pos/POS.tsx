@@ -1,7 +1,9 @@
 import { getErrorDetails } from "@shared/errorUtils";
+import { populatePosTransactionHeader } from "./utils/posTransactionHeader";
 import { useEffect, useMemo, useRef } from "react";
 import { useLocation as useLocationContext } from "@/contexts/LocationContext";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useApplicationLanguage } from "@/contexts/ApplicationLanguageContext";
 import { useLocation } from "wouter";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/PageHeader";
@@ -29,13 +31,19 @@ import { usePosMutations } from "./hooks/usePosMutations";
 import { usePosAutosave } from "./hooks/usePosAutosave";
 import { usePosHandlers } from "./hooks/usePosHandlers";
 
-import { POS_COLUMNS, formatDisplayAmount } from "./utils/posCalculations";
+import {
+  POS_COLUMNS,
+  adminPosColumnsForLanguage,
+  canSeePosReferencePrices,
+  formatDisplayAmount,
+} from "./utils/posCalculations";
 import { ErrorState } from "@/components/ui/page-state";
 import { GoldenCoastPosReadinessAlert } from "./pos-components/GoldenCoastPosReadinessAlert";
 
 export default function POS({ posUser, editVoucherId }: { posUser?: AuthMe; editVoucherId?: string } = {}) {
   const { selectedLocation, setSelectedLocation } = useLocationContext();
   const { selectedCompany } = useCompany();
+  const { language } = useApplicationLanguage();
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { selectedCurrency, exchangeRate: dailyExchangeRate, displayCurrency } = useCurrencyContext();
@@ -331,6 +339,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: AuthMe; edit
       rateUSD: parseFloat(String(item.sellingPrice)),
       amount: parseFloat(String(item.totalSales)),
       configuredPrice: parseFloat(String(item.configuredPrice || "0")) || undefined,
+      costPrice: item.costPrice == null ? undefined : Number(item.costPrice),
     }));
     newRows.push({
       id: String(newRows.length + 1),
@@ -343,6 +352,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: AuthMe; edit
       rateUSD: 0,
       amount: 0,
       configuredPrice: undefined,
+      costPrice: undefined,
     });
     setRows(newRows);
     editRowsInitRef.current = true;
@@ -535,6 +545,16 @@ export default function POS({ posUser, editVoucherId }: { posUser?: AuthMe; edit
 
   const handleKeyDown = makeHandleKeyDown(searchTerm);
   const fmtAmount = (v: number) => formatDisplayAmount(activeCurrency, v);
+  const showAdminReferencePrices = canSeePosReferencePrices(authUser?.currentRole ?? authUser?.role);
+  const fmtReferenceAmount = (usd: number) =>
+    fmtAmount(activeCurrency !== "USD" && exchangeRate ? usd * exchangeRate : usd);
+  const posDisplayRows = useMemo(() => {
+    if (!showAdminReferencePrices) return rows;
+    const costByItem = new Map(inventory.map((item) => [item.stockItemId, item.costPrice]));
+    return rows.map((row) =>
+      row.stockItemId && row.costPrice == null ? { ...row, costPrice: costByItem.get(row.stockItemId) } : row
+    );
+  }, [rows, inventory, showAdminReferencePrices]);
   const goldenCoastPosBlocked = isSpCompany && goldenCoastPhase6 && goldenCoastReadiness?.canPost === false;
   const goldenCoastPosSaveDisabled = isSpCompany && (goldenCoastReadinessLoading || goldenCoastPosBlocked);
 
@@ -550,26 +570,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: AuthMe; edit
       const wb = new ExcelJS.Workbook();
       const ws = wb.addWorksheet("Transaction");
 
-      // ── Header row ──────────────────────────────────────────────────────────
-      const headerRow = ws.addRow(["#", "Item", "Code", "Qty", "Rate", "Amt", "P/L", "T.P/L"]);
-      headerRow.font = { bold: true };
-      headerRow.eachCell((cell) => {
-        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE2E8F0" } };
-        cell.border = {
-          bottom: { style: "thin", color: { argb: "FF94A3B8" } },
-        };
-        cell.alignment = { horizontal: "center" };
-      });
-
-      // ── Column widths ────────────────────────────────────────────────────────
-      ws.getColumn(1).width = 5; // #
-      ws.getColumn(2).width = 30; // Item
-      ws.getColumn(3).width = 14; // Code
-      ws.getColumn(4).width = 8; // Qty
-      ws.getColumn(5).width = 10; // Rate
-      ws.getColumn(6).width = 12; // Amt
-      ws.getColumn(7).width = 10; // P/L
-      ws.getColumn(8).width = 12; // T.P/L
+      populatePosTransactionHeader(ws);
 
       // ── Data rows ────────────────────────────────────────────────────────────
       validRows.forEach((row, i) => {
@@ -753,8 +754,8 @@ export default function POS({ posUser, editVoucherId }: { posUser?: AuthMe; edit
               </div>
             ) : (
               <SaleGrid
-                rows={rows}
-                columns={POS_COLUMNS}
+                rows={posDisplayRows}
+                columns={showAdminReferencePrices ? adminPosColumnsForLanguage(language) : POS_COLUMNS}
                 selectedCell={selectedCell}
                 setSelectedCell={setSelectedCell}
                 updateRow={updateRow}
@@ -828,7 +829,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: AuthMe; edit
         selectItem={selectItem}
         ensureItemSellable={ensureItemSellable}
         resolveItemRate={resolveItemRate}
-        rows={rows}
+        rows={posDisplayRows}
         setRows={setRows}
         updateRow={updateRow}
         notes={notes}
@@ -839,6 +840,9 @@ export default function POS({ posUser, editVoucherId }: { posUser?: AuthMe; edit
         handleSaveSale={handleSaveSale}
         formatDisplayAmount={fmtAmount}
         isSpCompany={isSpCompany}
+        language={language}
+        showAdminReferencePrices={showAdminReferencePrices}
+        formatReferenceAmount={fmtReferenceAmount}
       />
 
       <POSDialogs

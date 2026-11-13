@@ -1,4 +1,5 @@
 import { searchAny } from "@shared/searchNormalization";
+import { compareContainerNumbersAZ } from "@shared/containerNumberSort";
 import type { ClientErrorLike } from "@/lib/clientError";
 import { useState } from "react";
 import { Link } from "wouter";
@@ -202,15 +203,8 @@ export function ContainerSpView({
       (!supplierFilter || c.supplierName === supplierFilter)
   );
 
-  // Sort the Offloaded tab by displayed container number, not by import date.
-  if (statusFilter === "OFFLOADED") {
-    filtered.sort((a, b) =>
-      a.displayName.localeCompare(b.displayName, undefined, {
-        numeric: true,
-        sensitivity: "base",
-      })
-    );
-  }
+  // Supplier Partner and PO-imported containers display A–Z in every tab.
+  filtered.sort((a, b) => compareContainerNumbersAZ(a.displayName, b.displayName));
 
   const exportContainers = async (full: boolean) => {
     try {

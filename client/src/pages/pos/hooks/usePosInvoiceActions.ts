@@ -38,7 +38,11 @@ export function usePosInvoiceActions({
     const pdfUrl = `/api/pos/invoice/${encodeURIComponent(String(voucherId))}/pdf`;
     const printWindow = window.open(pdfUrl, "_blank", "noopener,noreferrer");
     if (!printWindow) {
-      toast({ title: "Pop-up blocked", description: "Allow pop-ups to open the invoice PDF and print it.", variant: "destructive" });
+      toast({
+        title: "Pop-up blocked",
+        description: "Allow pop-ups to open the invoice PDF and print it.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -59,7 +63,7 @@ export function usePosInvoiceActions({
       "Item Name": item.stockItemName || "",
       UOM: item.stockItemUom || "",
       "Stock Qty": parseFloat(item.quantity),
-      "Avg Rate (USD)": parseFloat(item.averageRate),
+      "Avg Rate (USD)": item.averageRate == null ? "" : parseFloat(item.averageRate),
       "Total Value (USD)": parseFloat(item.totalValue),
       Group: item.stockGroupName || "",
     }));

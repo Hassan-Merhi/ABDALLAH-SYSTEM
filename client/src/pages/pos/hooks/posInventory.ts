@@ -24,6 +24,7 @@ export interface PosInventoryItem {
   stock: number;
   price: number;
   configuredPrice: number;
+  costPrice?: number;
   stockItemId: number;
 }
 
@@ -74,8 +75,14 @@ export function buildPosInventory(
     code: (item.stockItemCode || "").trim(),
     name: (item.stockItemName || "Unknown Item").trim(),
     stock: parseFloat(item.quantity) || 0,
-    price: parseFloat(item.lastSellingPrice || item.averageRate) || 0,
+    price: parseFloat(item.lastSellingPrice || item.averageRate || "0") || 0,
     configuredPrice: parseFloat(item.lastSellingPrice || "0") || 0,
+    costPrice:
+      item.averageRate == null
+        ? undefined
+        : Number.isFinite(Number(item.averageRate))
+          ? Number(item.averageRate)
+          : undefined,
     stockItemId: item.stockItemId,
   }));
 
@@ -96,13 +103,17 @@ export function buildPosInventory(
     const idKey = `id:${item.stockItemId}`;
     const codeKey = `code:${normalizeCode(item.code)}`;
     const movement = scopedByKey.get(idKey) || scopedByKey.get(codeKey) || allByKey.get(idKey) || allByKey.get(codeKey);
-    const finalCost =
-      movement && movement.stock > 0 ? movement.totalFinalCost / movement.stock : parseFloat(String(item.price)) || 0;
+    const hasMovementCost = Boolean(movement && movement.stock > 0);
+    const finalCost = hasMovementCost
+      ? movement!.totalFinalCost / movement!.stock
+      : parseFloat(String(item.price)) || 0;
 
     return {
       ...item,
       price: finalCost,
       configuredPrice: finalCost,
+      // A fallback selling price must never be represented as a verified bale cost.
+      costPrice: hasMovementCost ? finalCost : item.costPrice,
     };
   });
 
@@ -115,6 +126,7 @@ export function buildPosInventory(
       stock: movement.stock,
       price: finalCost,
       configuredPrice: finalCost,
+      costPrice: finalCost,
       stockItemId: movement.stockItemId,
     });
   }

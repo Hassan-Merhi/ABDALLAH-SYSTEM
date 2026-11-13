@@ -1,4 +1,5 @@
 import { searchAny } from "@shared/searchNormalization";
+import { compareContainerNumbersAZ } from "@shared/containerNumberSort";
 import { useState } from "react";
 import { useDebounce } from "@/hooks/use-debounce";
 import type { Container } from "@shared/schema";
@@ -29,7 +30,9 @@ export function useContainerFilters(allContainers: Container[], soldContainers: 
     setSearchTerm("");
   };
 
-  const otwContainers = allContainers.filter((c) => c.status === "OTW");
+  const otwContainers = allContainers
+    .filter((c) => c.status === "OTW")
+    .sort((a, b) => compareContainerNumbersAZ(a.containerNumber, b.containerNumber));
 
   // Extract unique values for OTW filters
   const uniqueOtwLocations = Array.from(
@@ -92,33 +95,24 @@ export function useContainerFilters(allContainers: Container[], soldContainers: 
     return true;
   });
 
-  const filteredSoldContainers = soldContainers.filter((sale) => {
-    if (!debouncedSoldSearch) return true;
-    return searchAny(debouncedSoldSearch, sale.containerNumber, sale.customerName);
-  });
+  const filteredSoldContainers = soldContainers
+    .filter((sale) => !debouncedSoldSearch || searchAny(debouncedSoldSearch, sale.containerNumber, sale.customerName))
+    .sort((a, b) => compareContainerNumbersAZ(a.containerNumber, b.containerNumber));
 
-  const containers = allContainers.filter((c) => {
-    if (debouncedSearch && !searchAny(debouncedSearch, c.containerNumber)) {
-      return false;
-    }
-    if (statusFilter !== "ALL" && c.status !== statusFilter) {
-      return false;
-    }
-    if (supplierFilter.length > 0 && !supplierFilter.includes(c.supplierId.toString())) {
-      return false;
-    }
-    return true;
-  });
-
-  // The Offloaded screen lists container numbers A–Z (with natural number ordering).
-  if (statusFilter === "OFFLOADED") {
-    containers.sort((a, b) =>
-      (a.containerNumber ?? "").localeCompare(b.containerNumber ?? "", undefined, {
-        numeric: true,
-        sensitivity: "base",
-      })
-    );
-  }
+  const containers = allContainers
+    .filter((c) => {
+      if (debouncedSearch && !searchAny(debouncedSearch, c.containerNumber)) {
+        return false;
+      }
+      if (statusFilter !== "ALL" && c.status !== statusFilter) {
+        return false;
+      }
+      if (supplierFilter.length > 0 && !supplierFilter.includes(c.supplierId.toString())) {
+        return false;
+      }
+      return true;
+    })
+    .sort((a, b) => compareContainerNumbersAZ(a.containerNumber, b.containerNumber));
 
   return {
     // Search terms

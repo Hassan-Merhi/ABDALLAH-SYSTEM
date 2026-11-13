@@ -37,6 +37,7 @@ describe("Supplier Partner POS stock visibility", () => {
         stock: 8,
         price: 4.25,
         configuredPrice: 4.25,
+        costPrice: 4.25,
         stockItemId: 101,
       },
     ]);
@@ -60,7 +61,7 @@ describe("Supplier Partner POS stock visibility", () => {
       10
     );
 
-    expect(result[0]).toMatchObject({ stock: 4, price: 5, configuredPrice: 5 });
+    expect(result[0]).toMatchObject({ stock: 4, price: 5, configuredPrice: 5, costPrice: 5 });
   });
 
   it("keeps mapped movement-only stock visible when the inventory mirror is missing", () => {
@@ -73,6 +74,7 @@ describe("Supplier Partner POS stock visibility", () => {
         stock: 3,
         price: 4.25,
         configuredPrice: 4.25,
+        costPrice: 4.25,
         stockItemId: 101,
       },
     ]);

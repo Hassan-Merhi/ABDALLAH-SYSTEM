@@ -17,7 +17,8 @@ import type {
   PosMutationPending,
   SaleRow,
 } from "./posTypes";
-import { getFilteredInventory } from "../utils/posCalculations";
+import { getFilteredInventory, POS_REFERENCE_PRICE_LABELS } from "../utils/posCalculations";
+import type { ApplicationLanguage } from "@shared/applicationLanguageContract";
 import type { PosItemSelectionOverrides } from "../hooks/usePosRowCalculations";
 import { PosMobileItemSheet, type PosItemRateInfo } from "./PosMobileItemSheet";
 import { useState } from "react";
@@ -65,6 +66,9 @@ interface PosMobileLayoutProps {
   handleSaveSale: () => void;
   formatDisplayAmount: (v: number) => string;
   isSpCompany?: boolean;
+  language?: ApplicationLanguage;
+  showAdminReferencePrices?: boolean;
+  formatReferenceAmount?: (valueUSD: number) => string;
 }
 
 export function PosMobileLayout({
@@ -108,7 +112,11 @@ export function PosMobileLayout({
   handleSaveSale,
   formatDisplayAmount,
   isSpCompany,
+  language = "en",
+  showAdminReferencePrices = false,
+  formatReferenceAmount,
 }: PosMobileLayoutProps) {
+  const referenceLabels = POS_REFERENCE_PRICE_LABELS[language];
   const filteredInventory = getFilteredInventory(inventory, searchTerm).slice(0, 60);
   const validRows = rows.filter((row) => row.stockItemId && row.quantity > 0);
   // A line stays on screen while its quantity is being retyped. Filtering the
@@ -164,11 +172,13 @@ export function PosMobileLayout({
               onChange={(event) => setSearchTerm(event.target.value)}
               data-testid="input-mobile-product-search"
             />
-            <MobileBarcodeScanner onScan={(code) => {
-              const match = inventory.find((item) => item.code?.trim().toUpperCase() === code.trim().toUpperCase());
-              if (match) openItemSheet(match);
-              else setSearchTerm(code);
-            }} />
+            <MobileBarcodeScanner
+              onScan={(code) => {
+                const match = inventory.find((item) => item.code?.trim().toUpperCase() === code.trim().toUpperCase());
+                if (match) openItemSheet(match);
+                else setSearchTerm(code);
+              }}
+            />
             {searchTerm && (
               <button
                 type="button"
@@ -511,6 +521,29 @@ export function PosMobileLayout({
                     </div>
                   </div>
                 </div>
+                {showAdminReferencePrices && row.stockItemId && (
+                  <div
+                    className="mt-2 grid grid-cols-2 gap-2 text-xs text-muted-foreground"
+                    data-testid={`pos-mobile-admin-prices-${actualIndex}`}
+                  >
+                    <div>
+                      {referenceLabels.baleCost}:{" "}
+                      <span className="font-mono">
+                        {row.costPrice != null && Number.isFinite(row.costPrice)
+                          ? (formatReferenceAmount?.(row.costPrice) ?? formatDisplayAmount(row.costPrice))
+                          : "—"}
+                      </span>
+                    </div>
+                    <div>
+                      {referenceLabels.configPrice}:{" "}
+                      <span className="font-mono">
+                        {row.configuredPrice != null && Number.isFinite(row.configuredPrice)
+                          ? (formatReferenceAmount?.(row.configuredPrice) ?? formatDisplayAmount(row.configuredPrice))
+                          : "—"}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </Card>
             );
           })
