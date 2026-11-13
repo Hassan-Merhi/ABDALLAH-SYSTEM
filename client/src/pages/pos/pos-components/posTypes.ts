@@ -11,6 +11,7 @@ export interface SaleRow {
   stockItemId?: number;
   salesItemId?: number; // Original sales item ID for edit mode
   configuredPrice?: number; // Configured selling price for P/L calculation (USD)
+  costPrice?: number; // Actual inventory unit/bale cost in USD (admin-only display)
 }
 
 export interface InventoryItem {
@@ -19,6 +20,7 @@ export interface InventoryItem {
   stock: number;
   price: number;
   configuredPrice: number; // Configured selling price (for P/L)
+  costPrice?: number; // Current inventory unit/bale cost (USD)
   stockItemId: number;
 }
 
@@ -27,7 +29,7 @@ export interface APIInventoryItem {
   locationId: number;
   stockItemId: number;
   quantity: string;
-  averageRate: string;
+  averageRate: string | null;
   totalValue: string;
   lastSellingPrice?: string;
   stockItemCode: string;
