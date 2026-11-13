@@ -543,6 +543,18 @@ export default function POS({ posUser, editVoucherId }: { posUser?: AuthMe; edit
   const showAdminReferencePrices = canSeePosReferencePrices(authUser?.currentRole ?? authUser?.role);
   const fmtReferenceAmount = (usd: number) =>
     fmtAmount(activeCurrency !== "USD" && exchangeRate ? usd * exchangeRate : usd);
+  // Restored drafts and old vouchers might not contain a cached cost. Use the
+  // current location's authorized inventory cost for display only, leaving the
+  // actual sale rows and historical P/L reference unchanged.
+  const posDisplayRows = useMemo(() => {
+    if (!showAdminReferencePrices) return rows;
+    const costByItem = new Map(inventory.map((item) => [item.stockItemId, item.costPrice]));
+    return rows.map((row) =>
+      row.stockItemId && row.costPrice == null
+        ? { ...row, costPrice: costByItem.get(row.stockItemId) }
+        : row
+    );
+  }, [rows, inventory, showAdminReferencePrices]);
   const goldenCoastPosBlocked = isSpCompany && goldenCoastPhase6 && goldenCoastReadiness?.canPost === false;
   const goldenCoastPosSaveDisabled = isSpCompany && (goldenCoastReadinessLoading || goldenCoastPosBlocked);
 
@@ -761,7 +773,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: AuthMe; edit
               </div>
             ) : (
               <SaleGrid
-                rows={rows}
+                rows={posDisplayRows}
                 columns={showAdminReferencePrices ? adminPosColumnsForLanguage(language) : POS_COLUMNS}
                 selectedCell={selectedCell}
                 setSelectedCell={setSelectedCell}
@@ -836,7 +848,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: AuthMe; edit
         selectItem={selectItem}
         ensureItemSellable={ensureItemSellable}
         resolveItemRate={resolveItemRate}
-        rows={rows}
+        rows={posDisplayRows}
         setRows={setRows}
         updateRow={updateRow}
         notes={notes}
