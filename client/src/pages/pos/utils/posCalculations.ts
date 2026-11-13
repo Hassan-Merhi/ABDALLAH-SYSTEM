@@ -26,6 +26,11 @@ export const ADMIN_POS_COLUMNS: POSColumn[] = [
   ...POS_COLUMNS.slice(4),
 ];
 
+/** Role-based visibility: never display purchase costs to cashier or other non-admin roles. */
+export function canSeePosReferencePrices(effectiveRole: string | null | undefined): boolean {
+  return effectiveRole === "Admin" || effectiveRole === "Developer";
+}
+
 export function formatDisplayAmount(activeCurrency: string, v: number): string {
   if (activeCurrency === "CFA") return `CFA ${Math.round(v).toLocaleString()}`;
   if (activeCurrency === "USD") return `$ ${v.toLocaleString()}`;
