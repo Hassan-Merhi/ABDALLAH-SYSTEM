@@ -24,6 +24,7 @@ export interface PosInventoryItem {
   stock: number;
   price: number;
   configuredPrice: number;
+  costPrice?: number;
   stockItemId: number;
 }
 
@@ -74,8 +75,9 @@ export function buildPosInventory(
     code: (item.stockItemCode || "").trim(),
     name: (item.stockItemName || "Unknown Item").trim(),
     stock: parseFloat(item.quantity) || 0,
-    price: parseFloat(item.lastSellingPrice || item.averageRate) || 0,
+    price: parseFloat(item.lastSellingPrice || item.averageRate || "0") || 0,
     configuredPrice: parseFloat(item.lastSellingPrice || "0") || 0,
+    costPrice: item.averageRate == null ? undefined : (Number.isFinite(Number(item.averageRate)) ? Number(item.averageRate) : undefined),
     stockItemId: item.stockItemId,
   }));
 
@@ -103,6 +105,7 @@ export function buildPosInventory(
       ...item,
       price: finalCost,
       configuredPrice: finalCost,
+      costPrice: finalCost,
     };
   });
 
@@ -115,6 +118,7 @@ export function buildPosInventory(
       stock: movement.stock,
       price: finalCost,
       configuredPrice: finalCost,
+      costPrice: finalCost,
       stockItemId: movement.stockItemId,
     });
   }
